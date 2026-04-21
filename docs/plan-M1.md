@@ -63,7 +63,7 @@ Wichtig:
 
 Die bestehenden Ports genuegen dem M1-Scope nicht und muessen erweitert werden:
 
-**Driven Port** (`CompileDatabasePort`): Die Methode `load_compile_database()` gibt bisher nur `CompileDatabaseStatus{bool}` zurueck. Fuer M1 muss der Rueckgabetyp die geladenen Compile-Eintraege, den Ladestatus und gegebenenfalls Diagnoseinformationen enthalten. Der Adapter muss entsprechend angepasst werden; bestehende Tests fuer den `ProjectAnalyzer` aendern sich ebenfalls.
+**Driven Port** (`CompileDatabasePort`): Die Methode `load_compile_database()` gibt bisher nur `CompileDatabaseStatus{bool}` zurueck. Fuer M1 muss der Rueckgabetyp die geladenen Compile-Eintraege, den Ladestatus und gegebenenfalls Diagnoseinformationen enthalten. Die Pfaduebergabe an den Adapter — per Konstruktor oder Methodenparameter — bleibt der Umsetzung ueberlassen. Der Adapter muss entsprechend angepasst werden; bestehende Tests fuer den `ProjectAnalyzer` aendern sich ebenfalls.
 
 **Driving Port** (`AnalyzeProjectPort`): Die Methode `analyze_project()` nimmt bisher keine Parameter entgegen. Fuer M1 muss der Pfad zur `compile_commands.json` von der CLI durch den Driving Port bis zum Service durchgereicht werden koennen. Die konkrete Loesung — Parameter an `analyze_project()`, Konfigurationsobjekt oder Setter — bleibt der Umsetzung ueberlassen, solange der Pfad nicht fest verdrahtet wird.
 
@@ -98,6 +98,9 @@ Als Mindestvalidierung fuer einen verwertbaren Eintrag gelten:
 - Quelldatei vorhanden und nicht leer
 - Arbeitsverzeichnis vorhanden und nicht leer
 - Compile-Aufruf ueber `command` oder `arguments` vorhanden und nicht leer — sind beide vorhanden, wird `arguments` bevorzugt und `command` ignoriert (entspricht CMake-Spezifikation)
+- ein vorhandenes, aber leeres `arguments`-Array (`[]`) gilt als "nicht vorhanden"; ist zusaetzlich kein `command` gesetzt, ist der Eintrag ungueltig
+
+Optionale Felder wie `output` werden fuer M1 nicht ausgewertet und bei der Validierung ignoriert.
 
 Die Rueckmeldung soll nicht nur sagen, dass die Datei ungueltig ist, sondern moeglichst auch warum, zum Beispiel:
 
@@ -118,7 +121,7 @@ Vorgesehene Artefakte:
 
 ### 1.3 CLI-Grundstruktur fuer M1 aufbauen
 
-Der CLI-Adapter soll von der Platzhalterausgabe zu einer nachvollziehbaren Befehlsstruktur wechseln. Die Benennung soll sich am Nutzerziel orientieren, nicht an internen Klassen.
+Der CLI-Adapter soll von der Platzhalterausgabe zu einer nachvollziehbaren Befehlsstruktur wechseln. Die Umsetzung nutzt CLI11, das bereits als Abhaengigkeit eingebunden ist. Die Benennung soll sich am Nutzerziel orientieren, nicht an internen Klassen.
 
 Fuer M1 reicht eine kleine, aber belastbare Struktur, zum Beispiel:
 
@@ -182,6 +185,7 @@ Vorgeschlagene M1-Exit-Codes:
 | Code | Bedeutung | Typischer Ausloeser |
 |---|---|---|
 | `0` | Erfolg | gueltige CLI-Verwendung und gueltige Eingabedaten |
+| `1` | (reserviert) | unerwartete Laufzeitfehler — wird in M1 nicht aktiv vergeben, bleibt als Auffangcode frei |
 | `2` | CLI-Verwendungsfehler | unbekanntes Unterkommando, fehlendes Pflichtargument |
 | `3` | Eingabedatei nicht lesbar | Datei fehlt, kein Zugriff, Pfad ungueltig |
 | `4` | Eingabedaten ungueltig | JSON fehlerhaft, kein Array, leer, Pflichtfelder fehlen |
@@ -237,6 +241,8 @@ Mindestens benoetigt:
 - CLI-Tests fuer `--help`
 - CLI-Tests fuer Erfolgspfad und definierte Fehlerpfade
 
+Nicht automatisiert abgedeckt in M1: Dateiberechtigungsfehler (Permission Denied). Dieser Fall faellt unter Exit-Code `3`, ist aber in Container-Umgebungen schwer reproduzierbar und wird daher nicht als Pflicht-Testfall gefuehrt.
+
 Sinnvolle Testdaten unter `tests/e2e/testdata/`. Jeder Testfall erhaelt ein eigenes Unterverzeichnis, damit die Datei den realen Namen `compile_commands.json` traegt:
 
 - `valid/compile_commands.json`
@@ -283,6 +289,8 @@ Die README soll fuer M1 mindestens enthalten:
 - erwartetes Verhalten bei leeren oder ungueltigen Eingaben
 - kurze Dokumentation der Exit-Codes
 
+Zusaetzlich ist die Versionsnummer in `application_info.h` und in der Root-`CMakeLists.txt` auf `0.2.0` zu aktualisieren.
+
 **Ergebnis**: README und Beispielaufrufe spiegeln den tatsaechlichen M1-Stand wider.
 
 ## 2. Zielartefakte
@@ -311,12 +319,13 @@ Hinweis: Die konkreten Dateinamen duerfen von dieser Zielstruktur abweichen, wen
 | 1a | 1.1 Compile-Database-Modell im Kern schaerfen | M0 |
 | 1b | 1.4 Exit-Codes und Fehlermeldungsregeln festlegen | M0 |
 | 2 | 1.2 `CompileCommandsJsonAdapter` umsetzen | 1a |
+| 2t | 1.6a Adapter-Tests fuer M1 | 2 |
 | 3 | 1.3 CLI-Grundstruktur fuer M1 aufbauen | 1a, 1b, 2 |
 | 4 | 1.5 Konfigurierbare Eingabepfade vorbereiten | 3 |
-| 5 | 1.6 Test- und Referenzdaten fuer M1 ausbauen | 2, 3, 4 |
+| 5 | 1.6b CLI- und End-to-End-Tests fuer M1 | 3, 4 |
 | 6 | 1.7 README und Nutzungsbeispiele aktualisieren | 3, 4, 5 |
 
-Schritte 1a und 1b koennen parallel bearbeitet werden. Die Exit-Code-Regeln (1b) sind eine reine Konventionsentscheidung ohne Code-Abhaengigkeit zum Kernmodell und sollten frueh feststehen, damit Adapter und CLI sie von Anfang an korrekt verwenden.
+Schritte 1a und 1b koennen parallel bearbeitet werden. Die Exit-Code-Regeln (1b) sind eine reine Konventionsentscheidung ohne Code-Abhaengigkeit zum Kernmodell und sollten frueh feststehen, damit Adapter und CLI sie von Anfang an korrekt verwenden. Adapter-Tests (2t) koennen direkt nach dem Adapter geschrieben werden, ohne auf die CLI zu warten; CLI- und End-to-End-Tests (5) setzen die fertige CLI voraus.
 
 ## 4. Pruefung
 
@@ -348,6 +357,12 @@ docker run --rm \
 docker run --rm \
   -v "$PWD/tests/e2e/testdata:/data:ro" \
   cmake-xray analyze --compile-commands /data/empty/compile_commands.json
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata:/data:ro" \
+  cmake-xray analyze --compile-commands /data/invalid_syntax/compile_commands.json
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata:/data:ro" \
+  cmake-xray analyze --compile-commands /data/missing_fields/compile_commands.json
 docker run --rm cmake-xray analyze --compile-commands /nonexistent/compile_commands.json
 ```
 
@@ -375,9 +390,10 @@ Hinweis: Falls das Runtime-Image bewusst schlank bleiben soll, werden Referenzda
 | Minimalverhalten bei Erfolg | Ausgabe der Anzahl geladener Eintraege | AP 1.3 |
 | Diagnose-zu-Exit-Code-Zuordnung | Liegt im CLI-Adapter, nicht im Hexagon | AP 1.1, 1.4 |
 | JSON-Parsing-Strategie | DOM-Parsing mit nlohmann/json, kein Groessenlimit fuer M1 | AP 1.2 |
-
-| Beide Felder vorhanden (`command` + `arguments`) | `arguments` bevorzugen, `command` ignorieren — entspricht CMake-Spezifikation, kein Warnhinweis noetig | AP 1.2 |
 | Gemischt gueltige/ungueltige Eintraege | Alle Fehler sammeln und zusammen auf `stderr` melden, Exit `4` — vermeidet Korrekturschleifen bei systematischen Problemen | AP 1.2, 1.4 |
+| Leeres `arguments`-Array | Gilt als "nicht vorhanden"; ist zusaetzlich kein `command` gesetzt, ist der Eintrag ungueltig | AP 1.2 |
+| Optionale Felder (`output`) | Werden fuer M1 nicht ausgewertet und bei der Validierung ignoriert | AP 1.2 |
+| Exit-Code `1` | Reserviert fuer unerwartete Laufzeitfehler, wird in M1 nicht aktiv vergeben | AP 1.4 |
 
 ### 6.2 Offen
 
