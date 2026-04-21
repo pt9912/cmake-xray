@@ -17,10 +17,10 @@ Dieser Plan beschreibt die konkreten Schritte fuer Milestone M0 (`v0.1.0`). Ziel
 M0 gilt als erreicht, wenn:
 
 - das Projekt auf Linux mit CMake und einem C++20-faehigen Compiler baut
-- ein leerer Testlauf durchlaeuft
-- `cmake-xray --help` oder ein gleichwertiger Aufruf ohne Fehler beendet wird
+- mindestens ein Platzhalter-Test durchlaeuft
+- ein minimaler Programmaufruf von `cmake-xray` ohne Fehler beendet wird
 - die Verzeichnisstruktur der Architektur entspricht
-- eine README mit Bauanleitung vorhanden ist
+- eine README mit Installations- und Nutzungsbeispielen fuer den M0-Stand vorhanden ist
 
 Relevante Kennungen: `RB-01`, `RB-02`, `RB-03`, `NF-07`, `NF-16`, `NF-17`, `RB-10`, `AK-07`, `AK-08`
 
@@ -80,13 +80,14 @@ Anforderungen:
 
 ### 1.3 Minimaler main.cpp
 
-`src/main.cpp` soll als Composition Root vorbereitet sein, aber in M0 nur eine minimale Ausgabe liefern:
+`src/main.cpp` soll als Composition Root vorbereitet sein, aber in M0 nur ein minimales Platzhalter-Programm liefern:
 
-- gibt bei Aufruf ohne Argumente oder mit `--help` einen Platzhalter-Hilfetext aus
+- gibt bei Aufruf ohne Argumente eine kurze Platzhalter-Ausgabe aus
 - gibt Exit-Code 0 zurueck
+- enthaelt noch keinen CLI-Parser und keine Unterkommandos
 - keine Analyse-Funktionalitaet
 
-**Ergebnis**: `./build/cmake-xray --help` beendet mit Code 0 und gibt Text aus.
+**Ergebnis**: `./build/cmake-xray` beendet mit Code 0 und gibt Text aus.
 
 ### 1.4 Externe Abhaengigkeiten entscheiden und einbinden
 
@@ -99,6 +100,7 @@ Fuer drei Bereiche muss eine Bibliothek gewaehlt und eingebunden werden (`RB-10`
 | Test-Framework | Catch2, GoogleTest, doctest | CMake-Integration, geringe Build-Zeit |
 
 Einbindung ueber `FetchContent` oder als Git-Submodul. Die Entscheidungen sollen in einer kurzen Notiz in der README oder in einem separaten Abschnitt dokumentiert werden.
+Die Bibliotheken muessen in M0 noch nicht fachlich genutzt werden; entscheidend ist, dass Auswahl, Einbindung und Build-Reproduzierbarkeit vorbereitet und dokumentiert sind.
 
 **Ergebnis**: Bibliotheken sind eingebunden, der Build laeuft mit ihnen durch, die Wahl ist dokumentiert.
 
@@ -119,7 +121,7 @@ Das Dockerfile soll:
 - auf einem etablierten Base-Image aufbauen (z.B. `ubuntu:24.04` oder `debian:bookworm`)
 - einen C++20-faehigen Compiler installieren (GCC >= 12 oder Clang >= 15)
 - CMake >= 3.20 bereitstellen
-- das Projekt bauen und die Tests ausfuehren
+- das Projekt so einbetten oder vorbereiten, dass der Container beim Start Konfiguration, Build und Testlauf ausfuehren kann
 
 Angestrebte Nutzung:
 
@@ -128,7 +130,7 @@ docker build -t cmake-xray .
 docker run --rm cmake-xray
 ```
 
-Der letzte Befehl soll Build und Testlauf durchfuehren und mit Exit-Code 0 enden.
+`docker build` erzeugt das Referenz-Image. `docker run --rm cmake-xray` fuehrt innerhalb dieser Referenzumgebung Konfiguration, Build und Testlauf aus und endet mit Exit-Code 0.
 
 **Ergebnis**: `docker build` und `docker run` laufen fehlerfrei durch.
 
@@ -138,8 +140,10 @@ Die README soll fuer M0 mindestens enthalten:
 
 - Projektbeschreibung (1-2 Saetze)
 - Voraussetzungen mit Verweis auf das Dockerfile als Referenzumgebung
+- Installations- bzw. Inbetriebnahmebeispiel fuer den Quellbuild
 - Bauanleitung (cmake + build sowie Docker-Variante)
 - Testanleitung (ctest sowie Docker-Variante)
+- mindestens ein Nutzungsbeispiel fuer den M0-Stand, z.B. der Aufruf des Platzhalter-Binaries oder des Docker-Containers
 - Hinweis auf gewaehlte externe Abhaengigkeiten und deren Einbindung
 - Verweis auf `docs/` fuer weitere Dokumentation
 
@@ -167,16 +171,16 @@ M0 ist abgeschlossen, wenn beide Pruefwege erfolgreich durchlaufen:
 
 **Lokal** (Linux-System mit C++20-Compiler und CMake >= 3.20):
 
-```
+``` 
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-./build/cmake-xray --help
+./build/cmake-xray
 cd build && ctest --output-on-failure
 ```
 
 **Docker** (reproduzierbare Referenzumgebung):
 
-```
+``` 
 docker build -t cmake-xray .
 docker run --rm cmake-xray
 ```
