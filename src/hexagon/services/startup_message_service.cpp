@@ -1,6 +1,6 @@
-#include "hexagon/services/startup_message_service.h"
+#include "services/startup_message_service.h"
 
-#include "hexagon/model/application_info.h"
+#include "model/application_info.h"
 
 namespace xray::hexagon::services {
 

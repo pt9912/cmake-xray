@@ -14,3 +14,8 @@ target_link_libraries(
 )
 
 add_test(NAME xray_tests COMMAND xray_tests)
+
+add_test(
+    NAME hexagon_boundary_check
+    COMMAND bash ${PROJECT_SOURCE_DIR}/cmake/check_hexagon_boundary.sh ${PROJECT_SOURCE_DIR}/src/hexagon
+)
