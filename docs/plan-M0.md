@@ -74,6 +74,8 @@ Anforderungen:
 - C++20 als Mindeststandard (`RB-03`)
 - `cmake_minimum_required` auf eine aktuelle, stabile CMake-Version (mindestens 3.20)
 - `xray_hexagon` darf keine externen Abhaengigkeiten haben
+- externe Bibliotheken duerfen nur in `xray_adapters`, `xray_tests` oder in der Composition Root verwendet werden, nicht in `src/hexagon/`
+- Ports und Modelle des Hexagons duerfen keine Typen externer Bibliotheken in ihren oeffentlichen Schnittstellen fuehren
 - Build muss auf Linux mit GCC und Clang funktionieren (`NF-07`)
 
 **Ergebnis**: `cmake -B build && cmake --build build` laeuft auf Linux ohne Fehler durch.
@@ -102,6 +104,16 @@ Fuer drei Bereiche muss eine Bibliothek gewaehlt und eingebunden werden (`RB-10`
 Einbindung ueber `FetchContent` oder als Git-Submodul. Die Entscheidungen sollen in einer kurzen Notiz in der README oder in einem separaten Abschnitt dokumentiert werden.
 Die Bibliotheken muessen in M0 noch nicht fachlich genutzt werden; entscheidend ist, dass Auswahl, Einbindung und Build-Reproduzierbarkeit vorbereitet und dokumentiert sind.
 
+Abhaengigkeitsgrenzen fuer M0:
+
+| Bibliothekstyp | Zulaessige Verwendung in M0 |
+|---|---|
+| JSON-Parsing | nur in Adaptern, insbesondere fuer spaetere Eingabeadapter unter `src/adapters/input/` |
+| CLI-Argument-Parsing | nur im CLI-Adapter unter `src/adapters/cli/`; `src/main.cpp` bleibt in M0 noch ohne eigentlichen CLI-Parser |
+| Test-Framework | nur in `tests/` und im Target `xray_tests` |
+
+Fuer M0 reicht es aus, die spaetere Nutzung ueber CMake-Targets und Verzeichnisgrenzen sauber vorzubereiten. Das Hexagon bleibt auch dann frei von externen Bibliotheken, wenn JSON- oder CLI-Bibliotheken bereits eingebunden, aber fachlich erst ab M1 genutzt werden.
+
 **Ergebnis**: Bibliotheken sind eingebunden, der Build laeuft mit ihnen durch, die Wahl ist dokumentiert.
 
 ### 1.5 Test-Grundgeruest
@@ -118,21 +130,33 @@ Ein `Dockerfile` definiert die Referenz-Build-Umgebung und stellt sicher, dass B
 
 Das Dockerfile soll:
 
+- als Multi-Stage-Build aufgebaut sein
 - auf einem etablierten Base-Image aufbauen (z.B. `ubuntu:24.04` oder `debian:bookworm`)
 - einen C++20-faehigen Compiler installieren (GCC >= 12 oder Clang >= 15)
 - CMake >= 3.20 bereitstellen
-- das Projekt so einbetten oder vorbereiten, dass der Container beim Start Konfiguration, Build und Testlauf ausfuehren kann
+- mindestens die Stages `build`, `test` und `runtime` enthalten
+
+Empfohlene Stage-Aufteilung:
+
+| Stage | Zweck |
+|---|---|
+| `build` | konfiguriert das Projekt und baut `cmake-xray` sowie die Tests |
+| `test` | fuehrt die in der `build`-Stage erzeugten Artefakte mit `ctest` oder einem gleichwertigen Aufruf aus und bricht bei Fehlern ab |
+| `runtime` | enthaelt nur die fuer M0 noetigen Laufzeitartefakte, insbesondere das Platzhalter-Binary und ggf. eine minimale Startanweisung |
+
+Optional kann zusaetzlich eine gemeinsame Basis-Stage wie `base` oder `toolchain` verwendet werden, um Paketinstallation und Build-Werkzeuge fuer `build` und `test` wiederzuverwenden.
 
 Angestrebte Nutzung:
 
 ```
-docker build -t cmake-xray .
+docker build --target test -t cmake-xray:test .
+docker build --target runtime -t cmake-xray .
 docker run --rm cmake-xray
 ```
 
-`docker build` erzeugt das Referenz-Image. `docker run --rm cmake-xray` fuehrt innerhalb dieser Referenzumgebung Konfiguration, Build und Testlauf aus und endet mit Exit-Code 0.
+Der Test-Build muss fehlschlagen, wenn Konfiguration, Build oder Testlauf fehlschlagen. Das Runtime-Image muss erfolgreich gebaut werden und `docker run --rm cmake-xray` soll das Platzhalter-Binary fuer M0 mit Exit-Code 0 starten.
 
-**Ergebnis**: `docker build` und `docker run` laufen fehlerfrei durch.
+**Ergebnis**: `docker build --target test`, `docker build --target runtime` und `docker run --rm cmake-xray` laufen fehlerfrei durch.
 
 ### 1.7 README
 
@@ -142,9 +166,10 @@ Die README soll fuer M0 mindestens enthalten:
 - Voraussetzungen mit Verweis auf das Dockerfile als Referenzumgebung
 - Installations- bzw. Inbetriebnahmebeispiel fuer den Quellbuild
 - Bauanleitung (cmake + build sowie Docker-Variante)
-- Testanleitung (ctest sowie Docker-Variante)
+- Testanleitung (ctest sowie Docker-Multi-Stage-Test-Target)
 - mindestens ein Nutzungsbeispiel fuer den M0-Stand, z.B. der Aufruf des Platzhalter-Binaries oder des Docker-Containers
 - Hinweis auf gewaehlte externe Abhaengigkeiten und deren Einbindung
+- kurze Erklaerung der Docker-Stages und ihres Zwecks
 - Verweis auf `docs/` fuer weitere Dokumentation
 
 Relevante Kennungen: `NF-16`, `NF-17`, `AK-08`
@@ -181,7 +206,8 @@ cd build && ctest --output-on-failure
 **Docker** (reproduzierbare Referenzumgebung):
 
 ``` 
-docker build -t cmake-xray .
+docker build --target test -t cmake-xray:test .
+docker build --target runtime -t cmake-xray .
 docker run --rm cmake-xray
 ```
 
