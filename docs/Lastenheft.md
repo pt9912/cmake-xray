@@ -1,5 +1,22 @@
 # Lastenheft - cmake-xray
 
+## 0. Dokumenteninformationen
+
+| Feld | Wert |
+|---|---|
+| Dokument | Lastenheft `cmake-xray` |
+| Version | `0.3` |
+| Stand | `2026-04-21` |
+| Status | Arbeitsstand |
+
+### 0.1 Aenderungshistorie
+
+| Version | Datum | Aenderung |
+|---|---|---|
+| `0.1` | `2026-04-21` | Erstfassung des Lastenhefts |
+| `0.2` | `2026-04-21` | Anforderungen konsolidiert, Kennungen eingefuehrt und Tabellenstruktur ergaenzt |
+| `0.3` | `2026-04-21` | Rueckverfolgbarkeit, Dokumentenstand, Messgroessen und Review-Anmerkungen ergaenzt |
+
 ## 1. Einleitung
 
 ### 1.1 Ziel des Dokuments
@@ -35,7 +52,7 @@ Das Werkzeug soll insbesondere dabei helfen:
 Fuer dieses Lastenheft gelten folgende Begriffe:
 
 - **Translation Unit**: eine in den Build-Eingaben referenzierte Quelldatei samt zugehoerigem Compile-Aufruf
-- **auffaellige Translation Unit**: eine Translation Unit, die im Analyseergebnis anhand dokumentierter Kennzahlen hoeher eingestuft wird als andere Translation Units
+- **auffaellige Translation Unit**: eine Translation Unit, die im Analyseergebnis anhand dokumentierter Kennzahlen hoeher eingestuft wird als andere Translation Units; moegliche Kennzahlen sind zum Beispiel Anzahl aufgeloester Includes, Tiefe von Include-Ketten, Groesse des Compile-Aufrufs oder Anzahl gesetzter Defines
 - **Include-Hotspot**: ein Header, der in einer fuer den Nutzer sichtbaren Anzahl von Translation Units vorkommt und deshalb im Bericht gesondert ausgewiesen wird
 - **Rebuild-Impact**: eine aus vorhandenen Build-Daten abgeleitete Abschaetzung, welche Translation Units oder Targets von einer Dateiaenderung betroffen sein koennen
 
@@ -49,6 +66,9 @@ Verwendete Praefixe:
 - `RB-xx` fuer Randbedingungen
 - `S-xx` fuer Schnittstellenanforderungen
 - `AK-xx` fuer Abnahmekriterien
+
+### 1.7 Schreibkonvention
+Dieses Dokument verwendet bewusst ASCII-Umschreibungen wie `ae`, `oe` und `ue`, damit Inhalt und Kennungen in einfachen Textumgebungen, Terminals und Build-Logs konsistent darstellbar bleiben.
 
 ---
 
@@ -217,6 +237,8 @@ Das Produkt muss als Kommandozeilenwerkzeug bedienbar sein.
 | `F-32` | Muss | `--help` fuer Hauptkommando und Unterkommandos |
 | `F-33` | Muss | aussagekraeftige Exit-Codes fuer Erfolg und Fehlerfaelle |
 | `F-34` | Muss | verstaendliche Fehlermeldungen |
+| `F-39` | Soll | Unterstuetzung mindestens eines detailreicheren Ausgabemodus fuer Diagnosezwecke, zum Beispiel `--verbose` |
+| `F-40` | Kann | Unterstuetzung eines reduzierten Ausgabemodus, zum Beispiel `--quiet` |
 
 ### 6.8 Konfiguration
 Das System soll konfigurierbar sein.
@@ -235,13 +257,16 @@ Das System soll konfigurierbar sein.
 ### 7.1 Analyse eines bestehenden Projekts
 Ein Entwickler moechte verstehen, welche Teile des Builds unnoetig komplex sind.
 Er fuehrt eine Projektanalyse aus und erhaelt einen Bericht ueber auffaellige Translation Units und Include-Hotspots.
+Betrifft: `F-06`, `F-07`, `F-08`, `F-12`, `F-13`, `F-14`
 
 ### 7.2 Abschaetzung der Auswirkung einer Header-Aenderung
 Ein Maintainer plant eine Aenderung an einer zentralen Header-Datei.
 Er fuehrt eine Impact-Analyse fuer diese Datei aus und erhaelt die betroffenen Translation Units sowie, falls verfuegbar, die betroffenen Targets.
+Betrifft: `F-21`, `F-22`, `F-23`, `F-24`
 
 ### 7.3 CI-gestuetzter Build-Report
 Ein Projekt erzeugt im CI-Lauf einen Konsolen- oder Markdown-Bericht, um Build-Probleme in Pull Requests sichtbar zu machen.
+Betrifft: `F-26`, `F-27`, `S-09`, `S-10`, `S-11`
 
 ---
 
@@ -259,9 +284,9 @@ Ein Projekt erzeugt im CI-Lauf einen Konsolen- oder Markdown-Bericht, um Build-P
 
 | Kennung | Kategorie | Anforderung |
 |---|---|---|
-| `NF-04` | Performance | Das Werkzeug soll auch bei mittelgrossen bis grossen Projekten praktikabel einsetzbar sein. |
-| `NF-05` | Performance | Analysezeiten sollen in einem angemessenen Verhaeltnis zum Nutzen stehen. |
-| `NF-06` | Performance | Der Speicherverbrauch soll fuer lokale Entwicklerumgebungen und CI-Laeufe beherrschbar bleiben. |
+| `NF-04` | Performance | Auf einer dokumentierten Referenzumgebung sollen Projekte mit bis zu 1.000 Translation Units im ersten Meilenstein in hoechstens 60 Sekunden analysierbar sein. |
+| `NF-05` | Performance | Auf derselben Referenzumgebung soll der Arbeitsspeicherverbrauch bei diesen Projekten 2 GB nicht ueberschreiten. |
+| `NF-06` | Performance | Die fuer Performance-Angaben verwendete Referenzumgebung und das Referenzprojekt muessen dokumentiert werden. |
 
 ### 8.3 Portabilitaet
 
@@ -299,6 +324,8 @@ Ein Projekt erzeugt im CI-Lauf einen Konsolen- oder Markdown-Bericht, um Build-P
 | `NF-16` | Dokumentation | Das Projekt soll eine verstaendliche README enthalten. |
 | `NF-17` | Dokumentation | Installations- und Nutzungsbeispiele sollen dokumentiert werden. |
 | `NF-18` | Dokumentation | Beispielausgaben fuer die wichtigsten Analysearten sollen vorhanden sein. |
+| `NF-19` | Dokumentation | Fuer zentrale Analysearten sollen Referenzprojekte oder Referenzdaten mit erwarteten Ergebnissen fuer automatisierte Tests vorhanden sein. |
+| `NF-20` | Dokumentation | Fuer maschinenlesbare Ausgabeformate muessen Formatversion oder Schema-Version dokumentiert werden. |
 
 ---
 
@@ -327,9 +354,7 @@ Fuer das Projekt soll eine etablierte Open-Source-Lizenz verwendet werden, bevor
 
 | Kennung | Kategorie | Randbedingung |
 |---|---|---|
-| `RB-09` | Lizenz | MIT |
-| `RB-10` | Lizenz | BSD-3-Clause |
-| `RB-11` | Lizenz | Apache-2.0 |
+| `RB-09` | Lizenz | Eine der folgenden Lizenzen soll verwendet werden: MIT, BSD-3-Clause oder Apache-2.0. |
 
 ---
 
@@ -341,7 +366,7 @@ Das Produkt soll folgende Eingaben unterstuetzen:
 | Kennung | Typ | Schnittstelle |
 |---|---|---|
 | `S-01` | Eingabe | `compile_commands.json` |
-| `S-02` | Eingabe | optional weitere Build-Metadaten fuer targetbezogene Analysen |
+| `S-02` | Eingabe | optional weitere Build-Metadaten fuer targetbezogene Analysen, zum Beispiel aus CMake-Metadaten oder anderen Build-Artefakten; nicht Bestandteil des MVP |
 | `S-03` | Eingabe | Dateipfade und Optionen ueber CLI-Parameter |
 
 ### 10.2 Ausgabeschnittstellen
@@ -409,16 +434,16 @@ Folgende Funktionen sind fuer spaetere Versionen vorgesehen:
 
 Das Produkt gilt fuer den ersten Meilenstein als abnahmefaehig, wenn:
 
-| Kennung | Abnahmekriterium |
-|---|---|
-| `AK-01` | eine gueltige `compile_commands.json` erfolgreich eingelesen und verarbeitet werden kann |
-| `AK-02` | eine ungueltige oder unvollstaendige `compile_commands.json` mit einer klaren Fehlermeldung und einem Fehler-Exit-Code quittiert wird |
-| `AK-03` | mindestens ein CLI-Befehl eine Rangfolge auffaelliger Translation Units inklusive zugehoeriger Kennzahlen ausgibt |
-| `AK-04` | mindestens ein Bericht Include-Hotspots mit Header-Bezeichnung und Anzahl betroffener Translation Units ausweist |
-| `AK-05` | eine Impact-Analyse fuer eine Datei ausfuehrbar ist und betroffene Translation Units oder einen nachvollziehbaren Hinweis auf fehlende Daten ausgibt |
-| `AK-06` | ein Markdown-Report erzeugt werden kann |
-| `AK-07` | das Projekt auf Linux baubar und testbar ist |
-| `AK-08` | eine README mit Installations- und Nutzungsbeispielen vorhanden ist |
+| Kennung | Abnahmekriterium | Prueft |
+|---|---|---|
+| `AK-01` | eine gueltige `compile_commands.json` erfolgreich eingelesen und verarbeitet werden kann | `F-01`, `F-04` |
+| `AK-02` | eine ungueltige oder unvollstaendige `compile_commands.json` mit einer klaren Fehlermeldung und einem Fehler-Exit-Code quittiert wird | `F-02`, `F-03`, `F-33`, `F-34` |
+| `AK-03` | mindestens ein CLI-Befehl eine Rangfolge auffaelliger Translation Units inklusive zugehoeriger Kennzahlen ausgibt | `F-06`, `F-07`, `F-08`, `F-09` |
+| `AK-04` | mindestens ein Bericht Include-Hotspots mit Header-Bezeichnung und Anzahl betroffener Translation Units ausweist | `F-12`, `F-13`, `F-14`, `F-15` |
+| `AK-05` | eine Impact-Analyse fuer eine Datei ausfuehrbar ist und betroffene Translation Units oder einen nachvollziehbaren Hinweis auf fehlende Daten ausgibt | `F-21`, `F-22`, `F-23` |
+| `AK-06` | ein Markdown-Report erzeugt werden kann | `F-27` |
+| `AK-07` | das Projekt auf Linux baubar und testbar ist | `NF-07`, `RB-01`, `RB-02`, `RB-03` |
+| `AK-08` | eine README mit Installations- und Nutzungsbeispielen vorhanden ist | `NF-16`, `NF-17` |
 
 ---
 
@@ -443,9 +468,9 @@ Das Produkt gilt fuer den ersten Meilenstein als abnahmefaehig, wenn:
 
 Das Projekt ist erfolgreich, wenn:
 
-- reale CMake-Projekte damit analysiert werden koennen
-- die Berichte konkrete Probleme sichtbar machen
-- externe Nutzer das Tool lokal oder in CI einsetzen
+- mindestens drei reale CMake-Projekte damit analysiert werden koennen
+- die Berichte in diesen Projekten konkrete Probleme sichtbar machen
+- mindestens ein Projekt das Tool lokal oder in CI einsetzt
 - erste Community-Beitraege oder Feature-Anfragen entstehen
 - das Projekt als nuetzliches Diagnosewerkzeug wahrgenommen wird
 
