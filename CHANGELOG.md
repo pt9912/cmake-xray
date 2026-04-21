@@ -9,10 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- repository-level `README.md`
-- repository-level `CHANGELOG.md`
-- initial requirements document in `docs/lastenheft.md`
-- initial design document in `docs/design.md`
-- initial architecture document in `docs/architecture.md`
-- initial roadmap in `docs/roadmap.md`
-- initial milestone plan in `docs/plan-M0.md`
+- CMake-based project skeleton with `xray_hexagon`, `xray_adapters`, and `cmake-xray`
+- placeholder M0 binary and adapter wiring boundaries for future milestones
+- doctest-based placeholder test suite and `ctest` integration
+- multi-stage `Dockerfile` with `build`, `test`, and `runtime` stages
+- updated `README.md` for build, test, and Docker usage

@@ -2,25 +2,18 @@
 
 Build visibility for CMake projects.
 
-`cmake-xray` ist ein geplantes Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Ziel ist es, Build-Komplexitaet, Include-Hotspots, auffaellige Translation Units und Rebuild-Auswirkungen nachvollziehbar zu machen.
+`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Der aktuelle Stand `v0.1.0` liefert das technische Fundament fuer spaetere Analysen: Projektstruktur, Build, Tests, Docker-Referenzumgebung und ein Platzhalter-Binary.
 
 ## Status
 
-Das Repository befindet sich aktuell in einer dokumentationsgetriebenen Vorbereitungsphase.
+Das Repository enthaelt den umgesetzten Meilenstein M0 aus [docs/plan-M0.md](./docs/plan-M0.md).
 
-Der aktuell dokumentierte erste Meilenstein ist `v0.1.0` gemass [docs/roadmap.md](./docs/roadmap.md).
+Der aktuelle Umfang ist bewusst klein:
 
-Derzeit vorhanden sind:
-
-- Anforderungsdokumente
-- Design- und Architekturentwuerfe
-- ein Phasenplan fuer das MVP
-
-Noch nicht vorhanden sind:
-
-- produktiver C++-Quellcode
-- eine nutzbare CLI-Implementierung
-- Releases oder installierbare Artefakte
+- baubares C++20/CMake-Projekt mit hexagonaler Grundstruktur
+- Platzhalter-Binary `cmake-xray`
+- Platzhalter-Testlauf ueber `ctest`
+- Multi-Stage-`Dockerfile` mit `build`, `test` und `runtime`
 
 ## Geplanter Umfang
 
@@ -40,6 +33,85 @@ Nicht Ziel des MVP sind insbesondere:
 - IDE-Integration
 - HTML-, JSON- oder DOT-Export im ersten Release
 
+## Voraussetzungen
+
+Referenzplattform ist Linux mit:
+
+- CMake >= 3.20
+- C++20-faehigem Compiler
+- Git fuer `FetchContent`
+
+Als Referenzumgebung steht ausserdem das [Dockerfile](./Dockerfile) zur Verfuegung.
+
+## Externe Abhaengigkeiten
+
+Fuer M0 sind folgende Bibliotheken festgelegt:
+
+| Bereich | Bibliothek | Einbindung | Verwendung |
+|---|---|---|---|
+| JSON-Parsing | `nlohmann/json` | `FetchContent` | spaetere Adapter unter `src/adapters/input/` |
+| CLI-Parsing | `CLI11` | `FetchContent` | spaeterer CLI-Adapter unter `src/adapters/cli/` |
+| Test-Framework | `doctest` | `FetchContent` | `tests/` und Target `xray_tests` |
+
+Wichtig: `src/hexagon/` bleibt frei von externen Bibliotheken. Externe Abhaengigkeiten sind auf Adapter, Tests und Composition Root begrenzt.
+
+## Build
+
+Lokaler Quellbuild:
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+Danach liegt das Platzhalter-Binary unter `./build/cmake-xray`.
+
+## Tests
+
+Lokal:
+
+```bash
+cd build && ctest --output-on-failure
+```
+
+Alternativ gezielt:
+
+```bash
+cmake --build build --target xray_tests
+./build/xray_tests
+```
+
+## Nutzung
+
+Der aktuelle M0-Stand liefert ein Platzhalter-Binary ohne echte Analysefunktion:
+
+```bash
+./build/cmake-xray
+```
+
+Erwartet wird eine kurze Textausgabe mit Exit-Code `0`.
+
+## Docker
+
+Das Projekt nutzt ein Multi-Stage-`Dockerfile`:
+
+- `build`: konfiguriert und baut das Projekt
+- `test`: fuehrt `ctest` in der Referenzumgebung aus
+- `runtime`: enthaelt nur das Platzhalter-Binary und noetige Laufzeitpakete
+
+Build und Test der Docker-Stages:
+
+```bash
+docker build --target test -t cmake-xray:test .
+docker build --target runtime -t cmake-xray .
+```
+
+Lauf des Runtime-Images:
+
+```bash
+docker run --rm cmake-xray
+```
+
 ## Dokumente
 
 Die fachliche und technische Planung ist in `docs/` abgelegt:
@@ -50,24 +122,9 @@ Die fachliche und technische Planung ist in `docs/` abgelegt:
 - [docs/roadmap.md](./docs/roadmap.md): inkrementelle Lieferplanung
 - [docs/plan-M0.md](./docs/plan-M0.md): Detailplanung fuer den ersten Meilenstein
 
-## Geplante Roadmap
-
-Die aktuelle Roadmap ist in vier inhaltliche Phasen gegliedert:
-
-1. Fundament: Projektgrundgeruest, Build, Tests, Dokumente
-2. MVP-Eingaben und CLI: valide Eingabedaten, Help, Exit-Codes
-3. Kernanalysen MVP: TU-Ranking, Include-Hotspots, Impact-Analyse
-4. Berichte und Qualitaet: Markdown, Referenzdaten, Performance-Baseline
-
-Erweiterungen wie Target-Metadaten, HTML, JSON und weitere Plattformen sind fuer spaetere Schritte vorgesehen.
-
 ## Lizenz
 
-Die Projektlizenz ist noch nicht final festgelegt. Laut Lastenheft ist eine der folgenden Lizenzen vorgesehen:
-
-- MIT
-- BSD-3-Clause
-- Apache-2.0
+Das Projekt steht unter der [MIT-Lizenz](./LICENSE).
 
 ## Changelog
 

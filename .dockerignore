@@ -1,0 +1,10 @@
+build/
+.git/
+.gitignore
+.dockerignore
+.cache/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
