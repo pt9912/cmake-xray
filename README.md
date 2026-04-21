@@ -112,6 +112,14 @@ Lauf des Runtime-Images:
 docker run --rm cmake-xray
 ```
 
+Empfohlene gehaertete Laufzeit:
+
+```bash
+docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m cmake-xray
+```
+
+Das Runtime-Image laeuft als unprivilegierter Benutzer `cmake-xray`. Die `--read-only`-Option ist fuer den aktuellen Platzhalter-Stand geeignet; das zusaetzliche `tmpfs` haelt eine temporaere Schreibflaeche bereit, falls spaetere Laufzeitbibliotheken oder kuenftige Funktionen sie benoetigen.
+
 ## Dokumente
 
 Die fachliche und technische Planung ist in `docs/` abgelegt:

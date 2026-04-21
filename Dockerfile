@@ -28,10 +28,18 @@ FROM ubuntu:24.04 AS runtime
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         libstdc++6 \
+    && useradd \
+        --system \
+        --create-home \
+        --home-dir /app \
+        --shell /usr/sbin/nologin \
+        cmake-xray \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY --from=build /workspace/build/cmake-xray /app/cmake-xray
+COPY --from=build --chown=cmake-xray:cmake-xray /workspace/build/cmake-xray /app/cmake-xray
+
+USER cmake-xray
 
 ENTRYPOINT ["/app/cmake-xray"]
