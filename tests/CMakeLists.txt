@@ -1,8 +1,8 @@
 add_executable(
     xray_tests
     test_main.cpp
-    hexagon/test_startup_message.cpp
-    adapters/test_dependency_boundaries.cpp
+    hexagon/test_project_analyzer.cpp
+    adapters/test_port_wiring.cpp
 )
 
 target_link_libraries(

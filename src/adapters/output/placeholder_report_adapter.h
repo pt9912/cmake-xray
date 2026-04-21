@@ -1,10 +1,12 @@
 #pragma once
 
-#include <string>
-#include <string_view>
+#include "hexagon/ports/driven/report_writer_port.h"
 
 namespace xray::adapters::output {
 
-std::string render_startup_message(std::string_view startup_message);
+class PlaceholderReportAdapter final : public xray::hexagon::ports::driven::ReportWriterPort {
+public:
+    std::string write_report(const xray::hexagon::model::AnalysisResult& analysis_result) const override;
+};
 
 }  // namespace xray::adapters::output

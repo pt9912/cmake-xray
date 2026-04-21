@@ -2,8 +2,11 @@
 
 namespace xray::adapters::output {
 
-std::string render_startup_message(std::string_view startup_message) {
-    return std::string(startup_message);
+std::string PlaceholderReportAdapter::write_report(
+    const xray::hexagon::model::AnalysisResult& analysis_result) const {
+    return std::string(analysis_result.application.name) + " " +
+           std::string(analysis_result.application.version) + " " +
+           std::string(analysis_result.summary);
 }
 
 }  // namespace xray::adapters::output
