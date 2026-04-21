@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Lastenheft `cmake-xray` |
-| Version | `0.5` |
+| Version | `0.6` |
 | Stand | `2026-04-21` |
 | Status | Arbeitsstand |
 
@@ -18,6 +18,7 @@
 | `0.3` | `2026-04-21` | Rueckverfolgbarkeit, Dokumentenstand, Messgroessen und Review-Anmerkungen ergaenzt |
 | `0.4` | `2026-04-21` | Kennungsregeln, AK-Abdeckung, Performance-Einordnung und Erfolgsmasstaebe weiter geschaerft; fruehere Lizenzkennungen `RB-09` bis `RB-11` zu `RB-09` zusammengefasst |
 | `0.5` | `2026-04-21` | Datengrundlage der Include-Analyse geklaert, NF-Prioritaeten ergaenzt und Eingabeverhalten weiter praezisiert |
+| `0.6` | `2026-04-21` | Verweis auf Folgedokumente ergaenzt |
 
 ## 1. Einleitung
 
@@ -71,7 +72,15 @@ Verwendete Praefixe:
 
 Nachtraeglich ergaenzte Anforderungen erhalten zur Wahrung stabiler Referenzen die jeweils naechste freie Kennung, auch wenn sie thematisch in einem frueheren Abschnitt einsortiert werden.
 
-### 1.7 Schreibkonvention
+### 1.7 Verwandte Dokumente
+
+| Dokument | Beschreibung |
+|---|---|
+| [Design](./design.md) | Fachliche und benutzerbezogene Ausgestaltung auf Basis dieses Lastenhefts |
+| [Architecture](./architecture.md) | Technische Systemstruktur und Datenfluesse |
+| [Phasenplan](./roadmap.md) | Inkrementelle Lieferplanung in Phasen |
+
+### 1.8 Schreibkonvention
 Dieses Dokument verwendet bewusst ASCII-Umschreibungen wie `ae`, `oe` und `ue`, damit Inhalt und Kennungen in einfachen Textumgebungen, Terminals und Build-Logs konsistent darstellbar bleiben.
 
 ---
