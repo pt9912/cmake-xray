@@ -7,7 +7,7 @@
 | Dokument | Plan M0 `cmake-xray` |
 | Version | `0.1` |
 | Stand | `2026-04-21` |
-| Status | Entwurf |
+| Status | Abgeschlossen |
 | Referenzen | [Lastenheft](./lastenheft.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md) |
 
 ### 0.1 Zweck
@@ -214,4 +214,6 @@ docker build --target runtime -t cmake-xray .
 docker run --rm cmake-xray
 ```
 
-Danach wird `v0.1.0` getaggt.
+Der Docker-Pruefpfad wurde am `2026-04-21` erfolgreich verifiziert.
+
+Das Release ist als `v0.1.0` getaggt.
