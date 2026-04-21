@@ -32,12 +32,12 @@ Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**.
 
 ### 2.1 Milestones
 
-| Milestone | Phase | Pruefkriterium |
-|---|---|---|
-| **M0** | Phase 0 | Projekt baut auf Linux, leerer Testlauf laeuft durch, Dokumentenstruktur steht |
-| **M1** | Phase 1 | `AK-01`, `AK-02`, `AK-09` erfuellt |
-| **M2** | Phase 2 | `AK-03`, `AK-04`, `AK-05` erfuellt; heuristische Ergebnisse gekennzeichnet |
-| **M3 (MVP)** | Phase 3 | Alle `AK-01` bis `AK-09` erfuellt; MVP lieferbar |
+| Milestone | Version | Phase | Pruefkriterium |
+|---|---|---|---|
+| **M0** | `v0.1.0` | Phase 0 | Projekt baut auf Linux, leerer Testlauf laeuft durch, Dokumentenstruktur steht |
+| **M1** | `v0.2.0` | Phase 1 | `AK-01`, `AK-02`, `AK-09` erfuellt |
+| **M2** | `v0.3.0` | Phase 2 | `AK-03`, `AK-04`, `AK-05` erfuellt; heuristische Ergebnisse gekennzeichnet |
+| **M3 (MVP)** | `v1.0.0` | Phase 3 | Alle `AK-01` bis `AK-09` erfuellt; MVP lieferbar |
 
 ## 3. Phasen im Detail
 
@@ -52,7 +52,7 @@ Ziel: ein baubares und testbares Projekt mit klaren Dokumentationsartefakten.
 | README und Dokumentenstruktur | `NF-16`, `NF-17`, `AK-08` |
 | Entscheidung und Einbindung externer Abhaengigkeiten (JSON, CLI-Parsing, Test-Framework) | `RB-10`, `RB-06`, `RB-07` |
 
-**Milestone M0**: Das Projekt baut auf Linux, ein leerer Testlauf laeuft durch und die Dokumentenstruktur steht.
+**Milestone M0 (`v0.1.0`)**: Das Projekt baut auf Linux, ein leerer Testlauf laeuft durch und die Dokumentenstruktur steht.
 
 ### 3.2 Phase 1 - MVP-Eingaben und CLI
 
@@ -64,7 +64,7 @@ Ziel: das Tool akzeptiert gueltige Eingaben, behandelt Fehlerfaelle sauber und i
 | CLI Adapter: Grundlegende Befehlsstruktur und Verdrahtung der Ports | `F-31`, `F-32`, `F-33`, `F-34`, `AK-09` |
 | Konfigurierbare Pfade und Formatauswahl | `F-35`, `F-36` |
 
-**Milestone M1**: `AK-01`, `AK-02` und `AK-09` sind erfuellt. Eine gueltige `compile_commands.json` wird eingelesen, ungueltige oder leere Eingaben werden mit klarer Meldung und Exit-Code quittiert, `--help` gibt verstaendliche Hilfe aus.
+**Milestone M1 (`v0.2.0`)**: `AK-01`, `AK-02` und `AK-09` sind erfuellt. Eine gueltige `compile_commands.json` wird eingelesen, ungueltige oder leere Eingaben werden mit klarer Meldung und Exit-Code quittiert, `--help` gibt verstaendliche Hilfe aus.
 
 ### 3.3 Phase 2 - Kernanalysen MVP
 
@@ -78,7 +78,7 @@ Ziel: die fachlich zentralen Analysen des ersten Releases liefern nutzbare Ergeb
 | `ConsoleReportAdapter` (`ReportWriterPort`): Konsolenausgabe der Ergebnisse | `F-26`, `AK-03` |
 | Reproduzierbarkeit der Analyseergebnisse sicherstellen | `NF-15` |
 
-**Milestone M2**: `AK-03`, `AK-04` und `AK-05` sind erfuellt. Das Tool gibt in der Konsole ein TU-Ranking mit Kennzahlen aus, listet Include-Hotspots mit betroffenen TUs, und fuehrt eine Impact-Analyse fuer eine Datei durch. Ergebnisse, die auf der heuristischen Include-Aufloesung basieren, sind als solche gekennzeichnet.
+**Milestone M2 (`v0.3.0`)**: `AK-03`, `AK-04` und `AK-05` sind erfuellt. Das Tool gibt in der Konsole ein TU-Ranking mit Kennzahlen aus, listet Include-Hotspots mit betroffenen TUs, und fuehrt eine Impact-Analyse fuer eine Datei durch. Ergebnisse, die auf der heuristischen Include-Aufloesung basieren, sind als solche gekennzeichnet.
 
 ### 3.4 Phase 3 - Berichte und Qualitaet
 
@@ -91,7 +91,7 @@ Ziel: Ergebnisse werden fuer reale Nutzung, Dokumentation und Absicherung stabil
 | Performance-Baseline und Referenzumgebung | `NF-04`, `NF-05`, `NF-06` |
 | Beispielausgaben und Nutzungsdokumentation | `NF-18`, `AK-08` |
 
-**Milestone M3 (MVP)**: Alle Abnahmekriterien `AK-01` bis `AK-09` sind erfuellt. Ein Markdown-Report kann erzeugt werden, die README enthaelt Installations- und Nutzungsbeispiele, automatisierte Tests laufen gegen Referenzdaten, und die Performance-Baseline ist dokumentiert. Das Produkt ist als MVP lieferbar.
+**Milestone M3 / MVP (`v1.0.0`)**: Alle Abnahmekriterien `AK-01` bis `AK-09` sind erfuellt. Ein Markdown-Report kann erzeugt werden, die README enthaelt Installations- und Nutzungsbeispiele, automatisierte Tests laufen gegen Referenzdaten, und die Performance-Baseline ist dokumentiert. Das Produkt ist als MVP lieferbar.
 
 ### 3.5 Phase 4 - Erweiterungen
 
