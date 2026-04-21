@@ -110,14 +110,36 @@ Einbindung ueber `FetchContent` oder als Git-Submodul. Die Entscheidungen sollen
 
 **Ergebnis**: `cmake --build build --target xray_tests && cd build && ctest` meldet 0 Fehler.
 
-### 1.6 README
+### 1.6 Dockerfile
+
+Ein `Dockerfile` definiert die Referenz-Build-Umgebung und stellt sicher, dass Build und Tests unabhaengig vom Host-System reproduzierbar sind (`NF-07`, `RB-04`).
+
+Das Dockerfile soll:
+
+- auf einem etablierten Base-Image aufbauen (z.B. `ubuntu:24.04` oder `debian:bookworm`)
+- einen C++20-faehigen Compiler installieren (GCC >= 12 oder Clang >= 15)
+- CMake >= 3.20 bereitstellen
+- das Projekt bauen und die Tests ausfuehren
+
+Angestrebte Nutzung:
+
+```
+docker build -t cmake-xray .
+docker run --rm cmake-xray
+```
+
+Der letzte Befehl soll Build und Testlauf durchfuehren und mit Exit-Code 0 enden.
+
+**Ergebnis**: `docker build` und `docker run` laufen fehlerfrei durch.
+
+### 1.7 README
 
 Die README soll fuer M0 mindestens enthalten:
 
 - Projektbeschreibung (1-2 Saetze)
-- Voraussetzungen (Compiler, CMake-Version)
-- Bauanleitung (cmake + build)
-- Testanleitung (ctest)
+- Voraussetzungen mit Verweis auf das Dockerfile als Referenzumgebung
+- Bauanleitung (cmake + build sowie Docker-Variante)
+- Testanleitung (ctest sowie Docker-Variante)
 - Hinweis auf gewaehlte externe Abhaengigkeiten und deren Einbindung
 - Verweis auf `docs/` fuer weitere Dokumentation
 
@@ -134,19 +156,29 @@ Relevante Kennungen: `NF-16`, `NF-17`, `AK-08`
 | 3 | 1.4 Externe Abhaengigkeiten | 1.2 |
 | 4 | 1.3 Minimaler main.cpp | 1.2 |
 | 5 | 1.5 Test-Grundgeruest | 1.2, 1.4 |
-| 6 | 1.6 README | 1.4 |
+| 6 | 1.6 Dockerfile | 1.2, 1.4, 1.5 |
+| 7 | 1.7 README | 1.4, 1.6 |
 
 Schritte 3 und 4 koennen parallel bearbeitet werden.
 
 ## 3. Pruefung
 
-M0 ist abgeschlossen, wenn alle folgenden Befehle auf einem Linux-System mit C++20-Compiler und CMake >= 3.20 erfolgreich durchlaufen:
+M0 ist abgeschlossen, wenn beide Pruefwege erfolgreich durchlaufen:
+
+**Lokal** (Linux-System mit C++20-Compiler und CMake >= 3.20):
 
 ```
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ./build/cmake-xray --help
 cd build && ctest --output-on-failure
+```
+
+**Docker** (reproduzierbare Referenzumgebung):
+
+```
+docker build -t cmake-xray .
+docker run --rm cmake-xray
 ```
 
 Danach wird `v0.1.0` getaggt.
