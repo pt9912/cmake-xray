@@ -77,6 +77,7 @@ Anforderungen:
 - externe Bibliotheken duerfen nur in `xray_adapters`, `xray_tests` oder in der Composition Root verwendet werden, nicht in `src/hexagon/`
 - Ports und Modelle des Hexagons duerfen keine Typen externer Bibliotheken in ihren oeffentlichen Schnittstellen fuehren
 - Build muss auf Linux mit GCC und Clang funktionieren (`NF-07`)
+- Compiler-Warnings sollen frueh aktiviert werden, mindestens `-Wall -Wextra -Wpedantic`; ob `-Werror` gesetzt wird, ist eine Implementierungsentscheidung
 
 **Ergebnis**: `cmake -B build && cmake --build build` laeuft auf Linux ohne Fehler durch.
 
@@ -145,6 +146,8 @@ Empfohlene Stage-Aufteilung:
 | `runtime` | enthaelt nur die fuer M0 noetigen Laufzeitartefakte, insbesondere das Platzhalter-Binary und ggf. eine minimale Startanweisung |
 
 Optional kann zusaetzlich eine gemeinsame Basis-Stage wie `base` oder `toolchain` verwendet werden, um Paketinstallation und Build-Werkzeuge fuer `build` und `test` wiederzuverwenden.
+
+Zum Dockerfile gehoert eine `.dockerignore`-Datei, die mindestens `build/`, `.git/` und IDE-spezifische Verzeichnisse ausschliesst, damit der Build-Kontext klein bleibt und das Layer-Caching nicht durch irrelevante Aenderungen invalidiert wird.
 
 Angestrebte Nutzung:
 
