@@ -88,7 +88,7 @@ Analyse-Ergebnisse wie das Translation-Unit-Ranking und die Include-Hotspot-List
 - Wird die Ausgabe begrenzt, soll ein Hinweis die Gesamtanzahl der analysierten Eintraege nennen, damit der Nutzer die Einordnung nicht verliert.
 - Die konkrete Standardanzahl (zum Beispiel Top 10 oder Top 20) wird im Pflichtenheft oder bei der Implementierung festgelegt.
 
-Relevante Anforderungen: `F-10`, `F-13`, `NF-03`
+Relevante Anforderungen: `F-42`, `F-10`, `F-13`, `NF-03`
 
 ## 4. Berichtsausgaben
 
@@ -142,7 +142,7 @@ Relevante Anforderungen: `F-09`, `F-23`, `NF-02`, `NF-14`
 | Translation-Unit-Analyse | `F-06` bis `F-11` |
 | Include-Analyse | `F-12` bis `F-17` |
 | Target- und Impact-Sicht | `F-18` bis `F-25` |
-| Ergebnisbegrenzung | `F-10`, `F-13`, `NF-03` |
+| Ergebnisbegrenzung | `F-42`, `F-10`, `F-13`, `NF-03` |
 | Berichtsausgaben | `F-26` bis `F-30`, `NF-20` |
 | Unsicherheit und Datenluecken | `F-09`, `F-23`, `NF-02`, `NF-14` |
 | CLI-Nutzung | `F-31` bis `F-34`, `F-39`, `F-40`, `NF-01` bis `NF-03` |

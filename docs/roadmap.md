@@ -41,7 +41,7 @@ Ziel: ein baubares und testbares Projekt mit klaren Dokumentationsartefakten.
 | C++/CMake-Projektgrundgeruest mit hexagonaler Grundstruktur (Kern, Ports, Adapter) | `RB-01`, `RB-02`, `RB-03` |
 | Linux-Build und Testbasis | `NF-07`, `AK-07` |
 | README und Dokumentenstruktur | `NF-16`, `NF-17`, `AK-08` |
-| Entscheidung und Einbindung externer Abhaengigkeiten (JSON, CLI-Parsing, Test-Framework) | `RB-06`, `RB-07` |
+| Entscheidung und Einbindung externer Abhaengigkeiten (JSON, CLI-Parsing, Test-Framework) | `RB-10`, `RB-06`, `RB-07` |
 
 Phase 0 gilt als abgeschlossen, wenn das Projekt auf Linux baut, ein leerer Testlauf durchlaeuft und die Dokumentenstruktur steht.
 

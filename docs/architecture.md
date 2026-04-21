@@ -59,34 +59,34 @@ Dieser Stil wurde gewaehlt, weil:
 ### 3.1 Uebersicht
 
 ```
-                  ┌─────────────────────┐
-                  │   Primary Adapter    │
-                  │       CLI            │
-                  └────────┬────────────┘
-                           │
-                  ╔════════▼════════════╗
-                  ║   Primary Ports     ║
-                  ║  (Driving)          ║
-                  ╠═════════════════════╣
-                  ║                     ║
-                  ║   Application Core  ║
-                  ║   (Hexagon)         ║
-                  ║                     ║
-                  ║  - TU Metrics       ║
-                  ║  - Include Analysis  ║
-                  ║  - Impact Engine    ║
-                  ║  - Target Model     ║
-                  ║  - Diagnostics      ║
-                  ║                     ║
-                  ╠═════════════════════╣
-                  ║   Secondary Ports   ║
-                  ║  (Driven)           ║
-                  ╚══╤═══════╤═══════╤══╝
-                     │       │       │
-              ┌──────▼──┐ ┌──▼───┐ ┌─▼──────────┐
-              │ Input    │ │Report│ │ Include     │
-              │ Adapters │ │Adapt.│ │ Adapters    │
-              └─────────┘ └──────┘ └──────��──────┘
+              +------------------------+
+              |    Primary Adapter     |
+              |         CLI            |
+              +-----------+------------+
+                          |
+              +-----------v------------+
+              |    Primary Ports       |
+              |    (Driving)           |
+              +========================+
+              |                        |
+              |    Application Core    |
+              |    (Hexagon)           |
+              |                        |
+              |  - TU Metrics          |
+              |  - Include Analysis    |
+              |  - Impact Engine       |
+              |  - Target Model        |
+              |  - Diagnostics         |
+              |                        |
+              +========================+
+              |    Secondary Ports     |
+              |    (Driven)            |
+              +--+--------+--------+--+
+                 |        |        |
+           +-----v--+ +--v----+ +-v-----------+
+           | Input   | |Report| | Include     |
+           | Adapt.  | |Adapt.| | Adapters    |
+           +---------+ +------+ +-------------+
 ```
 
 ### 3.2 Application Core (Hexagon)
@@ -140,7 +140,7 @@ Spaetere Primary Adapter (nicht MVP): IDE-Integration, programmatische API.
 | Adapter | Implementiert | Beschreibung | MVP |
 |---|---|---|---|
 | CompileCommandsJsonAdapter | `CompileDatabasePort` | Liest und validiert `compile_commands.json` | ja |
-| SourceParsingIncludeAdapter | `IncludeResolverPort` | Parst Quelldateien entlang der `-I`-Pfade aus dem Compile-Aufruf | ja (Kandidat) |
+| SourceParsingIncludeAdapter | `IncludeResolverPort` | Parst Quelldateien entlang der `-I`-Pfade aus dem Compile-Aufruf; **experimentelle MVP-Heuristik** mit bekannten Einschraenkungen (siehe 6.1) | ja (experimentell) |
 | CompilerDepsIncludeAdapter | `IncludeResolverPort` | Wertet `.d`-Dependency-Dateien oder compilergestuetzte `-M`-Ausgaben aus | spaeter |
 | ConsoleReportAdapter | `ReportWriterPort` | Schreibt Ergebnisse auf die Konsole | ja |
 | MarkdownReportAdapter | `ReportWriterPort` | Erzeugt einen Markdown-Bericht | ja |
@@ -274,15 +274,15 @@ Die Trennung in zwei Libraries stellt sicher, dass `xray_hexagon` **keine** exte
 Alle Abhaengigkeiten zeigen nach innen:
 
 ```
-CLI Adapter  ──►  Primary Ports  ──►  Application Core
-                                            │
-                                            ▼
-                                      Secondary Ports
-                                            │
-CompileCommandsJsonAdapter  ◄───────────────┘
-SourceParsingIncludeAdapter ◄──────���────────┘
-ConsoleReportAdapter        ◄─────���─────────┘
-MarkdownReportAdapter       ◄───────────────┘
+CLI Adapter  ------->  Primary Ports  ------->  Application Core
+                                                      |
+                                                      v
+                                                Secondary Ports
+                                                      |
+CompileCommandsJsonAdapter  <-------------------------+
+SourceParsingIncludeAdapter <-------------------------+
+ConsoleReportAdapter        <-------------------------+
+MarkdownReportAdapter       <-------------------------+
 ```
 
 Kein Adapter kennt einen anderen Adapter. Der Kern kennt keine konkreten Adapter, nur die Port-Schnittstellen.
@@ -293,13 +293,24 @@ Kein Adapter kennt einen anderen Adapter. Der Kern kennt keine konkreten Adapter
 
 Die offene Frage der Include-Datenherkunft wird durch den `IncludeResolverPort` architekturell geloest. Der Kern arbeitet gegen die Port-Abstraktion; der konkrete Adapter kann ausgetauscht werden, ohne den Kern zu aendern.
 
-Fuer den MVP wird ein einzelner Adapter implementiert. Die bevorzugte Strategie ist das **Parsen von Quelldateien entlang der Include-Pfade** (`SourceParsingIncludeAdapter`), da diese Variante:
+Fuer den MVP wird ein einzelner Adapter implementiert. Der erste Kandidat ist das **Parsen von Quelldateien entlang der Include-Pfade** (`SourceParsingIncludeAdapter`). Diese Variante wird als **experimentelle MVP-Heuristik** eingestuft, nicht als verlaessliche compilernahe Aufloesung.
+
+Vorteile:
 
 - keinen vorherigen Build erfordert
 - keinen Compiler auf dem Analysesystem voraussetzt
 - in CI-Umgebungen ohne Build-Artefakte funktioniert
 
-Alternative Adapter (compilergestuetzte Dependency-Informationen, vorhandene `.d`-Dateien) koennen spaeter als weitere `IncludeResolverPort`-Implementierungen ergaenzt werden.
+Bekannte Einschraenkungen:
+
+- **Bedingte Includes** (`#ifdef`, `#if`) werden nicht ausgewertet; der Adapter sieht alle Zweige, der Compiler nur den aktiven.
+- **Compilerdefinierte Makros** (`-D`, eingebaute Defines) beeinflussen Include-Pfade, werden aber nicht interpretiert.
+- **`-include`-Flags** (forced includes) und generierte Header sind im Quelltext nicht sichtbar.
+- **Systemabhaengige Aufloesung** (Compiler-interne Suchpfade, Frameworks unter macOS) wird nicht abgebildet.
+
+Daraus folgt: Die Ergebnisse von `F-12` bis `F-17` und `F-21` bis `F-25` koennen im MVP unvollstaendig oder ueberzaehlig sein. Die Architektur muss sicherstellen, dass Analyseergebnisse, die auf diesem Adapter basieren, im Bericht als **heuristisch** gekennzeichnet werden (`F-09`, `F-23`, `NF-15`). Die Diagnostics-Infrastruktur (6.6) transportiert diese Einschraenkung an den Nutzer.
+
+Alternative Adapter (compilergestuetzte Dependency-Informationen ueber `-M`-Flags, vorhandene `.d`-Dateien) sollen als weitere `IncludeResolverPort`-Implementierungen folgen und wuerden eine compilernahe Sicht liefern. Die Port-Abstraktion stellt sicher, dass der Wechsel ohne Kernaenderung moeglich ist.
 
 ### 6.2 Stabilitaet der internen Modelle
 
@@ -318,7 +329,7 @@ Neue Analysearten erweitern den Kern und fuegen bei Bedarf neue Secondary Ports 
 
 ### 6.4 Externe Abhaengigkeiten
 
-Externe Abhaengigkeiten sollen minimal gehalten werden, um die Einstiegshuerde fuer Beitragende niedrig zu halten (`RB-06`, `RB-07`). Wo bewaehrte Bibliotheken einen klaren Vorteil gegenueber Eigenimplementierungen bieten, sollen sie bevorzugt werden. Fuer den MVP werden mindestens Entscheidungen zu folgenden Bereichen benoetigt:
+Externe Abhaengigkeiten sollen minimal gehalten werden (`RB-10`), um Build-Komplexitaet und Einstiegshuerde fuer Beitragende gering zu halten (`RB-06`, `RB-07`). Wo bewaehrte Bibliotheken einen klaren Vorteil gegenueber Eigenimplementierungen bieten, sollen sie bevorzugt werden. Fuer den MVP werden mindestens Entscheidungen zu folgenden Bereichen benoetigt:
 
 - JSON-Parsing (fuer `compile_commands.json` und spaetere JSON-Ausgaben)
 - CLI-Argument-Parsing (im CLI Adapter)
@@ -364,8 +375,8 @@ Diagnostics ist kein eigener Port oder Adapter, sondern ein **Protokoll innerhal
 | ReportWriterPort / Adapter | `F-26` bis `F-30`, `NF-20` |
 | CLI Adapter | `F-31` bis `F-40`, `NF-01`, `NF-02` |
 | Diagnostics | `F-03`, `F-09`, `F-23`, `NF-02`, `NF-14`, `NF-15` |
-| Verzeichnisstruktur und CMake-Targets | `RB-01`, `RB-02`, `RB-06`, `RB-07` |
-| Externe Abhaengigkeiten | `RB-06`, `RB-07` |
+| Verzeichnisstruktur und CMake-Targets | `RB-01`, `RB-02`, `RB-10` |
+| Externe Abhaengigkeiten | `RB-10`, `RB-06`, `RB-07` |
 | Testbarkeit | `NF-10`, `NF-19`, `NF-04` bis `NF-06` |
 | Plattform- und Laufzeitrahmen | `NF-07`, `RB-01` bis `RB-05` |
 

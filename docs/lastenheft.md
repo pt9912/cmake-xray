@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Lastenheft `cmake-xray` |
-| Version | `0.6` |
+| Version | `0.7` |
 | Stand | `2026-04-21` |
 | Status | Arbeitsstand |
 
@@ -19,6 +19,7 @@
 | `0.4` | `2026-04-21` | Kennungsregeln, AK-Abdeckung, Performance-Einordnung und Erfolgsmasstaebe weiter geschaerft; fruehere Lizenzkennungen `RB-09` bis `RB-11` zu `RB-09` zusammengefasst |
 | `0.5` | `2026-04-21` | Datengrundlage der Include-Analyse geklaert, NF-Prioritaeten ergaenzt und Eingabeverhalten weiter praezisiert |
 | `0.6` | `2026-04-21` | Verweis auf Folgedokumente ergaenzt |
+| `0.7` | `2026-04-21` | `F-42` (Ergebnisbegrenzung) und `RB-10` (Abhaengigkeitsminimierung) ergaenzt |
 
 ## 1. Einleitung
 
@@ -265,6 +266,7 @@ Das System soll konfigurierbar sein.
 | `F-36` | Soll | Steuerung des Ausgabeformats |
 | `F-37` | Soll | Aktivierung und Deaktivierung einzelner Analysen |
 | `F-38` | Soll | Konfiguration von Schwellenwerten oder Grenzwerten fuer Auswertungen |
+| `F-42` | Soll | Begrenzung der Ergebnisausgabe auf eine konfigurierbare Anzahl der auffaelligsten Eintraege, mit Angabe der Gesamtanzahl analysierter Eintraege |
 
 ---
 
@@ -358,6 +360,7 @@ Diese Werte gelten als Mindestanforderung fuer den ersten Meilenstein. Fuer spae
 | `RB-03` | Technisch | Nutzung eines modernen Sprachstandards, mindestens **C++20** |
 | `RB-04` | Technisch | Das Produkt darf keine interaktive Laufzeitumgebung voraussetzen und muss in lokalen Entwicklerumgebungen sowie in CI-Automatisierungen nutzbar sein. |
 | `RB-05` | Technisch | quelloffene Entwicklung auf GitHub |
+| `RB-10` | Technisch | Externe Laufzeit- und Build-Abhaengigkeiten sollen minimal gehalten werden, um Build-Komplexitaet und Einstiegshuerde gering zu halten. |
 
 ### 9.2 Organisatorische Randbedingungen
 
