@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Lastenheft `cmake-xray` |
-| Version | `0.4` |
+| Version | `0.5` |
 | Stand | `2026-04-21` |
 | Status | Arbeitsstand |
 
@@ -17,6 +17,7 @@
 | `0.2` | `2026-04-21` | Anforderungen konsolidiert, Kennungen eingefuehrt und Tabellenstruktur ergaenzt |
 | `0.3` | `2026-04-21` | Rueckverfolgbarkeit, Dokumentenstand, Messgroessen und Review-Anmerkungen ergaenzt |
 | `0.4` | `2026-04-21` | Kennungsregeln, AK-Abdeckung, Performance-Einordnung und Erfolgsmasstaebe weiter geschaerft; fruehere Lizenzkennungen `RB-09` bis `RB-11` zu `RB-09` zusammengefasst |
+| `0.5` | `2026-04-21` | Datengrundlage der Include-Analyse geklaert, NF-Prioritaeten ergaenzt und Eingabeverhalten weiter praezisiert |
 
 ## 1. Einleitung
 
@@ -175,6 +176,7 @@ Das System muss `compile_commands.json` einlesen und verarbeiten koennen.
 | `F-03` | Muss | Ausgabe einer konkreten Fehlermeldung bei ungueltigen Eingabedaten |
 | `F-04` | Muss | Extraktion mindestens von Quelldateipfad, Arbeitsverzeichnis und Compile-Aufruf je Eintrag |
 | `F-05` | Soll | Verarbeitung zusaetzlicher Build-Metadaten, wenn diese fuer targetbezogene Analysen bereitgestellt werden |
+| `F-41` | Muss | Behandlung einer syntaktisch gueltigen, aber leeren `compile_commands.json` mit einer klaren Rueckmeldung und einem definierten Exit-Code |
 
 ### 6.2 Analyse von Translation Units
 Das System soll Translation Units untersuchen und in einer nachvollziehbaren Reihenfolge ausgeben.
@@ -190,6 +192,8 @@ Das System soll Translation Units untersuchen und in einer nachvollziehbaren Rei
 
 ### 6.3 Include-Analyse
 Das System soll Include-Beziehungen analysieren und Include-Hotspots sichtbar machen.
+
+Die Ermittlung von Include-Beziehungen erfolgt auf Basis der in den Eingabedaten beschriebenen Compile-Aufrufe und weiterer verfuegbarer Build-Informationen. Das konkrete Verfahren, etwa durch Quelltextauswertung, compilergestuetzte Abhaengigkeitsinformationen oder vorhandene Dependency-Artefakte, wird im Pflichtenheft festgelegt.
 
 | Kennung | Prioritaet | Anforderung |
 |---|---|---|
@@ -214,7 +218,7 @@ Das System soll die Auswirkungen einer Dateiaenderung abschaetzen koennen.
 
 | Kennung | Prioritaet | Anforderung |
 |---|---|---|
-| `F-21` | Muss | Eingabe einer geaenderten Datei ueber die CLI |
+| `F-21` | Muss | Angabe eines Dateipfads ueber die CLI, fuer den die Rebuild-Auswirkungen abgeschaetzt werden sollen |
 | `F-22` | Muss | Ausgabe der voraussichtlich betroffenen Translation Units |
 | `F-23` | Muss | Hinweis, wenn die Abschaetzung aufgrund fehlender Daten nur teilweise moeglich ist |
 | `F-24` | Soll | Ausgabe der voraussichtlich betroffenen Targets, sofern targetbezogene Metadaten vorliegen |
@@ -260,7 +264,7 @@ Das System soll konfigurierbar sein.
 ### 7.1 Analyse eines bestehenden Projekts
 Ein Entwickler moechte verstehen, welche Teile des Builds unnoetig komplex sind.
 Er fuehrt eine Projektanalyse aus und erhaelt einen Bericht ueber auffaellige Translation Units und Include-Hotspots.
-Betrifft: `F-06`, `F-07`, `F-08`, `F-12`, `F-13`, `F-14`
+Betrifft: `F-06`, `F-07`, `F-08`, `F-12`, `F-13`, `F-14`, `F-26`
 
 ### 7.2 Abschaetzung der Auswirkung einer Header-Aenderung
 Ein Maintainer plant eine Aenderung an einer zentralen Header-Datei.
@@ -277,60 +281,60 @@ Betrifft: `F-26`, `F-27`, `S-09`, `S-10`, `S-11`
 
 ### 8.1 Benutzbarkeit
 
-| Kennung | Kategorie | Anforderung |
+| Kennung | Prioritaet | Anforderung |
 |---|---|---|
-| `NF-01` | Benutzbarkeit | Die CLI soll konsistent und nachvollziehbar aufgebaut sein. |
-| `NF-02` | Benutzbarkeit | Fehlermeldungen sollen konkret und handlungsorientiert sein. |
-| `NF-03` | Benutzbarkeit | Standardausgaben sollen ohne zusaetzliche Konfiguration sinnvoll nutzbar sein. |
+| `NF-01` | Soll | Die CLI soll konsistent und nachvollziehbar aufgebaut sein. |
+| `NF-02` | Muss | Fehlermeldungen sollen konkret und handlungsorientiert sein. |
+| `NF-03` | Soll | Standardausgaben sollen ohne zusaetzliche Konfiguration sinnvoll nutzbar sein. |
 
 ### 8.2 Performance
 
-| Kennung | Kategorie | Anforderung |
+| Kennung | Prioritaet | Anforderung |
 |---|---|---|
-| `NF-04` | Performance | Auf einer dokumentierten Referenzumgebung sollen Projekte mit bis zu 1.000 Translation Units im ersten Meilenstein in hoechstens 60 Sekunden analysierbar sein. |
-| `NF-05` | Performance | Auf derselben Referenzumgebung soll der Arbeitsspeicherverbrauch bei diesen Projekten 2 GB nicht ueberschreiten. |
-| `NF-06` | Performance | Die fuer Performance-Angaben verwendete Referenzumgebung und das Referenzprojekt muessen dokumentiert werden. |
+| `NF-04` | Soll | Auf einer dokumentierten Referenzumgebung sollen Projekte mit bis zu 1.000 Translation Units im ersten Meilenstein in hoechstens 60 Sekunden analysierbar sein. |
+| `NF-05` | Soll | Auf derselben Referenzumgebung soll der Arbeitsspeicherverbrauch bei diesen Projekten 2 GB nicht ueberschreiten. |
+| `NF-06` | Soll | Die fuer Performance-Angaben verwendete Referenzumgebung und das Referenzprojekt muessen dokumentiert werden. |
 
 Diese Werte gelten als Mindestanforderung fuer den ersten Meilenstein. Fuer spaetere Releases sollen die Grenzwerte auf Basis realer Nutzungserfahrungen und groesserer Referenzprojekte fortgeschrieben werden.
 
 ### 8.3 Portabilitaet
 
-| Kennung | Kategorie | Anforderung |
+| Kennung | Prioritaet | Anforderung |
 |---|---|---|
-| `NF-07` | Portabilitaet | Das Produkt muss auf Linux baubar und nutzbar sein. |
-| `NF-08` | Portabilitaet | Das Produkt soll perspektivisch auch auf macOS und Windows nutzbar sein. |
-| `NF-09` | Portabilitaet | Es soll mit gaengigen Compilern und gaengigen CMake-Versionen einsetzbar sein. |
+| `NF-07` | Muss | Das Produkt muss auf Linux baubar und nutzbar sein. |
+| `NF-08` | Soll | Das Produkt soll perspektivisch auch auf macOS und Windows nutzbar sein. |
+| `NF-09` | Soll | Es soll mit gaengigen Compilern und gaengigen CMake-Versionen einsetzbar sein. |
 
 ### 8.4 Wartbarkeit
 
-| Kennung | Kategorie | Anforderung |
+| Kennung | Prioritaet | Anforderung |
 |---|---|---|
-| `NF-10` | Wartbarkeit | Der Code soll automatisiert testbar sein. |
-| `NF-11` | Wartbarkeit | Das Projekt soll fuer externe Beitragende nachvollziehbar dokumentiert sein. |
+| `NF-10` | Muss | Der Code soll automatisiert testbar sein. |
+| `NF-11` | Soll | Das Projekt soll fuer externe Beitragende nachvollziehbar dokumentiert sein. |
 
 ### 8.5 Erweiterbarkeit
 
-| Kennung | Kategorie | Anforderung |
+| Kennung | Prioritaet | Anforderung |
 |---|---|---|
-| `NF-12` | Erweiterbarkeit | Neue Analysearten sollen mit vertretbarem Aufwand ergaenzbar sein. |
-| `NF-13` | Erweiterbarkeit | Weitere Ausgabeformate sollen spaeter ergaenzbar sein. |
+| `NF-12` | Soll | Neue Analysearten sollen mit vertretbarem Aufwand ergaenzbar sein. |
+| `NF-13` | Soll | Weitere Ausgabeformate sollen spaeter ergaenzbar sein. |
 
 ### 8.6 Zuverlaessigkeit
 
-| Kennung | Kategorie | Anforderung |
+| Kennung | Prioritaet | Anforderung |
 |---|---|---|
-| `NF-14` | Zuverlaessigkeit | Fehlerhafte oder unvollstaendige Eingaben duerfen nicht zu schwer verstaendlichem Verhalten fuehren. |
-| `NF-15` | Zuverlaessigkeit | Die Analyse soll bei gleichen Eingabedaten reproduzierbare Ergebnisse liefern. |
+| `NF-14` | Muss | Fehlerhafte oder unvollstaendige Eingaben duerfen nicht zu schwer verstaendlichem Verhalten fuehren. |
+| `NF-15` | Muss | Die Analyse soll bei gleichen Eingabedaten reproduzierbare Ergebnisse liefern. |
 
 ### 8.7 Dokumentation
 
-| Kennung | Kategorie | Anforderung |
+| Kennung | Prioritaet | Anforderung |
 |---|---|---|
-| `NF-16` | Dokumentation | Das Projekt soll eine verstaendliche README enthalten. |
-| `NF-17` | Dokumentation | Installations- und Nutzungsbeispiele sollen dokumentiert werden. |
-| `NF-18` | Dokumentation | Beispielausgaben fuer die wichtigsten Analysearten sollen vorhanden sein. |
-| `NF-19` | Dokumentation | Fuer zentrale Analysearten sollen Referenzprojekte oder Referenzdaten mit erwarteten Ergebnissen fuer automatisierte Tests vorhanden sein. |
-| `NF-20` | Dokumentation | Fuer maschinenlesbare Ausgabeformate muessen Formatversion oder Schema-Version dokumentiert werden. |
+| `NF-16` | Muss | Das Projekt soll eine verstaendliche README enthalten. |
+| `NF-17` | Muss | Installations- und Nutzungsbeispiele sollen dokumentiert werden. |
+| `NF-18` | Soll | Beispielausgaben fuer die wichtigsten Analysearten sollen vorhanden sein. |
+| `NF-19` | Soll | Fuer zentrale Analysearten sollen Referenzprojekte oder Referenzdaten mit erwarteten Ergebnissen fuer automatisierte Tests vorhanden sein. |
+| `NF-20` | Soll | Fuer maschinenlesbare Ausgabeformate muessen Formatversion oder Schema-Version dokumentiert werden. |
 
 ---
 
@@ -343,7 +347,7 @@ Diese Werte gelten als Mindestanforderung fuer den ersten Meilenstein. Fuer spae
 | `RB-01` | Technisch | Implementierung in **C++** |
 | `RB-02` | Technisch | Build mit **CMake** |
 | `RB-03` | Technisch | Nutzung eines modernen Sprachstandards, mindestens **C++20** |
-| `RB-04` | Technisch | Nutzung in lokalen Entwicklerumgebungen und in CI |
+| `RB-04` | Technisch | Das Produkt darf keine interaktive Laufzeitumgebung voraussetzen und muss in lokalen Entwicklerumgebungen sowie in CI-Automatisierungen nutzbar sein. |
 | `RB-05` | Technisch | quelloffene Entwicklung auf GitHub |
 
 ### 9.2 Organisatorische Randbedingungen
@@ -442,7 +446,7 @@ Das Produkt gilt fuer den ersten Meilenstein als abnahmefaehig, wenn:
 | Kennung | Abnahmekriterium | Prueft |
 |---|---|---|
 | `AK-01` | eine gueltige `compile_commands.json` erfolgreich eingelesen und verarbeitet werden kann | `F-01`, `F-04` |
-| `AK-02` | eine ungueltige oder unvollstaendige `compile_commands.json` mit einer klaren Fehlermeldung und einem Fehler-Exit-Code quittiert wird | `F-02`, `F-03`, `F-33`, `F-34` |
+| `AK-02` | eine ungueltige, leere oder unvollstaendige `compile_commands.json` mit einer klaren Fehlermeldung oder definierten Rueckmeldung und einem passenden Exit-Code behandelt wird | `F-02`, `F-03`, `F-33`, `F-34`, `F-41` |
 | `AK-03` | mindestens ein CLI-Befehl in der Konsolenausgabe eine Rangfolge auffaelliger Translation Units inklusive zugehoeriger Kennzahlen ausgibt | `F-06`, `F-07`, `F-08`, `F-09`, `F-26` |
 | `AK-04` | mindestens ein Bericht Include-Hotspots mit Header-Bezeichnung und Anzahl betroffener Translation Units ausweist | `F-12`, `F-13`, `F-14`, `F-15` |
 | `AK-05` | eine Impact-Analyse fuer eine Datei ausfuehrbar ist und betroffene Translation Units oder einen nachvollziehbaren Hinweis auf fehlende Daten ausgibt | `F-21`, `F-22`, `F-23` |
