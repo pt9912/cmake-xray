@@ -66,7 +66,7 @@ Das Ergebnis im Markdown-Format darstellen und wenn möglich Tabellen verwenden.
 ## Empfohlene nächste Schritte
 
 1. ~~Runtime-Container härten: non-root user, optional read-only root filesystem als Laufzeitvorgabe dokumentieren.~~
-2. Aus den dokumentierten Ports echte Header im Hexagon machen und Adapter daran anbinden.
+2. ~~Aus den dokumentierten Ports echte Header im Hexagon machen und Adapter daran anbinden.~~
 3. Den ersten realen Use Case implementieren: compile_commands.json laden, validieren, Ergebnisobjekt erzeugen.
 4. Verhaltenstests für Erfolg, leere Eingabe und Fehlerfälle ergänzen.
 5. Dependency-Pinning in cmake/Dependencies.cmake:1 nachschärfen.
