@@ -129,6 +129,7 @@ Die fachliche und technische Planung ist in `docs/` abgelegt:
 - [docs/architecture.md](./docs/architecture.md): geplante Systemstruktur und Datenfluesse
 - [docs/roadmap.md](./docs/roadmap.md): inkrementelle Lieferplanung
 - [docs/plan-M0.md](./docs/plan-M0.md): Detailplanung fuer den ersten Meilenstein
+- [docs/plan-M1.md](./docs/plan-M1.md): Detailplanung fuer den zweiten Meilenstein
 - [docs/releasing.md](./docs/releasing.md): minimaler Release-Ablauf fuer Build, Test und Tagging
 
 ## Lizenz
