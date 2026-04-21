@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Architecture `cmake-xray` |
-| Version | `0.3` |
+| Version | `0.4` |
 | Stand | `2026-04-21` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Phasenplan](./roadmap.md) |
@@ -149,7 +149,118 @@ Spaetere Primary Adapter (nicht MVP): IDE-Integration, programmatische API.
 | DotReportAdapter | `ReportWriterPort` | Erzeugt DOT/Graphviz-Ausgabe | spaeter |
 | CmakeFileApiAdapter | `TargetMetadataPort` | Liest Target-Informationen aus der CMake File API | spaeter |
 
-## 4. Datenfluss
+## 4. Verzeichnis- und Dateistruktur
+
+Die Verzeichnisstruktur bildet die hexagonale Zerlegung direkt im Dateisystem ab. Der Kern (`hexagon/`) und die Adapter (`adapters/`) sind auf oberster Ebene getrennt.
+
+```
+cmake-xray/
+├── CMakeLists.txt
+├── src/
+│   ├── CMakeLists.txt
+│   ├── main.cpp                                    # Composition Root: verdrahtet Ports mit Adaptern
+│   │
+│   ├── hexagon/                                    # Application Core
+│   │   ├── CMakeLists.txt
+│   │   ├── model/                                  # Domaenmodelle und Datenstrukturen
+│   │   │   ├── compile_entry.h                     # Einzelner Eintrag aus der Compile-Datenbank
+│   │   │   ├── translation_unit.h                  # TU mit zugeordneten Kennzahlen
+│   │   │   ├── include_graph.h                     # Include-Beziehungen zwischen Dateien
+│   │   │   ├── impact_result.h                     # Ergebnis einer Impact-Analyse
+│   │   │   ├── analysis_result.h                   # Gesamtergebnis einer Projektanalyse
+│   │   │   ├── target_info.h                       # Optionale Target-Metadaten
+│   │   │   └── diagnostic.h                        # Warnungen, Hinweise, Datenluecken
+│   │   │
+│   │   ├── ports/                                  # Port-Schnittstellen
+│   │   │   ├── driving/                            # Primary Ports (Aussenwelt → Kern)
+│   │   │   │   ├── analyze_project_port.h
+│   │   │   │   ├── analyze_impact_port.h
+│   │   │   │   └── generate_report_port.h
+│   │   │   └── driven/                             # Secondary Ports (Kern → Aussenwelt)
+│   │   │       ├── compile_database_port.h
+│   │   │       ├── include_resolver_port.h
+│   │   │       ├── target_metadata_port.h
+│   │   │       └── report_writer_port.h
+│   │   │
+│   │   └── services/                               # Anwendungslogik (implementiert Primary Ports)
+│   │       ├── project_analyzer.h
+│   │       ├── project_analyzer.cpp
+│   │       ├── impact_analyzer.h
+│   │       ├── impact_analyzer.cpp
+│   │       ├── report_generator.h
+│   │       └── report_generator.cpp
+│   │
+│   └── adapters/                                   # Alle Adapter
+│       ├── CMakeLists.txt
+│       ├── cli/                                    # Primary Adapter
+│       │   ├── cli_adapter.h
+│       │   ├── cli_adapter.cpp
+│       │   └── exit_codes.h
+│       ├── input/                                  # Driven Adapter: Eingabequellen
+│       │   ├── compile_commands_json_adapter.h
+│       │   ├── compile_commands_json_adapter.cpp
+│       │   ├── source_parsing_include_adapter.h
+│       │   └── source_parsing_include_adapter.cpp
+│       └── output/                                 # Driven Adapter: Ausgabekanaele
+│           ├── console_report_adapter.h
+│           ├── console_report_adapter.cpp
+│           ├── markdown_report_adapter.h
+│           └── markdown_report_adapter.cpp
+│
+├── tests/
+│   ├── CMakeLists.txt
+│   ├── hexagon/                                    # Unit- und Integrationstests fuer den Kern
+│   │   ├── test_tu_metrics.cpp
+│   │   ├── test_include_analysis.cpp
+│   │   └── test_impact_engine.cpp
+│   ├── adapters/                                   # Adapter-Tests
+│   │   ├── test_compile_commands_json.cpp
+│   │   ├── test_source_parsing_include.cpp
+│   │   ├── test_console_report.cpp
+│   │   └── test_markdown_report.cpp
+│   └── e2e/                                        # End-to-End-Tests ueber CLI
+│       ├── test_cli_analyze.cpp
+│       └── testdata/                               # Referenzprojekte und erwartete Ausgaben
+│
+└── docs/
+    ├── lastenheft.md
+    ├── design.md
+    ├── architecture.md
+    └── roadmap.md
+```
+
+### 4.1 Zuordnung zur hexagonalen Zerlegung
+
+| Verzeichnis | Architekturrolle | Abhaengigkeiten |
+|---|---|---|
+| `src/hexagon/model/` | Domaenmodelle | keine |
+| `src/hexagon/ports/driving/` | Primary Ports | nur `model/` |
+| `src/hexagon/ports/driven/` | Secondary Ports | nur `model/` |
+| `src/hexagon/services/` | Anwendungslogik | `model/`, `ports/` |
+| `src/adapters/cli/` | Primary Adapter | `hexagon/ports/driving/`, `hexagon/model/` |
+| `src/adapters/input/` | Driven Adapter (Eingabe) | `hexagon/ports/driven/`, `hexagon/model/` |
+| `src/adapters/output/` | Driven Adapter (Ausgabe) | `hexagon/ports/driven/`, `hexagon/model/` |
+| `src/main.cpp` | Composition Root | alles (verdrahtet Ports mit konkreten Adaptern) |
+
+### 4.2 CMake-Targets
+
+| CMake-Target | Verzeichnis | Abhaengigkeiten |
+|---|---|---|
+| `xray_hexagon` (library) | `src/hexagon/` | keine externen |
+| `xray_adapters` (library) | `src/adapters/` | `xray_hexagon`, externe Bibliotheken (JSON, CLI-Parsing) |
+| `cmake-xray` (executable) | `src/main.cpp` | `xray_hexagon`, `xray_adapters` |
+| `xray_tests` (executable) | `tests/` | `xray_hexagon`, `xray_adapters`, Test-Framework |
+
+Die Trennung in zwei Libraries stellt sicher, dass `xray_hexagon` **keine** externen Abhaengigkeiten hat. Externe Bibliotheken werden ausschliesslich ueber `xray_adapters` eingebunden.
+
+### 4.3 Konventionen
+
+- Header und Implementierung liegen im selben Verzeichnis.
+- Dateinamen verwenden `snake_case`.
+- Jeder Port ist ein einzelner Header mit einer abstrakten Klasse.
+- Spaetere Adapter (HTML, JSON, DOT, CMake File API) werden in `adapters/output/` bzw. `adapters/input/` ergaenzt, ohne bestehende Dateien zu aendern.
+
+## 5. Datenfluss
 
 1. Der **CLI Adapter** nimmt Kommando, Eingabepfade und Optionen entgegen und ruft den passenden Primary Port auf.
 2. Der Kern ruft ueber den `CompileDatabasePort` die Compile-Eintraege ab. Der Adapter validiert und normalisiert die Daten.
@@ -158,7 +269,7 @@ Spaetere Primary Adapter (nicht MVP): IDE-Integration, programmatische API.
 5. Der Kern reicht das Analyseergebnis (einschliesslich Diagnostics) an den `ReportWriterPort`. Der aktive Adapter erzeugt die Ausgabe im gewaehlten Format.
 6. Der **CLI Adapter** setzt den Exit-Code basierend auf dem Ergebnis.
 
-### 4.1 Abhaengigkeitsrichtung
+### 5.1 Abhaengigkeitsrichtung
 
 Alle Abhaengigkeiten zeigen nach innen:
 
@@ -176,9 +287,9 @@ MarkdownReportAdapter       ◄───────────────┘
 
 Kein Adapter kennt einen anderen Adapter. Der Kern kennt keine konkreten Adapter, nur die Port-Schnittstellen.
 
-## 5. Architekturelle Entscheidungen
+## 6. Architekturelle Entscheidungen
 
-### 5.1 Include-Datenstrategie als austauschbarer Adapter
+### 6.1 Include-Datenstrategie als austauschbarer Adapter
 
 Die offene Frage der Include-Datenherkunft wird durch den `IncludeResolverPort` architekturell geloest. Der Kern arbeitet gegen die Port-Abstraktion; der konkrete Adapter kann ausgetauscht werden, ohne den Kern zu aendern.
 
@@ -190,7 +301,7 @@ Fuer den MVP wird ein einzelner Adapter implementiert. Die bevorzugte Strategie 
 
 Alternative Adapter (compilergestuetzte Dependency-Informationen, vorhandene `.d`-Dateien) koennen spaeter als weitere `IncludeResolverPort`-Implementierungen ergaenzt werden.
 
-### 5.2 Stabilitaet der internen Modelle
+### 6.2 Stabilitaet der internen Modelle
 
 Interne Datenmodelle sollen:
 
@@ -201,11 +312,11 @@ Interne Datenmodelle sollen:
 
 Die Modelle gehoeren zum Kern und sind frei von Adapter-spezifischen Details. Die Port-Schnittstellen verwenden ausschliesslich Kernmodelle, keine adapterspezifischen Typen.
 
-### 5.3 Erweiterbarkeit
+### 6.3 Erweiterbarkeit
 
 Neue Analysearten erweitern den Kern und fuegen bei Bedarf neue Secondary Ports hinzu. Neue Ausgabeformate erfordern nur einen neuen `ReportWriterPort`-Adapter. Neue Eingabequellen erfordern nur einen neuen Adapter fuer den jeweiligen Secondary Port. In keinem Fall muss bestehender Adapter-Code geaendert werden.
 
-### 5.4 Externe Abhaengigkeiten
+### 6.4 Externe Abhaengigkeiten
 
 Externe Abhaengigkeiten sollen minimal gehalten werden, um die Einstiegshuerde fuer Beitragende niedrig zu halten (`RB-06`, `RB-07`). Wo bewaehrte Bibliotheken einen klaren Vorteil gegenueber Eigenimplementierungen bieten, sollen sie bevorzugt werden. Fuer den MVP werden mindestens Entscheidungen zu folgenden Bereichen benoetigt:
 
@@ -215,7 +326,7 @@ Externe Abhaengigkeiten sollen minimal gehalten werden, um die Einstiegshuerde f
 
 Externe Abhaengigkeiten duerfen nur in Adaptern oder in der Adapter-Verdrahtung auftreten, nicht im Kern.
 
-### 5.5 Testbarkeitsstrategie
+### 6.5 Testbarkeitsstrategie
 
 Die hexagonale Architektur unterstuetzt Testbarkeit direkt: Secondary Ports koennen durch Test-Doubles ersetzt werden, ohne Dateisystem oder CLI.
 
@@ -228,11 +339,11 @@ Die hexagonale Architektur unterstuetzt Testbarkeit direkt: Secondary Ports koen
 
 Die Referenzumgebung und Referenzprojekte aus `NF-04` bis `NF-06` und `NF-19` sollen auch als Grundlage fuer die Testinfrastruktur dienen.
 
-### 5.6 Diagnostics als Querschnittsaspekt
+### 6.6 Diagnostics als Querschnittsaspekt
 
 Diagnostics ist kein eigener Port oder Adapter, sondern ein **Protokoll innerhalb des Kerns**. Analyseschritte fuegen Warnungen, Hinweise und Datenluecken an das Analyseergebnis an. Reporter-Adapter geben diese Informationen formatgerecht aus. Der CLI Adapter leitet daraus Exit-Codes ab.
 
-## 6. Risiken fuer die Architektur
+## 7. Risiken fuer die Architektur
 
 | Risiko | Auswirkung | Minderung durch Hexagonal |
 |---|---|---|
@@ -242,7 +353,7 @@ Diagnostics ist kein eigener Port oder Adapter, sondern ein **Protokoll innerhal
 | CLI und Analysekern sind zu eng gekoppelt | schlechte Testbarkeit | CLI ist nur ein Primary Adapter; Kern testbar ueber Ports ohne CLI |
 | Port-Abstraktionen werden zu frueh zu komplex | Over-Engineering | MVP startet mit je einer Implementierung pro Port; Abstraktion waechst mit den Anforderungen |
 
-## 7. Rueckverfolgbarkeit
+## 8. Rueckverfolgbarkeit
 
 | Architekturthema | Lastenheft-Kennungen |
 |---|---|
@@ -253,14 +364,15 @@ Diagnostics ist kein eigener Port oder Adapter, sondern ein **Protokoll innerhal
 | ReportWriterPort / Adapter | `F-26` bis `F-30`, `NF-20` |
 | CLI Adapter | `F-31` bis `F-40`, `NF-01`, `NF-02` |
 | Diagnostics | `F-03`, `F-09`, `F-23`, `NF-02`, `NF-14`, `NF-15` |
+| Verzeichnisstruktur und CMake-Targets | `RB-01`, `RB-02`, `RB-06`, `RB-07` |
 | Externe Abhaengigkeiten | `RB-06`, `RB-07` |
 | Testbarkeit | `NF-10`, `NF-19`, `NF-04` bis `NF-06` |
 | Plattform- und Laufzeitrahmen | `NF-07`, `RB-01` bis `RB-05` |
 
-## 8. Offene Architekturfragen
+## 9. Offene Architekturfragen
 
 - Welche interne Repraesentation eignet sich fuer reproduzierbare Rankings und sortierte Berichte?
 - Soll der `IncludeResolverPort` im MVP bereits mehrere Adapter unterstuetzen oder reicht einer?
 - Wie wird der `SourceParsingIncludeAdapter` mit Compiler-spezifischen Include-Konventionen umgehen (z.B. `__has_include`, bedingte Includes)?
 - Welche Formatversionen werden fuer spaetere JSON-Ausgaben benoetigt?
-- Wie werden Adapter in der Anwendung verdrahtet (manuelle Konstruktion, einfache Factory, Konfiguration)?
+- Soll `main.cpp` die Verdrahtung direkt vornehmen oder eine Factory verwenden?
