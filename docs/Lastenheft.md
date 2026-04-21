@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Lastenheft `cmake-xray` |
-| Version | `0.3` |
+| Version | `0.4` |
 | Stand | `2026-04-21` |
 | Status | Arbeitsstand |
 
@@ -16,6 +16,7 @@
 | `0.1` | `2026-04-21` | Erstfassung des Lastenhefts |
 | `0.2` | `2026-04-21` | Anforderungen konsolidiert, Kennungen eingefuehrt und Tabellenstruktur ergaenzt |
 | `0.3` | `2026-04-21` | Rueckverfolgbarkeit, Dokumentenstand, Messgroessen und Review-Anmerkungen ergaenzt |
+| `0.4` | `2026-04-21` | Kennungsregeln, AK-Abdeckung, Performance-Einordnung und Erfolgsmasstaebe weiter geschaerft; fruehere Lizenzkennungen `RB-09` bis `RB-11` zu `RB-09` zusammengefasst |
 
 ## 1. Einleitung
 
@@ -66,6 +67,8 @@ Verwendete Praefixe:
 - `RB-xx` fuer Randbedingungen
 - `S-xx` fuer Schnittstellenanforderungen
 - `AK-xx` fuer Abnahmekriterien
+
+Nachtraeglich ergaenzte Anforderungen erhalten zur Wahrung stabiler Referenzen die jeweils naechste freie Kennung, auch wenn sie thematisch in einem frueheren Abschnitt einsortiert werden.
 
 ### 1.7 Schreibkonvention
 Dieses Dokument verwendet bewusst ASCII-Umschreibungen wie `ae`, `oe` und `ue`, damit Inhalt und Kennungen in einfachen Textumgebungen, Terminals und Build-Logs konsistent darstellbar bleiben.
@@ -288,6 +291,8 @@ Betrifft: `F-26`, `F-27`, `S-09`, `S-10`, `S-11`
 | `NF-05` | Performance | Auf derselben Referenzumgebung soll der Arbeitsspeicherverbrauch bei diesen Projekten 2 GB nicht ueberschreiten. |
 | `NF-06` | Performance | Die fuer Performance-Angaben verwendete Referenzumgebung und das Referenzprojekt muessen dokumentiert werden. |
 
+Diese Werte gelten als Mindestanforderung fuer den ersten Meilenstein. Fuer spaetere Releases sollen die Grenzwerte auf Basis realer Nutzungserfahrungen und groesserer Referenzprojekte fortgeschrieben werden.
+
 ### 8.3 Portabilitaet
 
 | Kennung | Kategorie | Anforderung |
@@ -366,7 +371,7 @@ Das Produkt soll folgende Eingaben unterstuetzen:
 | Kennung | Typ | Schnittstelle |
 |---|---|---|
 | `S-01` | Eingabe | `compile_commands.json` |
-| `S-02` | Eingabe | optional weitere Build-Metadaten fuer targetbezogene Analysen, zum Beispiel aus CMake-Metadaten oder anderen Build-Artefakten; nicht Bestandteil des MVP |
+| `S-02` | Eingabe | optional weitere Build-Metadaten fuer targetbezogene Analysen, zum Beispiel aus der CMake File API oder anderen Build-Artefakten; nicht Bestandteil des MVP |
 | `S-03` | Eingabe | Dateipfade und Optionen ueber CLI-Parameter |
 
 ### 10.2 Ausgabeschnittstellen
@@ -438,16 +443,19 @@ Das Produkt gilt fuer den ersten Meilenstein als abnahmefaehig, wenn:
 |---|---|---|
 | `AK-01` | eine gueltige `compile_commands.json` erfolgreich eingelesen und verarbeitet werden kann | `F-01`, `F-04` |
 | `AK-02` | eine ungueltige oder unvollstaendige `compile_commands.json` mit einer klaren Fehlermeldung und einem Fehler-Exit-Code quittiert wird | `F-02`, `F-03`, `F-33`, `F-34` |
-| `AK-03` | mindestens ein CLI-Befehl eine Rangfolge auffaelliger Translation Units inklusive zugehoeriger Kennzahlen ausgibt | `F-06`, `F-07`, `F-08`, `F-09` |
+| `AK-03` | mindestens ein CLI-Befehl in der Konsolenausgabe eine Rangfolge auffaelliger Translation Units inklusive zugehoeriger Kennzahlen ausgibt | `F-06`, `F-07`, `F-08`, `F-09`, `F-26` |
 | `AK-04` | mindestens ein Bericht Include-Hotspots mit Header-Bezeichnung und Anzahl betroffener Translation Units ausweist | `F-12`, `F-13`, `F-14`, `F-15` |
 | `AK-05` | eine Impact-Analyse fuer eine Datei ausfuehrbar ist und betroffene Translation Units oder einen nachvollziehbaren Hinweis auf fehlende Daten ausgibt | `F-21`, `F-22`, `F-23` |
 | `AK-06` | ein Markdown-Report erzeugt werden kann | `F-27` |
 | `AK-07` | das Projekt auf Linux baubar und testbar ist | `NF-07`, `RB-01`, `RB-02`, `RB-03` |
 | `AK-08` | eine README mit Installations- und Nutzungsbeispielen vorhanden ist | `NF-16`, `NF-17` |
+| `AK-09` | `--help` fuer Hauptkommando und mindestens ein Unterkommando gibt eine verstaendliche Hilfetextausgabe aus | `F-31`, `F-32` |
 
 ---
 
 ## 14. Risiken
+
+Konkrete Minderungsmassnahmen fuer diese Risiken werden im Projektplan und in spaeteren Umsetzungsdokumenten abgeleitet.
 
 ### 14.1 Fachliche Risiken
 - Die Aussagekraft der Analysen koennte anfangs geringer sein als von Nutzern erwartet.
@@ -468,7 +476,7 @@ Das Produkt gilt fuer den ersten Meilenstein als abnahmefaehig, wenn:
 
 Das Projekt ist erfolgreich, wenn:
 
-- mindestens drei reale CMake-Projekte damit analysiert werden koennen
+- mindestens drei reale CMake-Projekte mit jeweils mindestens 50 Translation Units damit analysiert werden koennen
 - die Berichte in diesen Projekten konkrete Probleme sichtbar machen
 - mindestens ein Projekt das Tool lokal oder in CI einsetzt
 - erste Community-Beitraege oder Feature-Anfragen entstehen
