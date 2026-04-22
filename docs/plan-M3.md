@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M3 `cmake-xray` |
-| Version | `0.5` |
+| Version | `0.6` |
 | Stand | `2026-04-22` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M2](./plan-M2.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -66,6 +66,7 @@ Wichtig:
 - die konkreten Format-Adapter bleiben reine Text-Renderer; sie kennen weder CLI-Optionen noch Dateisystem-Sinks und enthalten keine Dispatch-Logik
 - die bestehenden textbasierten Report-Ports koennen in M3 erhalten bleiben; Port-Churn ist nur dann gerechtfertigt, wenn er fuer gemeinsam genutzte Hilfslogik oder klarere Fehlerpfade tatsaechlich noetig ist
 - Ausgabe- oder Schreibfehler duerfen nicht als Eingabefehler maskiert werden; der bisher reservierte Exit-Code `1` wird in M3 fuer unerwartete Laufzeit- bzw. Report-Schreibfehler aktiviert
+- M3 schaerft die Diagnostics-Vertraege: `AnalysisResult::diagnostics` und `ImpactResult::diagnostics` tragen nur reportweite Hinweise; elementbezogene Diagnostics verbleiben an Ranking-Eintraegen bzw. Include-Hotspots. Falls M2 noch Doppelerfassungen zwischen Elementen und Report-Ebene enthaelt, werden diese vor dem Rendern im Kern bereinigt
 - die Reihenfolge von Abschnitten, Listen und Diagnostics muss explizit dokumentiert und nicht vom Zufall der Eingabereihenfolge abhaengig sein; wenn Reporter selbst nicht sortieren, muss der Kern fuer reportweite Diagnostics eine stabile Reihenfolge liefern
 
 Vorgesehene Artefakte:
@@ -107,11 +108,12 @@ Ein Markdown-Bericht fuer `impact` soll genau folgende Hauptteile in genau diese
   - `Compile database: <display path>`
   - `Changed file: <display path>`
   - `Affected translation units: <count>`
-  - `Heuristic result: yes|no`
-- fuer M3 ist die Semantik von `Heuristic result` fest definiert:
-  - dies ist fuer den Markdown-Report eine bewusste Praezisierung gegenueber der knapperen M2-Kennzeichnung; die folgenden Regeln sind fuer Goldens und Beispiele verbindlich
-  - `yes` bedeutet, dass das Impact-Ergebnis oder ein Null-Treffer nicht ausschliesslich aus einer direkten Quelldatei-Zuordnung stammt, sondern auf heuristischer Include-Graph-Auswertung und/oder fehlender direkter TU-Zuordnung beruht
-  - `no` ist nur zulaessig, wenn mindestens eine betroffene Translation Unit direkt ueber einen bekannten Quelldateipfad gefunden wurde und fuer das Ergebnis keine include-basierte Heuristik benoetigt wurde
+  - `Impact classification: direct|heuristic|uncertain`
+- fuer M3 ist die Semantik von `Impact classification` fest definiert:
+  - die Klassifikation macht die im Design unterschiedenen Ergebnisklassen fuer Goldens und Beispiele explizit sichtbar, statt sie in einem Bool-Wert zusammenzufalten
+  - `direct` ist nur zulaessig, wenn mindestens eine betroffene Translation Unit direkt ueber einen bekannten Quelldateipfad gefunden wurde und fuer das Ergebnis keine include-basierte Heuristik benoetigt wurde
+  - `heuristic` gilt, sobald mindestens eine betroffene Translation Unit ueber den Include-Graphen abgeleitet wurde; direkte und heuristische Treffer duerfen gemeinsam vorkommen, die Ergebnis-Klassifikation bleibt dann `heuristic`
+  - `uncertain` gilt, wenn keine betroffene Translation Unit gefunden wurde und der Null-Treffer deshalb nur unter heuristischer bzw. unvollstaendiger Datengrundlage bewertbar ist; die Datenluecke wird zusaetzlich ueber `## Diagnostics` erklaert
 - bei `0` betroffenen Translation Units direkt nach der Uebersicht die exakte Zeile `No affected translation units found.`
 - Abschnitt exakt `## Directly Affected Translation Units`
 - Abschnitt exakt `## Heuristically Affected Translation Units`
@@ -129,12 +131,13 @@ Formatregeln fuer M3:
 - alle Listen werden exakt in der Reihenfolge der bereits im Kern vorliegenden Ergebnisvektoren ausgegeben; Reporter fuehren in M3 keine zusaetzliche Sortierschicht fuer `translation_units`, `include_hotspots`, deren `affected_translation_units` oder Diagnostics ein
 - fuer `impact` gilt diese Regel ausdruecklich auch fuer reportweite Diagnostics: `ImpactResult::diagnostics` muss bereits im Kern in stabiler, von der Eingabereihenfolge unabhaengiger Reihenfolge vorliegen, damit Markdown- und Konsolen-Goldens bei permutierten `compile_commands.json` bytegleich bleiben koennen
 - `Top limit: <n>` gibt immer den konfigurierten numerischen CLI-Wert wieder; ob Ranking- oder Hotspot-Listen vollstaendig sind, wird ausschliesslich ueber `Translation unit ranking entries: <shown> of <total>` und `Include hotspot entries: <shown> of <total>` ausgewiesen, nicht ueber einen synthetischen Wert wie `all`
-- der Abschnitt `Translation Unit Ranking` wird immer als geordnete Liste ausgegeben; jeder Eintrag besteht exakt aus einer ersten Zeile `<rank>. <source_path> [directory: <directory>]`, einer unmittelbar folgenden und exakt mit vier Leerzeichen eingerueckten Zeile `Metrics: arg_count=<n>, include_path_count=<n>, define_count=<n>` und optional einem unmittelbar folgenden, ebenfalls mit vier Leerzeichen eingerueckten Block `Diagnostics:`; jede Diagnostikzeile ist dann ebenfalls exakt mit vier Leerzeichen eingerueckt und lautet `- <severity>: <message>`
-- der Abschnitt `Include Hotspots` wird immer als geordnete Liste ausgegeben; jeder Eintrag besteht exakt aus einer ersten Zeile `<index>. Header: <path>`, danach aus den jeweils mit vier Leerzeichen eingerueckten Zeilen `Affected translation units: <n>` und `Translation units:`; jede TU-Zeile ist danach ebenfalls exakt mit vier Leerzeichen eingerueckt und lautet `- <source_path> [directory: <directory>]`; ein optionaler `Diagnostics:`-Block folgt ebenfalls mit vier Leerzeichen eingerueckt, und jede Diagnostikzeile lautet dann ebenfalls mit vier Leerzeichen eingerueckt `- <severity>: <message>`
+- der Abschnitt `Translation Unit Ranking` wird immer als geordnete Liste ausgegeben; jeder Eintrag besteht exakt aus einer ersten Zeile `<rank>. <source_path> [directory: <directory>]`, einer unmittelbar folgenden Zeile `Metrics: arg_count=<n>, include_path_count=<n>, define_count=<n>` und optional einem unmittelbar folgenden Block `Diagnostics:`; alle Fortsetzungszeilen werden exakt so weit eingerueckt, dass sie syntaktisch zur geordneten Liste gehoeren und unter dem ersten Zeichen nach `<rank>. ` beginnen. Das bedeutet fuer `1.` bis `9.` vier Leerzeichen, fuer `10.` bis `99.` fuenf und ab `100.` sechs
+- der Abschnitt `Include Hotspots` wird immer als geordnete Liste ausgegeben; jeder Eintrag besteht exakt aus einer ersten Zeile `<index>. Header: <path>`, danach aus den Fortsetzungszeilen `Affected translation units: <n>` und `Translation units:`; jede TU-Zeile lautet `- <source_path> [directory: <directory>]`, ein optionaler `Diagnostics:`-Block enthaelt Zeilen `- <severity>: <message>`. Alle Fortsetzungszeilen werden exakt so weit eingerueckt, dass sie syntaktisch zur geordneten Liste gehoeren und unter dem ersten Zeichen nach `<index>. ` beginnen; fuer einstellige, zweistellige und dreistellige Indizes gilt dieselbe Einrueckungsregel wie im Ranking
 - die Impact-Abschnitte `Directly Affected Translation Units` und `Heuristically Affected Translation Units` werden bei vorhandenen Eintraegen als ungeordnete Listen ausgegeben; jeder Eintrag besteht exakt aus `- <source_path> [directory: <directory>]`, die Impact-Art wird nicht nochmals inline wiederholt, weil sie bereits ueber den Abschnittstitel kodiert ist
+- M3 trennt explizit zwischen elementbezogenen und reportweiten Diagnostics: Inline `Diagnostics:`-Bloecke sind nur fuer elementbezogene Diagnostics zulaessig, also bei einzelnen Ranking-Eintraegen oder Include-Hotspots; der Abschnitt `## Diagnostics` enthaelt ausschliesslich echte reportweite Hinweise aus `AnalysisResult::diagnostics` bzw. `ImpactResult::diagnostics`
 - der Abschnitt `## Diagnostics` wird bei vorhandenen Eintraegen als ungeordnete Liste ausgegeben und enthaelt ausschliesslich reportweite Diagnostics aus `AnalysisResult::diagnostics` bzw. `ImpactResult::diagnostics` in Modellreihenfolge; jeder Eintrag besteht exakt aus `- <severity>: <message>`
-- inline `Diagnostics:`-Bloecke sind nur fuer elementbezogene Diagnostics zulaessig, also bei einzelnen Ranking-Eintraegen oder Include-Hotspots; solche Diagnostics werden in M3 nicht zusaetzlich im globalen Abschnitt `## Diagnostics` wiederholt
-- fuer `impact` gibt es in M3 keine elementbezogenen Diagnostics pro betroffener Translation Unit; Heuristik-Hinweise und Datenluecken dieses Analysepfads erscheinen deshalb ausschliesslich im reportweiten Abschnitt `## Diagnostics`
+- inline `Diagnostics:`-Bloecke werden in M3 nicht zusaetzlich im globalen Abschnitt `## Diagnostics` wiederholt
+- fuer `impact` gibt es in M3 keine elementbezogenen Diagnostics pro betroffener Translation Unit; Heuristik und Datenluecken dieses Analysepfads muessen deshalb mindestens ueber `Impact classification:` in der Uebersicht sichtbar sein und koennen im Abschnitt `## Diagnostics` detailliert ausgefuehrt werden
 - leere Abschnitte sind die einzige Ausnahme von den Listenregeln und verwenden exakt diese Saetze: `No include hotspots found.`, `No directly affected translation units.`, `No heuristically affected translation units.`, `No diagnostics.`
 - pfadtragende Felder verwenden Anzeige-Pfade, nicht Vergleichsschluessel und nicht rohe CLI-Eingaben. Fuer M3 gilt die M2-Trennung unveraendert:
   - `Compile database:` zeigt den lexikalisch normalisierten Aufrufpfad der uebergebenen `compile_commands.json`
@@ -143,7 +146,7 @@ Formatregeln fuer M3:
 - dynamische Pfad- und Meldungstexte werden fuer Markdown maskiert; mindestens Backslash, Backtick, Stern, Unterstrich, eckige Klammern, fuehrende `#` sowie fuehrende Listenmarker werden escaped
 - Pfadangaben werden lexikalisch normalisiert und fuer Golden-Tests in einer kanonischen Aufrufform erzeugt: Die bytegenauen Referenzdateien entstehen aus einem festen Arbeitsverzeichnis mit fixture-relativen Eingabepfaden; Docker-Pruefungen verifizieren denselben Inhaltspfad funktional, aber nicht ueber identische Pfadstrings
 - genau ein abschliessender Zeilenumbruch
-- Heuristik-Hinweise und Datenluecken folgen derselben Platzierungsregel wie andere Diagnostics: elementbezogen inline, reportweit im Abschnitt `## Diagnostics`; Reporter erzeugen dafuer in M3 keine zweite zusammenfassende Spiegelung
+- Heuristik-Hinweise und Datenluecken folgen derselben Platzierungsregel wie andere Diagnostics: elementbezogen inline, reportweit im Abschnitt `## Diagnostics`; komprimierte Statusfelder in der Uebersicht wie `Include analysis heuristic:` oder `Impact classification:` sind zulaessige Ergebniszusammenfassungen und keine zusaetzliche Diagnostik-Spiegelung
 
 Ein moeglicher M3-Zielaufruf ist:
 
@@ -205,11 +208,11 @@ Mit M3 steigt die Regressionsempfindlichkeit: Schon kleine Aenderungen an Sortie
 
 Mindestens benoetigt:
 
-- Adapter-Tests fuer `MarkdownReportAdapter`, insbesondere fuer feste Abschnittsreihenfolge, literal festgelegte Ueberschriften und Leersaetze, exakt spezifizierte mehrzeilige Listenform, Vollstaendigkeitsangaben zu `--top`, Markdown-Escaping, Heuristik-Kennzeichnung und Diagnostics
+- Adapter-Tests fuer `MarkdownReportAdapter`, insbesondere fuer feste Abschnittsreihenfolge, literal festgelegte Ueberschriften und Leersaetze, exakt spezifizierte mehrzeilige Listenform einschliesslich markerabhaengiger Einrueckung bei mehrstelligen Ordnungszahlen, Vollstaendigkeitsangaben zu `--top`, Markdown-Escaping, Impact-Klassifikation und Diagnostics
 - CLI-Tests fuer `--format markdown`, `--output`, ungueltige Kombinationen, Report-Schreibfehler und den Dateivertrag ohne teilgeschriebene Zieldatei
 - End-to-End-Tests, die zentrale Konsolen- und Markdown-Ausgaben gegen erwartete Dateien vergleichen
 - Golden-Outputs fuer zentrale Erfolgsfaelle von `analyze` und `impact`, jeweils fuer Konsole und Markdown
-- Tests dafuer, dass dieselben fachlichen Daten in Konsole und Markdown konsistent wiedergegeben werden, pfadtragende Felder dieselbe Anzeigesemantik verwenden und reportweite `impact`-Diagnostics auch bei permutierten Eingaben stabil bleiben
+- Tests dafuer, dass dieselben fachlichen Daten in Konsole und Markdown konsistent wiedergegeben werden, pfadtragende Felder dieselbe Anzeigesemantik verwenden, `Impact classification` die Ergebnisklasse korrekt abbildet und reportweite `impact`-Diagnostics auch bei permutierten Eingaben stabil bleiben
 
 Fuer M3 gilt eine klare Referenzquellen-Regel:
 
@@ -235,7 +238,7 @@ Golden-Output-Regeln fuer M3:
 - erwartete Ausgaben enthalten keine volatilen Werte wie Zeitstempel oder temporaere Verzeichnisse
 - reine Versionshebungen ohne Format- oder Inhaltsaenderung duerfen keine Regeneration von Report-Golden-Files oder `docs/examples/` erzwingen
 - die literal festgelegten Abschnittstitel, Leersaetze und Listenformen sind Teil des Golden-Vertrags und werden bytegenau abgesichert
-- mehrzeilige Listeneintraege, Einrueckung, Diagnostikformate und die Vollstaendigkeitsangaben fuer `--top` gehoeren explizit zum Golden-Vertrag
+- mehrzeilige Listeneintraege, markerabhaengige Einrueckung geordneter Listen, Diagnostikformate, `Impact classification` und die Vollstaendigkeitsangaben fuer `--top` gehoeren explizit zum Golden-Vertrag
 - fuer `impact` gehoert auch die stabile Reihenfolge reportweiter Diagnostics zum Golden-Vertrag; dieselbe `compile_commands.json` in anderer Eingabereihenfolge darf keinen anderen Markdown- oder Konsolenreport erzeugen
 - pfadtragende Golden-Files und `docs/examples/` werden aus derselben kanonischen Aufrufform erzeugt; Docker-Smoke-Tests sind kein Ersatz fuer diese bytegenaue Referenzquelle
 - Vergleiche sollen byte-stabil sein oder hoechstens zeilenendungsbezogen auf LF normalisieren; fachliche Vergleiche "ungefaehr gleich" reichen fuer M3 nicht aus
@@ -452,9 +455,9 @@ Die Pruefung soll insbesondere bestaetigen:
 | Dateiausgabe | `--output <path>` ist nur fuer Markdown zulaessig; ohne `--output` geht Markdown auf `stdout`, mit `--output` bleibt `stdout` bei Erfolg leer; der Zielpfad wird nur nach vollstaendig erfolgreichem Schreiben ersetzt | AP 1.3 |
 | Schreibfehler | nicht beschreibbare Report-Pfade nutzen Exit-Code `1`; Eingabefehler behalten `3` und `4` | AP 1.1, 1.3 |
 | Verantwortung der Report-Strecke | Report-Adapter erzeugen Text; `stdout`/Dateisystem-Entscheidung bleibt ausserhalb des Hexagons | AP 1.1 |
-| Markdown-Vertrag | M3 fixiert literal die Ueberschriften, Abschnittsreihenfolge, Listenformen einschliesslich Einrueckung und Eintragsformat, die expliziten Leer-Saetze als Ausnahme fuer leere Abschnitte, `--top`-Vollstaendigkeitsangaben und Escaping-Regeln; Reporter geben Ergebnisvektoren in Modellreihenfolge aus, und der Kern liefert dafuer insbesondere reportweite `impact`-Diagnostics bereits in stabiler Reihenfolge | AP 1.2, 1.4 |
-| Heuristik-Semantik fuer `impact` | `Heuristic result: yes` umfasst im Markdown-Report bewusst sowohl include-basierte Treffer als auch Null-Treffer ohne direkte TU-Zuordnung; `no` ist nur fuer rein direkte Quelldatei-Treffer zulaessig | AP 1.2, 1.4 |
-| Platzierung von Diagnostics | reportweite Diagnostics stehen ausschliesslich im Abschnitt `## Diagnostics`; elementbezogene Diagnostics bleiben inline und werden nicht gespiegelt | AP 1.2, 1.4 |
+| Markdown-Vertrag | M3 fixiert literal die Ueberschriften, Abschnittsreihenfolge, Listenformen einschliesslich markerabhaengiger Einrueckung und Eintragsformat, die expliziten Leer-Saetze als Ausnahme fuer leere Abschnitte, `--top`-Vollstaendigkeitsangaben, `Impact classification` und Escaping-Regeln; Reporter geben Ergebnisvektoren in Modellreihenfolge aus, und der Kern liefert dafuer insbesondere reportweite `impact`-Diagnostics bereits in stabiler Reihenfolge | AP 1.2, 1.4 |
+| Impact-Klassifikation | Der Markdown-Report unterscheidet die Ergebnisklassen `direct`, `heuristic` und `uncertain`; damit bleiben direkte, heuristisch abgeleitete und unklare Null-Treffer sichtbar getrennt | AP 1.2, 1.4 |
+| Platzierung von Diagnostics | elementbezogene Diagnostics bleiben inline; `## Diagnostics` enthaelt nur echte reportweite Hinweise und wird nicht mit Element-Diagnostics dupliziert. Fuer `impact` bleibt Unsicherheit zusaetzlich ueber `Impact classification` in der Uebersicht sichtbar | AP 1.1, 1.2, 1.4 |
 | Versionsdarstellung im Report | Die Tool-Version ist kein Bestandteil des Report-Bodys; reine Versionshebungen duerfen Report-Goldens nicht invalidieren | AP 1.2, 1.4 |
 | Pfaddarstellung im Report | Markdown nutzt dieselben Anzeige-Pfadregeln wie M2; Vergleichsschluessel bleiben intern, angezeigt werden normalisierte Display-Pfade | AP 1.2, 1.4 |
 | Markdown-Stil | einfaches, diffbares Markdown ohne HTML, Zeitstempel oder sonstige volatile Metadaten | AP 1.2 |
