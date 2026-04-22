@@ -5,8 +5,8 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M1 `cmake-xray` |
-| Version | `0.2` |
-| Stand | `2026-04-21` |
+| Version | `0.3` |
+| Stand | `2026-04-22` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M0](./plan-M0.md), [Qualitaet](./quality.md) |
 
@@ -22,7 +22,7 @@ M1 gilt als erreicht, wenn:
 - die CLI fuer Erfolg und Fehlerfaelle nachvollziehbare Exit-Codes verwendet
 - Adapter-, Hexagon- und End-to-End-Tests die M1-Faelle automatisiert absichern
 
-Relevante Kennungen: `F-01`, `F-02`, `F-03`, `F-04`, `F-31`, `F-32`, `F-33`, `F-34`, `F-41`, `NF-01`, `NF-02`, `NF-14`, `AK-01`, `AK-02`, `AK-09`
+Relevante Kennungen: `F-01`, `F-02`, `F-03`, `F-04`, `F-31`, `F-32`, `F-33`, `F-34`, `F-41`, `NF-01`, `NF-02`, `NF-10`, `NF-14`, `AK-01`, `AK-02`, `AK-09`
 
 ### 0.3 Abgrenzung
 Bestandteil von M1 sind:
@@ -89,7 +89,7 @@ Der Adapter soll mindestens:
 - eine leere, aber syntaktisch gueltige Datei gezielt erkennen (`F-41`)
 - pro Eintrag die Pflichtinformationen validieren
 - unvollstaendige oder unbrauchbare Eintraege mit klarer Rueckmeldung behandeln
-- bei gemischt gueltigen und ungueltigen Eintraegen alle Fehler sammeln und zusammen melden, nicht beim ersten Fehler abbrechen
+- bei gemischt gueltigen und ungueltigen Eintraegen alle Fehler sammeln und zusammen melden, nicht beim ersten Fehler abbrechen — enthaelt die Datei mindestens einen ungueltigen Eintrag, wird die gesamte Datenbasis abgelehnt (kein Teilerfolg)
 
 Fuer M1 genuegt DOM-Parsing mit nlohmann/json ohne Groessenlimit. SAX-Parsing oder Eingabebegrenzung koennen in spaeteren Phasen ergaenzt werden, wenn reale Projekte das erfordern.
 
@@ -142,7 +142,7 @@ Anforderungen fuer die erste CLI-Struktur:
 M1 muss noch keine fachliche Analyse aus Phase 2 liefern. Bei gueltigen Eingaben gibt die CLI eine Bestaetigung mit der Anzahl geladener Eintraege aus, zum Beispiel:
 
 ```text
-compile database loaded: 42 translation units
+compile database loaded: 42 entries
 ```
 
 Damit ist der gesamte Pfad von CLI ueber Driving Port bis zum Adapter nachweisbar verdrahtet, ohne dass fachliche Analyseergebnisse vorliegen muessen.
@@ -196,11 +196,21 @@ Fehlermeldungen sollen nach einem einheitlichen Muster aufgebaut sein:
 - betroffenen Pfad oder Eintrag nennen
 - einen naechsten Schritt vorschlagen, sofern sinnvoll
 
-Beispiel:
+Beispiel fuer einen einzelnen Fehler:
 
 ```text
 error: compile_commands.json is empty: /path/to/compile_commands.json
 hint: generate the compilation database before running cmake-xray analyze
+```
+
+Beispiel fuer mehrere gesammelte Eintragsfehler:
+
+```text
+error: compile_commands.json contains 3 invalid entries: /path/to/compile_commands.json
+  entry 2: missing "file" field
+  entry 5: missing "directory" field
+  entry 7: missing "command" and "arguments"
+hint: fix or regenerate the compilation database before running cmake-xray analyze
 ```
 
 **Ergebnis**: Exit-Codes und Fehlermeldungen sind konsistent, automatisiert pruefbar und in README oder Hilfe dokumentiert.
@@ -225,6 +235,7 @@ Entscheidung fuer M1:
 - der explizite CLI-Pfad ist der Primaerpfad
 - ein impliziter Standardpfad ist optional, aber kein Abschlusskriterium fuer M1
 - falls ein Standardpfad unterstuetzt wird, muss `--help` das Verhalten eindeutig benennen
+- Hinweis: Wird in einem spaeteren Milestone ein Standardpfad eingefuehrt, aendert sich `--compile-commands` von einem Pflichtargument zu einem optionalen Argument. Dieses Breaking Change ist akzeptiert und wird im jeweiligen Milestone-CHANGELOG dokumentiert
 
 **Ergebnis**: Eingabepfade sind explizit steuerbar und die CLI bleibt fuer spaetere Optionen erweiterbar.
 
@@ -271,6 +282,11 @@ Mindestens abzudeckende Testmatrix:
 | Eintrag ohne `file` | Exit `4`, Eintragsfehler benannt |
 | Eintrag ohne `directory` | Exit `4`, Eintragsfehler benannt |
 | Eintrag ohne `command` und ohne `arguments` | Exit `4`, Eintragsfehler benannt |
+| Eintrag nur mit `command`, kein `arguments` | Exit `0`, `command` wird verwendet |
+| Eintrag mit `command` und `arguments` | Exit `0`, `arguments` bevorzugt |
+| Eintrag mit leerem `arguments` (`[]`) und gueltigem `command` | Exit `0`, Fallback auf `command` |
+| Eintrag mit leerem `arguments` (`[]`) und ohne `command` | Exit `4`, Eintragsfehler benannt |
+| gemischt gueltige und ungueltige Eintraege | Exit `4`, alle Fehler gesammelt, Datenbasis abgelehnt |
 | `--help` fuer Hauptkommando | Exit `0`, Hilfetext auf `stdout` |
 | `analyze --help` | Exit `0`, Hilfetext auf `stdout` |
 | fehlendes Pflichtargument `--compile-commands` | Exit `2`, Nutzungsfehler |
@@ -323,7 +339,7 @@ Hinweis: Die konkreten Dateinamen duerfen von dieser Zielstruktur abweichen, wen
 | 3 | 1.3 CLI-Grundstruktur fuer M1 aufbauen | 1a, 1b, 2 |
 | 4 | 1.5 Konfigurierbare Eingabepfade vorbereiten | 3 |
 | 5 | 1.6b CLI- und End-to-End-Tests fuer M1 | 3, 4 |
-| 6 | 1.7 README und Nutzungsbeispiele aktualisieren | 3, 4, 5 |
+| 6 | 1.7 README, CHANGELOG und Nutzungsbeispiele aktualisieren | 3, 4, 5 |
 
 Schritte 1a und 1b koennen parallel bearbeitet werden. Die Exit-Code-Regeln (1b) sind eine reine Konventionsentscheidung ohne Code-Abhaengigkeit zum Kernmodell und sollten frueh feststehen, damit Adapter und CLI sie von Anfang an korrekt verwenden. Adapter-Tests (2t) koennen direkt nach dem Adapter geschrieben werden, ohne auf die CLI zu warten; CLI- und End-to-End-Tests (5) setzen die fertige CLI voraus.
 
@@ -349,21 +365,21 @@ cd build && ctest --output-on-failure
 ```bash
 docker build --target test -t cmake-xray:test .
 docker build --target runtime -t cmake-xray .
-docker run --rm cmake-xray --help
-docker run --rm cmake-xray analyze --help
+docker run --rm cmake-xray --help && echo "exit: $?"
+docker run --rm cmake-xray analyze --help && echo "exit: $?"
 docker run --rm \
   -v "$PWD/tests/e2e/testdata:/data:ro" \
-  cmake-xray analyze --compile-commands /data/valid/compile_commands.json
+  cmake-xray analyze --compile-commands /data/valid/compile_commands.json; echo "exit: $?"
 docker run --rm \
   -v "$PWD/tests/e2e/testdata:/data:ro" \
-  cmake-xray analyze --compile-commands /data/empty/compile_commands.json
+  cmake-xray analyze --compile-commands /data/empty/compile_commands.json; echo "exit: $?"
 docker run --rm \
   -v "$PWD/tests/e2e/testdata:/data:ro" \
-  cmake-xray analyze --compile-commands /data/invalid_syntax/compile_commands.json
+  cmake-xray analyze --compile-commands /data/invalid_syntax/compile_commands.json; echo "exit: $?"
 docker run --rm \
   -v "$PWD/tests/e2e/testdata:/data:ro" \
-  cmake-xray analyze --compile-commands /data/missing_fields/compile_commands.json
-docker run --rm cmake-xray analyze --compile-commands /nonexistent/compile_commands.json
+  cmake-xray analyze --compile-commands /data/missing_fields/compile_commands.json; echo "exit: $?"
+docker run --rm cmake-xray analyze --compile-commands /nonexistent/compile_commands.json; echo "exit: $?"
 ```
 
 Hinweis: Falls das Runtime-Image bewusst schlank bleiben soll, werden Referenzdaten fuer den Docker-Pruefpfad per Bind-Mount bereitgestellt statt ins Image kopiert. Der Test gegen `/nonexistent/...` prueft den Fehlerpfad ohne Bind-Mount.
@@ -386,11 +402,11 @@ Hinweis: Falls das Runtime-Image bewusst schlank bleiben soll, werden Referenzda
 |---|---|---|
 | Exit-Code-Mapping | `0`/`2`/`3`/`4` gemaess Tabelle in AP 1.4 | AP 1.4 |
 | `command` vs. `arguments` | Beide akzeptiert; `arguments` bevorzugt wenn beide vorhanden, `command` als Fallback — kein Hinweis bei Koexistenz | AP 1.2 |
-| Standardpfad in M1 | Optional, kein Abschlusskriterium | AP 1.5 |
-| Minimalverhalten bei Erfolg | Ausgabe der Anzahl geladener Eintraege | AP 1.3 |
+| Standardpfad in M1 | Optional, kein Abschlusskriterium — kuenftiges Breaking Change (`--compile-commands` wird optional) ist akzeptiert | AP 1.5 |
+| Minimalverhalten bei Erfolg | Ausgabe der Anzahl geladener Eintraege (`entries`, nicht `translation units` — eine TU kann mehrere Eintraege haben) | AP 1.3 |
 | Diagnose-zu-Exit-Code-Zuordnung | Liegt im CLI-Adapter, nicht im Hexagon | AP 1.1, 1.4 |
 | JSON-Parsing-Strategie | DOM-Parsing mit nlohmann/json, kein Groessenlimit fuer M1 | AP 1.2 |
-| Gemischt gueltige/ungueltige Eintraege | Alle Fehler sammeln und zusammen auf `stderr` melden, Exit `4` — vermeidet Korrekturschleifen bei systematischen Problemen | AP 1.2, 1.4 |
+| Gemischt gueltige/ungueltige Eintraege | Alle Fehler sammeln und zusammen auf `stderr` melden, Exit `4` — gesamte Datenbasis wird abgelehnt (kein Teilerfolg), vermeidet Korrekturschleifen bei systematischen Problemen | AP 1.2, 1.4 |
 | Leeres `arguments`-Array | Gilt als "nicht vorhanden"; ist zusaetzlich kein `command` gesetzt, ist der Eintrag ungueltig | AP 1.2 |
 | Optionale Felder (`output`) | Werden fuer M1 nicht ausgewertet und bei der Validierung ignoriert | AP 1.2 |
 | Exit-Code `1` | Reserviert fuer unerwartete Laufzeitfehler, wird in M1 nicht aktiv vergeben | AP 1.4 |

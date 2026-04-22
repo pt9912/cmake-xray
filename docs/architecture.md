@@ -5,8 +5,8 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Architecture `cmake-xray` |
-| Version | `0.4` |
-| Stand | `2026-04-21` |
+| Version | `0.5` |
+| Stand | `2026-04-22` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Phasenplan](./roadmap.md) |
 
@@ -140,7 +140,7 @@ Spaetere Primary Adapter (nicht MVP): IDE-Integration, programmatische API.
 | Adapter | Implementiert | Beschreibung | MVP |
 |---|---|---|---|
 | CompileCommandsJsonAdapter | `CompileDatabasePort` | Liest und validiert `compile_commands.json` | ja |
-| SourceParsingIncludeAdapter | `IncludeResolverPort` | Parst Quelldateien entlang der `-I`-Pfade aus dem Compile-Aufruf; **experimentelle MVP-Heuristik** mit bekannten Einschraenkungen (siehe 6.1) | ja (experimentell) |
+| SourceParsingIncludeAdapter | `IncludeResolverPort` | Parst Quelldateien entlang der `-I`-Pfade aus dem Compile-Aufruf; **experimentelle MVP-Heuristik** mit bekannten Einschraenkungen (siehe 6.1) und einzige Include-Adapter-Implementierung im MVP | ja (einziger MVP-Adapter, experimentell) |
 | CompilerDepsIncludeAdapter | `IncludeResolverPort` | Wertet `.d`-Dependency-Dateien oder compilergestuetzte `-M`-Ausgaben aus | spaeter |
 | ConsoleReportAdapter | `ReportWriterPort` | Schreibt Ergebnisse auf die Konsole | ja |
 | MarkdownReportAdapter | `ReportWriterPort` | Erzeugt einen Markdown-Bericht | ja |
@@ -148,6 +148,8 @@ Spaetere Primary Adapter (nicht MVP): IDE-Integration, programmatische API.
 | JsonReportAdapter | `ReportWriterPort` | Erzeugt JSON-Ausgabe mit Schema-Version | spaeter |
 | DotReportAdapter | `ReportWriterPort` | Erzeugt DOT/Graphviz-Ausgabe | spaeter |
 | CmakeFileApiAdapter | `TargetMetadataPort` | Liest Target-Informationen aus der CMake File API | spaeter |
+
+Der MVP startet mit genau einer Implementierung des `IncludeResolverPort`. Weitere Include-Adapter werden erst nach Stabilisierung des MVP eingefuehrt, damit Portverhalten, Diagnostics und Ergebniskennzeichnung zunaechst an einer einzigen Datenstrategie geschaerft werden koennen.
 
 ## 4. Verzeichnis- und Dateistruktur
 
@@ -327,6 +329,8 @@ Die Modelle gehoeren zum Kern und sind frei von Adapter-spezifischen Details. Di
 
 Neue Analysearten erweitern den Kern und fuegen bei Bedarf neue Secondary Ports hinzu. Neue Ausgabeformate erfordern nur einen neuen `ReportWriterPort`-Adapter. Neue Eingabequellen erfordern nur einen neuen Adapter fuer den jeweiligen Secondary Port. In keinem Fall muss bestehender Adapter-Code geaendert werden.
 
+Fuer targetbezogene Zusatzdaten bleibt der `TargetMetadataPort` bereits im MVP Teil der Architektur, darf dort aber leer bleiben. Eine konkrete Implementierung lohnt sich erst nach stabilem MVP; der erste Ausbauschritt soll mit der TU-zu-Target-Zuordnung (`F-19`) und der targetbezogenen Ausgabe in der Impact-Analyse (`F-24`) beginnen. Weitergehende Target-Graph-Analysen (`F-18`, `F-20`, `F-25`) folgen danach.
+
 ### 6.4 Externe Abhaengigkeiten
 
 Externe Abhaengigkeiten sollen minimal gehalten werden (`RB-10`), um Build-Komplexitaet und Einstiegshuerde fuer Beitragende gering zu halten (`RB-06`, `RB-07`). Wo bewaehrte Bibliotheken einen klaren Vorteil gegenueber Eigenimplementierungen bieten, sollen sie bevorzugt werden. Fuer den MVP werden mindestens Entscheidungen zu folgenden Bereichen benoetigt:
@@ -349,6 +353,8 @@ Die hexagonale Architektur unterstuetzt Testbarkeit direkt: Secondary Ports koen
 | End-to-End-Tests | CLI-Werkzeug als Ganzes | Referenzprojekte (`NF-19`); Ausgaben gegen erwartete Ergebnisse vergleichen |
 
 Die Referenzumgebung und Referenzprojekte aus `NF-04` bis `NF-06` und `NF-19` sollen auch als Grundlage fuer die Testinfrastruktur dienen.
+
+Als erste gemeinsame Grundlage fuer Performance- und Testaussagen wird ein versioniertes synthetisches CMake-Referenzprojekt im Repository vorgesehen. Es soll reproduzierbar mehrere Groessenstufen, mindestens `250`, `500` und `1.000` Translation Units, sowie kontrollierte Include-Hotspots bereitstellen.
 
 ### 6.6 Diagnostics als Querschnittsaspekt
 
@@ -383,7 +389,6 @@ Diagnostics ist kein eigener Port oder Adapter, sondern ein **Protokoll innerhal
 ## 9. Offene Architekturfragen
 
 - Welche interne Repraesentation eignet sich fuer reproduzierbare Rankings und sortierte Berichte?
-- Soll der `IncludeResolverPort` im MVP bereits mehrere Adapter unterstuetzen oder reicht einer?
 - Wie wird der `SourceParsingIncludeAdapter` mit Compiler-spezifischen Include-Konventionen umgehen (z.B. `__has_include`, bedingte Includes)?
 - Welche Formatversionen werden fuer spaetere JSON-Ausgaben benoetigt?
 - Soll `main.cpp` die Verdrahtung direkt vornehmen oder eine Factory verwenden?

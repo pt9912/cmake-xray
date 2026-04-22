@@ -5,8 +5,8 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Phasenplan `cmake-xray` |
-| Version | `0.4` |
-| Stand | `2026-04-21` |
+| Version | `0.5` |
+| Stand | `2026-04-22` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md) |
 
@@ -72,7 +72,7 @@ Ziel: die fachlich zentralen Analysen des ersten Releases liefern nutzbare Ergeb
 
 | Arbeitspaket | Relevante Kennungen |
 |---|---|
-| Application Core: Translation-Unit-Ranking | `F-06` bis `F-09`, `AK-03` |
+| Application Core: Translation-Unit-Ranking auf Basis von `arg_count`, `include_path_count` und `define_count` | `F-06` bis `F-09`, `AK-03` |
 | `IncludeResolverPort` und MVP-Adapter: Include-Hotspot-Analyse | `F-12` bis `F-15`, `AK-04` |
 | Application Core: Dateibasierte Impact-Analyse | `F-21` bis `F-23`, `AK-05` |
 | `ConsoleReportAdapter` (`ReportWriterPort`): Konsolenausgabe der Ergebnisse | `F-26`, `AK-03` |
@@ -88,7 +88,7 @@ Ziel: Ergebnisse werden fuer reale Nutzung, Dokumentation und Absicherung stabil
 |---|---|
 | `MarkdownReportAdapter` (`ReportWriterPort`): Markdown-Report | `F-27`, `AK-06` |
 | Referenzdaten und automatisierte Tests | `NF-10`, `NF-19` |
-| Performance-Baseline und Referenzumgebung | `NF-04`, `NF-05`, `NF-06` |
+| Performance-Baseline und Referenzumgebung mit versioniertem Referenzprojekt im Repository | `NF-04`, `NF-05`, `NF-06` |
 | Beispielausgaben und Nutzungsdokumentation | `NF-18`, `AK-08` |
 
 **Milestone M3 / MVP (`v1.0.0`)**: Alle Abnahmekriterien `AK-01` bis `AK-09` sind erfuellt. Ein Markdown-Report kann erzeugt werden, die README enthaelt Installations- und Nutzungsbeispiele, automatisierte Tests laufen gegen Referenzdaten, und die Performance-Baseline ist dokumentiert. Das Produkt ist als MVP lieferbar.
@@ -99,7 +99,7 @@ Ziel: nicht-MVP-Funktionen kontrolliert aufbauen.
 
 | Arbeitspaket | Relevante Kennungen |
 |---|---|
-| `CmakeFileApiAdapter` (`TargetMetadataPort`): Target-Metadaten und Target-Analyse | `F-18` bis `F-20`, `F-24`, `F-25`, `S-02` |
+| `CmakeFileApiAdapter` (`TargetMetadataPort`): Target-Metadaten und initiale Target-Sicht; Einstieg mit TU-zu-Target-Zuordnung und targetbezogener Impact-Ausgabe | `F-18` bis `F-20`, `F-24`, `F-25`, `S-02` |
 | `HtmlReportAdapter`: HTML-Export | `F-28` |
 | `JsonReportAdapter` und `DotReportAdapter`: JSON- und DOT-Ausgaben | `F-29`, `F-30`, `NF-20` |
 | Erweiterte Plattformunterstuetzung | `NF-08`, `NF-09` |
@@ -137,9 +137,9 @@ Nicht Bestandteil des MVP sind insbesondere:
 | optionale Target-Metadaten sind uneinheitlich | Phase 4 wird staerker experimentell |
 | Performance reicht fuer Referenzprojekte nicht aus | Phase 3 braucht zusaetzliche Optimierungsschleifen |
 
-## 7. Offene Planungsfragen
+## 7. Planungsentscheidungen
 
-- Welches Referenzprojekt soll fuer `NF-04` bis `NF-06` zuerst verwendet werden?
-- Welche minimale Kennzahlenmenge reicht fuer das erste Translation-Unit-Ranking?
-- Welcher `IncludeResolverPort`-Adapter ist fuer den MVP am risikoaermsten?
-- Wann lohnt sich der Einstieg in targetbezogene Zusatzdaten?
+- Fuer `NF-04` bis `NF-06` wird zuerst ein **versioniertes, synthetisches CMake-Referenzprojekt im Repository** verwendet. Es soll reproduzierbar mehrere Groessenstufen abdecken, mindestens `250`, `500` und `1.000` Translation Units, und zugleich als Grundlage fuer `NF-19` dienen.
+- Fuer das erste Translation-Unit-Ranking reicht als Minimalmenge die Kombination aus `arg_count`, `include_path_count` und `define_count`. Diese Kennzahlen sind direkt aus der Compile-Datenbank ableitbar und entkoppeln das erste Ranking von der heuristischen Include-Aufloesung.
+- Fuer den MVP ist der `SourceParsingIncludeAdapter` der risikoaermste `IncludeResolverPort`-Adapter. Er bleibt im MVP die einzige Implementierung; seine Ergebnisse werden als heuristisch gekennzeichnet.
+- Der Einstieg in targetbezogene Zusatzdaten lohnt sich erst nach stabilem MVP, also in Phase 4. Der erste Ausbauschritt soll mit `F-19` und `F-24` beginnen, bevor weitergehende Target-Graph-Analysen folgen.

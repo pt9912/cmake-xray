@@ -5,8 +5,8 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Design `cmake-xray` |
-| Version | `0.2` |
-| Stand | `2026-04-21` |
+| Version | `0.3` |
+| Stand | `2026-04-22` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md) |
 
@@ -59,6 +59,14 @@ Geplante Ergebnisbausteine:
 | Rang | Position innerhalb der auffaelligen Translation Units | `F-07` |
 | Kennzahlen | Werte, die zur Einstufung herangezogen wurden | `F-08`, `F-09` |
 | Kontext | Einordnung relativ zu anderen Dateien oder Grenzwerten | `F-09`, `F-10` |
+
+Fuer das erste Ranking werden standardmaessig drei compile-database-basierte Kennzahlen verwendet:
+
+- `arg_count`: Anzahl der Argumente des Compile-Aufrufs
+- `include_path_count`: Anzahl erkannter Include-Suchpfade aus `-I`, `-isystem` und `-iquote`
+- `define_count`: Anzahl gesetzter Praeprozessor-Defines aus `-D`
+
+Diese Minimalmenge ist fuer den MVP ausreichend, weil sie ohne weitere Quelltext- oder Include-Heuristiken verfuegbar ist. Include-basierte Kennzahlen wie Anzahl aufgeloester Includes oder Include-Tiefe koennen spaeter als zusaetzlicher Kontext ergaenzt werden, sollen aber die erste Rangfolge nicht voraussetzen.
 
 ### 3.2 Include-Hotspots
 
@@ -150,7 +158,6 @@ Relevante Anforderungen: `F-09`, `F-23`, `NF-02`, `NF-14`
 
 ## 8. Offene Designfragen
 
-- Welche Standard-Kennzahlen sollen fuer die erste Einstufung auffaelliger Translation Units verwendet werden?
 - Welche Detailtiefe soll der `--verbose`-Modus liefern, ohne die Standardausgabe zu ueberladen?
 - Wie sollen teilweise fehlende Include- oder Target-Daten visuell und sprachlich markiert werden?
 - Welche Struktur soll ein Markdown-Bericht fuer spaetere Automatisierung und Diffbarkeit bekommen?
