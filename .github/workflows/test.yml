@@ -1,0 +1,48 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-test:
+    name: Docker Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build test image
+        run: docker build --target test -t cmake-xray:test .
+
+      - name: Enforce coverage threshold
+        run: docker build --target coverage-check -t cmake-xray:coverage-check .
+
+      - name: Build coverage report image
+        run: docker build --target coverage -t cmake-xray:coverage .
+
+      - name: Extract coverage reports
+        run: |
+          mkdir -p artifacts/coverage
+          container_id=$(docker create cmake-xray:coverage)
+          docker cp "$container_id:/workspace/build-coverage/coverage/summary.txt" artifacts/coverage/summary.txt
+          docker cp "$container_id:/workspace/build-coverage/coverage/coverage.txt" artifacts/coverage/coverage.txt
+          docker rm "$container_id"
+
+      - name: Show coverage summary
+        run: cat artifacts/coverage/summary.txt
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: artifacts/coverage
