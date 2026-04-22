@@ -9,11 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `MarkdownReportAdapter` with deterministic `analyze` and `impact` reports for human-readable artifacts and CI goldens
+- CLI report selection via `--format console|markdown` and atomic markdown file output via `--output <path>`
+- versioned M3 report fixtures, markdown golden files, example reports under `docs/examples/`, and E2E byte-compare coverage for console and markdown
+- versioned reference projects under `tests/reference/scale_250`, `scale_500`, and `scale_1000` plus a checked-in generator for reproducible performance baselines
+- `docs/performance.md` with measured baseline artifacts and explicit NF-04/NF-05 evaluation for the MVP path
 
 ### Changed
 
+- report-wide diagnostics are now normalized in the kernel, sorted by `(severity, message)`, and shared consistently between console and markdown reporters
+- `AnalysisResult` and `ImpactResult` now carry display-ready compile database paths for deterministic report context
+- Docker toolchain images now include `time`, enabling reproducible in-container performance measurement paths
+- application and project version bumped to `1.0.0`
+- README and release documentation now describe the shipped MVP report paths, reference data, examples, and release checks
 
 ### Fixed
+
+- console reporting no longer depends on reporter-side diagnostic deduplication and now matches the M3 report contract
+- `impact` markdown classification and report-wide diagnostics remain stable for permuted compile database orderings
+- markdown output writes leave no partial target files under the destination name and surface report write failures via exit code `1`
 
 ## [0.3.0] - 2026-04-22
 

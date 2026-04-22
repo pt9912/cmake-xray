@@ -325,6 +325,10 @@ std::filesystem::path compile_commands_base_directory(std::string_view compile_c
     return base.empty() ? std::filesystem::current_path() : base;
 }
 
+std::string display_compile_commands_path(std::string_view compile_commands_path) {
+    return std::filesystem::path{compile_commands_path}.lexically_normal().generic_string();
+}
+
 std::string normalize_path(const std::filesystem::path& path) {
     return std::filesystem::absolute(path).lexically_normal().generic_string();
 }

@@ -119,38 +119,22 @@ TEST_CASE("console report adapter disambiguates duplicate impact observations") 
           std::string::npos);
 }
 
-TEST_CASE("console report adapter keeps omitted translation-unit diagnostics visible with top limit") {
+TEST_CASE("console report adapter renders report-wide diagnostics after visible sections") {
     const ConsoleReportAdapter adapter;
     auto result = make_analysis_result();
-    result.translation_units.push_back(
-        RankedTranslationUnit{
-            .reference = make_reference("src/tools/tool.cpp", "build/tools",
-                                        "src/tools/tool.cpp|build/tools"),
-            .rank = 2,
-            .arg_count = 2,
-            .include_path_count = 1,
-            .define_count = 0,
-            .diagnostics = {{{xray::hexagon::model::DiagnosticSeverity::warning,
-                              "could not resolve include \"generated/late.h\" from src/tools/tool.cpp"}}},
-        });
     result.diagnostics = {
-        {xray::hexagon::model::DiagnosticSeverity::warning,
-         "could not resolve include \"generated/late.h\" from src/tools/tool.cpp"},
         {xray::hexagon::model::DiagnosticSeverity::note,
          "include-based results are heuristic; conditional or generated includes may be missing"},
     };
 
     const auto report = adapter.write_analysis_report(result, 1);
 
-    CHECK(report.find("top 1 of 2 translation units") != std::string::npos);
-    CHECK(report.find("warning: could not resolve include \"generated/late.h\" from src/tools/tool.cpp") !=
+    CHECK(report.find("top 1 of 1 translation units") != std::string::npos);
+    CHECK(report.find("note: include-based results are heuristic; conditional or generated includes may be missing") !=
           std::string::npos);
-    CHECK(count_occurrences(report,
-                            "could not resolve include \"generated/late.h\" from src/tools/tool.cpp") ==
-          1);
 }
 
-TEST_CASE("console report adapter deduplicates displayed diagnostics and handles empty hotspots") {
+TEST_CASE("console report adapter preserves inline diagnostics and handles empty hotspots") {
     const ConsoleReportAdapter adapter;
     auto result = make_analysis_result();
     result.translation_units = {
@@ -187,8 +171,6 @@ TEST_CASE("console report adapter deduplicates displayed diagnostics and handles
     };
     result.include_hotspots.clear();
     result.diagnostics = {
-        {xray::hexagon::model::DiagnosticSeverity::warning,
-         "could not resolve include \"generated/version.h\" from src/app/main.cpp"},
         {xray::hexagon::model::DiagnosticSeverity::note,
          "include-based results are heuristic; conditional or generated includes may be missing"},
     };
@@ -199,4 +181,8 @@ TEST_CASE("console report adapter deduplicates displayed diagnostics and handles
     CHECK(count_occurrences(
               report,
               "could not resolve include \"generated/version.h\" from src/app/main.cpp") == 2);
+    CHECK(count_occurrences(
+              report,
+              "include-based results are heuristic; conditional or generated includes may be missing") ==
+          1);
 }

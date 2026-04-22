@@ -11,6 +11,7 @@ namespace xray::hexagon::model {
 struct AnalysisResult {
     ApplicationInfo application;
     CompileDatabaseResult compile_database;
+    std::string compile_database_path;
     bool include_analysis_heuristic{false};
     std::vector<RankedTranslationUnit> translation_units;
     std::vector<IncludeHotspot> include_hotspots;

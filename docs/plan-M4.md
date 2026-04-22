@@ -23,8 +23,11 @@ M4 gilt als erreicht, wenn:
 - `analyze` bei geladener File-API-Lage die bestehenden TU- und Hotspot-Ausgaben um sichtbare Target-Zuordnungen erweitert, ohne die M3-Standardausgabe ohne Zusatzdaten zu veraendern
 - `impact` bei geladener File-API- und Target-Sicht zusaetzlich betroffene Targets ausgibt; direkte Evidenz aus direkt betroffenen Translation Units und heuristische Evidenz aus include-basiert betroffenen Translation Units bleiben unterscheidbar
 - `analyze` und `impact` bei ausreichender File-API-Lage auch ohne `compile_commands.json` Kernanalysen ausfuehren koennen; die Datengrundlage wird dabei als `derived` sichtbar gemacht
+- bei gemeinsamer Angabe von `compile_commands.json` und File API die Compile Database die autoritative `exact`-Grundlage fuer Ranking, Hotspots und TU-basierte Impact-Ableitung bleibt; die File API reichert passende Beobachtungen um Target-Kontext an und fuehrt in M4 keine zusaetzlichen nur-File-API-Beobachtungen in diese Kernergebnisse ein
+- `impact` relative `--changed-file`-Pfade im Mischpfad relativ zum Verzeichnis der `compile_commands.json` und im File-API-Only-Pfad relativ zum im Codemodel angegebenen Top-Level-Source-Verzeichnis aufloest
 - unvollstaendige oder nur teilweise verwertbare File-API-Daten als Diagnostics sichtbar werden, ohne die Kernanalyse zu maskieren
 - explizit angegebene, aber nicht lesbare oder syntaktisch ungueltige File-API-Daten mit klarer Fehlermeldung und konsistenter Exit-Code-Semantik behandelt werden
+- Konsole und Markdown die Beobachtungsherkunft (`exact` oder `derived`) und den Ladezustand der Target-Metadaten explizit sichtbar machen, sobald File-API-Daten beteiligt sind
 - Adapter-, Kern-, Reporter- und End-to-End-Tests die Pfade mit und ohne File-API-Daten sowie regressionskritische Faelle fuer Mehrfachzuordnungen, partielle Metadaten und stabile Sortierung absichern
 
 Relevante Kennungen: `F-05`, `F-19`, `F-24`, `F-26`, `F-27`, `F-31`, `F-32`, `F-33`, `F-34`, `F-35`, `F-36`, `NF-10`, `NF-14`, `NF-15`, `NF-18`, `NF-19`, `S-02`
@@ -61,6 +64,7 @@ Die bisherige Trennung zwischen `CompileDatabasePort` fuer die Kernanalyse und `
 
 Fuer M4 benoetigt der Kern mindestens:
 
+- ein quellenunabhaengiges Modell fuer Beobachtungsidentitaet und Match-Key, das von `CompileCommandsJsonAdapter` und `CmakeFileApiAdapter` nach denselben Normalisierungsregeln befuellt wird
 - ein Modell fuer Target-Identitaet mit stabilem Vergleichsschluessel, menschenlesbarem Namen und technischem Typ
 - ein Modell fuer die Zuordnung einer konkreten Translation-Unit-Beobachtung zu null, einem oder mehreren Targets
 - ein Ergebnisobjekt fuer geladene Build-Beobachtungen inklusive Herkunft (`exact` oder `derived`) und Diagnostics
@@ -68,10 +72,11 @@ Fuer M4 benoetigt der Kern mindestens:
 
 Wichtig:
 
-- die Zuordnung darf nicht nur auf `source_path` basieren; Doppelbeobachtungen mit identischem Quelldateipfad, aber unterschiedlichem Build-Kontext, muessen ueber die bestehende Beobachtungsidentitaet (`unique_key`) getrennt bleiben
+- die Beobachtungsidentitaet darf nicht nur auf `source_path` basieren; Doppelbeobachtungen mit identischem Quelldateipfad, aber unterschiedlichem Build-Kontext, muessen ueber denselben adapteruebergreifend normalisierten Match-Key getrennt bleiben
 - ein und dieselbe Quelldatei kann in mehreren Targets vorkommen; M4 darf daher keine implizite 1:1-Annahme zwischen Translation Unit und Target treffen
 - fehlende Target-Zuordnungen sind in M4 kein Ladefehler, sondern fachliche Unvollstaendigkeit und werden als Diagnostics behandelt
 - eine File-API-basierte Beobachtung darf dieselben Ergebnisarten speisen wie eine Compile-Database-Beobachtung, muss ihre Herkunft aber explizit tragen
+- wenn sowohl `compile_commands.json` als auch File API vorliegen, bleibt die Compile Database in M4 die autoritative Menge fuer Ranking, Hotspots und TU-basierte Impact-Ableitung; die File API reichert nur passende Beobachtungen an, statt die Kernergebnis-Menge stillschweigend zu erweitern
 - direkte Target-Abhaengigkeiten muessen in M4 noch nicht modelliert werden; fuer den ersten Ausbau reichen Target-Beschreibung und Source-Zuordnung
 - Report-Adapter duerfen keine eigenen Target-Matches berechnen; die Aufloesung bleibt Aufgabe von Port, Adapter und Kern
 
@@ -101,11 +106,13 @@ Der Adapter muss mindestens folgende Faelle robust behandeln:
 - strukturell gueltige, aber fuer M4 unzureichende Reply-Daten, zum Beispiel ohne auswertbare Codemodel-Information
 - Quellen, die in der File API vorhanden sind, aber keinen fuer die Kernanalyse nutzbaren Compile-Kontext liefern
 - Dateien, die in mehreren Targets auftauchen
+- Reply-Daten, aus denen sich kein belastbarer Top-Level-Source-Root fuer den File-API-Only-Pfad von `impact` ableiten laesst
 
 Fuer die Zuordnung gelten in M4 folgende Regeln:
 
 - verglichen wird auf lexikalisch normalisierten Pfadschluesseln, nicht auf rohen Anzeige-Strings
 - die Zuordnung laeuft immer von einer konkreten normalisierten Beobachtung zur Target-Menge; doppelte Beobachtungen bleiben getrennt
+- die File API liefert fuer jede nutzbare Beobachtung denselben quellenunabhaengigen Match-Key wie die Compile Database; fuer M4 wird dafuer mindestens normalisierter Quellpfad plus normalisierter Kontextschluessel verwendet
 - Mehrfachtreffer werden deterministisch gespeichert und spaeter sortiert ausgegeben
 
 Vorgesehene Artefakte:
@@ -123,11 +130,15 @@ Die neue Eingabequelle ist erst nutzbar, wenn Projekt- und Impact-Analyse sie in
 Fuer `analyze` bedeutet das:
 
 - die bestehende Ranking- und Hotspot-Logik aus M2/M3 bleibt unveraendert die fachliche Basis
+- wenn `compile_commands.json` und File API gemeinsam vorliegen, bildet die Compile Database die autoritative `exact`-Beobachtungsmenge; Ranking und Hotspots arbeiten in M4 auf dieser Menge weiter, waehrend File-API-Daten nur passende Beobachtungen um Target-Kontext und Diagnostics anreichern
+- Beobachtungen, die nur in der File API vorkommen und keinen Match zur exakten Beobachtungsmenge haben, werden im Mischpfad in M4 nicht in Ranking oder Hotspots aufgenommen, sondern als reportweite Diagnostics sichtbar gemacht
 - vorhandene Target-Zuordnungen werden den betroffenen Translation Units als Zusatzkontext beigefuegt
 - fehlende oder partielle Zuordnungen werden als Diagnostics sichtbar, ohne Ranking oder Hotspot-Analyse ungueltig zu machen
 
 Fuer `impact` bedeutet das:
 
+- wenn `compile_commands.json` und File API gemeinsam vorliegen, wird die Menge direkt und heuristisch betroffener Translation Units weiterhin aus der `exact`-Beobachtungsmenge der Compile Database abgeleitet; die File API liefert dazu nur Target-Zuordnungen und Zusatzdiagnostics
+- wenn nur die File API vorliegt, wird dieselbe Impact-Logik auf der `derived`-Beobachtungsmenge ausgefuehrt
 - betroffene Targets werden als Vereinigungsmenge aller Targets gebildet, die zu betroffenen Translation Units gehoeren
 - die Herkunft der Evidenz bleibt sichtbar: Targets, die ueber mindestens eine direkt betroffene Translation Unit erreicht werden, gelten in M4 als `direct`; Targets, die ausschliesslich ueber heuristisch betroffene Translation Units erreicht werden, gelten als `heuristic`
 - erscheint dasselbe Target in beiden Evidenzarten, gewinnt `direct`; das Target wird genau einmal in der staerkeren Klasse gefuehrt
@@ -137,6 +148,7 @@ Wichtig:
 
 - ohne geladene File-API-Daten bleiben die Ergebnisobjekte fachlich auf M3-Niveau; neue Felder koennen leer sein, duerfen aber keine geaenderte Standardausgabe erzwingen
 - mit ausschliesslich File-API-basierter Eingabe bleiben Ranking, Hotspots und Impact fachlich verfuegbar; Ergebnisobjekte kennzeichnen die Beobachtungen als `derived`
+- der Mischpfad kennzeichnet seine Kernergebnisse weiterhin als `exact`; die zusaetzliche File-API-Nutzung wird getrennt davon als geladene oder partielle Target-Metadatenlage sichtbar gemacht
 - Diagnostics fuer fehlende Target-Abdeckung bleiben reportweit; einzelne Translation Units sollen nicht mit redundanten Standardhinweisen ueberfrachtet werden
 - Sortierung und Priorisierung muessen reproduzierbar bleiben; neue Target-Listen werden deterministisch nach `(classification, display_name, type)` erzeugt
 
@@ -155,6 +167,7 @@ M4 fuegt keine neuen Ausgabeformate hinzu, erweitert aber die bestehenden M3-Rep
 Fuer die Report-Vertraege gilt:
 
 - ohne File-API-Daten bleibt die M3-Ausgabe fuer identische Eingaben bytegleich
+- sobald File-API-Daten beteiligt sind, machen Konsole und Markdown in der Uebersicht die Beobachtungsherkunft (`exact` oder `derived`) und den Ladezustand der Target-Metadaten explizit sichtbar
 - mit File-API-Daten werden bestehende TU-Zeilen in Konsole und Markdown um eine deterministisch sortierte Target-Anzeige erweitert, zum Beispiel als Suffix ` [targets: app, core]`
 - `impact` erhaelt zusaetzlich eigene Target-Abschnitte fuer `direct` und `heuristic`
 - `analyze` fuehrt in M4 keine eigenstaendige Target-Rangliste ein; die erste Target-Sicht bleibt absichtlich kontextgebunden an Ranking und Hotspots
@@ -163,16 +176,21 @@ Fuer Markdown bedeutet das konkret:
 
 - der bestehende M3-Vertrag bleibt fuer Aufrufe ohne File-API-Daten unveraendert
 - `analyze` ergaenzt in der Uebersicht genau dann Target-Zeilen, wenn File-API-Daten geladen wurden, mindestens:
+  - `Observation source: exact|derived`
   - `Target metadata: loaded|partial`
   - `Translation units with target mapping: <mapped> of <total>`
 - TU-Zeilen in `## Translation Unit Ranking` und in `## Include Hotspots` koennen bei vorhandener Zuordnung den Target-Suffix tragen
-- `impact` ergaenzt in der Uebersicht bei geladener Target-Sicht die Zeile `Affected targets: <count>`
+- `impact` ergaenzt in der Uebersicht bei geladener Target-Sicht mindestens:
+  - `Observation source: exact|derived`
+  - `Target metadata: loaded|partial`
+  - `Affected targets: <count>`
 - `impact` fuegt vor `## Diagnostics` die neuen Abschnitte `## Directly Affected Targets` und `## Heuristically Affected Targets` ein; fuer leere Abschnitte gelten explizite Leersaetze analog zum M3-Stil
 
 Fuer die Konsolenausgabe gilt dieselbe fachliche Semantik:
 
 - keine neuen Farben oder volatilen Metadaten
 - klare, diffbare Textstruktur
+- sichtbare Uebersichtszeilen fuer `observation source: exact|derived` und `target metadata: loaded|partial`, sobald File-API-Daten beteiligt sind
 - deterministische Sortierung innerhalb der Target-Listen
 
 Vorgesehene Artefakte:
@@ -190,23 +208,29 @@ Der neue Metadatenpfad muss fuer Nutzer klar und fuer bestehende Automation stab
 Entscheidung fuer M4:
 
 - `analyze` und `impact` erhalten die optionale Angabe `--cmake-file-api <path>`
+- `analyze` und `impact` verlangen mindestens eine primaere Eingabequelle; erlaubt sind `--compile-commands`, `--cmake-file-api` oder beide gemeinsam
 - ohne diese Option bleibt das Verhalten fachlich und textuell auf M3-Niveau
 - die Option ist explizit; es gibt keine automatische Ableitung aus `--compile-commands`
 - die Option muss auch ohne `--compile-commands` nutzbar sein, wenn die File-API-Lage fuer die Kernanalyse ausreicht
+- fuer `impact` gilt: relative `--changed-file`-Pfade werden mit `--compile-commands` wie bisher relativ zum Verzeichnis der Compile Database interpretiert; im File-API-Only-Pfad werden sie relativ zum im Codemodel angegebenen Top-Level-Source-Verzeichnis interpretiert
 - `--format console|markdown` bleibt unveraendert; M4 fuehrt kein neues Formatflag ein
 
 Fehlerregeln fuer M4:
 
 - ein nicht lesbarer expliziter `--cmake-file-api`-Pfad wird wie andere nicht lesbare Eingaben als Exit-Code `3` behandelt
-- syntaktisch oder strukturell ungueltige Reply-Daten werden wie andere ungueltige Eingaben mit Exit-Code `4` behandelt
-- partielle, aber parsebare File-API-Daten liefern Exit-Code `0` und werden ueber Diagnostics erklaert
+- syntaktisch ungueltige Reply-Daten sowie strukturell unlesbare Reply-Sets werden wie andere ungueltige Eingaben mit Exit-Code `4` behandelt, auch wenn zusaetzlich eine `compile_commands.json` angegeben wurde
+- im File-API-Only-Pfad werden strukturell gueltige, aber fuer die Kernanalyse unzureichende Reply-Daten ebenfalls als Exit-Code `4` behandelt; dazu zaehlen insbesondere fehlende nutzbare Beobachtungen oder ein fehlender Top-Level-Source-Root fuer relative `impact`-Pfade
+- partielle, aber parsebare File-API-Daten liefern genau dann Exit-Code `0`, wenn sie wenigstens einen fachlich nutzbaren Teilbeitrag fuer den gewaehlten Aufruf liefern; im Mischpfad reichen dafuer zum Beispiel teilweise vorhandene Target-Zuordnungen, im File-API-Only-Pfad mindestens eine fuer die Kernanalyse nutzbare Beobachtung
 - bestehende M3-Codes fuer CLI-Verwendungsfehler (`2`), Report-Schreibfehler (`1`) und Compile-Database-Probleme (`3`/`4`) bleiben erhalten
 
 Die Hilfe und Fehlermeldungen sollen mindestens klaeren:
 
 - was `--cmake-file-api` erwartet
+- dass als Wert entweder das Build-Verzeichnis oder direkt das Reply-Verzeichnis akzeptiert wird
 - dass der Pfad optional ist
+- dass mindestens eine primaere Eingabequelle angegeben werden muss
 - dass ohne diese Option keine Target-Sicht berechnet wird
+- wie relative `--changed-file`-Pfade im Compile-Database- und im File-API-Only-Pfad aufgeloest werden
 - welcher naechste Schritt bei fehlenden oder ungueltigen Reply-Daten sinnvoll ist
 
 Vorgesehene Artefakte:
@@ -225,10 +249,14 @@ M4 fuehrt mit der CMake File API eine zweite reale Datengrundlage ein. Damit ste
 Mindestens benoetigt:
 
 - Adapter-Tests fuer `CmakeFileApiAdapter`, insbesondere fuer valide Codemodel-Reply-Daten, nicht lesbare Pfade, ungueltiges JSON und strukturell unzureichende Replies
+- Adapter- und Kern-Tests fuer den adapteruebergreifend identischen Beobachtungs-Match-Key, damit Compile Database und File API dieselbe TU-Identitaet verwenden
 - Kern-Tests fuer null, eine und mehrere Target-Zuordnungen pro Translation-Unit-Beobachtung
+- Kern-Tests fuer den Mischpfad, die bestaetigen, dass die Compile Database die autoritative `exact`-Grundlage bleibt und File-API-Daten nur passende Beobachtungen anreichern
 - Kern-Tests fuer targetbezogene Impact-Ableitung, insbesondere fuer gemischte direkte und heuristische Evidenz
+- CLI- und Kern-Tests fuer die Pfadauflosung von `impact`: relativ zum Compile-Database-Verzeichnis im Mischpfad und relativ zum File-API-Source-Root im File-API-Only-Pfad
 - Reporter-Tests fuer Target-Suffixe in Ranking- und Hotspot-Eintraegen sowie fuer neue Target-Abschnitte im Impact-Report
-- End-to-End-Tests fuer `analyze` und `impact` mit und ohne `--cmake-file-api`
+- Reporter-Tests fuer sichtbare Uebersichtsangaben zu `Observation source: exact|derived` und `Target metadata: loaded|partial`
+- End-to-End-Tests fuer `analyze` und `impact` mit und ohne `--cmake-file-api`, jeweils mit Build-Verzeichnis und direktem Reply-Verzeichnis
 - Regressionstests, die bestaetigen, dass M3-Ausgaben ohne File-API-Daten unveraendert bleiben
 
 Fuer Referenzdaten gilt in M4:
@@ -237,6 +265,7 @@ Fuer Referenzdaten gilt in M4:
 - mindestens ein Fixture muss partielle Target-Abdeckung enthalten
 - mindestens ein Fixture muss Mehrfachzuordnungen derselben Quelldatei zu mehreren Targets abdecken
 - mindestens ein Fixture muss eine permutierte oder anders sortierte Reply-Struktur abdecken, damit die Sortierung der Target-Listen nicht von Dateireihenfolgen abhaengt
+- mindestens ein Fixture muss den File-API-Only-Pfad mit relativem `--changed-file` und eindeutigem Top-Level-Source-Root absichern
 
 **Ergebnis**: Die neuen M4-Pfade sind ueber reproduzierbare Fixtures und bytegenaue Reporter-Erwartungen abgesichert.
 
@@ -320,9 +349,11 @@ cmake --build build
 ./build/cmake-xray impact --help
 ./build/cmake-xray analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json
 ./build/cmake-xray analyze --cmake-file-api tests/e2e/testdata/m4/with_targets/build
+./build/cmake-xray analyze --cmake-file-api tests/e2e/testdata/m4/with_targets/build/.cmake/api/v1/reply
 ./build/cmake-xray analyze --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build
 ./build/cmake-xray analyze --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --format markdown
 ./build/cmake-xray impact --cmake-file-api tests/e2e/testdata/m4/with_targets/build --changed-file include/common/config.h
+./build/cmake-xray impact --cmake-file-api tests/e2e/testdata/m4/with_targets/build/.cmake/api/v1/reply --changed-file include/common/config.h
 ./build/cmake-xray impact --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --changed-file include/common/config.h --cmake-file-api tests/e2e/testdata/m4/with_targets/build
 ./build/cmake-xray impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --changed-file include/common/config.h --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --format markdown
 ./build/cmake-xray analyze --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api /nonexistent/reply
@@ -333,12 +364,16 @@ ctest --test-dir build --output-on-failure
 Die Pruefung soll insbesondere bestaetigen:
 
 - Aufrufe ohne `--cmake-file-api` bleiben fachlich und textuell auf M3-Niveau
+- bei gemeinsamem Einsatz von `compile_commands.json` und File API bleibt die Compile Database die autoritative `exact`-Grundlage fuer Ranking, Hotspots und TU-basierte Impact-Ableitung
 - valide File-API-Reply-Daten werden fuer `analyze` und `impact` geladen und deterministisch ausgewertet
+- Build-Verzeichnis und direktes Reply-Verzeichnis werden als Werte fuer `--cmake-file-api` gleichwertig akzeptiert
 - Mehrfachzuordnungen einer Quelldatei zu mehreren Targets bleiben sichtbar und reproduzierbar sortiert
 - Target-Ausgaben unterscheiden direkte und heuristische Evidenz, ohne transitive Zielgraph-Ableitungen vorzutaeuschen
 - nicht lesbare explizite Metadatenpfade liefern Exit-Code `3`
 - syntaktisch oder strukturell ungueltige explizite Metadaten liefern Exit-Code `4`
 - partielle, aber parsebare Metadaten liefern Exit-Code `0` und reportweite Diagnostics
+- File-API-Only-`impact` loest relative `--changed-file`-Pfade ueber den im Codemodel angegebenen Top-Level-Source-Root auf
+- Konsole und Markdown machen die Beobachtungsherkunft (`exact` oder `derived`) und den Status der Target-Metadaten sichtbar
 - Konsole und Markdown geben dieselbe targetbezogene Fachinformation wieder
 - Sortierung bleibt stabil, auch wenn Compile-Database-Eintraege oder File-API-Dateien anders angeordnet sind
 
@@ -364,9 +399,12 @@ Die Pruefung soll insbesondere bestaetigen:
 | CLI fuer die zweite Eingabequelle | `analyze` und `impact` erhalten die optionale Angabe `--cmake-file-api <path>`; es gibt keine implizite Auto-Erkennung aus `--compile-commands` | AP 1.5 |
 | Rueckwaertskompatibilitaet | Ohne `--cmake-file-api` bleiben die bestehenden M3-Ausgaben unveraendert | 0.1, AP 1.4, AP 1.5 |
 | Granularitaet der Zuordnung | Target-Zuordnung erfolgt pro Translation-Unit-Beobachtung und darf null, ein oder mehrere Targets liefern | AP 1.1, 1.2 |
+| Merge-Policy fuer beide Eingabequellen | Im Mischpfad bleibt `compile_commands.json` die autoritative `exact`-Grundlage fuer Kernergebnisse; die File API reichert nur passende Beobachtungen mit Target-Kontext an | AP 1.1, 1.3 |
 | Semantik targetbezogener Impact-Ausgabe | `direct` und `heuristic` beschreiben in M4 die Herkunft der Evidenz ueber betroffene Translation Units, nicht transitive Abhaengigkeiten im Target-Graph | AP 1.3, 1.4 |
 | Konfliktfall direkte plus heuristische Evidenz | Erreicht dasselbe Target beide Evidenzarten, wird es genau einmal als `direct` ausgegeben | AP 1.3 |
-| Fehlerbehandlung fuer explizite Metadaten | Nicht lesbare Pfade liefern Exit-Code `3`, ungueltige oder unzureichende Reply-Daten Exit-Code `4`, partielle aber parsebare Daten nur Diagnostics | AP 1.5 |
+| Aufloesung relativer `impact`-Pfade | Mit `--compile-commands` relativ zum Verzeichnis der Compile Database, im File-API-Only-Pfad relativ zum Top-Level-Source-Root aus dem Codemodel | AP 1.5 |
+| Sichtbarkeit der Datenherkunft | Sobald File-API-Daten beteiligt sind, machen Konsole und Markdown die Beobachtungsherkunft (`exact` oder `derived`) und den Ladezustand der Target-Metadaten sichtbar | AP 1.3, 1.4 |
+| Fehlerbehandlung fuer explizite Metadaten | Nicht lesbare Pfade liefern Exit-Code `3`; syntaktisch ungueltige oder strukturell unlesbare Reply-Sets liefern `4`; partielle, aber fachlich nutzbare Daten bleiben bei `0` und werden ueber Diagnostics erklaert | AP 1.5 |
 | Analyze-Report in M4 | Keine eigenstaendige Target-Rangliste; die erste Target-Sicht bleibt an Ranking- und Hotspot-Kontext gekoppelt | AP 1.4 |
 
 ### 6.2 Offen

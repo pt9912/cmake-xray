@@ -5,37 +5,13 @@
 #include "model/application_info.h"
 #include "model/diagnostic.h"
 #include "services/analysis_support.h"
+#include "services/diagnostic_support.h"
 
 namespace xray::hexagon::services {
 
 namespace {
 
 using xray::hexagon::model::AnalysisResult;
-using xray::hexagon::model::Diagnostic;
-
-bool diagnostics_equal(const Diagnostic& lhs, const Diagnostic& rhs) {
-    return lhs.severity == rhs.severity && lhs.message == rhs.message;
-}
-
-void append_unique_diagnostic(std::vector<Diagnostic>& target, const Diagnostic& diagnostic) {
-    const auto duplicate = std::any_of(target.begin(), target.end(), [&](const auto& existing) {
-        return diagnostics_equal(existing, diagnostic);
-    });
-    if (!duplicate) target.push_back(diagnostic);
-}
-
-void append_unique_diagnostics(std::vector<Diagnostic>& target,
-                               const std::vector<Diagnostic>& diagnostics) {
-    for (const auto& diagnostic : diagnostics) {
-        append_unique_diagnostic(target, diagnostic);
-    }
-}
-
-void append_translation_unit_diagnostics(AnalysisResult& result) {
-    for (const auto& translation_unit : result.translation_units) {
-        append_unique_diagnostics(result.diagnostics, translation_unit.diagnostics);
-    }
-}
 
 }  // namespace
 
@@ -49,6 +25,7 @@ model::AnalysisResult ProjectAnalyzer::analyze_project(
     std::string_view compile_commands_path) const {
     model::AnalysisResult result;
     result.application = model::application_info();
+    result.compile_database_path = display_compile_commands_path(compile_commands_path);
     result.compile_database = compile_database_port_.load_compile_database(compile_commands_path);
 
     if (!result.compile_database.is_success()) return result;
@@ -62,7 +39,6 @@ model::AnalysisResult ProjectAnalyzer::analyze_project(
     result.include_hotspots =
         build_include_hotspots(observations, include_resolution, compile_commands_path);
     result.diagnostics = include_resolution.diagnostics;
-    append_translation_unit_diagnostics(result);
 
     if (result.include_analysis_heuristic) {
         append_unique_diagnostic(
@@ -70,6 +46,7 @@ model::AnalysisResult ProjectAnalyzer::analyze_project(
             {model::DiagnosticSeverity::note,
              "include-based results are heuristic; conditional or generated includes may be missing"});
     }
+    normalize_report_diagnostics(result.diagnostics);
 
     return result;
 }

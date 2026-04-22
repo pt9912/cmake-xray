@@ -23,6 +23,7 @@ struct ImpactedTranslationUnit {
 struct ImpactResult {
     ApplicationInfo application;
     CompileDatabaseResult compile_database;
+    std::string compile_database_path;
     std::string changed_file;
     std::string changed_file_key;
     bool heuristic{false};

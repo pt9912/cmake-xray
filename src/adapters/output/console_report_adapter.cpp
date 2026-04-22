@@ -23,24 +23,6 @@ struct AnalysisSectionCounts {
     std::size_t hotspot_count{0};
 };
 
-bool diagnostics_equal(const Diagnostic& lhs, const Diagnostic& rhs) {
-    return lhs.severity == rhs.severity && lhs.message == rhs.message;
-}
-
-void append_unique_diagnostic(std::vector<Diagnostic>& target, const Diagnostic& diagnostic) {
-    const auto duplicate = std::any_of(target.begin(), target.end(), [&](const auto& existing) {
-        return diagnostics_equal(existing, diagnostic);
-    });
-    if (!duplicate) target.push_back(diagnostic);
-}
-
-void append_unique_diagnostics(std::vector<Diagnostic>& target,
-                               const std::vector<Diagnostic>& diagnostics) {
-    for (const auto& diagnostic : diagnostics) {
-        append_unique_diagnostic(target, diagnostic);
-    }
-}
-
 std::string diagnostic_prefix(DiagnosticSeverity severity) {
     return severity == DiagnosticSeverity::warning ? "warning" : "note";
 }
@@ -57,33 +39,6 @@ void append_diagnostics(std::ostringstream& out, const std::vector<Diagnostic>& 
             << '\n';
     }
 }
-
-std::vector<Diagnostic> collect_displayed_diagnostics(const AnalysisResult& analysis_result,
-                                                      const AnalysisSectionCounts& counts) {
-    std::vector<Diagnostic> displayed;
-
-    for (std::size_t index = 0; index < counts.ranking_count; ++index) {
-        append_unique_diagnostics(displayed, analysis_result.translation_units[index].diagnostics);
-    }
-    for (std::size_t index = 0; index < counts.hotspot_count; ++index) {
-        append_unique_diagnostics(displayed, analysis_result.include_hotspots[index].diagnostics);
-    }
-
-    return displayed; }
-
-std::vector<Diagnostic> collect_remaining_diagnostics(const AnalysisResult& analysis_result,
-                                                      const std::vector<Diagnostic>& displayed) {
-    std::vector<Diagnostic> remaining;
-
-    for (const auto& diagnostic : analysis_result.diagnostics) {
-        const auto was_displayed = std::any_of(displayed.begin(), displayed.end(),
-                                               [&](const auto& shown) {
-                                                   return diagnostics_equal(shown, diagnostic);
-                                               });
-        if (!was_displayed) remaining.push_back(diagnostic);
-    }
-
-    return remaining; }
 
 AnalysisSectionCounts append_ranking_section(std::ostringstream& out,
                                              const AnalysisResult& analysis_result,
@@ -147,11 +102,8 @@ std::string ConsoleReportAdapter::write_analysis_report(const AnalysisResult& an
     std::ostringstream out;
 
     const auto counts = append_ranking_section(out, analysis_result, top_limit);
-    const auto displayed_diagnostics = collect_displayed_diagnostics(analysis_result, counts);
-    const auto remaining_diagnostics =
-        collect_remaining_diagnostics(analysis_result, displayed_diagnostics);
     append_hotspot_section(out, analysis_result, counts.hotspot_count);
-    append_diagnostics(out, remaining_diagnostics, "");
+    append_diagnostics(out, analysis_result.diagnostics, "");
 
     return out.str();
 }

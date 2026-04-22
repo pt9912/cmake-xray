@@ -16,8 +16,11 @@ TAG="v$VER"
 
 Vor einem Release:
 
+- noch nicht veroeffentlichte Aenderungen bleiben unter `## [Unreleased]` in `CHANGELOG.md`; ein datierter Versionsabschnitt wird erst fuer den finalen Release-Commit angelegt
 - `CHANGELOG.md` auf den Zielstand bringen
 - betroffene Plan-, Status- und Nutzungsdokumente aktualisieren
+- kuratierte Beispielausgaben unter `docs/examples/` aus den kanonischen M3-Fixtures regenerieren, falls sich Report-Inhalt oder -Layout geaendert hat
+- bei Aenderungen am Analyse- oder Report-Pfad die Performance-Artefakte unter `build/reports/performance/` und `docs/performance.md` aktualisieren
 - sicherstellen, dass nur beabsichtigte Dateien fuer den Release-Commit vorgemerkt sind
 - falls Release-Artefakte mit veroefentlicht werden sollen, `./release-assets/` vorbereiten
 
@@ -31,6 +34,12 @@ docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t 
 docker build --target quality-check -t cmake-xray:quality-check .
 docker build --target runtime -t cmake-xray .
 docker run --rm cmake-xray --help
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata/m3:/data:ro" \
+  cmake-xray analyze --compile-commands /data/report_project/compile_commands.json --format markdown
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata/m3:/data:ro" \
+  cmake-xray impact --compile-commands /data/report_impact_header/compile_commands.json --changed-file include/common/config.h --format markdown
 ```
 
 Optional koennen die Reports separat ausgegeben werden:
@@ -42,10 +51,15 @@ docker build --target quality -t cmake-xray:quality .
 docker run --rm cmake-xray:quality
 ```
 
+Vor einem MVP-Release zusaetzlich pruefen:
+
+- `docs/performance.md` verweist auf aktuelle Messwerte und die Artefakte unter `build/reports/performance/`
+- `docs/examples/` und die M3-Golden-Files unter `tests/e2e/testdata/m3/` stammen noch aus denselben kanonischen Fixtures
+
 ## Release-Commit und Tag
 
 ```bash
-git add CHANGELOG.md README.md docs/quality.md docs/releasing.md
+git add CHANGELOG.md README.md docs/examples docs/performance.md docs/quality.md docs/releasing.md docs/plan-M3.md
 git commit -m "docs: finalize release $TAG"
 git tag -a "$TAG" -m "Release $TAG"
 ```
@@ -100,3 +114,4 @@ Falls kein Asset-Upload erforderlich ist, koennen die `./release-assets/*`-Argum
 - Falls ein Tag bereits vor dem finalen Commit erzeugt wurde, muss es auf den finalen Release-Commit umgesetzt werden.
 - Der `coverage`-Stage dient dem Report; das eigentliche Build-Gate fuer Mindestabdeckung liegt in `coverage-check`.
 - Der `quality`-Stage dient dem Report; das eigentliche Build-Gate fuer statische Analyse und Metriken liegt in `quality-check`.
+- Fuer `v1.0.0` gehoeren Markdown-Smoke-Tests, Golden-Output-Konsistenz, `docs/examples/` und `docs/performance.md` zum Release-Check.

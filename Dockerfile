@@ -8,6 +8,7 @@ RUN apt-get update \
         ca-certificates \
         cmake \
         git \
+        time \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace

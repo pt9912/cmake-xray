@@ -2,38 +2,29 @@
 
 Build visibility for CMake projects.
 
-`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Der aktuelle Stand `v0.3.0` liest `compile_commands.json`, rankt auffaellige Translation Units, leitet heuristische Include-Hotspots ab und bietet eine dateibasierte Impact-Analyse fuer Translation Units.
+`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Der aktuelle MVP-Stand `v1.0.0` liest `compile_commands.json`, rankt auffaellige Translation Units, leitet heuristische Include-Hotspots ab, analysiert Datei-Impact und exportiert dieselben Ergebnisse sowohl als Konsolen- als auch als Markdown-Report.
 
 ## Status
 
-Das Repository enthaelt die umgesetzten Meilensteine M0, M1 und M2 aus [docs/plan-M0.md](./docs/plan-M0.md), [docs/plan-M1.md](./docs/plan-M1.md) und [docs/plan-M2.md](./docs/plan-M2.md).
+Das Repository enthaelt die umgesetzten Meilensteine M0 bis M3 aus [docs/plan-M0.md](./docs/plan-M0.md), [docs/plan-M1.md](./docs/plan-M1.md), [docs/plan-M2.md](./docs/plan-M2.md) und [docs/plan-M3.md](./docs/plan-M3.md).
 
-Der aktuelle Umfang:
+Der MVP-Umfang umfasst:
 
-- baubares C++20/CMake-Projekt mit hexagonaler Grundstruktur
-- CLI mit `analyze`- und `impact`-Unterkommandos
-- Einlesen und Validieren von `compile_commands.json`
-- Translation-Unit-Ranking auf Basis von `arg_count`, `include_path_count` und `define_count`
-- Include-Hotspots mit heuristischer Source-Parsing-Aufloesung
-- dateibasierte Impact-Analyse fuer Translation Units
-- begrenzbare Konsolenausgabe via `--top`
-- definierte Exit-Codes und Fehlermeldungen
-- Adapter-, Hexagon- und End-to-End-Tests
-- Multi-Stage-`Dockerfile` mit `build`, `test` und `runtime`
-
-## Geplanter Umfang
-
-Fuer das erste Release ist weiterhin vorgesehen:
-
-- Konsolen- und Markdown-Reports
-- Nutzung auf Linux in lokalen Umgebungen und in CI
+- CLI mit `analyze` und `impact`
+- Validierung von `compile_commands.json`
+- deterministisches Translation-Unit-Ranking auf Basis von `arg_count`, `include_path_count` und `define_count`
+- heuristische Include-Hotspots und dateibasierte Impact-Analyse
+- Report-Ausgabe als `console` oder `markdown`
+- atomisches Schreiben von Markdown-Reports via `--output`
+- versionierte Golden-Files, Referenzdaten und Performance-Baselines
+- Docker-basierte Test-, Coverage- und Quality-Gates
 
 Nicht Ziel des MVP sind insbesondere:
 
 - Ersatz fuer CMake
 - vollstaendige CMake-Interpretation
 - IDE-Integration
-- HTML-, JSON- oder DOT-Export im ersten Release
+- HTML-, JSON- oder DOT-Export
 
 ## Voraussetzungen
 
@@ -43,19 +34,9 @@ Referenzplattform ist Linux mit:
 - C++20-faehigem Compiler
 - Git fuer `FetchContent`
 
-Als Referenzumgebung steht ausserdem das [Dockerfile](./Dockerfile) zur Verfuegung.
+Als reproduzierbare Referenzumgebung steht das Multi-Stage-[Dockerfile](./Dockerfile) zur Verfuegung.
 
-## Externe Abhaengigkeiten
-
-| Bereich | Bibliothek | Einbindung | Verwendung |
-|---|---|---|---|
-| JSON-Parsing | `nlohmann/json` | `FetchContent` | Input-Adapter unter `src/adapters/input/` |
-| CLI-Parsing | `CLI11` | `FetchContent` | CLI-Adapter unter `src/adapters/cli/` |
-| Test-Framework | `doctest` | `FetchContent` | `tests/` und Target `xray_tests` |
-
-Wichtig: `src/hexagon/` bleibt frei von externen Bibliotheken. Externe Abhaengigkeiten sind auf Adapter, Tests und Composition Root begrenzt.
-
-## Build
+## Build und Installation
 
 Lokaler Quellbuild:
 
@@ -64,184 +45,132 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-## Tests
-
-Lokal:
+Runtime-Image bauen:
 
 ```bash
-ctest --test-dir build --output-on-failure
+docker build --target runtime -t cmake-xray .
 ```
 
-Alternativ gezielt:
-
-```bash
-cmake --build build --target xray_tests
-./build/xray_tests
-```
+Danach steht das Binary lokal unter `./build/cmake-xray` bzw. im Container als Entrypoint zur Verfuegung.
 
 ## Nutzung
 
 ### Hilfe
 
 ```bash
-cmake-xray --help
-cmake-xray analyze --help
-cmake-xray impact --help
+./build/cmake-xray --help
+./build/cmake-xray analyze --help
+./build/cmake-xray impact --help
 ```
 
-### Projektanalyse
+### Projektanalyse in der Konsole
 
 ```bash
-cmake-xray analyze --compile-commands path/to/compile_commands.json --top 10
+./build/cmake-xray analyze \
+  --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json \
+  --top 10
 ```
 
-Beispielausgabe:
+### Projektanalyse als Markdown auf `stdout`
 
-```text
-translation unit ranking
-based on metrics: arg_count + include_path_count + define_count
-top 3 of 17 translation units
-1. src/app/main.cpp [directory: build/app]
-   arg_count=8 include_path_count=2 define_count=1
-
-include hotspots [heuristic]
-top 2 of 4 include hotspots
-- include/common/config.h (affected translation units: 3)
-  src/app/main.cpp [directory: build/app]
-  src/lib/core.cpp [directory: build/lib]
+```bash
+./build/cmake-xray analyze \
+  --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json \
+  --format markdown \
+  --top 10
 ```
 
-Die Ranking-Basis ist in der Standardausgabe sichtbar. Include-Hotspots sind in M2 bewusst heuristisch und werden inline als solche gekennzeichnet.
+### Projektanalyse als Markdown-Datei
+
+```bash
+./build/cmake-xray analyze \
+  --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json \
+  --format markdown \
+  --output build/reports/analyze.md \
+  --top 10
+```
 
 ### Impact-Analyse
 
 ```bash
-cmake-xray impact \
-  --compile-commands path/to/compile_commands.json \
+./build/cmake-xray impact \
+  --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json \
   --changed-file include/common/config.h
 ```
 
-Relative `--changed-file`-Pfade werden relativ zur uebergebenen `compile_commands.json` interpretiert.
+### Impact-Analyse als Markdown
 
-Beispielausgabe:
-
-```text
-impact analysis for include/common/config.h [heuristic]
-affected translation units: 3
-  src/app/main.cpp [directory: build/app] [heuristic]
-  src/lib/core.cpp [directory: build/lib] [heuristic]
-note: conditional or generated includes may be missing from this result
+```bash
+./build/cmake-xray impact \
+  --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json \
+  --changed-file include/common/config.h \
+  --format markdown \
+  --output build/reports/impact.md
 ```
 
-Impact-Ergebnisse fuer Header beruhen in M2 auf derselben heuristischen Include-Aufloesung wie die Hotspots. Direkte Treffer auf bekannte Quelldateien werden ohne Heuristik-Kennzeichnung ausgegeben.
+Relative `--changed-file`-Pfade werden relativ zum Verzeichnis der uebergebenen `compile_commands.json` interpretiert.
 
-Bei ungueltiger Eingabe:
+## Heuristik-Hinweis
 
-```text
-error: compile_commands.json is empty: path/to/compile_commands.json
-hint: generate the compilation database before running cmake-xray analyze
-```
+Include-Hotspots und Header-Impact beruhen im MVP auf heuristischer Include-Aufloesung. `cmake-xray` kennzeichnet diese Ergebnisse explizit und gibt Datenluecken als Diagnostics aus. Direkte Treffer auf bekannte Quelldateien werden ohne heuristische Klassifikation ausgewiesen.
 
-### Exit-Codes
+## Beispielausgaben
+
+Kuratierte Beispielartefakte liegen unter [docs/examples](./docs/examples):
+
+- [docs/examples/analyze-console.txt](./docs/examples/analyze-console.txt)
+- [docs/examples/analyze-report.md](./docs/examples/analyze-report.md)
+- [docs/examples/impact-console.txt](./docs/examples/impact-console.txt)
+- [docs/examples/impact-report.md](./docs/examples/impact-report.md)
+
+Die Beispiele stammen aus denselben kanonischen M3-Fixtures wie die E2E-Golden-Files.
+
+## Exit-Codes
 
 | Code | Bedeutung | Typischer Ausloeser |
 |---|---|---|
 | `0` | Erfolg | gueltige CLI-Verwendung und gueltige Eingabedaten |
-| `1` | (reserviert) | unerwartete Laufzeitfehler |
-| `2` | CLI-Verwendungsfehler | unbekanntes Unterkommando, fehlendes Pflichtargument |
+| `1` | Laufzeit- oder Report-Schreibfehler | nicht beschreibbarer `--output`-Pfad, unerwarteter Fehler |
+| `2` | CLI-Verwendungsfehler | unbekanntes Unterkommando, fehlendes Pflichtargument, ungueltige Optionskombination |
 | `3` | Eingabedatei nicht lesbar | Datei fehlt, kein Zugriff, Pfad ungueltig |
 | `4` | Eingabedaten ungueltig | JSON fehlerhaft, kein Array, leer, Pflichtfelder fehlen |
 
-## Docker
+## Tests und Quality Gates
 
-Das Projekt nutzt ein Multi-Stage-`Dockerfile`:
-
-- `build`: konfiguriert und baut das Projekt
-- `test`: fuehrt `ctest` in der Referenzumgebung aus
-- `coverage`: baut mit Coverage-Instrumentierung, fuehrt `ctest` aus und erzeugt einen `gcovr`-Report
-- `coverage-check`: prueft waehrend `docker build`, ob ein konfigurierbarer Coverage-Schwellwert erreicht wurde (Standard: `100`)
-- `quality`: fuehrt `clang-tidy` und `lizard` aus und erzeugt einen Qualitaetsreport
-- `quality-check`: prueft waehrend `docker build`, ob die Qualitaets-Gates fuer `clang-tidy` und `lizard` eingehalten werden
-- `runtime`: enthaelt nur das Binary und noetige Laufzeitpakete
-
-Build und Test der Docker-Stages:
+Docker-basierte Referenzpfade:
 
 ```bash
 docker build --target test -t cmake-xray:test .
-docker build --target coverage -t cmake-xray:coverage .
 docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
-docker build --target quality -t cmake-xray:quality .
 docker build --target quality-check -t cmake-xray:quality-check .
 docker build --target runtime -t cmake-xray .
+docker run --rm cmake-xray --help
 ```
 
-Coverage-Zusammenfassung aus dem Docker-Image lesen:
+Separat verfuegbare Reports:
 
 ```bash
+docker build --target coverage -t cmake-xray:coverage .
 docker run --rm cmake-xray:coverage
-```
-
-Coverage-Gate waehrend des Docker-Builds ausfuehren:
-
-```bash
-docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
-docker build --target coverage-check \
-  --build-arg XRAY_COVERAGE_THRESHOLD=101 \
-  -t cmake-xray:coverage-check .
-```
-
-Der `coverage`-Stage dient nur dem Report. Das eigentliche Fail-fast-Gate fuer die Mindestabdeckung liegt in `coverage-check`, damit ein Report auch dann separat erzeugt werden kann, wenn der Schwellwert unterschritten wird.
-
-Qualitaetsreport aus dem Docker-Image lesen:
-
-```bash
+docker build --target quality -t cmake-xray:quality .
 docker run --rm cmake-xray:quality
 ```
 
-Qualitaets-Gates waehrend des Docker-Builds ausfuehren:
+## Performance-Baseline
 
-```bash
-docker build --target quality-check -t cmake-xray:quality-check .
-docker build --target quality-check \
-  --build-arg XRAY_LIZARD_MAX_CCN=5 \
-  -t cmake-xray:quality-check .
-```
-
-Der `quality`-Stage dient dem Report. Das eigentliche Build-Gate fuer statische Analyse und Metriken liegt in `quality-check`.
-
-Konfigurierbare Build-Argumente fuer `quality-check`:
-
-- `XRAY_CLANG_TIDY_MAX_FINDINGS` (Standard: `0`)
-- `XRAY_LIZARD_MAX_CCN` (Standard: `10`)
-- `XRAY_LIZARD_MAX_LENGTH` (Standard: `50`)
-- `XRAY_LIZARD_MAX_PARAMETERS` (Standard: `5`)
-
-Lauf des Runtime-Images:
-
-```bash
-docker run --rm cmake-xray --help
-docker run --rm cmake-xray analyze --help
-docker run --rm cmake-xray impact --help
-docker run --rm \
-  -v "$PWD/tests/e2e/testdata:/data:ro" \
-  cmake-xray analyze --compile-commands /data/m2/analyze/compile_commands.json --top 2
-docker run --rm \
-  -v "$PWD/tests/e2e/testdata:/data:ro" \
-  cmake-xray impact --compile-commands /data/m2/analyze/compile_commands.json --changed-file include/common/config.h
-```
+Die versionierten Referenzprojekte liegen unter [tests/reference](./tests/reference). Die dokumentierte Baseline fuer `scale_250`, `scale_500` und `scale_1000` sowie die Impact-Stichprobe steht in [docs/performance.md](./docs/performance.md). Die zugehoerigen Messartefakte werden unter `build/reports/performance/` erzeugt.
 
 ## Dokumente
 
-Die fachliche und technische Planung ist in `docs/` abgelegt:
+Weitere Dokumentation:
 
-- [docs/lastenheft.md](./docs/lastenheft.md): Anforderungen, Randbedingungen und Abnahmekriterien
-- [docs/design.md](./docs/design.md): fachliche und benutzerbezogene Ausgestaltung
-- [docs/architecture.md](./docs/architecture.md): geplante Systemstruktur und Datenfluesse
-- [docs/roadmap.md](./docs/roadmap.md): inkrementelle Lieferplanung
-- [docs/plan-M0.md](./docs/plan-M0.md): Detailplanung fuer den ersten Meilenstein
-- [docs/plan-M1.md](./docs/plan-M1.md): Detailplanung fuer den zweiten Meilenstein
-- [docs/plan-M2.md](./docs/plan-M2.md): Detailplanung fuer den Kernanalyse-Meilenstein
-- [docs/releasing.md](./docs/releasing.md): minimaler Release-Ablauf fuer Build, Test und Tagging
+- [docs/lastenheft.md](./docs/lastenheft.md)
+- [docs/design.md](./docs/design.md)
+- [docs/architecture.md](./docs/architecture.md)
+- [docs/roadmap.md](./docs/roadmap.md)
+- [docs/releasing.md](./docs/releasing.md)
+- [docs/quality.md](./docs/quality.md)
+- [docs/performance.md](./docs/performance.md)
 
 ## Lizenz
 

@@ -1,5 +1,6 @@
 add_library(
     xray_hexagon
+    services/diagnostic_support.cpp
     services/analysis_support.cpp
     services/impact_analyzer.cpp
     services/project_analyzer.cpp

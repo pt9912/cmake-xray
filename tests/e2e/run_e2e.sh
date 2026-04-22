@@ -6,6 +6,32 @@ set -euo pipefail
 BINARY="$1"
 TESTDATA="$2"
 failures=0
+REPO_ROOT="$(cd "$TESTDATA/../../.." && pwd)"
+
+assert_stdout_equals_file() {
+    local description="$1" expected_file="$2"
+    shift 2
+    local actual_file
+    actual_file="$(mktemp)"
+    "$@" >"$actual_file" 2>/dev/null || true
+    if cmp -s "$actual_file" "$expected_file"; then
+        echo "PASS: $description"
+    else
+        echo "FAIL: $description — stdout differed from $expected_file" >&2
+        failures=$((failures + 1))
+    fi
+    rm -f "$actual_file"
+}
+
+assert_file_equals() {
+    local description="$1" actual_file="$2" expected_file="$3"
+    if cmp -s "$actual_file" "$expected_file"; then
+        echo "PASS: $description"
+    else
+        echo "FAIL: $description — file differed from $expected_file" >&2
+        failures=$((failures + 1))
+    fi
+}
 
 assert_exit() {
     local description="$1" expected="$2"
@@ -46,6 +72,8 @@ assert_stderr_contains() {
     fi
 }
 
+cd "$REPO_ROOT"
+
 # --help
 assert_exit "--help exits 0" 0 "$BINARY" --help
 assert_stdout_contains "--help shows cmake-xray" "cmake-xray" "$BINARY" --help
@@ -56,18 +84,49 @@ assert_stdout_contains "--help shows impact subcommand" "impact" "$BINARY" --hel
 assert_exit "analyze --help exits 0" 0 "$BINARY" analyze --help
 assert_stdout_contains "analyze --help shows --compile-commands" "compile-commands" "$BINARY" analyze --help
 assert_stdout_contains "analyze --help shows --top" "top" "$BINARY" analyze --help
+assert_stdout_contains "analyze --help shows --format" "format" "$BINARY" analyze --help
+assert_stdout_contains "analyze --help shows --output" "output" "$BINARY" analyze --help
 
 # impact --help
 assert_exit "impact --help exits 0" 0 "$BINARY" impact --help
 assert_stdout_contains "impact --help shows --changed-file" "changed-file" "$BINARY" impact --help
+assert_stdout_contains "impact --help shows --format" "format" "$BINARY" impact --help
+assert_stdout_contains "impact --help shows --output" "output" "$BINARY" impact --help
 
-# Analyze success path
-assert_exit "M2 analyze exits 0" 0 "$BINARY" analyze --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --top 2
-assert_stdout_contains "M2 analyze shows ranking" "translation unit ranking" "$BINARY" analyze --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --top 2
-assert_stdout_contains "M2 analyze shows top limit" "top 2 of 3 translation units" "$BINARY" analyze --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --top 2
-assert_stdout_contains "M2 analyze shows hotspots" "include hotspots" "$BINARY" analyze --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --top 2
+# Golden outputs
+assert_exit "M3 analyze console exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --top 2
+assert_stdout_equals_file "M3 analyze console matches golden" tests/e2e/testdata/m3/report_project/analyze-console.txt \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --top 2
+assert_exit "M3 analyze markdown exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --format markdown --top 2
+assert_stdout_equals_file "M3 analyze markdown matches golden" tests/e2e/testdata/m3/report_project/analyze-markdown.md \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --format markdown --top 2
 
-# Impact success path
+assert_exit "M3 impact console exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h
+assert_stdout_equals_file "M3 impact console matches golden" tests/e2e/testdata/m3/report_impact_header/impact-console.txt \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h
+assert_exit "M3 impact markdown exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --format markdown
+assert_stdout_equals_file "M3 impact markdown matches golden" tests/e2e/testdata/m3/report_impact_header/impact-markdown.md \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --format markdown
+
+# Markdown file output
+report_dir="$(mktemp -d)"
+report_file="$report_dir/analyze.md"
+assert_exit "markdown output file exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --format markdown --output "$report_file" --top 2
+if [ -f "$report_file" ]; then
+    assert_file_equals "markdown output file matches golden" "$report_file" tests/e2e/testdata/m3/report_project/analyze-markdown.md
+else
+    echo "FAIL: markdown output file was not created" >&2
+    failures=$((failures + 1))
+fi
+if find "$report_dir" -maxdepth 1 -name '.cmake-xray-*' | grep -q .; then
+    echo "FAIL: markdown output left temporary files behind" >&2
+    failures=$((failures + 1))
+else
+    echo "PASS: markdown output leaves no temporary files behind"
+fi
+rm -rf "$report_dir"
+
+# Impact and path semantics
 assert_exit "impact source exits 0" 0 "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --changed-file src/app/main.cpp
 assert_stdout_contains "impact source shows one affected TU" "affected translation units: 1" "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --changed-file src/app/main.cpp
 assert_exit "impact transitive header exits 0" 0 "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --changed-file include/common/shared.h
@@ -96,6 +155,30 @@ else
     failures=$((failures + 1))
 fi
 
+permute_dir="$(mktemp -d)"
+cp -R tests/e2e/testdata/m2/basic_project/. "$permute_dir/"
+baseline_markdown=$("$BINARY" analyze --compile-commands "$permute_dir/compile_commands.json" --format markdown --top 2 2>/dev/null) || true
+cp tests/e2e/testdata/m2/permuted_compile_commands/compile_commands.json "$permute_dir/compile_commands.json"
+permuted_markdown=$("$BINARY" analyze --compile-commands "$permute_dir/compile_commands.json" --format markdown --top 2 2>/dev/null) || true
+if [ "$baseline_markdown" = "$permuted_markdown" ]; then
+    echo "PASS: permuted compile_commands produce identical markdown analyze output"
+else
+    echo "FAIL: permuted compile_commands produce identical markdown analyze output — stdout differed" >&2
+    failures=$((failures + 1))
+fi
+
+cp -R tests/e2e/testdata/m2/basic_project/. "$permute_dir/"
+baseline_impact_markdown=$("$BINARY" impact --compile-commands "$permute_dir/compile_commands.json" --changed-file include/common/shared.h --format markdown 2>/dev/null) || true
+cp tests/e2e/testdata/m2/permuted_compile_commands/compile_commands.json "$permute_dir/compile_commands.json"
+permuted_impact_markdown=$("$BINARY" impact --compile-commands "$permute_dir/compile_commands.json" --changed-file include/common/shared.h --format markdown 2>/dev/null) || true
+if [ "$baseline_impact_markdown" = "$permuted_impact_markdown" ]; then
+    echo "PASS: permuted compile_commands produce identical markdown impact output"
+else
+    echo "FAIL: permuted compile_commands produce identical markdown impact output — stdout differed" >&2
+    failures=$((failures + 1))
+fi
+rm -rf "$permute_dir"
+
 # M1 compatibility
 assert_exit "legacy valid input exits 0" 0 "$BINARY" analyze --compile-commands "$TESTDATA/valid/compile_commands.json"
 assert_exit "only_command exits 0" 0 "$BINARY" analyze --compile-commands "$TESTDATA/only_command/compile_commands.json"
@@ -105,6 +188,7 @@ assert_exit "empty_arguments_with_command exits 0" 0 "$BINARY" analyze --compile
 # CLI usage error
 assert_exit "missing --compile-commands exits 2" 2 "$BINARY" analyze
 assert_exit "impact missing --changed-file exits 2" 2 "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json"
+assert_exit "output without markdown exits 2" 2 "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --output report.md
 
 # Input file errors
 assert_exit "nonexistent file exits 3" 3 "$BINARY" analyze --compile-commands /nonexistent/compile_commands.json

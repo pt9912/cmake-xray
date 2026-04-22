@@ -14,6 +14,7 @@ namespace xray::hexagon::services {
 
 std::filesystem::path compile_commands_base_directory(std::string_view compile_commands_path);
 
+std::string display_compile_commands_path(std::string_view compile_commands_path);
 std::string normalize_path(const std::filesystem::path& path);
 std::string make_display_path(const std::string& normalized_path,
                               const std::filesystem::path& base_directory);

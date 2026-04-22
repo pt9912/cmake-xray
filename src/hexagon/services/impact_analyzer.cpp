@@ -7,6 +7,7 @@
 #include "model/application_info.h"
 #include "model/diagnostic.h"
 #include "services/analysis_support.h"
+#include "services/diagnostic_support.h"
 
 namespace xray::hexagon::services {
 
@@ -18,24 +19,6 @@ using xray::hexagon::model::ImpactKind;
 using xray::hexagon::model::ImpactedTranslationUnit;
 using xray::hexagon::model::ImpactResult;
 using xray::hexagon::model::TranslationUnitObservation;
-
-bool diagnostics_equal(const Diagnostic& lhs, const Diagnostic& rhs) {
-    return lhs.severity == rhs.severity && lhs.message == rhs.message;
-}
-
-void append_unique_diagnostic(std::vector<Diagnostic>& target, const Diagnostic& diagnostic) {
-    const auto duplicate = std::any_of(target.begin(), target.end(), [&](const auto& existing) {
-        return diagnostics_equal(existing, diagnostic);
-    });
-    if (!duplicate) target.push_back(diagnostic);
-}
-
-void append_unique_diagnostics(std::vector<Diagnostic>& target,
-                               const std::vector<Diagnostic>& diagnostics) {
-    for (const auto& diagnostic : diagnostics) {
-        append_unique_diagnostic(target, diagnostic);
-    }
-}
 
 bool impacted_translation_unit_less(const ImpactedTranslationUnit& lhs,
                                     const ImpactedTranslationUnit& rhs) {
@@ -146,6 +129,7 @@ ImpactResult ImpactAnalyzer::analyze_impact(std::string_view compile_commands_pa
                                             const std::filesystem::path& changed_path) const {
     ImpactResult result;
     result.application = model::application_info();
+    result.compile_database_path = display_compile_commands_path(compile_commands_path);
     result.compile_database = compile_database_port_.load_compile_database(compile_commands_path);
 
     if (!result.compile_database.is_success()) return result;
@@ -173,6 +157,7 @@ ImpactResult ImpactAnalyzer::analyze_impact(std::string_view compile_commands_pa
     append_resolution_diagnostics(result, include_resolution, impacted_by_key, direct_match_found,
                                   heuristic_match_found);
     append_impact_diagnostics(result, direct_match_found, heuristic_match_found);
+    normalize_report_diagnostics(result.diagnostics);
 
     return result;
 }

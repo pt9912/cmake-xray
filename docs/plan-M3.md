@@ -7,7 +7,7 @@
 | Dokument | Plan M3 `cmake-xray` |
 | Version | `0.7` |
 | Stand | `2026-04-22` |
-| Status | Entwurf |
+| Status | Abgeschlossen |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M2](./plan-M2.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
 
 ### 0.1 Zweck

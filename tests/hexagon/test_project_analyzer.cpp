@@ -92,7 +92,12 @@ public:
                         {},
                     },
                 },
-            .diagnostics = {},
+            .diagnostics =
+                {
+                    {xray::hexagon::model::DiagnosticSeverity::note, "zebra note"},
+                    {xray::hexagon::model::DiagnosticSeverity::warning, "alpha warning"},
+                    {xray::hexagon::model::DiagnosticSeverity::warning, "alpha warning"},
+                },
         };
     }
 };
@@ -133,8 +138,9 @@ TEST_CASE("project analyzer builds ranked translation units and hotspots") {
     const auto result = analyzer.analyze_project("/tmp/compile_commands.json");
 
     CHECK(result.application.name == std::string_view{"cmake-xray"});
-    CHECK(result.application.version == std::string_view{"v0.3.0"});
+    CHECK(result.application.version == std::string_view{"v1.0.0"});
     CHECK(result.compile_database.is_success());
+    CHECK(result.compile_database_path == "/tmp/compile_commands.json");
     REQUIRE(result.translation_units.size() == 3);
     CHECK(result.translation_units[0].reference.source_path == "/project/src/main.cpp");
     CHECK(result.translation_units[1].reference.source_path == "/project/src/tool.cpp");
@@ -149,9 +155,10 @@ TEST_CASE("project analyzer builds ranked translation units and hotspots") {
     CHECK(result.include_hotspots[0].header_path == "/project/include/common/config.h");
     CHECK(result.include_hotspots[0].affected_translation_units.size() == 3);
     CHECK(result.include_hotspots[1].header_path == "/project/include/common/shared.h");
-    REQUIRE_FALSE(result.diagnostics.empty());
-    CHECK(result.diagnostics[0].message.find("generated/version.h") != std::string::npos);
-    CHECK(result.diagnostics.back().message.find("heuristic") != std::string::npos);
+    REQUIRE(result.diagnostics.size() == 3);
+    CHECK(result.diagnostics[0].message == "alpha warning");
+    CHECK(result.diagnostics[1].message.find("heuristic") != std::string::npos);
+    CHECK(result.diagnostics[2].message == "zebra note");
 }
 
 TEST_CASE("project analyzer propagates compile database errors") {
