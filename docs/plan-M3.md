@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M3 `cmake-xray` |
-| Version | `0.3` |
+| Version | `0.4` |
 | Stand | `2026-04-22` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M2](./plan-M2.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -19,7 +19,7 @@ M3 gilt als erreicht, wenn:
 - `cmake-xray analyze` und `cmake-xray impact` neben der Konsolenausgabe auch einen deterministischen Markdown-Report erzeugen koennen
 - das Ausgabeformat und ein optionaler Ausgabepfad per CLI steuerbar sind, ohne die bestehende Exit-Code-Semantik fuer Eingabefehler zu verwischen
 - Markdown-Berichte die M2-Ergebnisse vollstaendig und reproduzierbar abbilden: Analysekontext, TU-Ranking, Include-Hotspots, Impact-Ergebnis sowie Diagnostics und Heuristik-Hinweise
-- versionierte Referenzdaten und erwartete Konsolen- bzw. Markdown-Ausgaben fuer die zentralen Analysepfade vorliegen und automatisiert geprueft werden
+- versionierte Referenzdaten und erwartete Konsolen- bzw. Markdown-Ausgaben fuer die zentralen Analysepfade sowie fuer regressionskritische M2-Randfaelle zu Pfadsemantik, TU-Identitaet und deterministischer Sortierung vorliegen und automatisiert geprueft werden
 - README, Beispielausgaben, CHANGELOG und Release-Dokumentation den M3-/MVP-Stand widerspiegeln
 - eine dokumentierte Referenzumgebung sowie Baseline-Messwerte fuer `250`, `500` und `1.000` Translation Units fuer den gemeinsamen Analysekern von `analyze` vorliegen, zusaetzlich dokumentierte Stichproben fuer die neuen M3-Pfade `analyze --format markdown` und `impact` vorhanden sind und die Soll-Ziele aus `NF-04` und `NF-05` explizit bewertet werden
 - die Docker-Pruefpfade fuer Test, Coverage-Gate, statische Analyse-/Metrik-Reports und Quality-Gate mit dem M3-Stand erfolgreich durchlaufen
@@ -171,7 +171,7 @@ Mindestens benoetigt:
 - Adapter-Tests fuer `MarkdownReportAdapter`, insbesondere fuer Abschnittsreihenfolge, Tabellen-/Listendarstellung, Heuristik-Kennzeichnung und Diagnostics
 - CLI-Tests fuer `--format markdown`, `--output`, ungueltige Kombinationen und Report-Schreibfehler
 - End-to-End-Tests, die zentrale Konsolen- und Markdown-Ausgaben gegen erwartete Dateien vergleichen
-- Golden-Outputs fuer zentrale Erfolgsfaelle von `analyze` und `impact`, jeweils fuer Konsole und Markdown, sofern der Pfad beide Formate anbietet
+- Golden-Outputs fuer zentrale Erfolgsfaelle von `analyze` und `impact`, jeweils fuer Konsole und Markdown
 - Tests dafuer, dass dieselben fachlichen Daten in Konsole und Markdown konsistent wiedergegeben werden
 
 Sinnvolle Referenzfaelle unter `tests/e2e/testdata/m3/` sind:
@@ -183,6 +183,8 @@ Sinnvolle Referenzfaelle unter `tests/e2e/testdata/m3/` sind:
 - `report_diagnostics/` fuer sichtbare Datenluecken und Heuristik-Hinweise
 - `report_top_limit/` fuer `--top` in Konsole und Markdown
 
+Ergaenzend zu neuen M3-Fixtures werden die fuer M3 regressionskritischen M2-Referenzfaelle weiterverwendet oder in `tests/e2e/testdata/m3/` gespiegelt. Dazu gehoeren mindestens Faelle fuer mehrfach vorkommende TU-Pfade (`duplicate_tu_entries`), Pfadsemantik und lexikalische Normalisierung (`path_semantics`) sowie permutierte Eingabereihenfolgen (`permuted_compile_commands`), damit Markdown-Renderer und Golden-Tests dieselbe Stabilitaet wie die M2-Konsolenausgabe absichern.
+
 Golden-Output-Regeln fuer M3:
 
 - erwartete Konsolen- und Markdown-Dateien liegen versioniert im Repository
@@ -191,9 +193,9 @@ Golden-Output-Regeln fuer M3:
 - Vergleiche sollen byte-stabil sein oder hoechstens zeilenendungsbezogen auf LF normalisieren; fachliche Vergleiche "ungefaehr gleich" reichen fuer M3 nicht aus
 - Konsolen-Golden-Files duerfen gegenueber Markdown eigene Layout- und Wortlaut-Erwartungen haben; reine Inhaltsparitaet ersetzt keinen formatspezifischen Regressionstest
 
-Fuer die Nutzerdokumentation sinnvoll:
+Fuer die Nutzerdokumentation gilt:
 
-- die kuratierten Beispielausgaben in `docs/examples/` werden aus denselben Testfaellen abgeleitet oder zumindest daran gespiegelt, damit Dokumentation und Golden-Tests nicht auseinanderlaufen
+- die kuratierten Beispielausgaben in `docs/examples/` werden aus denselben kanonischen Testfaellen und derselben kanonischen Aufrufform erzeugt wie die pfadtragenden Golden-Files; sie sind keine separate Wahrheitsquelle
 
 **Ergebnis**: Markdown- und Konsolenberichte sind gegen unbeabsichtigte Layout- und Inhaltsregressionen abgesichert.
 
@@ -224,6 +226,7 @@ Pragmatische Entscheidung fuer M3:
 - sie wird als eigener dokumentierter Pruefpfad behandelt, lokal oder in einem separaten CI-Workflow
 - die Bewertung gegen `NF-04` und `NF-05` erfolgt auf Basis der `analyze`-Baseline; fuer `analyze --format markdown` und `impact` werden zusaetzliche Stichproben dokumentiert
 - Nichterreichen darf nicht stillschweigend uebergangen werden, sondern muss in der Dokumentation sichtbar sein
+- Referenzumgebung, Messmethodik, Messartefakte und Soll-Ist-Bewertung werden verbindlich in `docs/performance.md` festgehalten
 
 Vorgesehene Artefakte:
 
@@ -246,7 +249,7 @@ Die README soll fuer M3 mindestens enthalten:
 - Beispiel fuer `--output <path>`
 - klaren Hinweis auf heuristische Include-/Impact-Aussagen
 - Verweis auf Referenz- und Beispielausgaben
-- Verweis auf `docs/performance.md`, sofern diese Datei eingefuehrt wird
+- Verweis auf `docs/performance.md`
 
 Zusaetzlich sind bei Abschluss von M3 zu aktualisieren:
 
@@ -281,9 +284,9 @@ Folgende Dateien oder Dateigruppen sollen nach M3 voraussichtlich neu entstehen 
 | Build | `src/adapters/CMakeLists.txt`, `tests/CMakeLists.txt` |
 | Adapter-Tests | neue oder erweiterte Tests unter `tests/adapters/` fuer Markdown-Reporting und Output-Fehlerfaelle |
 | E2E-Tests | neue oder erweiterte Tests unter `tests/e2e/` fuer Markdown und Golden-Outputs |
-| Referenzdaten | neue Fixtures unter `tests/e2e/testdata/m3/` sowie versionierte Referenzprojekte oder Generatoren unter `tests/reference/` |
+| Referenzdaten | neue Fixtures unter `tests/e2e/testdata/m3/`, weiterverwendete oder gespiegelt uebernommene regressionskritische M2-Referenzfaelle sowie versionierte Referenzprojekte oder Generatoren unter `tests/reference/` |
 | Beispielausgaben | neue Dateien unter `docs/examples/` |
-| Performance-Dokumentation | neue Datei `docs/performance.md` oder ein klar abgegrenzter Abschnitt in bestehender Dokumentation |
+| Performance-Dokumentation | neue Datei `docs/performance.md` |
 | Produktdokumentation | `README.md`, `CHANGELOG.md`, `docs/releasing.md`, gegebenenfalls `docs/roadmap.md` |
 
 Hinweis: Die konkreten Dateinamen duerfen von dieser Zielstruktur abweichen, solange die Trennung zwischen Kern, Report-Adaptern, CLI und Referenzdaten erhalten bleibt.
@@ -361,10 +364,10 @@ Die Pruefung soll insbesondere bestaetigen:
 - ungueltige Format-/Output-Kombinationen liefern Exit-Code `2`
 - Schreibfehler fuer Report-Dateien liefern Exit-Code `1`
 - Eingabefehler behalten ihre M1-/M2-Codes `3` und `4`
-- Golden-Outputs fuer Konsole und Markdown bleiben stabil
+- Golden-Outputs fuer Konsole und Markdown bleiben stabil, einschliesslich regressionskritischer Faelle fuer TU-Identitaet, Pfadsemantik und permutierte Eingabereihenfolge
 - statische Analyse- und Metrik-Reports gemaess `docs/quality.md` bleiben erzeugbar, einschliesslich `summary.txt`, `clang-tidy.txt`, `lizard.txt` und `lizard-warnings.txt`
 - Coverage-Gate und Quality-Gate bleiben trotz Report-Ausbau gruen
-- Referenzumgebung, Messwerte und Bewertung gegen `NF-04` und `NF-05` sind dokumentiert; `stdout`- und `time`-Artefakte der `analyze`-Baseline sowie dokumentierte Stichproben fuer Markdown und Impact liegen nachvollziehbar vor
+- Referenzumgebung, Messwerte und Bewertung gegen `NF-04` und `NF-05` sind in `docs/performance.md` dokumentiert; `stdout`- und `time`-Artefakte der `analyze`-Baseline sowie dokumentierte Stichproben fuer Markdown und Impact liegen nachvollziehbar vor
 
 ## 5. Rueckverfolgbarkeit
 
