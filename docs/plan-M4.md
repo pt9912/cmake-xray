@@ -406,9 +406,10 @@ Die Pruefung soll insbesondere bestaetigen:
 | Sichtbarkeit der Datenherkunft | Sobald File-API-Daten beteiligt sind, machen Konsole und Markdown die Beobachtungsherkunft (`exact` oder `derived`) und den Ladezustand der Target-Metadaten sichtbar | AP 1.3, 1.4 |
 | Fehlerbehandlung fuer explizite Metadaten | Nicht lesbare Pfade liefern Exit-Code `3`; syntaktisch ungueltige oder strukturell unlesbare Reply-Sets liefern `4`; partielle, aber fachlich nutzbare Daten bleiben bei `0` und werden ueber Diagnostics erklaert | AP 1.5 |
 | Analyze-Report in M4 | Keine eigenstaendige Target-Rangliste; die erste Target-Sicht bleibt an Ranking- und Hotspot-Kontext gekoppelt | AP 1.4 |
+| Folge-CLI fuer transitive Target-Analysen | Spaetere Phase-4-Meilensteine bauen weiter auf `analyze` und `impact` auf; ein eigenes Unterkommando wird erst dann eingefuehrt, wenn eine eigenstaendige Graph-Exploration fachlich notwendig wird | 0.3, AP 1.3, AP 1.5 |
+| Benennung kuenftiger Metadatenoptionen | `--cmake-file-api` bleibt die konkrete Benutzeroberflaeche, solange nur diese zweite Metadatenquelle existiert; ein generischer Alias wird erst mit einer weiteren realen Quelle eingefuehrt, waehrend `--cmake-file-api` aus Rueckwaertskompatibilitaetsgruenden erhalten bleibt | AP 1.5 |
+| Grundlage spaeterer HTML-, JSON- und DOT-Reporter | Weitere Reporter bauen auf strukturierten Kernmodellen und Ergebnisfeldern fuer Target-Sicht, Mapping-Abdeckung und Impact-Klassifikation auf; die M4-Textdarstellungen in Konsole und Markdown sind nur menschenlesbare Projektionen und kein Formatvertrag fuer Folgeformate | 1.1, AP 1.3, AP 1.4 |
 
 ### 6.2 Offen
 
-- Soll ein spaeterer Phase-4-Meilenstein fuer transitive Target-Analysen ein eigenes Unterkommando einfuehren oder weiter auf `analyze` und `impact` aufbauen?
-- Soll fuer spaetere weitere Metadatenquellen neben der CMake File API ein generischerer CLI-Name als `--cmake-file-api` eingefuehrt werden, oder bleibt diese Option dauerhaft die primaere Benutzeroberflaeche?
-- Wie sollen HTML-, JSON- und DOT-Reporter spaeter auf der M4-Target-Sicht aufsetzen, ohne ihre jeweiligen Formatvertraege vorzeitig an M4-Textdarstellungen zu koppeln?
+Derzeit keine weiteren offenen Punkte mit unmittelbarem Einfluss auf Scope, CLI-Vertrag oder Reporter-Semantik von M4.

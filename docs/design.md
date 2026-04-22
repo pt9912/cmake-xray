@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Design `cmake-xray` |
-| Version | `0.3` |
+| Version | `0.4` |
 | Stand | `2026-04-22` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md) |
@@ -14,7 +14,7 @@
 Dieses Dokument konkretisiert die fachliche und benutzerbezogene Ausgestaltung des Produkts auf Basis der Anforderungen im [Lastenheft](./lastenheft.md). Es beschreibt beabsichtigtes Verhalten, Ausgabemodelle und Interaktionsmuster, ohne die technische Implementierungstiefe des Architekturdokuments vorwegzunehmen.
 
 ### 0.2 Nicht-Ziel
-Dieses Dokument definiert keine abschliessenden Klassen-, Modul- oder Build-Strukturen. Die hexagonale Zerlegung in Ports und Adapter wird in [architecture.md](./architecture.md) beschrieben.
+Dieses Dokument definiert keine abschliessenden Klassen-, Modul- oder Build-Strukturen. Die hexagonale Zerlegung in Ports und Adapter wird in [architecture.md](./architecture.md) beschrieben. Organisatorische Randbedingungen wie Repository-Hosting, Lizenzwahl und formale Abnahmekriterien werden hier nur insoweit beruehrt, wie sie sichtbares Produktverhalten beeinflussen; ihre primaere Heimat bleiben Lastenheft, Roadmap und Projektdokumentation.
 
 ## 1. Designprinzipien
 
@@ -38,9 +38,12 @@ Dieses Dokument definiert keine abschliessenden Klassen-, Modul- oder Build-Stru
 ### 2.2 Erwartete CLI-Eigenschaften
 
 - Unterkommandos sollen nach Nutzerziel statt nach interner Verarbeitung benannt werden.
+- `--help` soll fuer Hauptkommando und Unterkommandos eine knappe, aber vollstaendige Orientierung geben.
 - Konsolenausgaben sollen standardmaessig knapp, aber interpretierbar sein.
 - Ein detailreicher Modus soll zusaetzliche Diagnoseinformationen liefern.
+- Exit-Codes sollen zwischen Verwendungsfehlern, nicht lesbaren Eingaben, ungueltigen Eingaben und erfolgreicher Analyse unterscheiden.
 - Fehlermeldungen sollen den konkreten Eingabefehler benennen und einen naechsten Schritt vorschlagen.
+- Alle Eingaben und Steueroptionen sollen ueber CLI-Parameter uebergeben werden; das Produkt soll keine interaktive Laufzeitumgebung voraussetzen.
 
 ### 2.3 Eingabegrundlagen
 
@@ -54,6 +57,8 @@ Beide Quellen sollen dieselben fachlichen Analysearten tragen koennen. Die Daten
 - Berichte sollen sichtbar machen, ob Kennzahlen und Ableitungen auf `exact` oder `derived` Beobachtungen beruhen.
 - Ergebnisse aus abgeleiteten Daten duerfen nicht stillschweigend denselben Praezisionsanspruch tragen wie compilernahe Eingaben.
 - Fehlt `compile_commands.json`, soll eine ausreichend vollstaendige CMake-File-API-Lage fuer die Kernanalysen genutzt werden, statt allein wegen der fehlenden Compilation Database abzubrechen.
+- Bereits beim Einlesen soll sichtbar unterscheidbar bleiben, ob Eingaben nicht lesbar, syntaktisch ungueltig, strukturell unzureichend oder nur fachlich partiell verwertbar sind.
+- Jede nutzbare Beobachtung muss mindestens Quelldatei, Arbeitskontext und einen fuer die Analyse nutzbaren Compile-Kontext transportieren, damit spaetere Auswertungen dieselbe fachliche Grundlage teilen.
 
 ## 3. Design der Analyseergebnisse
 
@@ -90,17 +95,38 @@ Ein Include-Hotspot soll nicht nur als Headername erscheinen, sondern als beobac
 - Liste oder Auswahl der betroffenen Translation Units
 - optional Kennzeichnung intern/extern
 
-### 3.3 Impact-Analyse
+Die Ergebnisdarstellung soll ausserdem offen fuer spaetere Verfeinerungen bleiben:
 
-Die Impact-Analyse soll einen Dateipfad als Eingabe nehmen und drei Ergebnisklassen unterscheiden:
+- Projekt-Header und externe Header sollen unterscheidbar gemacht werden, sobald die zugrunde liegenden Daten dies belastbar erlauben.
+- Wo moeglich, soll kenntlich sein, ob ein Hotspot auf direkten Includes, indirekten Includes oder einer gemischten Sicht beruht.
+
+### 3.3 Target-Sicht
+
+Sobald geeignete Build-Metadaten vorliegen, soll das Design neben Translation Units auch Targets als sichtbare Kontexteinheit fuehren:
+
+- Translation Units koennen null, einem oder mehreren Targets zugeordnet sein.
+- Die erste Target-Sicht bleibt kontextgebunden an Projektanalyse und Impact-Analyse; sie ist kein eigener Analysebaum.
+- Spaetere Ausbaustufen duerfen direkte Target-Abhaengigkeiten textuell ausgeben und auffaellige stark vernetzte Targets hervorheben, muessen diese Zusatzsicht aber klar von der initialen Target-Zuordnung trennen.
+
+### 3.4 Impact-Analyse
+
+Die Impact-Analyse soll einen Dateipfad als Eingabe nehmen und drei Ergebnisklassen unterscheiden. Diese Grundklassifikation beschreibt die Herkunft und Belastbarkeit der Evidenz und nicht die Tiefe eines spaeteren Target-Graphen:
 
 | Ergebnistyp | Bedeutung |
 |---|---|
-| direkte Betroffenheit | Translation Units oder Targets koennen unmittelbar betroffen sein |
-| indirekte Betroffenheit | Betroffenheit ergibt sich aus weiteren Beziehungen oder Zusatzdaten |
-| unklare Betroffenheit | fuer Teile der Analyse fehlen Daten oder belastbare Ableitungen |
+| `direct` | mindestens eine betroffene Translation Unit oder ein betroffenes Target wurde ohne include-basierte Heuristik direkt aus bekannten Quelldatei- oder Zuordnungsdaten abgeleitet |
+| `heuristic` | Betroffenheit ergibt sich aus include-basierten oder sonst abgeleiteten Beobachtungen; direkte und heuristische Treffer koennen gemeinsam vorkommen, die Gesamtsicht bleibt dann `heuristic` |
+| `uncertain` | es wurden keine belastbaren Treffer gefunden und die verfuegbare Datengrundlage ist heuristisch oder partiell |
 
-### 3.4 Sortierung und Begrenzung von Ergebnislisten
+Die ausgegebene Sicht soll mindestens enthalten:
+
+- den geprueften Dateipfad
+- die voraussichtlich betroffenen Translation Units
+- bei vorhandener Target-Sicht die voraussichtlich betroffenen Targets
+- einen sichtbaren Hinweis, wenn Teile der Ableitung nur heuristisch oder nur partiell moeglich waren
+- spaetere Erweiterungen duerfen Auswirkungen zusaetzlich nach direkter oder transitiver Target-Beziehung priorisieren, muessen diese zweite Achse aber klar von der Grundklassifikation `direct|heuristic|uncertain` trennen
+
+### 3.5 Sortierung und Begrenzung von Ergebnislisten
 
 Analyse-Ergebnisse wie das Translation-Unit-Ranking und die Include-Hotspot-Liste koennen bei grossen Projekten umfangreich werden. Das Design soll folgende Regeln einhalten:
 
@@ -110,6 +136,14 @@ Analyse-Ergebnisse wie das Translation-Unit-Ranking und die Include-Hotspot-List
 - Die konkrete Standardanzahl (zum Beispiel Top 10 oder Top 20) wird im Pflichtenheft oder bei der Implementierung festgelegt.
 
 Relevante Anforderungen: `F-42`, `F-10`, `F-13`, `NF-03`
+
+### 3.6 Konfigurations- und Vergleichserweiterungen
+
+Nicht jede Konfiguration gehoert in den MVP, aber das Design soll die Richtung spaeterer Erweiterungen vorgeben:
+
+- Schwellenwerte fuer Einstufungen sollen konfigurierbar ergaenzt werden koennen, ohne die Grundlogik des Rankings auszutauschen.
+- Einzelne Analysearten sollen spaeter gezielt aktivier- oder deaktivierbar sein, damit Nutzer Berichte auf ihr Ziel reduzieren koennen.
+- Ein spaeterer Vergleich zwischen zwei Analysezeitpunkten soll auf denselben fachlichen Ergebnisobjekten aufsetzen, statt einen getrennten Berichtstyp mit eigener Semantik einzufuehren.
 
 ## 4. Berichtsausgaben
 
@@ -136,6 +170,14 @@ Markdown ist das erste persistente Berichtsziel. Ein Bericht soll mindestens ent
 
 HTML, JSON und DOT sind Erweiterungen ausserhalb des MVP. Fuer diese Formate muessen spaeter Stabilitaets- und Versionsfragen gesondert beschrieben werden.
 
+### 4.4 Nutzung in Shell und CI
+
+Die ersten Berichtsformate muessen nicht nur lokal lesbar sein, sondern sich auch fuer Automatisierung eignen:
+
+- Konsolen- und Markdown-Ausgaben sollen in Shell-Skripten, GitHub Actions und anderen CI-Pipelines ohne interaktive Nacharbeit nutzbar sein.
+- Standardausgaben sollen diff- und logfreundlich bleiben; Zusatzdetails duerfen nur ueber explizite Optionen dazukommen.
+- Nutzungsbeispiele fuer die wichtigsten Aufrufe sollen so formuliert sein, dass sie direkt in lokale Skripte oder CI-Schritte uebernommen werden koennen.
+
 ## 5. Verhalten bei fehlenden oder schwachen Daten
 
 Dieses Produkt darf Unsicherheit nicht verstecken. Wenn Eingaben oder Ableitungen nicht ausreichen, soll das Design folgende Regeln einhalten:
@@ -157,21 +199,33 @@ Abschnitt 5 beschreibt, wann Unsicherheit kommuniziert wird. Dieser Abschnitt be
 
 Relevante Anforderungen: `F-09`, `F-23`, `NF-02`, `NF-14`
 
-## 7. Rueckverfolgbarkeit
+## 7. Nichtfunktionale Leitplanken fuer das Design
+
+Die fachliche Ausgestaltung soll folgende nichtfunktionalen Leitplanken respektieren:
+
+- Der erste nutzbare Stand bleibt Linux-zentriert; spaetere Plattformen duerfen keine abweichende Fachsemantik erzwingen.
+- Standardausgaben sollen ohne Zusatzkonfiguration fuer lokale Nutzung und CI sinnvoll einsetzbar sein.
+- Erweiterungen fuer neue Analysearten und Ausgabeformate sollen auf denselben fachlichen Ergebnisobjekten aufsetzen.
+- Performance- und Referenzumgebungsziele werden nicht im Design berechnet, aber das Design soll keine Interaktion oder Datenpflichten vorsehen, die diese Ziele unnoetig gefaehrden.
+- Dokumentation und Beispielausgaben gehoeren zum Produktverhalten und muessen die wichtigsten Nutzungsmodi nachvollziehbar machen.
+
+## 8. Rueckverfolgbarkeit
 
 | Designbereich | Lastenheft-Kennungen |
 |---|---|
-| Eingabeverhalten | `F-01` bis `F-05`, `F-41`, `S-01` bis `S-03` |
+| Eingabeverhalten | `F-01` bis `F-05`, `F-41`, `S-01` bis `S-03`, `RB-04` |
 | Translation-Unit-Analyse | `F-06` bis `F-11` |
 | Include-Analyse | `F-12` bis `F-17` |
 | Target- und Impact-Sicht | `F-18` bis `F-25` |
 | Ergebnisbegrenzung | `F-42`, `F-10`, `F-13`, `NF-03` |
-| Berichtsausgaben | `F-26` bis `F-30`, `NF-20` |
+| Berichtsausgaben | `F-26` bis `F-30`, `S-04` bis `S-08`, `NF-13`, `NF-20` |
 | Unsicherheit und Datenluecken | `F-09`, `F-23`, `NF-02`, `NF-14` |
 | CLI-Nutzung | `F-31` bis `F-34`, `F-39`, `F-40`, `NF-01` bis `NF-03` |
 | Konfiguration | `F-35` bis `F-38` |
+| Nutzung in Shell und CI | `S-09` bis `S-11`, `NF-16` bis `NF-18` |
+| Nichtfunktionale Leitplanken | `NF-04` bis `NF-13` |
 
-## 8. Offene Designfragen
+## 9. Offene Designfragen
 
 - Welche Detailtiefe soll der `--verbose`-Modus liefern, ohne die Standardausgabe zu ueberladen?
 - Wie sollen teilweise fehlende Include- oder Target-Daten visuell und sprachlich markiert werden?

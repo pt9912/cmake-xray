@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Architecture `cmake-xray` |
-| Version | `0.6` |
+| Version | `0.7` |
 | Stand | `2026-04-22` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Phasenplan](./roadmap.md) |
@@ -13,7 +13,10 @@
 ### 0.1 Zweck
 Dieses Dokument beschreibt die geplante Systemstruktur von **cmake-xray**. Es leitet aus den Anforderungen und dem Design eine technische Zerlegung in Verantwortlichkeiten, Datenfluesse und Integrationspunkte ab.
 
-### 0.2 Architekturstil
+### 0.2 Nicht-Ziel
+Dieses Dokument beschreibt keine Projektgovernance, keine Lizenzwahl und keine formalen Abnahmekriterien im Detail. Solche Punkte werden nur dann aufgegriffen, wenn sie die technische Systemstruktur oder den Integrationsrahmen direkt beeinflussen.
+
+### 0.3 Architekturstil
 Das System folgt einer **hexagonalen Architektur** (Ports & Adapters). Der fachliche Analysekern definiert Ports als abstrakte Schnittstellen. Konkrete Adapter binden externe Quellen, Ausgabekanaele und Steuerungswege an.
 
 Dieser Stil wurde gewaehlt, weil:
@@ -40,19 +43,26 @@ Dieser Stil wurde gewaehlt, weil:
 | `compile_commands.json` | exakte, compilernahe Eingabequelle fuer Translation Units und Compile-Aufrufe |
 | CMake File API (`codemodel`, `toolchains`) | zweite CMake-native Eingabequelle fuer Kernanalysen und Target-Sicht; liefert abgeleitete Compile-Kontexte auch ohne `compile_commands.json` |
 | Quelldateien / Header | Grundlage fuer Include- oder Abhaengigkeitsableitungen |
+| CLI-Parameter | transportieren Eingabepfade, Formatwahl und spaetere Analyseoptionen in den Kern |
 | CLI-Nutzer | startet Analysen lokal |
+| lokale Shell-Skripte | fuehren das Werkzeug nicht interaktiv aus |
 | CI-Systeme | fuehren Analysen automatisiert aus |
+| GitHub Actions / andere CI-Pipelines | binden das Werkzeug in Build- und Review-Automatisierungen ein |
 | Konsole / Markdown-Datei | erste Ausgabekanaele |
+| spaetere HTML-, JSON- und DOT-Ausgaben | weitere Ausgabekanaele ueber dieselben Kernergebnisse |
 
 ### 2.2 Architekturtreiber
 
 | Treiber | Herkunft |
 |---|---|
 | Linux als primaere Zielplattform | `NF-07`, `RB-01`, `RB-02`, `RB-03` |
+| nichtinteraktive Nutzung lokal und in CI | `RB-04`, `S-09` bis `S-11` |
 | reproduzierbare Analyseergebnisse | `NF-15` |
 | austauschbare Datengrundlagen fuer Kernanalysen, Include-Sicht und Target-Sicht | `F-05`, `F-12` bis `F-25`, `S-01`, `S-02` |
+| CLI-gesteuerte Pfad-, Format- und Umfangssteuerung mit sinnvollen Defaults | `F-35`, `F-36`, `F-42`, `S-03`, `NF-03` |
 | klare Fehlermeldungen und Exit-Codes | `F-03`, `F-33`, `F-34`, `NF-02` |
 | automatisierte Testbarkeit | `NF-10`, `NF-19` |
+| Erweiterbarkeit fuer weitere Analysearten und Ausgabeformate | `NF-12`, `NF-13` |
 
 ## 3. Hexagonale Zerlegung
 
@@ -120,7 +130,7 @@ Ports sind abstrakte Schnittstellen, die der Kern definiert. Sie beschreiben **w
 |---|---|---|
 | `BuildModelPort` | Normalisierte Analyse-Eingaben aus `compile_commands.json` oder CMake File API laden | `F-01` bis `F-05`, `F-18` bis `F-20`, `F-24`, `F-41`, `S-01`, `S-02` |
 | `IncludeResolverPort` | Include-Beziehungen fuer Translation Units ermitteln | `F-12` bis `F-17` |
-| `ReportWriterPort` | Analyseergebnisse in ein konkretes Format schreiben | `F-26` bis `F-30`, `NF-20` |
+| `ReportWriterPort` | Analyseergebnisse in ein konkretes Format schreiben | `F-26` bis `F-30`, `S-04` bis `S-08`, `NF-13`, `NF-20` |
 
 ### 3.4 Adapter
 
@@ -130,7 +140,7 @@ Adapter sind konkrete Implementierungen der Ports. Sie enthalten die technischen
 
 | Adapter | Implementiert | Beschreibung | Relevante Kennungen |
 |---|---|---|---|
-| CLI Adapter | `AnalyzeProject`, `AnalyzeImpact`, `GenerateReport` | Uebersetzt Kommandozeilenargumente in Port-Aufrufe; verantwortet Help, Exit-Codes, Fehlerausgabe | `F-31` bis `F-40` |
+| CLI Adapter | `AnalyzeProject`, `AnalyzeImpact`, `GenerateReport` | Uebersetzt Kommandozeilenargumente in Port-Aufrufe; verantwortet Help, Exit-Codes, Fehlerausgabe sowie Pfad-, Format- und Umfangsoptionen | `F-31` bis `F-40`, `F-42`, `S-03`, `NF-01` bis `NF-03`, `RB-04` |
 
 Spaetere Primary Adapter (nicht MVP): IDE-Integration, programmatische API.
 
@@ -267,7 +277,7 @@ Die Trennung in zwei Libraries stellt sicher, dass `xray_hexagon` **keine** exte
 
 ## 5. Datenfluss
 
-1. Der **CLI Adapter** nimmt Kommando, Eingabepfade und Optionen entgegen und ruft den passenden Primary Port auf.
+1. Der **CLI Adapter** nimmt Kommando, Eingabepfade, Formatwahl und Umfangsoptionen entgegen und ruft den passenden Primary Port auf.
 2. Der Kern ruft ueber den `BuildModelPort` die normalisierte Buildbeschreibung ab. Der aktive Adapter liest entweder `compile_commands.json` oder die CMake File API und ueberfuehrt die Daten in dieselben Kernmodelle.
 3. Der Kern ruft ueber den `IncludeResolverPort` die Include-Beziehungen fuer die geladenen Translation-Unit-Beobachtungen ab. Welcher Adapter dahinter steht, ist dem Kern nicht bekannt.
 4. Der Kern fuehrt die angeforderte Analyse durch (TU-Ranking, Hotspots, Impact, spaeter Targets) und sammelt dabei Diagnostics-Informationen einschliesslich der Herkunft der Datengrundlage.
@@ -342,7 +352,7 @@ Bekannte Einschraenkungen:
 - **`-include`-Flags** (forced includes) und generierte Header sind im Quelltext nicht sichtbar.
 - **Systemabhaengige Aufloesung** (Compiler-interne Suchpfade, Frameworks unter macOS) wird nicht abgebildet.
 
-Daraus folgt: Ab Phase 2 / M2 und damit auch im spaeter lieferbaren Gesamt-MVP koennen die Ergebnisse von `F-12` bis `F-17` und `F-21` bis `F-25` unvollstaendig oder ueberzaehlig sein. Die Architektur muss sicherstellen, dass Analyseergebnisse, die auf diesem Adapter basieren, im Bericht als **heuristisch** gekennzeichnet werden (`F-09`, `F-23`, `NF-15`). Die Diagnostics-Infrastruktur (6.7) transportiert diese Einschraenkung an den Nutzer.
+Daraus folgt: Ab Phase 2 / M2 und damit auch im spaeter lieferbaren Gesamt-MVP koennen die Ergebnisse von `F-12` bis `F-17` und `F-21` bis `F-25` unvollstaendig oder ueberzaehlig sein. Die Architektur muss sicherstellen, dass Analyseergebnisse, die auf diesem Adapter basieren, im Bericht als **heuristisch** gekennzeichnet werden (`F-09`, `F-23`, `NF-15`). Die Diagnostics-Infrastruktur (6.8) transportiert diese Einschraenkung an den Nutzer.
 
 Alternative Adapter (compilergestuetzte Dependency-Informationen ueber `-M`-Flags, vorhandene `.d`-Dateien) sollen als weitere `IncludeResolverPort`-Implementierungen folgen und wuerden eine compilernahe Sicht liefern. Die Port-Abstraktion stellt sicher, dass der Wechsel ohne Kernaenderung moeglich ist.
 
@@ -363,7 +373,15 @@ Neue Analysearten erweitern den Kern und fuegen bei Bedarf neue Secondary Ports 
 
 Fuer die zweite primaere Eingabequelle wird deshalb nicht nur ein Nebenport fuer Target-Metadaten eingefuehrt, sondern der gemeinsame `BuildModelPort` erweitert. Die CMake File API ist der erste Adapter fuer diesen erweiterten Port. Der erste Ausbauschritt nach dem MVP beginnt mit `derived` Translation-Unit-Beobachtungen aus der File API, der TU-zu-Target-Zuordnung (`F-19`) und der targetbezogenen Ausgabe in der Impact-Analyse (`F-24`). Weitergehende Target-Graph-Analysen (`F-18`, `F-20`, `F-25`) folgen danach.
 
-### 6.5 Externe Abhaengigkeiten
+### 6.5 CLI-Steuerung und Ergebnisgrenzen
+
+Pfad-, Format- und Umfangssteuerung sind architektonisch Teil des Driving Edge:
+
+- Eingabepfade, Ausgabeformat und Ergebnisgrenzen werden im CLI Adapter validiert und als klare Parameter in den Kern uebergeben.
+- Ergebnisbegrenzungen wie `--top` beeinflussen die Selektion praesentierter Ergebnisse, nicht die zugrunde liegende Kernanalyse.
+- Spaetere Schalter fuer Analyseauswahl, Schwellenwerte oder Vergleichsmodi sollen auf denselben Primary Ports und Ergebnisobjekten aufsetzen, statt parallele Spezialpfade einzufuehren.
+
+### 6.6 Externe Abhaengigkeiten
 
 Externe Abhaengigkeiten sollen minimal gehalten werden (`RB-10`), um Build-Komplexitaet und Einstiegshuerde fuer Beitragende gering zu halten (`RB-06`, `RB-07`). Wo bewaehrte Bibliotheken einen klaren Vorteil gegenueber Eigenimplementierungen bieten, sollen sie bevorzugt werden. Fuer den MVP werden mindestens Entscheidungen zu folgenden Bereichen benoetigt:
 
@@ -373,7 +391,7 @@ Externe Abhaengigkeiten sollen minimal gehalten werden (`RB-10`), um Build-Kompl
 
 Externe Abhaengigkeiten duerfen nur in Adaptern oder in der Adapter-Verdrahtung auftreten, nicht im Kern.
 
-### 6.6 Testbarkeitsstrategie
+### 6.7 Testbarkeitsstrategie
 
 Die hexagonale Architektur unterstuetzt Testbarkeit direkt: Secondary Ports koennen durch Test-Doubles ersetzt werden, ohne Dateisystem oder CLI.
 
@@ -388,7 +406,7 @@ Die Referenzumgebung und Referenzprojekte aus `NF-04` bis `NF-06` und `NF-19` so
 
 Als erste gemeinsame Grundlage fuer Performance- und Testaussagen wird ein versioniertes synthetisches CMake-Referenzprojekt im Repository vorgesehen. Es soll reproduzierbar mehrere Groessenstufen, mindestens `250`, `500` und `1.000` Translation Units, sowie kontrollierte Include-Hotspots bereitstellen.
 
-### 6.7 Diagnostics als Querschnittsaspekt
+### 6.8 Diagnostics als Querschnittsaspekt
 
 Diagnostics ist kein eigener Port oder Adapter, sondern ein **Protokoll innerhalb des Kerns**. Analyseschritte fuegen Warnungen, Hinweise und Datenluecken an das Analyseergebnis an. Reporter-Adapter geben diese Informationen formatgerecht aus. Der CLI Adapter leitet daraus Exit-Codes ab.
 
@@ -410,13 +428,14 @@ Diagnostics ist kein eigener Port oder Adapter, sondern ein **Protokoll innerhal
 | Application Core | `F-06` bis `F-25`, `NF-15` |
 | BuildModelPort / Adapter | `F-01` bis `F-05`, `F-18` bis `F-20`, `F-24`, `F-41`, `S-01`, `S-02` |
 | IncludeResolverPort / Adapter | `F-12` bis `F-17`, `S-02` |
-| ReportWriterPort / Adapter | `F-26` bis `F-30`, `NF-20` |
-| CLI Adapter | `F-31` bis `F-40`, `NF-01`, `NF-02` |
+| ReportWriterPort / Adapter | `F-26` bis `F-30`, `S-04` bis `S-08`, `NF-13`, `NF-20` |
+| CLI-Steuerung und Ergebnisgrenzen | `F-35` bis `F-42`, `S-03`, `NF-03` |
+| CLI Adapter | `F-31` bis `F-40`, `NF-01`, `NF-02`, `RB-04` |
 | Diagnostics | `F-03`, `F-09`, `F-23`, `NF-02`, `NF-14`, `NF-15` |
 | Verzeichnisstruktur und CMake-Targets | `RB-01`, `RB-02`, `RB-10` |
 | Externe Abhaengigkeiten | `RB-10`, `RB-06`, `RB-07` |
 | Testbarkeit | `NF-10`, `NF-19`, `NF-04` bis `NF-06` |
-| Plattform- und Laufzeitrahmen | `NF-07`, `RB-01` bis `RB-05` |
+| Plattform- und Laufzeitrahmen | `NF-07` bis `NF-09`, `RB-01` bis `RB-05`, `S-09` bis `S-11` |
 
 ## 9. Offene Architekturfragen
 

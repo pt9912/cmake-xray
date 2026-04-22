@@ -5,7 +5,7 @@
 | Feld       | Wert                                                                                   |
 | ---------- | -------------------------------------------------------------------------------------- |
 | Dokument   | Phasenplan `cmake-xray`                                                                |
-| Version    | `0.5`                                                                                  |
+| Version    | `0.6`                                                                                  |
 | Stand      | `2026-04-22`                                                                           |
 | Status     | Entwurf                                                                                |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md) |
@@ -29,6 +29,7 @@ Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**.
 | Phase 2 | Kernanalysen MVP       | Translation-Unit-Analyse, Include-Hotspots, Impact fuer Dateien | gross            |
 | Phase 3 | Berichte und Qualitaet | Markdown, Dokumentation, Referenzdaten, Performance-Baseline    | mittel           |
 | Phase 4 | Erweiterungen          | Target-Sicht, HTML, JSON, weitere Plattformen                   | fortlaufend      |
+| Phase 5 | Weitere Erweiterungen nach M4 | weitere Konfiguration, Vergleichsansichten und verfeinerte Analyse | fortlaufend      |
 
 ### 2.1 Milestones
 
@@ -39,6 +40,7 @@ Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**.
 | **M2**       | `v0.3.0` | Phase 2 | `AK-03`, `AK-04`, `AK-05` erfuellt; heuristische Ergebnisse gekennzeichnet     |
 | **M3 (MVP)** | `v1.0.0` | Phase 3 | Alle `AK-01` bis `AK-09` erfuellt; MVP lieferbar                               |
 | **M4**       | `v1.1.0` | Phase 4 |                                                                                |
+| **M5**       | `tbd`    | Phase 5 | weitere Erweiterungen nach Abschluss von M4                                    |
 
 ## 3. Phasen im Detail
 
@@ -110,6 +112,15 @@ Hinweis: `F-39` (Soll) kann bei Bedarf in Phase 2 oder 3 vorgezogen werden, fall
 
 Einzelne Arbeitspakete koennen bei Bedarf eigene Abschlusskriterien erhalten.
 
+### 3.6 Phase 5 - Weitere Erweiterungen nach M4
+
+Ziel: zusaetzliche Ausbaupunkte nach dem bereits geplanten M4-Umfang aufnehmen, ohne die historische Planung der Phasen 0 bis 4 umzuschreiben.
+
+| Arbeitspaket                                                                                   | Relevante Kennungen            |
+| ---------------------------------------------------------------------------------------------- | ------------------------------ |
+| Verfeinerte Include-Sicht jenseits des MVP                                                     | `F-16`, `F-17`                 |
+| Erweiterte Analysekonfiguration, Schwellenwerte und Vergleichsansichten                        | `F-10`, `F-11`, `F-37`, `F-38` |
+
 ## 4. MVP-Abgrenzung
 
 Der MVP umfasst Phase 0 bis Phase 3, soweit die Ergebnisse direkt auf die Abnahmekriterien `AK-01` bis `AK-09` einzahlen.
@@ -145,3 +156,16 @@ Nicht Bestandteil des MVP sind insbesondere:
 - Fuer das erste Translation-Unit-Ranking reicht als Minimalmenge die Kombination aus `arg_count`, `include_path_count` und `define_count`. Diese Kennzahlen sind direkt aus der Compile-Datenbank ableitbar und entkoppeln das erste Ranking von der heuristischen Include-Aufloesung.
 - Fuer den MVP ist der `SourceParsingIncludeAdapter` der risikoaermste `IncludeResolverPort`-Adapter. Er bleibt im MVP die einzige Implementierung; seine Ergebnisse werden als heuristisch gekennzeichnet.
 - Der Einstieg in eine zweite CMake-native Eingabequelle lohnt sich erst nach stabilem MVP, also in Phase 4. Der erste Ausbauschritt soll die Kernanalysen ueber die CMake File API oeffnen und zugleich mit `F-19` und `F-24` die erste Target-Sicht liefern, bevor weitergehende Target-Graph-Analysen folgen.
+
+## 8. Ergaenzende Rueckverfolgbarkeit
+
+Die Beschreibungen von Phase 0 bis Phase 4 bleiben bewusst am bisherigen Planstand. Die folgende Matrix ergaenzt deshalb nur die explizite Zuordnung von Kennungen, die dort bereits implizit oder querschnittlich angelegt sind, sowie die zusaetzlichen Ausbaupunkte ab Phase 5.
+
+| Kennungen | Zuordnung | Hinweis |
+| --------- | --------- | ------- |
+| `RB-04`, `RB-05`, `RB-08`, `RB-09`, `NF-11`, `NF-12`, `NF-13` | Phase 0 | Projekt-, Repo-, Lizenz- und Strukturgrundlagen des bereits umgesetzten Fundaments |
+| `S-01`, `S-03`, `NF-01`, `NF-02`, `NF-14` | Phase 1 | Eingabe-, CLI- und Fehlervertraege des MVP-Einstiegs |
+| `F-42`, `S-04`, `NF-03` | Phase 2 | Ergebnisbegrenzung und nutzbare Standard-Konsolenausgabe des umgesetzten Analysepfads |
+| `S-05`, `S-09`, `S-10`, `S-11` | Phase 3 | Markdown-Ausgabe sowie Nutzungs- und Integrationsbeispiele des MVP |
+| `S-06`, `S-07`, `S-08` | Phase 4 | kuenftige HTML-, JSON- und DOT-Schnittstellen innerhalb des bestehenden Erweiterungsblocks |
+| `F-10`, `F-11`, `F-16`, `F-17`, `F-37`, `F-38` | Phase 5 | weitere Ausbaupunkte nach dem bereits geplanten M4-Umfang |
