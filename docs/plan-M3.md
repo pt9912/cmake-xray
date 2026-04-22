@@ -315,7 +315,7 @@ Die README soll fuer M3 mindestens enthalten:
 
 Zusaetzlich sind bei Abschluss von M3 zu aktualisieren:
 
-- `CHANGELOG.md` fuer `v1.0.0`
+- `CHANGELOG.md` fuer `v1.0.0`; bis zum eigentlichen Release duerfen die Inhalte unter `## [Unreleased]` bleiben, die datierte Versionsueberschrift fuer `1.0.0` entsteht erst im Release-Commit
 - `src/hexagon/model/application_info.h`
 - Root-`CMakeLists.txt`
 - `docs/releasing.md`, sodass Release-Ablauf, pruefpflichtige Artefakte und der MVP-Stand `v1.0.0` konsistent dokumentiert sind; die Releasing-Checkliste wird um Markdown-Report-Pruefung, Performance-Baseline-Dokumentation und Golden-Output-Regeneration erweitert

@@ -108,6 +108,34 @@ assert_exit "M3 impact markdown exits 0" 0 "$BINARY" impact --compile-commands t
 assert_stdout_equals_file "M3 impact markdown matches golden" tests/e2e/testdata/m3/report_impact_header/impact-markdown.md \
     "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --format markdown
 
+assert_exit "M3 direct impact console exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_source/compile_commands.json --changed-file src/app/main.cpp
+assert_stdout_equals_file "M3 direct impact console matches golden" tests/e2e/testdata/m3/report_impact_source/impact-console.txt \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_source/compile_commands.json --changed-file src/app/main.cpp
+assert_exit "M3 direct impact markdown exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_source/compile_commands.json --changed-file src/app/main.cpp --format markdown
+assert_stdout_equals_file "M3 direct impact markdown matches golden" tests/e2e/testdata/m3/report_impact_source/impact-markdown.md \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_source/compile_commands.json --changed-file src/app/main.cpp --format markdown
+
+assert_exit "M3 empty impact console exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_empty_impact/compile_commands.json --changed-file include/generated/version.h
+assert_stdout_equals_file "M3 empty impact console matches golden" tests/e2e/testdata/m3/report_empty_impact/impact-console.txt \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_empty_impact/compile_commands.json --changed-file include/generated/version.h
+assert_exit "M3 empty impact markdown exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_empty_impact/compile_commands.json --changed-file include/generated/version.h --format markdown
+assert_stdout_equals_file "M3 empty impact markdown matches golden" tests/e2e/testdata/m3/report_empty_impact/impact-markdown.md \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_empty_impact/compile_commands.json --changed-file include/generated/version.h --format markdown
+
+assert_exit "M3 diagnostics analyze console exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_diagnostics/compile_commands.json --top 3
+assert_stdout_equals_file "M3 diagnostics analyze console matches golden" tests/e2e/testdata/m3/report_diagnostics/analyze-console.txt \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_diagnostics/compile_commands.json --top 3
+assert_exit "M3 diagnostics analyze markdown exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_diagnostics/compile_commands.json --format markdown --top 3
+assert_stdout_equals_file "M3 diagnostics analyze markdown matches golden" tests/e2e/testdata/m3/report_diagnostics/analyze-markdown.md \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_diagnostics/compile_commands.json --format markdown --top 3
+
+assert_exit "M3 top-limit analyze console exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_top_limit/compile_commands.json --top 1
+assert_stdout_equals_file "M3 top-limit analyze console matches golden" tests/e2e/testdata/m3/report_top_limit/analyze-console.txt \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_top_limit/compile_commands.json --top 1
+assert_exit "M3 top-limit analyze markdown exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_top_limit/compile_commands.json --format markdown --top 1
+assert_stdout_equals_file "M3 top-limit analyze markdown matches golden" tests/e2e/testdata/m3/report_top_limit/analyze-markdown.md \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_top_limit/compile_commands.json --format markdown --top 1
+
 # Markdown file output
 report_dir="$(mktemp -d)"
 report_file="$report_dir/analyze.md"

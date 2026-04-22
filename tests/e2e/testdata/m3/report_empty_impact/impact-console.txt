@@ -1,0 +1,5 @@
+impact analysis for include/generated/version.h [heuristic]
+affected translation units: 0
+warning: could not resolve include "generated/version.h" from src/app/main.cpp
+note: conditional or generated includes may be missing from this result
+note: the file was not present in the loaded compile database or resolved include graph

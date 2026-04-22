@@ -1,6 +1,8 @@
 #include <doctest/doctest.h>
 
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "adapters/output/markdown_report_adapter.h"
 #include "hexagon/model/analysis_result.h"
@@ -87,6 +89,23 @@ AnalysisResult make_analysis_result() {
          "include-based results are heuristic; conditional or generated includes may be missing"},
     };
     return result;
+}
+
+RankedTranslationUnit make_ranked_translation_unit(std::string source_path, std::string directory,
+                                                   std::string unique_key, std::size_t rank,
+                                                   std::size_t arg_count,
+                                                   std::size_t include_path_count,
+                                                   std::size_t define_count,
+                                                   std::vector<Diagnostic> diagnostics = {}) {
+    return RankedTranslationUnit{
+        .reference = make_reference(std::move(source_path), std::move(directory),
+                                    std::move(unique_key)),
+        .rank = rank,
+        .arg_count = arg_count,
+        .include_path_count = include_path_count,
+        .define_count = define_count,
+        .diagnostics = std::move(diagnostics),
+    };
 }
 
 ImpactResult make_impact_result() {
@@ -220,4 +239,56 @@ TEST_CASE("markdown report adapter renders direct impact classification without 
 
     CHECK(report.find("- Impact classification: direct\n") != std::string::npos);
     CHECK(report.find("No affected translation units found.\n") != std::string::npos);
+}
+
+TEST_CASE("markdown report adapter preserves marker-dependent indentation for two-digit list entries") {
+    const MarkdownReportAdapter adapter;
+    AnalysisResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.compile_database_path = "tests/e2e/testdata/m3/report_top_limit/compile_commands.json";
+    result.include_analysis_heuristic = true;
+    result.translation_units = {
+        make_ranked_translation_unit("src/nine.cpp", "build/nine", "src/nine.cpp|build/nine", 9,
+                                     4, 1, 0),
+        make_ranked_translation_unit("src/ten.cpp", "build/ten", "src/ten.cpp|build/ten", 10, 5,
+                                     1, 1,
+                                     {{DiagnosticSeverity::note, "rank 10 diagnostic"}}),
+    };
+
+    for (std::size_t index = 1; index <= 10; ++index) {
+        result.include_hotspots.push_back(IncludeHotspot{
+            .header_path = "include/hotspot_" + std::to_string(index) + ".h",
+            .affected_translation_units =
+                {
+                    make_reference("src/hotspot.cpp", "build/hotspot",
+                                   "src/hotspot.cpp|build/hotspot"),
+                },
+            .diagnostics =
+                index == 10 ? std::vector<Diagnostic>{{DiagnosticSeverity::note,
+                                                       "hotspot 10 diagnostic"}}
+                            : std::vector<Diagnostic>{},
+        });
+    }
+
+    const auto report = adapter.write_analysis_report(result, 10);
+
+    CHECK(report.find("9. src/nine.cpp [directory: build/nine]\n"
+                      "    Metrics: arg_count=4, include_path_count=1, define_count=0\n") !=
+          std::string::npos);
+    CHECK(report.find("10. src/ten.cpp [directory: build/ten]\n"
+                      "     Metrics: arg_count=5, include_path_count=1, define_count=1\n"
+                      "     Diagnostics:\n"
+                      "     - note: rank 10 diagnostic\n") != std::string::npos);
+    CHECK(report.find("9. Header: include/hotspot\\_9.h\n"
+                      "    Affected translation units: 1\n"
+                      "    Translation units:\n"
+                      "    - src/hotspot.cpp [directory: build/hotspot]\n") !=
+          std::string::npos);
+    CHECK(report.find("10. Header: include/hotspot\\_10.h\n"
+                      "     Affected translation units: 1\n"
+                      "     Translation units:\n"
+                      "     - src/hotspot.cpp [directory: build/hotspot]\n"
+                      "     Diagnostics:\n"
+                      "     - note: hotspot 10 diagnostic\n") != std::string::npos);
 }

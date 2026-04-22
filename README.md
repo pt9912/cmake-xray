@@ -2,13 +2,13 @@
 
 Build visibility for CMake projects.
 
-`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Der aktuelle MVP-Stand `v1.0.0` liest `compile_commands.json`, rankt auffaellige Translation Units, leitet heuristische Include-Hotspots ab, analysiert Datei-Impact und exportiert dieselben Ergebnisse sowohl als Konsolen- als auch als Markdown-Report.
+`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Der aktuelle Entwicklungsstand auf `main` implementiert den geplanten M3-/MVP-Umfang fuer das kommende `v1.0.0`-Release: `compile_commands.json` lesen, auffaellige Translation Units ranken, heuristische Include-Hotspots ableiten, Datei-Impact analysieren und dieselben Ergebnisse sowohl als Konsolen- als auch als Markdown-Report exportieren.
 
 ## Status
 
 Das Repository enthaelt die umgesetzten Meilensteine M0 bis M3 aus [docs/plan-M0.md](./docs/plan-M0.md), [docs/plan-M1.md](./docs/plan-M1.md), [docs/plan-M2.md](./docs/plan-M2.md) und [docs/plan-M3.md](./docs/plan-M3.md).
 
-Der MVP-Umfang umfasst:
+Der umgesetzte M3-/MVP-Umfang umfasst:
 
 - CLI mit `analyze` und `impact`
 - Validierung von `compile_commands.json`
@@ -18,6 +18,8 @@ Der MVP-Umfang umfasst:
 - atomisches Schreiben von Markdown-Reports via `--output`
 - versionierte Golden-Files, Referenzdaten und Performance-Baselines
 - Docker-basierte Test-, Coverage- und Quality-Gates
+
+Die Release-Artefakte fuer `v1.0.0` werden erst beim eigentlichen Releasing finalisiert; bis dahin bleiben die Aenderungen im [CHANGELOG](./CHANGELOG.md) unter `Unreleased`.
 
 Nicht Ziel des MVP sind insbesondere:
 
