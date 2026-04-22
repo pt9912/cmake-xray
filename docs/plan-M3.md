@@ -108,6 +108,9 @@ Ein Markdown-Bericht fuer `impact` soll genau folgende Hauptteile in genau diese
   - `Changed file: <display path>`
   - `Affected translation units: <count>`
   - `Heuristic result: yes|no`
+- fuer M3 ist die Semantik von `Heuristic result` fest definiert:
+  - `yes` bedeutet, dass das Impact-Ergebnis oder ein Null-Treffer nicht ausschliesslich aus einer direkten Quelldatei-Zuordnung stammt, sondern auf heuristischer Include-Graph-Auswertung und/oder fehlender direkter TU-Zuordnung beruht
+  - `no` ist nur zulaessig, wenn mindestens eine betroffene Translation Unit direkt ueber einen bekannten Quelldateipfad gefunden wurde und fuer das Ergebnis keine include-basierte Heuristik benoetigt wurde
 - bei `0` betroffenen Translation Units direkt nach der Uebersicht die exakte Zeile `No affected translation units found.`
 - Abschnitt exakt `## Directly Affected Translation Units`
 - Abschnitt exakt `## Heuristically Affected Translation Units`
@@ -124,6 +127,9 @@ Formatregeln fuer M3:
 - der Abschnitt `Translation Unit Ranking` wird immer als geordnete Liste ausgegeben; jeder Eintrag besteht exakt aus einer Kopfzeile `<rank>. <source_path> [directory: <directory>]`, einer Metrikzeile `Metrics: arg_count=<n>, include_path_count=<n>, define_count=<n>` und optional einem unmittelbar folgenden `Diagnostics:`-Block mit ungeordneter Liste
 - der Abschnitt `Include Hotspots` wird immer als geordnete Liste ausgegeben; jeder Eintrag besteht exakt aus den Zeilen `Header: <path>`, `Affected translation units: <n>`, `Translation units:` sowie optional `Diagnostics:`; TU-Zuordnungen und Hotspot-Diagnostics stehen jeweils als ungeordnete Listen direkt darunter
 - die Impact-Abschnitte `Directly Affected Translation Units` und `Heuristically Affected Translation Units` werden immer als ungeordnete Listen ausgegeben; die Impact-Art wird nicht nochmals inline wiederholt, weil sie bereits ueber den Abschnittstitel kodiert ist
+- der Abschnitt `## Diagnostics` wird immer als ungeordnete Liste ausgegeben und enthaelt ausschliesslich reportweite Diagnostics aus `AnalysisResult::diagnostics` bzw. `ImpactResult::diagnostics` in Modellreihenfolge
+- inline `Diagnostics:`-Bloecke sind nur fuer elementbezogene Diagnostics zulaessig, also bei einzelnen Ranking-Eintraegen oder Include-Hotspots; solche Diagnostics werden in M3 nicht zusaetzlich im globalen Abschnitt `## Diagnostics` wiederholt
+- fuer `impact` gibt es in M3 keine elementbezogenen Diagnostics pro betroffener Translation Unit; Heuristik-Hinweise und Datenluecken dieses Analysepfads erscheinen deshalb ausschliesslich im reportweiten Abschnitt `## Diagnostics`
 - leere Abschnitte verwenden exakt diese Saetze: `No include hotspots found.`, `No directly affected translation units.`, `No heuristically affected translation units.`, `No diagnostics.`
 - pfadtragende Felder verwenden Anzeige-Pfade, nicht Vergleichsschluessel und nicht rohe CLI-Eingaben. Fuer M3 gilt die M2-Trennung unveraendert:
   - `Compile database:` zeigt den lexikalisch normalisierten Aufrufpfad der uebergebenen `compile_commands.json`
@@ -132,7 +138,7 @@ Formatregeln fuer M3:
 - dynamische Pfad- und Meldungstexte werden fuer Markdown maskiert; mindestens Backslash, Backtick, Stern, Unterstrich, eckige Klammern, fuehrende `#` sowie fuehrende Listenmarker werden escaped
 - Pfadangaben werden lexikalisch normalisiert und fuer Golden-Tests in einer kanonischen Aufrufform erzeugt: Die bytegenauen Referenzdateien entstehen aus einem festen Arbeitsverzeichnis mit fixture-relativen Eingabepfaden; Docker-Pruefungen verifizieren denselben Inhaltspfad funktional, aber nicht ueber identische Pfadstrings
 - genau ein abschliessender Zeilenumbruch
-- Heuristik-Hinweise und Datenluecken entweder inline am Ergebnis oder in einem unmittelbar folgenden Hinweisblock, nicht nur versteckt in einer Fussnote
+- Heuristik-Hinweise und Datenluecken folgen derselben Platzierungsregel wie andere Diagnostics: elementbezogen inline, reportweit im Abschnitt `## Diagnostics`; Reporter erzeugen dafuer in M3 keine zweite zusammenfassende Spiegelung
 
 Ein moeglicher M3-Zielaufruf ist:
 
@@ -199,6 +205,12 @@ Mindestens benoetigt:
 - Golden-Outputs fuer zentrale Erfolgsfaelle von `analyze` und `impact`, jeweils fuer Konsole und Markdown
 - Tests dafuer, dass dieselben fachlichen Daten in Konsole und Markdown konsistent wiedergegeben werden und pfadtragende Felder dieselbe Anzeigesemantik verwenden
 
+Fuer M3 gilt eine klare Referenzquellen-Regel:
+
+- `tests/reference/` ist die verbindliche Rohdatenbasis fuer versionierte Referenzprojekte, Generatoren und Performance-Szenarien
+- `tests/e2e/testdata/m3/` enthaelt daraus abgeleitete oder explizit kuratierte Kleinfixturen fuer bytegenaue CLI- und Markdown-Golden-Tests; diese Fixtures sind die einzige Wahrheitsquelle fuer Golden-Dateien und `docs/examples/`
+- wenn ein regressionskritischer M2-Randfall fuer M3 weiterverwendet wird, wird entweder die bestehende M2-Fixture direkt referenziert oder einmalig in `tests/e2e/testdata/m3/` gespiegelt; danach darf keine zweite fachlich abweichende Variante gepflegt werden
+
 Sinnvolle Referenzfaelle unter `tests/e2e/testdata/m3/` sind:
 
 - `report_project/` fuer einen typischen `analyze`-Durchlauf
@@ -235,7 +247,7 @@ Das Referenzprojekt soll:
 - im Repository versioniert sein; externe Downloads oder lokale Ad-hoc-Projekte reichen nicht aus
 - mehrere Groessenstufen abdecken, mindestens `250`, `500` und `1.000` Translation Units
 - kontrollierte Include-Hotspots und reproduzierbare Compile-Daten enthalten
-- fuer Performance-Messung und fuer Teile der End-to-End-Teststrategie wiederverwendbar sein
+- fuer Performance-Messung und als Rohdatenbasis fuer daraus abgeleitete E2E-Fixtures wiederverwendbar sein
 
 Die Messmethodik fuer M3 soll mindestens dokumentieren:
 
@@ -311,7 +323,7 @@ Folgende Dateien oder Dateigruppen sollen nach M3 voraussichtlich neu entstehen 
 | Build | `src/adapters/CMakeLists.txt`, `tests/CMakeLists.txt` |
 | Adapter-Tests | neue oder erweiterte Tests unter `tests/adapters/` fuer Markdown-Reporting und Output-Fehlerfaelle |
 | E2E-Tests | neue oder erweiterte Tests unter `tests/e2e/` fuer Markdown und Golden-Outputs |
-| Referenzdaten | neue Fixtures unter `tests/e2e/testdata/m3/`, weiterverwendete oder gespiegelt uebernommene regressionskritische M2-Referenzfaelle sowie versionierte Referenzprojekte oder Generatoren unter `tests/reference/` |
+| Referenzdaten | neue, aus `tests/reference/` oder bestehenden Kleinfixturen abgeleitete Fixtures unter `tests/e2e/testdata/m3/`, weiterverwendete oder gespiegelt uebernommene regressionskritische M2-Referenzfaelle sowie versionierte Referenzprojekte oder Generatoren unter `tests/reference/` |
 | Beispielausgaben | neue Dateien unter `docs/examples/` |
 | Performance-Dokumentation | neue Datei `docs/performance.md` |
 | Produktdokumentation | `README.md`, `CHANGELOG.md`, `docs/releasing.md`, gegebenenfalls `docs/roadmap.md` |
@@ -330,7 +342,7 @@ Hinweis: Die konkreten Dateinamen duerfen von dieser Zielstruktur abweichen, sol
 | 4 | 1.5 Performance-Baseline messen und dokumentieren | 1b, 3 |
 | 5 | 1.6 README, Beispielausgaben und Release-Artefakte abschliessen | 2b, 3, 4 |
 
-Schritte 1a und 1b koennen parallel bearbeitet werden. Das Referenzprojekt fuer Performance und Regressionstests sollte frueh feststehen, damit Reporter-Tests, Beispielausgaben und spaetere Baseline-Messungen auf derselben Datengrundlage aufbauen. Die eigentlichen Messungen aus 1.5 sollten jedoch erst gegen einen funktional stabilen M3-Stand erfolgen, damit nicht auf vorlaeufigen Report- oder Ausgabewegen gemessen wird.
+Schritte 1a und 1b koennen parallel bearbeitet werden. Das Referenzprojekt fuer Performance und groessere Regressionstests sollte frueh feststehen. Bytegenaue Reporter-Tests und Beispielausgaben bauen auf den kuratierten M3-Fixtures auf; diese muessen ihre Herkunft aus `tests/reference/` oder aus weiterverwendeten M2-Randfaellen explizit bewahren, damit keine zweite unabhaengige Wahrheitsquelle entsteht. Die eigentlichen Messungen aus 1.5 sollten jedoch erst gegen einen funktional stabilen M3-Stand erfolgen, damit nicht auf vorlaeufigen Report- oder Ausgabewegen gemessen wird.
 
 ## 4. Pruefung
 
@@ -422,11 +434,13 @@ Die Pruefung soll insbesondere bestaetigen:
 | Schreibfehler | nicht beschreibbare Report-Pfade nutzen Exit-Code `1`; Eingabefehler behalten `3` und `4` | AP 1.1, 1.3 |
 | Verantwortung der Report-Strecke | Report-Adapter erzeugen Text; `stdout`/Dateisystem-Entscheidung bleibt ausserhalb des Hexagons | AP 1.1 |
 | Markdown-Vertrag | M3 fixiert literal die Ueberschriften, Abschnittsreihenfolge, Listenformen, Leersaetze und Escaping-Regeln; Reporter geben Ergebnisvektoren in Modellreihenfolge aus | AP 1.2, 1.4 |
+| Heuristik-Semantik fuer `impact` | `Heuristic result: yes` umfasst sowohl include-basierte Treffer als auch Null-Treffer ohne direkte TU-Zuordnung; `no` ist nur fuer rein direkte Quelldatei-Treffer zulaessig | AP 1.2, 1.4 |
+| Platzierung von Diagnostics | reportweite Diagnostics stehen ausschliesslich im Abschnitt `## Diagnostics`; elementbezogene Diagnostics bleiben inline und werden nicht gespiegelt | AP 1.2, 1.4 |
 | Versionsdarstellung im Report | Die Tool-Version ist kein Bestandteil des Report-Bodys; reine Versionshebungen duerfen Report-Goldens nicht invalidieren | AP 1.2, 1.4 |
 | Pfaddarstellung im Report | Markdown nutzt dieselben Anzeige-Pfadregeln wie M2; Vergleichsschluessel bleiben intern, angezeigt werden normalisierte Display-Pfade | AP 1.2, 1.4 |
 | Markdown-Stil | einfaches, diffbares Markdown ohne HTML, Zeitstempel oder sonstige volatile Metadaten | AP 1.2 |
 | Golden-Outputs | versioniert im Repository und gegen stabile, nichtvolatile Ausgaben geprueft | AP 1.4 |
-| Referenzprojekt | versioniert im Repository unter `tests/reference/`; keine externen Benchmark-Abhaengigkeiten | AP 1.5 |
+| Referenzquellen fuer Goldens und Performance | `tests/reference/` ist Rohdatenbasis fuer Referenzprojekte und Performance; `tests/e2e/testdata/m3/` ist die einzige Wahrheitsquelle fuer bytegenaue Goldens und `docs/examples/` | AP 1.4, 1.5 |
 | Performance-Pfad | reproduzierbar dokumentiert, aber kein Pflichtbestandteil jedes `ctest`-Laufs; `NF-04`/`NF-05` werden ueber die `analyze`-Baseline bewertet, Markdown und Impact zusaetzlich stichprobenartig dokumentiert | AP 1.5 |
 | Nicht-MVP-Formate | HTML, JSON und DOT bleiben ausserhalb von M3 | AP 0.3 |
 
