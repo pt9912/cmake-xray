@@ -169,8 +169,8 @@ Mindestens benoetigt:
 
 - Adapter-Tests fuer `MarkdownReportAdapter`, insbesondere fuer Abschnittsreihenfolge, Tabellen-/Listendarstellung, Heuristik-Kennzeichnung und Diagnostics
 - CLI-Tests fuer `--format markdown`, `--output`, ungueltige Kombinationen und Report-Schreibfehler
-- End-to-End-Tests, die Markdown-Ausgaben gegen erwartete Dateien vergleichen
-- Golden-Outputs fuer zentrale Erfolgsfaelle von `analyze` und `impact`
+- End-to-End-Tests, die zentrale Konsolen- und Markdown-Ausgaben gegen erwartete Dateien vergleichen
+- Golden-Outputs fuer zentrale Erfolgsfaelle von `analyze` und `impact`, jeweils fuer Konsole und Markdown, sofern der Pfad beide Formate anbietet
 - Tests dafuer, dass dieselben fachlichen Daten in Konsole und Markdown konsistent wiedergegeben werden
 
 Sinnvolle Referenzfaelle unter `tests/e2e/testdata/m3/` sind:
@@ -184,9 +184,10 @@ Sinnvolle Referenzfaelle unter `tests/e2e/testdata/m3/` sind:
 
 Golden-Output-Regeln fuer M3:
 
-- erwartete Markdown-Dateien liegen versioniert im Repository
+- erwartete Konsolen- und Markdown-Dateien liegen versioniert im Repository
 - erwartete Ausgaben enthalten keine volatilen Werte wie Zeitstempel oder temporaere Verzeichnisse
 - Vergleiche sollen byte-stabil sein oder hoechstens zeilenendungsbezogen auf LF normalisieren; fachliche Vergleiche "ungefaehr gleich" reichen fuer M3 nicht aus
+- Konsolen-Golden-Files duerfen gegenueber Markdown eigene Layout- und Wortlaut-Erwartungen haben; reine Inhaltsparitaet ersetzt keinen formatspezifischen Regressionstest
 
 Fuer die Nutzerdokumentation sinnvoll:
 
@@ -235,6 +236,7 @@ M3 ist der MVP-Abschluss. Dokumentation und Release-Artefakte muessen deshalb ni
 Die README soll fuer M3 mindestens enthalten:
 
 - aktualisierten Projektstatus mit Verweis auf M2 und M3
+- mindestens ein Installationsbeispiel fuer die Nutzung auf Linux, etwa als lokaler Quellbuild; optional ergaenzt um das Runtime-Image als Bezugsweg
 - Beispiele fuer `analyze` und `impact` in der Konsole
 - Beispiele fuer Markdown-Ausgabe via `--format markdown`
 - Beispiel fuer `--output <path>`
@@ -247,7 +249,7 @@ Zusaetzlich sind bei Abschluss von M3 zu aktualisieren:
 - `CHANGELOG.md` fuer `v1.0.0`
 - `src/hexagon/model/application_info.h`
 - Root-`CMakeLists.txt`
-- `docs/releasing.md`, falls der Release-Ablauf um Markdown-Artefakte oder weitere Pruefschritte ergaenzt wird
+- `docs/releasing.md`, sodass Release-Ablauf, pruefpflichtige Artefakte und der MVP-Stand `v1.0.0` konsistent dokumentiert sind
 - gegebenenfalls `docs/roadmap.md`, falls Status oder Formulierungen vom Entwurf in den erreichten MVP-Stand uebergehen
 
 Sinnvolle Beispielartefakte unter `docs/examples/`:
@@ -337,9 +339,10 @@ docker run --rm \
 **Performance-Baseline**:
 
 ```bash
-/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_250/compile_commands.json --top 10 > /tmp/xray-250.txt
-/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_500/compile_commands.json --top 10 > /tmp/xray-500.txt
-/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_1000/compile_commands.json --top 10 > /tmp/xray-1000.txt
+mkdir -p build/reports/performance
+/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_250/compile_commands.json --top 10 > build/reports/performance/xray-250.stdout.txt 2> build/reports/performance/xray-250.time.txt
+/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_500/compile_commands.json --top 10 > build/reports/performance/xray-500.stdout.txt 2> build/reports/performance/xray-500.time.txt
+/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_1000/compile_commands.json --top 10 > build/reports/performance/xray-1000.stdout.txt 2> build/reports/performance/xray-1000.time.txt
 ```
 
 Die Pruefung soll insbesondere bestaetigen:
@@ -350,9 +353,9 @@ Die Pruefung soll insbesondere bestaetigen:
 - ungueltige Format-/Output-Kombinationen liefern Exit-Code `2`
 - Schreibfehler fuer Report-Dateien liefern Exit-Code `1`
 - Eingabefehler behalten ihre M1-/M2-Codes `3` und `4`
-- Golden-Outputs bleiben stabil
+- Golden-Outputs fuer Konsole und Markdown bleiben stabil
 - Coverage- und Quality-Gates bleiben trotz Report-Ausbau gruen
-- Referenzumgebung, Messwerte und Bewertung gegen `NF-04` und `NF-05` sind dokumentiert
+- Referenzumgebung, Messwerte und Bewertung gegen `NF-04` und `NF-05` sind dokumentiert; `stdout`- und `time`-Artefakte der Baseline liegen nachvollziehbar vor
 
 ## 5. Rueckverfolgbarkeit
 
