@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <fstream>
+#include <string_view>
 #include <string>
 #include <vector>
 
@@ -33,54 +34,110 @@ struct EntryValidation {
     bool valid{true};
 };
 
+struct RequiredStringField {
+    std::string_view key;
+    std::string_view missing_field_message;
+    std::string* target;
+};
+
+void append_problem(std::string& problems, std::string_view problem) {
+    if (!problems.empty()) problems += ", ";
+    problems += problem;
+}
+
+bool try_read_required_string(const nlohmann::json& obj, std::string_view key,
+                              std::string& target) {
+    const auto key_str = std::string(key);
+    if (!obj.contains(key_str) || !obj[key_str].is_string()) return false;
+
+    target = obj[key_str].get<std::string>();
+    return !target.empty();
+}
+
+void validate_required_string(const nlohmann::json& obj, const RequiredStringField& field,
+                              std::string& problems) {
+    if (!try_read_required_string(obj, field.key, *field.target)) {
+        append_problem(problems, field.missing_field_message);
+    }
+}
+
+std::vector<std::string> read_arguments(const nlohmann::json& obj) {
+    if (!obj.contains("arguments") || !obj["arguments"].is_array() || obj["arguments"].empty()) {
+        return {};
+    }
+
+    std::vector<std::string> arguments;
+    for (const auto& arg : obj["arguments"]) {
+        if (arg.is_string()) arguments.push_back(arg.get<std::string>());
+    }
+    return arguments;
+}
+
+bool try_read_command(const nlohmann::json& obj, std::vector<std::string>& arguments) {
+    std::string command;
+    if (!try_read_required_string(obj, "command", command)) return false;
+
+    arguments = {std::move(command)};
+    return true;
+}
+
+void validate_arguments(const nlohmann::json& obj, EntryValidation& result,
+                        std::string& problems) {
+    result.arguments = read_arguments(obj);
+    if (!result.arguments.empty()) return;
+
+    if (try_read_command(obj, result.arguments)) return;
+
+    append_problem(problems, "missing \"command\" and \"arguments\"");
+}
+
 EntryValidation validate_entry(const nlohmann::json& obj) {
     EntryValidation result;
     std::string problems;
 
-    bool has_file = obj.contains("file") && obj["file"].is_string() &&
-                    !obj["file"].get<std::string>().empty();
-    bool has_directory = obj.contains("directory") && obj["directory"].is_string() &&
-                         !obj["directory"].get<std::string>().empty();
-    bool has_command = obj.contains("command") && obj["command"].is_string() &&
-                       !obj["command"].get<std::string>().empty();
+    validate_required_string(
+        obj, RequiredStringField{"file", "missing \"file\" field", &result.file}, problems);
+    validate_required_string(obj,
+                             RequiredStringField{"directory", "missing \"directory\" field",
+                                                 &result.directory},
+                             problems);
+    validate_arguments(obj, result, problems);
 
-    if (!has_file) {
-        problems += "missing \"file\" field";
-    } else {
-        result.file = obj["file"].get<std::string>();
-    }
+    if (problems.empty()) return result;
 
-    if (!has_directory) {
-        if (!problems.empty()) problems += ", ";
-        problems += "missing \"directory\" field";
-    } else {
-        result.directory = obj["directory"].get<std::string>();
-    }
-
-    bool arguments_usable = false;
-    if (obj.contains("arguments") && obj["arguments"].is_array() &&
-        !obj["arguments"].empty()) {
-        for (const auto& arg : obj["arguments"]) {
-            if (arg.is_string()) {
-                result.arguments.push_back(arg.get<std::string>());
-            }
-        }
-        arguments_usable = !result.arguments.empty();
-    }
-
-    if (!arguments_usable && has_command) {
-        result.arguments = {obj["command"].get<std::string>()};
-    } else if (!arguments_usable) {
-        if (!problems.empty()) problems += ", ";
-        problems += "missing \"command\" and \"arguments\"";
-    }
-
-    if (!problems.empty()) {
-        result.valid = false;
-        result.error_message = std::move(problems);
-    }
-
+    result.valid = false;
+    result.error_message = std::move(problems);
     return result;
+}
+
+CompileDatabaseResult build_entry_result(const nlohmann::json& root, std::string_view path) {
+    std::vector<CompileEntry> entries;
+    std::vector<EntryDiagnostic> diagnostics;
+    std::size_t total_invalid = 0;
+    entries.reserve(root.size());
+
+    for (std::size_t i = 0; i < root.size(); ++i) {
+        auto validation = validate_entry(root[i]);
+        if (!validation.valid) {
+            ++total_invalid;
+            if (diagnostics.size() < max_reported_entry_errors) {
+                diagnostics.emplace_back(i, std::move(validation.error_message));
+            }
+            continue;
+        }
+
+        entries.emplace_back(std::move(validation.file), std::move(validation.directory),
+                             std::move(validation.arguments));
+    }
+
+    if (total_invalid == 0) {
+        return CompileDatabaseResult{CompileDatabaseError::none, {}, std::move(entries), {}};
+    }
+
+    std::string description = "compile_commands.json contains " + std::to_string(total_invalid) +
+                              " invalid entries: " + std::string(path);
+    return CompileDatabaseResult{CompileDatabaseError::invalid_entries, std::move(description), {},
+                                 std::move(diagnostics), total_invalid};
 }
 
 }  // namespace
@@ -112,36 +169,7 @@ CompileDatabaseResult CompileCommandsJsonAdapter::load_compile_database(
                           "compile_commands.json is empty: " + std::string(path));
     }
 
-    std::vector<CompileEntry> entries;
-    std::vector<EntryDiagnostic> diagnostics;
-    std::size_t total_invalid = 0;
-    entries.reserve(root.size());
-
-    for (std::size_t i = 0; i < root.size(); ++i) {
-        auto validation = validate_entry(root[i]);
-        if (!validation.valid) {
-            ++total_invalid;
-            if (diagnostics.size() < max_reported_entry_errors) {
-                diagnostics.emplace_back(i, std::move(validation.error_message));
-            }
-        } else {
-            entries.emplace_back(std::move(validation.file),
-                                 std::move(validation.directory),
-                                 std::move(validation.arguments));
-        }
-    }
-
-    if (total_invalid > 0) {
-        std::string description = "compile_commands.json contains " +
-                                  std::to_string(total_invalid) +
-                                  " invalid entries: " + std::string(path);
-        return CompileDatabaseResult{CompileDatabaseError::invalid_entries,
-                                     std::move(description), {},
-                                     std::move(diagnostics), total_invalid};
-    }
-
-    return CompileDatabaseResult{CompileDatabaseError::none, {},
-                                 std::move(entries), {}};
+    return build_entry_result(root, path);
 }
 
 }  // namespace xray::adapters::input

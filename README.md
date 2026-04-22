@@ -125,6 +125,8 @@ Das Projekt nutzt ein Multi-Stage-`Dockerfile`:
 - `test`: fuehrt `ctest` in der Referenzumgebung aus
 - `coverage`: baut mit Coverage-Instrumentierung, fuehrt `ctest` aus und erzeugt einen `gcovr`-Report
 - `coverage-check`: prueft waehrend `docker build`, ob ein konfigurierbarer Coverage-Schwellwert erreicht wurde (Standard: `100`)
+- `quality`: fuehrt `clang-tidy` und `lizard` aus und erzeugt einen Qualitaetsreport
+- `quality-check`: prueft waehrend `docker build`, ob die Qualitaets-Gates fuer `clang-tidy` und `lizard` eingehalten werden
 - `runtime`: enthaelt nur das Binary und noetige Laufzeitpakete
 
 Build und Test der Docker-Stages:
@@ -133,6 +135,8 @@ Build und Test der Docker-Stages:
 docker build --target test -t cmake-xray:test .
 docker build --target coverage -t cmake-xray:coverage .
 docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
+docker build --target quality -t cmake-xray:quality .
+docker build --target quality-check -t cmake-xray:quality-check .
 docker build --target runtime -t cmake-xray .
 ```
 
@@ -152,6 +156,30 @@ docker build --target coverage-check \
 ```
 
 Der `coverage`-Stage dient nur dem Report. Das eigentliche Fail-fast-Gate fuer die Mindestabdeckung liegt in `coverage-check`, damit ein Report auch dann separat erzeugt werden kann, wenn der Schwellwert unterschritten wird.
+
+Qualitaetsreport aus dem Docker-Image lesen:
+
+```bash
+docker run --rm cmake-xray:quality
+```
+
+Qualitaets-Gates waehrend des Docker-Builds ausfuehren:
+
+```bash
+docker build --target quality-check -t cmake-xray:quality-check .
+docker build --target quality-check \
+  --build-arg XRAY_LIZARD_MAX_CCN=5 \
+  -t cmake-xray:quality-check .
+```
+
+Der `quality`-Stage dient dem Report. Das eigentliche Build-Gate fuer statische Analyse und Metriken liegt in `quality-check`.
+
+Konfigurierbare Build-Argumente fuer `quality-check`:
+
+- `XRAY_CLANG_TIDY_MAX_FINDINGS` (Standard: `0`)
+- `XRAY_LIZARD_MAX_CCN` (Standard: `10`)
+- `XRAY_LIZARD_MAX_LENGTH` (Standard: `50`)
+- `XRAY_LIZARD_MAX_PARAMETERS` (Standard: `5`)
 
 Lauf des Runtime-Images:
 

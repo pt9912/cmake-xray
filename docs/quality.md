@@ -1,5 +1,53 @@
 # Qualität
 
+## Statische Analyse und Metriken
+
+Die statische Analyse und die Metriken werden im Projekt Docker-basiert ermittelt. Dabei gilt:
+
+- `clang-tidy` prueft regelbasierte Codequalitaet und statische Analysebefunde fuer `src/`.
+- `lizard` liefert Komplexitaets- und Laengenmetriken fuer `src/`.
+- Der Qualitaetsreport und das Build-Gate sind bewusst getrennt.
+
+### Docker-Workflow
+
+```bash
+docker build --target quality -t cmake-xray:quality .
+docker run --rm cmake-xray:quality
+```
+
+Der `quality`-Stage erzeugt die Report-Dateien:
+
+- `/workspace/build-quality/quality/summary.txt`
+- `/workspace/build-quality/quality/clang-tidy.txt`
+- `/workspace/build-quality/quality/lizard.txt`
+- `/workspace/build-quality/quality/lizard-warnings.txt`
+
+Das eigentliche Build-Gate liegt in einem separaten Stage:
+
+```bash
+docker build --target quality-check -t cmake-xray:quality-check .
+docker build --target quality-check \
+  --build-arg XRAY_LIZARD_MAX_CCN=5 \
+  -t cmake-xray:quality-check .
+```
+
+Die Trennung ist bewusst:
+
+- `quality` bleibt fuer Auswertung und Diagnose nutzbar.
+- `quality-check` laesst den Build bei Ueberschreitung der konfigurierten Gates scheitern.
+
+### Aktueller Gate-Stand
+
+- `clang-tidy`: maximal `0` Findings
+- `lizard`: maximal `10` CCN, `50` Zeilen pro Funktion, `5` Parameter
+
+Konfigurierbare Build-Argumente:
+
+- `XRAY_CLANG_TIDY_MAX_FINDINGS`
+- `XRAY_LIZARD_MAX_CCN`
+- `XRAY_LIZARD_MAX_LENGTH`
+- `XRAY_LIZARD_MAX_PARAMETERS`
+
 
 ## Testabdeckung
 

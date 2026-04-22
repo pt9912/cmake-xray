@@ -69,6 +69,54 @@ RUN coverage_percent="$(awk '$1 == "TOTAL" { gsub("%", "", $4); print $4 }' /wor
         exit 1; \
     fi
 
+FROM toolchain AS quality-base
+
+ARG XRAY_CLANG_TIDY_MAX_FINDINGS=0
+ARG XRAY_LIZARD_MAX_CCN=10
+ARG XRAY_LIZARD_MAX_LENGTH=50
+ARG XRAY_LIZARD_MAX_PARAMETERS=5
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        clang \
+        clang-tidy \
+        python3 \
+        python3-pip \
+    && python3 -m pip install --no-cache-dir --break-system-packages lizard==1.22.0 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY . .
+
+RUN chmod +x /workspace/scripts/run-quality-report.sh /workspace/scripts/show-quality.sh \
+    && XRAY_CLANG_TIDY_MAX_FINDINGS="${XRAY_CLANG_TIDY_MAX_FINDINGS}" \
+       XRAY_LIZARD_MAX_CCN="${XRAY_LIZARD_MAX_CCN}" \
+       XRAY_LIZARD_MAX_LENGTH="${XRAY_LIZARD_MAX_LENGTH}" \
+       XRAY_LIZARD_MAX_PARAMETERS="${XRAY_LIZARD_MAX_PARAMETERS}" \
+       /workspace/scripts/run-quality-report.sh /workspace
+
+FROM quality-base AS quality
+
+ENTRYPOINT ["/workspace/scripts/show-quality.sh"]
+
+FROM quality-base AS quality-check
+
+ARG XRAY_CLANG_TIDY_MAX_FINDINGS=0
+
+RUN clang_tidy_findings="$(awk -F= '$1 == "clang_tidy_findings" { print $2 }' /workspace/build-quality/quality/summary.txt)" \
+    && lizard_warning_count="$(awk -F= '$1 == "lizard_warning_count" { print $2 }' /workspace/build-quality/quality/summary.txt)" \
+    && test -n "$clang_tidy_findings" \
+    && test -n "$lizard_warning_count" \
+    && echo "clang-tidy findings: ${clang_tidy_findings} (threshold: ${XRAY_CLANG_TIDY_MAX_FINDINGS})" >&2 \
+    && echo "lizard warnings: ${lizard_warning_count} (threshold: 0)" >&2 \
+    && if [ "$clang_tidy_findings" -gt "${XRAY_CLANG_TIDY_MAX_FINDINGS}" ]; then \
+        echo "error: clang-tidy findings exceed threshold: ${clang_tidy_findings} > ${XRAY_CLANG_TIDY_MAX_FINDINGS}" >&2; \
+        exit 1; \
+    fi \
+    && if [ "$lizard_warning_count" -gt 0 ]; then \
+        echo "error: lizard warnings exceed threshold: ${lizard_warning_count} > 0" >&2; \
+        exit 1; \
+    fi
+
 FROM ubuntu:24.04 AS runtime
 
 RUN apt-get update \

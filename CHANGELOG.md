@@ -11,11 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - GitHub Actions workflows for Docker-based build and test validation
 - CI artifact upload for coverage reports (`summary.txt` and `coverage.txt`)
+- Docker `quality` stage with `clang-tidy` and `lizard` reports
+- Docker `quality-check` stage for static-analysis and metrics gates
+- repository-wide `.clang-tidy` baseline configuration
 
 ### Changed
 
 - `coverage-check` now enforces a default minimum line coverage threshold of `100%`
 - coverage and release documentation now use the Docker-based coverage gate consistently
+- CI now publishes quality artifacts alongside coverage artifacts
 
 ### Fixed
 

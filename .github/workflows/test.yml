@@ -24,11 +24,11 @@ jobs:
       - name: Build test image
         run: docker build --target test -t cmake-xray:test .
 
-      - name: Enforce coverage threshold
-        run: docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
-
       - name: Build coverage report image
         run: docker build --target coverage -t cmake-xray:coverage .
+
+      - name: Build quality report image
+        run: docker build --target quality -t cmake-xray:quality .
 
       - name: Extract coverage reports
         run: |
@@ -46,3 +46,28 @@ jobs:
         with:
           name: coverage-report
           path: artifacts/coverage
+
+      - name: Extract quality reports
+        run: |
+          mkdir -p artifacts/quality
+          container_id=$(docker create cmake-xray:quality)
+          docker cp "$container_id:/workspace/build-quality/quality/summary.txt" artifacts/quality/summary.txt
+          docker cp "$container_id:/workspace/build-quality/quality/clang-tidy.txt" artifacts/quality/clang-tidy.txt
+          docker cp "$container_id:/workspace/build-quality/quality/lizard.txt" artifacts/quality/lizard.txt
+          docker cp "$container_id:/workspace/build-quality/quality/lizard-warnings.txt" artifacts/quality/lizard-warnings.txt
+          docker rm "$container_id"
+
+      - name: Show quality summary
+        run: cat artifacts/quality/summary.txt
+
+      - name: Upload quality artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: quality-report
+          path: artifacts/quality
+
+      - name: Enforce coverage threshold
+        run: docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
+
+      - name: Enforce quality thresholds
+        run: docker build --target quality-check -t cmake-xray:quality-check .

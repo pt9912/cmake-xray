@@ -28,15 +28,18 @@ Vor Tagging und Release-Erstellung muessen die Docker-Pfade erfolgreich sein:
 ```bash
 docker build --target test -t cmake-xray:test .
 docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
+docker build --target quality-check -t cmake-xray:quality-check .
 docker build --target runtime -t cmake-xray .
 docker run --rm cmake-xray --help
 ```
 
-Optional kann der Coverage-Report separat ausgegeben werden:
+Optional koennen die Reports separat ausgegeben werden:
 
 ```bash
 docker build --target coverage -t cmake-xray:coverage .
 docker run --rm cmake-xray:coverage
+docker build --target quality -t cmake-xray:quality .
+docker run --rm cmake-xray:quality
 ```
 
 ## Release-Commit und Tag
@@ -96,3 +99,4 @@ Falls kein Asset-Upload erforderlich ist, koennen die `./release-assets/*`-Argum
 - Unverwandte lokale Aenderungen bleiben ausserhalb des Release-Commits.
 - Falls ein Tag bereits vor dem finalen Commit erzeugt wurde, muss es auf den finalen Release-Commit umgesetzt werden.
 - Der `coverage`-Stage dient dem Report; das eigentliche Build-Gate fuer Mindestabdeckung liegt in `coverage-check`.
+- Der `quality`-Stage dient dem Report; das eigentliche Build-Gate fuer statische Analyse und Metriken liegt in `quality-check`.

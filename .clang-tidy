@@ -1,0 +1,13 @@
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  readability-function-cognitive-complexity
+WarningsAsErrors: ''
+HeaderFilterRegex: '^(/workspace/)?src/'
+FormatStyle: none
+CheckOptions:
+  - key: readability-function-cognitive-complexity.Threshold
+    value: '20'
+  - key: readability-function-cognitive-complexity.DescribeBasicIncrements
+    value: 'false'
