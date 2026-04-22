@@ -5,7 +5,7 @@
 | Feld       | Wert                                                                                                                                                                   |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Dokument   | Plan M2 `cmake-xray`                                                                                                                                                   |
-| Version    | `0.1`                                                                                                                                                                  |
+| Version    | `0.2`                                                                                                                                                                  |
 | Stand      | `2026-04-22`                                                                                                                                                           |
 | Status     | Entwurf                                                                                                                                                                |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M1](./plan-M1.md), [Qualitaet](./quality.md) |
@@ -55,6 +55,7 @@ Der M1-Kern kennt bisher nur `CompileDatabaseResult` und eine minimale `Analysis
 
 Mindestens benoetigt:
 
+- ein erweitertes Eingabemodell fuer Compile-Eintraege bzw. Compile-Aufrufe, das die Herkunft des Aufrufs (`arguments` vs. `command`) fuer M2 sichtbar haelt
 - ein Modell fuer eine analysierte Translation Unit mit Pfad, Rang, Kennzahlen und optionalen Hinweisen
 - ein Modell fuer Include-Hotspots mit Header-Bezeichnung, Anzahl betroffener Translation Units und Liste bzw. Vorschau der betroffenen Translation Units
 - ein Modell fuer Impact-Ergebnisse mit mindestens direkter Betroffenheit, heuristisch abgeleiteter Betroffenheit und Hinweisen auf fehlende Daten
@@ -66,6 +67,8 @@ Wichtig:
 - bestehende M1-Fehlermodelle fuer ungueltige Eingaben bleiben erhalten; M2-Diagnostics behandeln nur fachliche Unsicherheit nach erfolgreichem Laden der Eingabedaten
 - Diagnostics gehoeren in den Kern und werden von Report-Adaptern dargestellt, nicht im CLI-Adapter zusammengesetzt
 - Sortierreihenfolgen duerfen nicht implizit von der Reihenfolge in `compile_commands.json` abhaengen; Modelle sollen die fuer reproduzierbare Sortierung noetigen Schluessel explizit tragen
+- M2 darf die Herkunft des Compile-Aufrufs nicht verlieren: Eintraege aus `arguments` und `command` muessen im Kern unterscheidbar bleiben, damit Tokenisierung, Diagnostics und Tests fachlich korrekt moeglich sind
+- Pfadvergleiche fuer TU-Dateien, Header und `--changed-file` duerfen nicht gegen rohe Anzeige-Strings laufen; der Kern benoetigt dafuer einen expliziten, dokumentierten Vergleichsschluessel
 - M2 analysiert jede geladene Compile-Database-Zeile als eigenstaendige TU-Beobachtung; bei identischem Quelldateipfad duerfen daher mehrere Ergebniszeilen entstehen
 
 #### Port-Anpassungen
@@ -82,11 +85,13 @@ Die bestehenden Port-Signaturen sind fuer M2 zu schmal und muessen konkretisiert
 
 Vorgesehene Artefakte:
 
-- neue oder erweiterte Modelle unter `src/hexagon/model/` fuer Translation Units, Hotspots, Impact und Diagnostics
+- neue oder erweiterte Modelle unter `src/hexagon/model/` fuer Compile-Aufruf, Translation Units, Hotspots, Impact und Diagnostics
+- Anpassung von `compile_entry.h` oder Einfuehrung eines dedizierten Modells fuer den urspruenglichen Compile-Aufruf
 - Anpassung von `analysis_result.h`
 - Ersatz des Platzhalters in `analyze_impact_port.h`
 - substanzielle Erweiterung von `include_resolver_port.h`
 - Anpassung von `report_writer_port.h` und `generate_report_port.h`
+- Folgeanpassung im Compile-Database-Ladepfad (`compile_database_port.h`, `compile_commands_json_adapter.*`), damit die Compile-Aufruf-Provenienz erhalten bleibt
 
 **Ergebnis**: Der Kern kann M2-Ergebnisse fachlich modellieren, ohne dass Reporter oder CLI Fachzustand als unstrukturierte Strings tragen muessen.
 
@@ -102,8 +107,12 @@ Fuer jede analysierte Translation Unit werden mindestens berechnet:
 
 Fuer Eintraege mit `arguments` kann direkt auf dem Vektor gearbeitet werden. Fuer Eintraege mit `command` muss M2 erstmals eine begrenzte Tokenisierung einfuehren.
 
+Voraussetzung fuer M2 ist, dass das Eingabemodell zwischen originalem `arguments`-Vektor und rohem `command`-String unterscheiden kann. Das blosse Speichern eines einteiligen Pseudo-`arguments`-Vektors aus dem `command`-String reicht fuer Tokenisierung, Diagnostics und Testbarkeit nicht aus.
+
 Entscheidung fuer M2:
 
+- enthaelt ein Eintrag sowohl `arguments` als auch `command`, bleibt die M1-Prioritaet erhalten: `arguments` werden verwendet, `command` wird ignoriert
+- enthaelt ein Eintrag nur `command`, wird der rohe String bis zur Tokenisierung erhalten
 - `arguments` werden unveraendert ausgewertet
 - `command` wird mit einem dokumentierten, lokalen Tokenizer in Argumente zerlegt
 - volle POSIX-Shell-Semantik, Umgebungsvariablen, Command-Substitution oder Backtick-Auswertung sind nicht Bestandteil des MVP
@@ -129,6 +138,7 @@ Nicht Bestandteil von M2:
 Vorgesehene Artefakte:
 
 - Kernlogik fuer Metrikextraktion und Rangbildung unter `src/hexagon/services/` oder `src/hexagon/model/`
+- Anpassung des Eingabemodells und des Ladepfads, damit `arguments` und `command` fuer M2 getrennt erhalten bleiben
 - Tests fuer `arguments`-, `command`- und Mischfaelle
 - Erweiterung von `ProjectAnalyzer`, damit die Metriken nach dem Laden der Compile-Datenbank berechnet werden
 
@@ -162,6 +172,17 @@ Fuer M2 reicht ein pragmatischer Parser:
 - Kommentare und offensichtliche Nicht-Include-Zeilen werden ignoriert
 - tiefere Praeprozessor-Semantik bleibt ausserhalb des Scopes
 
+#### Pfadkanonisierung und Vergleich
+
+Damit Ranking, Hotspots und Impact bei realen Daten reproduzierbar funktionieren, legt M2 eine einheitliche Vergleichssemantik fuer Pfade fest:
+
+- Compile-Database-Quelldateien werden fuer Vergleiche gegen das jeweilige `directory` des Eintrags aufgeloest, falls `file` relativ ist
+- ein aufgeloester Header wird fuer Vergleiche als normalisierter Pfadschluessel gespeichert; Grundlage ist der tatsaechlich erfolgreiche Aufloesungspfad ueber Dateikontext und Include-Suchpfade
+- `--changed-file` wird, falls relativ angegeben, relativ zum Verzeichnis der uebergebenen `compile_commands.json` interpretiert
+- vor Vergleichen werden mindestens `.`- und `..`-Segmente sowie triviale Separatorunterschiede lexikalisch normalisiert
+- eine Aufloesung ueber Symlinks oder Dateisystem-Kanonisierung ist fuer M2 nicht erforderlich; M2 arbeitet mit einer stabilen lexikalischen Normalform
+- fuer die Anzeige darf weiterhin die nutzernahe Originalschreibweise oder eine bewusst kompakte Darstellung verwendet werden; Vergleichsschluessel und Anzeigeformat sind getrennt zu behandeln
+
 Nicht Bestandteil von M2:
 
 - alternative Include-Resolver auf Basis von `.d`-Dateien
@@ -184,15 +205,16 @@ Sobald der Include-Graph verfuegbar ist, muss der Kern daraus nachvollziehbare I
 Fuer M2 gilt:
 
 - ein Hotspot ist ein Header, der in mindestens zwei analysierten Translation Units vorkommt
-- die Zaehlung basiert auf betroffenen Translation Units, nicht auf der absoluten Anzahl einzelner Include-Kanten
+- die Zaehlung basiert auf betroffenen TU-Beobachtungen aus der Compile-Datenbank, nicht auf der absoluten Anzahl einzelner Include-Kanten
 - dieselbe TU darf einen Header nur einmal zum Hotspot-Zaehler beitragen, auch wenn der Header mehrfach entlang verschiedener Include-Pfade erreicht wird
+- existieren mehrere Compile-Database-Zeilen mit identischem Quelldateipfad, zaehlen diese Beobachtungen fuer Hotspots getrennt, sofern der Header fuer jede Beobachtung nachweisbar ist
 - die Hotspot-Liste wird absteigend nach Anzahl betroffener Translation Units sortiert; Gleichstaende werden ueber den Header-Pfad stabil aufgeloest
 
 Die Konsolenausgabe muss mindestens enthalten:
 
 - Header-Bezeichnung
 - Anzahl betroffener Translation Units
-- eine sichtbare Zuordnung zu betroffenen Translation Units
+- eine sichtbare Zuordnung zu betroffenen Translation Units; bei Pfadkollisionen muss die Ausgabe die TU-Beobachtungen disambiguieren, zum Beispiel ueber Arbeitsverzeichnis oder einen stabilen TU-Schluessel
 
 Da die Liste betroffener Translation Units gross werden kann, soll M2 fuer die Konsole eine kompakte Vorschau definieren:
 
@@ -224,9 +246,15 @@ Der neue Service `ImpactAnalyzer` soll mindestens:
 
 - die Compile-Datenbank laden
 - denselben Include-Graphen bzw. dieselbe Include-Resolver-Logik wie die Projektanalyse nutzen, um doppelte Analysepfade zu vermeiden
-- den uebergebenen Dateipfad gegen bekannte TU-Quelldateien und gegen aufgeloeste Header vergleichen
+- den uebergebenen Dateipfad ueber denselben kanonischen Vergleichsschluessel wie die Projektanalyse gegen bekannte TU-Quelldateien und gegen aufgeloeste Header vergleichen
 - betroffene Translation Units deterministisch sortieren
 - Diagnostics erzeugen, wenn die Aussage nur partiell moeglich ist
+
+Fuer direkte Treffer gilt in M2:
+
+- trifft der geaenderte Pfad auf mehrere Compile-Database-Zeilen mit identischem Quelldateipfad, sind alle passenden TU-Beobachtungen als direkt betroffen auszugeben
+- die Impact-Ausgabe darf dabei nicht stillschweigend auf eindeutige Quelldateipfade deduplizieren; sie muss dieselbe TU-Semantik wie Ranking und Hotspots verwenden
+- bei Pfadkollisionen muss die Konsolenausgabe die einzelnen TU-Beobachtungen sichtbar unterscheiden
 
 Fuer M2 wird keine targetbezogene Ausgabe verlangt. Fehlen Target-Metadaten, ist dies kein Fehler und erfordert keinen eigenen Exit-Code.
 
@@ -242,6 +270,7 @@ Vorgesehene Ergebnisregeln:
 - ist die Eingabe formal gueltig, liefert der Befehl Exit-Code `0`, auch wenn keine betroffenen Translation Units gefunden werden
 - findet die Analyse keine Betroffenen, soll die Ausgabe dies explizit und nachvollziehbar sagen
 - beruht die Aussage auf dem heuristischen Include-Graphen, muss dies inline sichtbar sein
+- relative `--changed-file`-Angaben muessen gemaess der oben definierten Pfadsemantik reproduzierbar zum selben Vergleichsschluessel fuehren wie die intern aufgeloesten TU- und Header-Pfade
 
 Beispiel fuer einen positiven Fall:
 
@@ -297,6 +326,7 @@ Entscheidung fuer M2:
 - die Ausgabe nennt bei Begrenzung immer die Gesamtanzahl, zum Beispiel `top 10 of 37 translation units`
 - die Begrenzung betrifft die Hauptlisten fuer TU-Ranking und Hotspots; Impact-Ergebnisse werden in M2 voll ausgegeben
 - Analyse-Diagnostics mit gueltiger Datengrundlage fuehren nicht zu neuen Exit-Codes; sie erscheinen inline im Report
+- die Hilfe fuer `impact` nennt explizit, dass relative `--changed-file`-Pfade relativ zur uebergebenen `compile_commands.json` interpretiert werden
 
 Die CLI-Hilfe und/oder die Konsolenausgabe muessen die Bewertungsgrundlage fuer das TU-Ranking benennen (`F-09`), zum Beispiel:
 
@@ -323,9 +353,12 @@ Mindestens benoetigt:
 - Tests fuer Metrikextraktion aus `arguments`
 - Tests fuer Metrikextraktion aus `command`
 - Tests fuer reproduzierbare Rangfolge bei verschiedenen Eingabereihenfolgen
+- Tests dafuer, dass `command`-basierte Eintraege ihre Provenienz bis zur Tokenisierung behalten
 - Tests fuer Hotspot-Aggregation, eindeutige TU-Zaehlung und stabile Sortierung
+- Tests fuer Pfadkanonisierung bei relativen, absoluten und lexikalisch aequivalenten Pfaden
 - Tests fuer Impact-Analyse bei direkter TU-Betroffenheit
 - Tests fuer Impact-Analyse bei Header-Betroffenheit ueber transitive Includes
+- Tests fuer direkte Betroffenheit bei mehreren Compile-Database-Zeilen mit identischem Quelldateipfad
 
 #### 1.7b Adapter-Tests
 
@@ -347,6 +380,8 @@ Mindestens benoetigt:
 - Analyse mit leerem Ergebnis, aber gueltiger Datengrundlage
 - Begrenzung via `--top`
 - stabile Ausgabe bei permutierter Reihenfolge in `compile_commands.json`
+- Erfolgspfad fuer `impact` mit relativem `--changed-file`, das relativ zur `compile_commands.json` interpretiert wird
+- Ausgabe mit disambiguierten TU-Beobachtungen bei mehrfach vorkommendem Quelldateipfad
 
 #### Referenzdaten
 
@@ -356,6 +391,8 @@ Sinnvoll sind kleine, versionierte Referenzprojekte unter `tests/e2e/testdata/`,
 - `m2/hotspots/` mit einem bewusst haeufig inkludierten Header
 - `m2/impact_header/` mit transitiven Includes
 - `m2/impact_source/` fuer direkte TU-Betroffenheit
+- `m2/duplicate_tu_entries/` fuer mehrfach vorkommende Quelldateipfade bei unterschiedlichen TU-Beobachtungen
+- `m2/path_semantics/` fuer relative, absolute und lexikalisch aequivalente Pfade
 - `m2/unresolved_include/` fuer Diagnostics und Heuristik-Hinweise
 - `m2/permuted_compile_commands/` als inhaltlich identische, anders sortierte Datenbasis zur Reproduzierbarkeitspruefung
 
@@ -372,13 +409,18 @@ Mindestens abzudeckende Testmatrix:
 | ------------------------------------------------------------ | ------------------------------------------------------------------------- |
 | `arguments` mit `-I`, `-isystem`, `-iquote`, `-D`            | korrekte Kennzahlen                                                       |
 | `command` mit Quotes und Leerzeichen                         | Tokenizer liefert reproduzierbar nutzbare Argumente                       |
+| `command`-basierter Eintrag                                  | Herkunft des Compile-Aufrufs bleibt bis zur Tokenisierung erhalten        |
 | identische Datenbasis in anderer Reihenfolge                 | identisches Ranking und identische Hotspot-Reihenfolge                    |
 | zwei Compile-Eintraege mit gleichem Quelldateipfad           | beide TU-Beobachtungen bleiben erhalten, Ausgabe bleibt eindeutig         |
 | direkter Include-Hotspot in mehreren TUs                     | Header wird mit korrekter TU-Anzahl ausgewiesen                           |
+| zwei TUs mit gleichem Quelldateipfad und gemeinsamem Header  | Hotspot zaehlt beide TU-Beobachtungen, Ausgabe bleibt disambiguiert       |
 | transitive Includes ueber mehrere Header-Stufen              | Impact-Analyse findet betroffene TUs                                      |
+| `impact` mit relativem `--changed-file`                      | Pfad wird relativ zur `compile_commands.json` korrekt aufgeloest          |
+| `impact` mit lexikalisch aequivalentem Pfad (`./`, `..`)     | gleiches fachliches Ergebnis wie mit kanonischer Schreibweise             |
 | unaufloesbarer Header                                        | Analyse bleibt erfolgreich, Diagnostic und Heuristik-Hinweis erscheinen   |
 | `analyze --top 3`                                            | Ausgabe zeigt Top-3 und Gesamtanzahl                                      |
 | `impact` fuer Quelldatei aus Compile-Datenbank               | direkte Betroffenheit, Exit `0`                                           |
+| `impact` fuer Quelldatei mit mehrfacher TU-Beobachtung       | alle passenden TU-Beobachtungen werden separat ausgewiesen                |
 | `impact` fuer Header aus Include-Graph                       | heuristisch markierte Betroffenheit, Exit `0`                             |
 | `impact` fuer Datei ausserhalb aller bekannten Daten         | Exit `0`, klarer Hinweis auf fehlende Daten                               |
 | ungueltige `compile_commands.json` im `impact`-Befehl        | bestehende M1-Fehlermeldung und Exit-Code `4` bzw. `3` bleiben erhalten   |
@@ -395,6 +437,7 @@ Die README soll fuer M2 mindestens enthalten:
 - Beispiel fuer `impact --compile-commands ... --changed-file ...`
 - kurze Erlaeuterung der TU-Kennzahlen
 - sichtbaren Hinweis auf heuristische Include- und Impact-Ergebnisse
+- Hinweis auf die Pfadsemantik von `--changed-file` (relative Pfade gelten relativ zur `compile_commands.json`)
 - Erklaerung von `--top`
 
 Zusatzlich sind bei Abschluss der Implementierung:
@@ -410,13 +453,14 @@ Folgende Dateien oder Dateigruppen sollen nach M2 voraussichtlich neu entstehen 
 
 | Bereich             | Zielartefakte                                                                                                                       |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Kernmodelle         | neue/erweiterte Modelle unter `src/hexagon/model/` fuer Translation Units, Hotspots, Impact und Diagnostics                       |
+| Kernmodelle         | neue/erweiterte Modelle unter `src/hexagon/model/` fuer Compile-Aufruf, Translation Units, Hotspots, Impact und Diagnostics       |
+| Compile Input Model | `src/hexagon/model/compile_entry.h` oder separates Modell fuer `arguments`/`command`-Provenienz                                   |
 | Analysis Result     | `src/hexagon/model/analysis_result.h`                                                                                               |
 | Impact Result       | neues Modell unter `src/hexagon/model/impact_result.h`                                                                              |
 | Driving Ports       | `src/hexagon/ports/driving/analyze_project_port.h`, `src/hexagon/ports/driving/analyze_impact_port.h`                              |
 | Driven Ports        | `src/hexagon/ports/driven/include_resolver_port.h`, `src/hexagon/ports/driven/report_writer_port.h`                                |
 | Services            | `src/hexagon/services/project_analyzer.*`, neue Dateien `src/hexagon/services/impact_analyzer.*`, `src/hexagon/services/report_generator.*` |
-| Input-Adapter       | neue Dateien `src/adapters/input/source_parsing_include_adapter.*`                                                                  |
+| Input-Adapter       | Anpassung von `src/adapters/input/compile_commands_json_adapter.*`, neue Dateien `src/adapters/input/source_parsing_include_adapter.*` |
 | Output-Adapter      | neue Dateien `src/adapters/output/console_report_adapter.*`, Entfernung oder Ersatz von `placeholder_report_adapter.*`             |
 | CLI                 | `src/adapters/cli/cli_adapter.*`, optional `src/adapters/cli/exit_codes.h`                                                         |
 | Composition Root    | `src/main.cpp`                                                                                                                      |
@@ -459,6 +503,7 @@ cmake --build build
 ./build/cmake-xray analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --top 3
 ./build/cmake-xray impact --compile-commands tests/e2e/testdata/m2/impact_source/compile_commands.json --changed-file src/app/main.cpp
 ./build/cmake-xray impact --compile-commands tests/e2e/testdata/m2/impact_header/compile_commands.json --changed-file include/common/config.h
+./build/cmake-xray impact --compile-commands tests/e2e/testdata/m2/path_semantics/compile_commands.json --changed-file ./include/common/../common/config.h
 ./build/cmake-xray impact --compile-commands tests/e2e/testdata/m2/unresolved_include/compile_commands.json --changed-file include/generated/version.h
 ctest --test-dir build --output-on-failure
 ```
@@ -477,6 +522,9 @@ docker run --rm \
 docker run --rm \
   -v "$PWD/tests/e2e/testdata/m2:/data:ro" \
   cmake-xray impact --compile-commands /data/impact_header/compile_commands.json --changed-file include/common/config.h
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata/m2:/data:ro" \
+  cmake-xray impact --compile-commands /data/path_semantics/compile_commands.json --changed-file ./include/common/../common/config.h
 ```
 
 Die lokale und Docker-Pruefung sollen insbesondere bestaetigen:
@@ -484,6 +532,7 @@ Die lokale und Docker-Pruefung sollen insbesondere bestaetigen:
 - Exit-Code `0` fuer erfolgreiche `analyze`- und `impact`-Aufrufe mit gueltiger Datengrundlage
 - unveraenderte M1-Fehlercodes fuer ungueltige oder unlesbare Eingaben
 - sichtbare Heuristik-Kennzeichnung in Hotspot- und Header-basierten Impact-Ausgaben
+- reproduzierbare Pfadvergleiche fuer relative und lexikalisch aequivalente `--changed-file`-Angaben
 - reproduzierbare Ausgabe unabhaengig von der Reihenfolge in `compile_commands.json`
 
 ## 5. Rueckverfolgbarkeit
@@ -506,10 +555,12 @@ Die lokale und Docker-Pruefung sollen insbesondere bestaetigen:
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
 | Ranking-Basis                          | `score = arg_count + include_path_count + define_count`; Tie-Break gemaess AP 1.2                                                                                              | AP 1.2      |
 | `command`-Tokenisierung                | lokaler, dokumentierter Tokenizer; keine volle Shell-Semantik, kein Shell-Out                                                                                                  | AP 1.2      |
-| TU-Identitaet in M2                    | jede Compile-Database-Zeile ist eine eigenstaendige TU-Beobachtung; Ausgabe muss Pfadkollisionen eindeutig darstellen                                                         | AP 1.1, 1.2 |
+| Compile-Aufruf-Provenienz              | M2 behaelt sichtbar, ob ein Eintrag aus `arguments` oder `command` stammt; `command` bleibt bis zur Tokenisierung als roher String verfuegbar                                | AP 1.1, 1.2 |
+| TU-Identitaet in M2                    | jede Compile-Database-Zeile ist eine eigenstaendige TU-Beobachtung; Ranking, Hotspots und Impact arbeiten auf dieser Beobachtungsebene, Ausgabe muss Pfadkollisionen eindeutig darstellen | AP 1.1, 1.2, 1.4, 1.5 |
 | Include-Strategie im MVP               | rekursives Source-Parsing entlang `#include` und Compile-Suchpfaden; Ergebnis ist heuristisch                                                                                  | AP 1.3      |
+| Pfadvergleich in M2                    | Vergleiche laufen ueber lexikalisch normalisierte Vergleichsschluessel; relative TU-Pfade gegen `directory`, relative `--changed-file`-Pfade gegen das Verzeichnis der `compile_commands.json` | AP 1.3, 1.5 |
 | Unaufloesbare Includes                 | fuehren zu Diagnostics, nicht zum Analyseabbruch                                                                                                                                | AP 1.3      |
-| Hotspot-Zaehlung                       | pro Header Anzahl betroffener Translation Units, nicht Anzahl einzelner Kanten; jede TU zaehlt hoechstens einmal pro Header                                                   | AP 1.4      |
+| Hotspot-Zaehlung                       | pro Header Anzahl betroffener TU-Beobachtungen, nicht Anzahl einzelner Kanten; jede TU zaehlt hoechstens einmal pro Header                                                    | AP 1.4      |
 | Heuristik-Kennzeichnung                | Hotspots immer heuristisch; Impact nur dann heuristisch, wenn Header-/Include-Graph-Daten beteiligt sind                                                                       | AP 1.4, 1.5 |
 | Impact-CLI                             | neues Unterkommando `impact` mit `--compile-commands` und `--changed-file`                                                                                                     | AP 1.5      |
 | Exit-Codes bei Datenluecken            | gueltige Analyse mit fehlenden oder partiellen Daten bleibt Exit `0`; Unsicherheit wird im Report statt ueber neuen Exit-Code transportiert                                   | AP 1.5, 1.6 |
