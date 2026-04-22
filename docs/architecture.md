@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Architecture `cmake-xray` |
-| Version | `0.5` |
+| Version | `0.6` |
 | Stand | `2026-04-22` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Phasenplan](./roadmap.md) |
@@ -137,19 +137,21 @@ Spaetere Primary Adapter (nicht MVP): IDE-Integration, programmatische API.
 
 #### Secondary Adapter (Driven)
 
-| Adapter | Implementiert | Beschreibung | MVP |
+Die folgende Tabelle beschreibt den Zielzustand fuer den **Gesamt-MVP** gemaess Phasenplan, also den bis `M3 / v1.0.0` lieferbaren Stand. Zwischenstaende einzelner Milestones wie `M2` koennen bewusst nur eine Teilmenge dieser Adapter enthalten.
+
+| Adapter | Implementiert | Beschreibung | Gesamt-MVP (bis M3) |
 |---|---|---|---|
-| CompileCommandsJsonAdapter | `CompileDatabasePort` | Liest und validiert `compile_commands.json` | ja |
-| SourceParsingIncludeAdapter | `IncludeResolverPort` | Parst Quelldateien entlang der `-I`-Pfade aus dem Compile-Aufruf; **experimentelle MVP-Heuristik** mit bekannten Einschraenkungen (siehe 6.1) und einzige Include-Adapter-Implementierung im MVP | ja (einziger MVP-Adapter, experimentell) |
+| CompileCommandsJsonAdapter | `CompileDatabasePort` | Liest und validiert `compile_commands.json` | ja (ab Phase 1 / M1) |
+| SourceParsingIncludeAdapter | `IncludeResolverPort` | Parst Quelldateien entlang der `-I`-Pfade aus dem Compile-Aufruf; **experimentelle MVP-Heuristik** mit bekannten Einschraenkungen (siehe 6.1) und einzige Include-Adapter-Implementierung im MVP | ja (ab Phase 2 / M2; einziger Include-Adapter im Gesamt-MVP, experimentell) |
 | CompilerDepsIncludeAdapter | `IncludeResolverPort` | Wertet `.d`-Dependency-Dateien oder compilergestuetzte `-M`-Ausgaben aus | spaeter |
-| ConsoleReportAdapter | `ReportWriterPort` | Schreibt Ergebnisse auf die Konsole | ja |
-| MarkdownReportAdapter | `ReportWriterPort` | Erzeugt einen Markdown-Bericht | ja |
+| ConsoleReportAdapter | `ReportWriterPort` | Schreibt Ergebnisse auf die Konsole | ja (ab Phase 2 / M2) |
+| MarkdownReportAdapter | `ReportWriterPort` | Erzeugt einen Markdown-Bericht | ja (ab Phase 3 / M3) |
 | HtmlReportAdapter | `ReportWriterPort` | Erzeugt einen HTML-Bericht | spaeter |
 | JsonReportAdapter | `ReportWriterPort` | Erzeugt JSON-Ausgabe mit Schema-Version | spaeter |
 | DotReportAdapter | `ReportWriterPort` | Erzeugt DOT/Graphviz-Ausgabe | spaeter |
 | CmakeFileApiAdapter | `TargetMetadataPort` | Liest Target-Informationen aus der CMake File API | spaeter |
 
-Der MVP startet mit genau einer Implementierung des `IncludeResolverPort`. Weitere Include-Adapter werden erst nach Stabilisierung des MVP eingefuehrt, damit Portverhalten, Diagnostics und Ergebniskennzeichnung zunaechst an einer einzigen Datenstrategie geschaerft werden koennen.
+Im Gesamt-MVP gibt es genau eine Implementierung des `IncludeResolverPort`; sie wird ab Phase 2 / M2 eingefuehrt. Weitere Include-Adapter werden erst nach Stabilisierung des MVP eingefuehrt, damit Portverhalten, Diagnostics und Ergebniskennzeichnung zunaechst an einer einzigen Datenstrategie geschaerft werden koennen.
 
 ## 4. Verzeichnis- und Dateistruktur
 
@@ -295,7 +297,7 @@ Kein Adapter kennt einen anderen Adapter. Der Kern kennt keine konkreten Adapter
 
 Die offene Frage der Include-Datenherkunft wird durch den `IncludeResolverPort` architekturell geloest. Der Kern arbeitet gegen die Port-Abstraktion; der konkrete Adapter kann ausgetauscht werden, ohne den Kern zu aendern.
 
-Fuer den MVP wird ein einzelner Adapter implementiert. Der erste Kandidat ist das **Parsen von Quelldateien entlang der Include-Pfade** (`SourceParsingIncludeAdapter`). Diese Variante wird als **experimentelle MVP-Heuristik** eingestuft, nicht als verlaessliche compilernahe Aufloesung.
+Fuer den Gesamt-MVP wird, beginnend in Phase 2 / M2, genau ein Adapter implementiert. Der erste Kandidat ist das **Parsen von Quelldateien entlang der Include-Pfade** (`SourceParsingIncludeAdapter`). Diese Variante wird als **experimentelle MVP-Heuristik** eingestuft, nicht als verlaessliche compilernahe Aufloesung.
 
 Vorteile:
 
@@ -310,7 +312,7 @@ Bekannte Einschraenkungen:
 - **`-include`-Flags** (forced includes) und generierte Header sind im Quelltext nicht sichtbar.
 - **Systemabhaengige Aufloesung** (Compiler-interne Suchpfade, Frameworks unter macOS) wird nicht abgebildet.
 
-Daraus folgt: Die Ergebnisse von `F-12` bis `F-17` und `F-21` bis `F-25` koennen im MVP unvollstaendig oder ueberzaehlig sein. Die Architektur muss sicherstellen, dass Analyseergebnisse, die auf diesem Adapter basieren, im Bericht als **heuristisch** gekennzeichnet werden (`F-09`, `F-23`, `NF-15`). Die Diagnostics-Infrastruktur (6.6) transportiert diese Einschraenkung an den Nutzer.
+Daraus folgt: Ab Phase 2 / M2 und damit auch im spaeter lieferbaren Gesamt-MVP koennen die Ergebnisse von `F-12` bis `F-17` und `F-21` bis `F-25` unvollstaendig oder ueberzaehlig sein. Die Architektur muss sicherstellen, dass Analyseergebnisse, die auf diesem Adapter basieren, im Bericht als **heuristisch** gekennzeichnet werden (`F-09`, `F-23`, `NF-15`). Die Diagnostics-Infrastruktur (6.6) transportiert diese Einschraenkung an den Nutzer.
 
 Alternative Adapter (compilergestuetzte Dependency-Informationen ueber `-M`-Flags, vorhandene `.d`-Dateien) sollen als weitere `IncludeResolverPort`-Implementierungen folgen und wuerden eine compilernahe Sicht liefern. Die Port-Abstraktion stellt sicher, dass der Wechsel ohne Kernaenderung moeglich ist.
 

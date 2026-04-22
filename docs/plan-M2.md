@@ -5,7 +5,7 @@
 | Feld       | Wert                                                                                                                                                                   |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Dokument   | Plan M2 `cmake-xray`                                                                                                                                                   |
-| Version    | `0.2`                                                                                                                                                                  |
+| Version    | `0.3`                                                                                                                                                                  |
 | Stand      | `2026-04-22`                                                                                                                                                           |
 | Status     | Entwurf                                                                                                                                                                |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M1](./plan-M1.md), [Qualitaet](./quality.md) |
@@ -23,7 +23,7 @@ M2 gilt als erreicht, wenn:
 - die Sortierung und Begrenzung der Ergebnislisten reproduzierbar und automatisiert abgesichert ist
 - Adapter-, Kern-, Reporter- und End-to-End-Tests die M2-Pfade automatisiert absichern
 
-Relevante Kennungen: `F-06`, `F-07`, `F-08`, `F-09`, `F-12`, `F-13`, `F-14`, `F-15`, `F-21`, `F-22`, `F-23`, `F-26`, `F-31`, `F-32`, `F-35`, `F-42`, `NF-03`, `NF-10`, `NF-14`, `NF-15`, `AK-03`, `AK-04`, `AK-05`
+Relevante Kennungen: `F-06`, `F-07`, `F-08`, `F-09`, `F-12`, `F-13`, `F-14`, `F-15`, `F-21`, `F-22`, `F-23`, `F-26`, `F-31`, `F-32`, `F-42`, `NF-03`, `NF-10`, `NF-14`, `NF-15`, `AK-03`, `AK-04`, `AK-05`; zusaetzlich wird der Eingabepfad-Teilaspekt aus `F-35` fuer `--compile-commands` und `--changed-file` mit abgedeckt
 
 ### 0.3 Abgrenzung
 Bestandteil von M2 sind:
@@ -35,17 +35,21 @@ Bestandteil von M2 sind:
 - heuristische Include-Hotspot-Analyse und dateibasierte Impact-Analyse auf TU-Ebene
 - ein echter `ConsoleReportAdapter` fuer Projekt- und Impact-Ausgaben
 - CLI-Erweiterung um den Impact-Pfad sowie aktualisierte Hilfe- und Nutzungsbeispiele
+- Eingabepfade fuer `--compile-commands` und `--changed-file` als Teilaspekt von `F-35`
 - Referenzdaten und automatisierte Tests fuer Ranking, Hotspots, Impact und Heuristik-Kennzeichnung
 
 Nicht Bestandteil von M2 sind:
 
 - targetbezogene Ausgabe (`F-24`, `F-25`) und konkrete `TargetMetadataPort`-Implementierungen
 - Markdown-, HTML-, JSON- oder DOT-Ausgaben (`F-27` bis `F-30`)
+- konfigurierbare Ausgabepfade aus `F-35` und Steuerung des Ausgabeformats (`F-36`)
 - Vergleich zwischen zwei Analysezeitpunkten (`F-11`)
 - alternative Include-Adapter auf Basis von `.d`-Dateien oder Compiler-Flags
 - Unterscheidung zwischen Projekt-Headern und externen Headern (`F-16`), sofern dies die M2-Lieferung verzoegert
 - direkte/indirekte Include-Umschaltung (`F-17`) als vom Nutzer steuerbare Option
 - `--verbose` und `--quiet` als voll ausgearbeitete Modi (`F-39`, `F-40`), sofern die Standardausgabe die M2-Abnahmekriterien bereits erfuellt
+
+Diese Abgrenzung konkretisiert den Phasenplan fuer M2: `F-27` bleibt in Phase 3 bzw. M3. Architekturstellen, die spaetere Report-Adapter bereits als MVP-Zielbild beschreiben, sind fuer diesen Milestone daher als Zielstruktur ueber M2 hinaus zu lesen.
 
 ## 1. Arbeitspakete
 
@@ -57,7 +61,7 @@ Mindestens benoetigt:
 
 - ein erweitertes Eingabemodell fuer Compile-Eintraege bzw. Compile-Aufrufe, das die Herkunft des Aufrufs (`arguments` vs. `command`) fuer M2 sichtbar haelt
 - ein Modell fuer eine analysierte Translation Unit mit Pfad, Rang, Kennzahlen und optionalen Hinweisen
-- ein Modell fuer Include-Hotspots mit Header-Bezeichnung, Anzahl betroffener Translation Units und Liste bzw. Vorschau der betroffenen Translation Units
+- ein Modell fuer Include-Hotspots mit Header-Bezeichnung, Anzahl betroffener Translation Units und vollstaendiger, disambiguierbarer sowie stabil sortierbarer Liste der betroffenen Translation Units
 - ein Modell fuer Impact-Ergebnisse mit mindestens direkter Betroffenheit, heuristisch abgeleiteter Betroffenheit und Hinweisen auf fehlende Daten
 - ein wiederverwendbares Diagnosemodell fuer Warnungen, Datenluecken und Heuristik-Hinweise
 - Erweiterung von `AnalysisResult`, damit neben `compile_database` auch TU-Ranking, Include-Hotspots und Analyse-Diagnostics transportiert werden
@@ -79,7 +83,7 @@ Die bestehenden Port-Signaturen sind fuer M2 zu schmal und muessen konkretisiert
 
 **Driving Port** (`AnalyzeImpactPort`): die aktuelle Signatur `std::string analyze_impact(std::string_view changed_path)` ist nur Platzhalter. Fuer M2 muss der Port mindestens den Pfad zur `compile_commands.json` und den geaenderten Dateipfad entgegennehmen sowie ein fachliches `ImpactResult` zurueckgeben. Eine Signatur mit zwei Parametern ist fuer M2 ausreichend; ein eigenes Request-Objekt ist optional.
 
-**Driven Port** (`IncludeResolverPort`): die aktuelle Boole-Methode `can_resolve_includes()` reicht nicht aus. Fuer M2 muss der Port Include-Beziehungen fuer eine Menge von Compile-Eintraegen liefern koennen, inklusive Heuristik-Hinweisen und partiellen Fehlern. Der Rueckgabetyp soll sowohl erfolgreich aufgeloeste Beziehungen als auch unresolved Includes bzw. Warnungen transportieren.
+**Driven Port** (`IncludeResolverPort`): die aktuelle Boole-Methode `can_resolve_includes()` reicht nicht aus. Fuer M2 muss der Port Include-Beziehungen fuer eine Menge von Compile-Eintraegen liefern koennen, inklusive Heuristik-Hinweisen und partiellen Fehlern. Der Rueckgabetyp soll sowohl erfolgreich aufgeloeste Beziehungen als auch unresolved Includes bzw. Warnungen transportieren. Dabei muss jede Beziehung der konkreten TU-Beobachtung bzw. Compile-Database-Zeile zuordenbar bleiben; Beobachtungen mit identischem Quelldateipfad duerfen auf Port-Ebene nicht zusammengefaltet werden.
 
 **Driven Port** (`ReportWriterPort`) und **Driving Port** (`GenerateReportPort`): beide sind aktuell nur auf `AnalysisResult` ausgelegt. Fuer M2 muss der Report-Pfad sowohl Projektanalyse- als auch Impact-Ergebnisse ausgeben koennen. Fuer den aktuellen Scope genuegen zwei explizite Methoden statt eines generischen Variant-Modells, zum Beispiel eine fuer Projektanalyse und eine fuer Impact-Ergebnisse.
 
@@ -168,8 +172,8 @@ Bekannte und fuer M2 akzeptierte Einschraenkungen:
 
 Fuer M2 reicht ein pragmatischer Parser:
 
-- Zeilen werden textuell untersucht; relevant sind Direktiven, die mit `#include` beginnen
-- sowohl `#include "..."` als auch `#include <...>` werden erkannt
+- Zeilen werden textuell untersucht; relevant sind Include-Direktiven mit optionalem fuehrenden Whitespace sowie optionalem Leerraum zwischen `#` und `include`
+- sowohl `#include "..."`, `# include "..."`, `#include <...>` als auch `# include <...>` werden erkannt
 - Kommentare und offensichtliche Nicht-Include-Zeilen werden ignoriert
 - tiefere Praeprozessor-Semantik bleibt ausserhalb des Scopes
 
@@ -569,7 +573,7 @@ Die lokale und Docker-Pruefung sollen insbesondere bestaetigen:
 | Include-Hotspots                         | `F-12`, `F-13`, `F-14`, `F-15`, `AK-04`, `NF-15`           |
 | Impact-Analyse                           | `F-21`, `F-22`, `F-23`, `AK-05`, `NF-14`                   |
 | Konsolenausgabe und Ergebnisbegrenzung   | `F-26`, `F-31`, `F-32`, `F-42`, `NF-03`                    |
-| Eingabepfadsteuerung                     | `F-35`                                                     |
+| Eingabepfade (`--compile-commands`, `--changed-file`; Teilaspekt aus `F-35`) | `F-35`                                |
 | Heuristik-Kennzeichnung und Diagnostics  | `F-09`, `F-23`, `NF-14`, `NF-15`                           |
 | Tests und Referenzdaten                  | `AK-03`, `AK-04`, `AK-05`, `NF-10`                         |
 
@@ -583,16 +587,19 @@ Die lokale und Docker-Pruefung sollen insbesondere bestaetigen:
 | `command`-Tokenisierung                | lokaler, dokumentierter Tokenizer; keine volle Shell-Semantik, kein Shell-Out                                                                                                  | AP 1.2      |
 | Compile-Aufruf-Provenienz              | M2 behaelt sichtbar, ob ein Eintrag aus `arguments` oder `command` stammt; `command` bleibt bis zur Tokenisierung als roher String verfuegbar                                | AP 1.1, 1.2 |
 | TU-Identitaet in M2                    | jede Compile-Database-Zeile ist eine eigenstaendige TU-Beobachtung; Ranking, Hotspots und Impact arbeiten auf dieser Beobachtungsebene, Ausgabe muss Pfadkollisionen eindeutig darstellen | AP 1.1, 1.2, 1.4, 1.5 |
+| IncludeResolver-Portvertrag            | aufgeloeste Include-Beziehungen bleiben bis in Kernmodelle und Reporter der konkreten TU-Beobachtung zuordenbar; identische Quelldateipfade duerfen nicht implizit dedupliziert werden | AP 1.1, 1.3 |
 | Include-Strategie im MVP               | rekursives Source-Parsing entlang `#include` und Compile-Suchpfaden; Ergebnis ist heuristisch                                                                                  | AP 1.3      |
 | Pfadvergleich in M2                    | Vergleiche laufen ueber lexikalisch normalisierte Vergleichsschluessel; relative TU-Pfade gegen `directory`, relative `--changed-file`-Pfade gegen das Verzeichnis der `compile_commands.json` | AP 1.3, 1.5 |
 | Unaufloesbare Includes                 | fuehren zu Diagnostics, nicht zum Analyseabbruch                                                                                                                                | AP 1.3      |
 | Hotspot-Zaehlung                       | pro Header Anzahl betroffener TU-Beobachtungen, nicht Anzahl einzelner Kanten; jede TU zaehlt hoechstens einmal pro Header                                                    | AP 1.4      |
+| Hotspot-Modell in M2                   | speichert fuer jeden Hotspot die vollstaendige, disambiguierbare und stabil sortierbare TU-Zuordnung; kompakte Vorschauen sind hoechstens eine spaetere Reporterableitung       | AP 1.1, 1.4 |
 | Heuristik-Kennzeichnung                | Hotspots immer heuristisch; Impact nur dann heuristisch, wenn Header-/Include-Graph-Daten beteiligt sind                                                                       | AP 1.4, 1.5 |
 | Impact-CLI                             | neues Unterkommando `impact` mit `--compile-commands` und `--changed-file`                                                                                                     | AP 1.5      |
 | Exit-Codes bei Datenluecken            | gueltige Analyse mit fehlenden oder partiellen Daten bleibt Exit `0`; Unsicherheit wird im Report statt ueber neuen Exit-Code transportiert                                   | AP 1.5, 1.6 |
 | Ergebnisbegrenzung                     | `--top` fuer `analyze`, Standardwert `10`, Gesamtanzahl bleibt sichtbar                                                                                                        | AP 1.6      |
 | Impact-Ausgabelaenge                   | Impact-Ergebnisse werden in M2 voll ausgegeben; `--top` gilt nicht fuer `impact`                                                                                               | AP 1.6      |
 | Report-Port fuer M2                    | Projektanalyse und Impact erhalten getrennte Report-Methoden statt eines generischen Variant-Payloads                                                                          | AP 1.1, 1.6 |
+| Markdown-Report in M2                  | nicht Bestandteil dieses Milestones; fuer die M2-Planung gilt der Phasenplan mit Einordnung von `F-27` in Phase 3 bzw. M3                                                     | AP 1.6, Phasenplan |
 | Target-Metadaten in M2                 | nicht Bestandteil des Milestones; fehlende Targets sind kein Fehler                                                                                                             | AP 1.5      |
 | Projekt-/Externe-Header-Unterscheidung | kein Pflichtumfang fuer M2; wird nur umgesetzt, wenn sie ohne Risiko fuer `AK-04` erreichbar ist                                                                              | AP 1.3, 1.4 |
 
