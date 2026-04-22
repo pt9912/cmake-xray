@@ -20,7 +20,7 @@ public:
             .error = xray::hexagon::model::CompileDatabaseError::none,
             .error_description = {},
             .entries = {
-                {.file = "main.cpp", .directory = "/project", .arguments = {"g++", "main.cpp"}},
+                xray::hexagon::model::CompileEntry{"main.cpp", "/project", {"g++", "main.cpp"}},
             },
             .entry_diagnostics = {},
         };
@@ -48,7 +48,7 @@ TEST_CASE("project analyzer loads compile database through driven port") {
     CHECK(result.application.version == std::string_view{"v0.2.0"});
     CHECK(result.compile_database.is_success());
     CHECK(result.compile_database.entries.size() == 1);
-    CHECK(result.compile_database.entries[0].file == "main.cpp");
+    CHECK(result.compile_database.entries[0].file() == "main.cpp");
 }
 
 TEST_CASE("project analyzer propagates compile database errors") {
@@ -85,7 +85,7 @@ TEST_CASE("report generator delegates rendering to the report writer port") {
             .error = xray::hexagon::model::CompileDatabaseError::none,
             .error_description = {},
             .entries = {
-                {.file = "main.cpp", .directory = "/project", .arguments = {"g++", "main.cpp"}},
+                xray::hexagon::model::CompileEntry{"main.cpp", "/project", {"g++", "main.cpp"}},
             },
             .entry_diagnostics = {},
         },

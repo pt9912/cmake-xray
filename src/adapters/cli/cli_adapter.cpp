@@ -37,7 +37,7 @@ void format_error(std::ostream& err, const xray::hexagon::model::CompileDatabase
         std::size_t displayed = 0;
         for (const auto& diag : result.entry_diagnostics) {
             if (displayed >= max_displayed_entry_errors) break;
-            err << "  entry " << diag.index << ": " << diag.message << '\n';
+            err << "  entry " << diag.index() << ": " << diag.message() << '\n';
             ++displayed;
         }
 

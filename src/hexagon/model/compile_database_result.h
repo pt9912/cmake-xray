@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "compile_entry.h"
@@ -17,9 +18,17 @@ enum class CompileDatabaseError {
     invalid_entries,
 };
 
-struct EntryDiagnostic {
-    std::size_t index;
-    std::string message;
+class EntryDiagnostic {
+public:
+    EntryDiagnostic(std::size_t index, std::string message)
+        : index_(index), message_(std::move(message)) {}
+
+    std::size_t index() const { return index_; }
+    const std::string& message() const { return message_; }
+
+private:
+    std::size_t index_;
+    std::string message_;
 };
 
 struct CompileDatabaseResult {

@@ -31,7 +31,9 @@ CompileDatabaseResult make_error(CompileDatabaseError error, std::string descrip
 }
 
 struct EntryValidation {
-    CompileEntry entry;
+    std::string file;
+    std::string directory;
+    std::vector<std::string> arguments;
     std::string error_message;
     bool valid{true};
 };
@@ -44,33 +46,36 @@ EntryValidation validate_entry(const nlohmann::json& obj) {
                     !obj["file"].get<std::string>().empty();
     bool has_directory = obj.contains("directory") && obj["directory"].is_string() &&
                          !obj["directory"].get<std::string>().empty();
-    bool has_arguments = obj.contains("arguments") && obj["arguments"].is_array() &&
-                         !obj["arguments"].empty();
     bool has_command = obj.contains("command") && obj["command"].is_string() &&
                        !obj["command"].get<std::string>().empty();
 
     if (!has_file) {
         problems += "missing \"file\" field";
     } else {
-        result.entry.file = obj["file"].get<std::string>();
+        result.file = obj["file"].get<std::string>();
     }
 
     if (!has_directory) {
         if (!problems.empty()) problems += ", ";
         problems += "missing \"directory\" field";
     } else {
-        result.entry.directory = obj["directory"].get<std::string>();
+        result.directory = obj["directory"].get<std::string>();
     }
 
-    if (has_arguments) {
+    bool arguments_usable = false;
+    if (obj.contains("arguments") && obj["arguments"].is_array() &&
+        !obj["arguments"].empty()) {
         for (const auto& arg : obj["arguments"]) {
             if (arg.is_string()) {
-                result.entry.arguments.push_back(arg.get<std::string>());
+                result.arguments.push_back(arg.get<std::string>());
             }
         }
-    } else if (has_command) {
-        result.entry.arguments = {obj["command"].get<std::string>()};
-    } else {
+        arguments_usable = !result.arguments.empty();
+    }
+
+    if (!arguments_usable && has_command) {
+        result.arguments = {obj["command"].get<std::string>()};
+    } else if (!arguments_usable) {
         if (!problems.empty()) problems += ", ";
         problems += "missing \"command\" and \"arguments\"";
     }
@@ -122,11 +127,12 @@ CompileDatabaseResult CompileCommandsJsonAdapter::load_compile_database(
         if (!validation.valid) {
             ++total_invalid;
             if (diagnostics.size() < max_reported_entry_errors) {
-                diagnostics.push_back(
-                    {.index = i, .message = std::move(validation.error_message)});
+                diagnostics.emplace_back(i, std::move(validation.error_message));
             }
         } else {
-            entries.push_back(std::move(validation.entry));
+            entries.emplace_back(std::move(validation.file),
+                                 std::move(validation.directory),
+                                 std::move(validation.arguments));
         }
     }
 

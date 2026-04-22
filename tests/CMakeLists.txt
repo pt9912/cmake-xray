@@ -22,3 +22,10 @@ add_test(
     NAME hexagon_boundary_check
     COMMAND bash ${PROJECT_SOURCE_DIR}/cmake/check_hexagon_boundary.sh ${PROJECT_SOURCE_DIR}/src/hexagon
 )
+
+add_test(
+    NAME e2e_binary
+    COMMAND bash ${PROJECT_SOURCE_DIR}/tests/e2e/run_e2e.sh
+            $<TARGET_FILE:cmake-xray>
+            ${PROJECT_SOURCE_DIR}/tests/e2e/testdata
+)
