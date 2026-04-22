@@ -61,7 +61,7 @@ Ziel: das Tool akzeptiert gueltige Eingaben, behandelt Fehlerfaelle sauber und i
 
 | Arbeitspaket                                                                                              | Relevante Kennungen                         |
 | --------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `CompileCommandsJsonAdapter` (`CompileDatabasePort`): Einlesen und Validieren von `compile_commands.json` | `F-01` bis `F-05`, `F-41`, `AK-01`, `AK-02` |
+| `CompileCommandsJsonAdapter` (`BuildModelPort`, erster Spezialfall): Einlesen und Validieren von `compile_commands.json` | `F-01` bis `F-05`, `F-41`, `AK-01`, `AK-02` |
 | CLI Adapter: Grundlegende Befehlsstruktur und Verdrahtung der Ports                                       | `F-31`, `F-32`, `F-33`, `F-34`, `AK-09`     |
 | Konfigurierbare Pfade und Formatauswahl                                                                   | `F-35`, `F-36`                              |
 
@@ -100,7 +100,7 @@ Ziel: nicht-MVP-Funktionen kontrolliert aufbauen.
 
 | Arbeitspaket                                                                                                                                                     | Relevante Kennungen                       |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `CmakeFileApiAdapter` (`TargetMetadataPort`): Target-Metadaten und initiale Target-Sicht; Einstieg mit TU-zu-Target-Zuordnung und targetbezogener Impact-Ausgabe | `F-18` bis `F-20`, `F-24`, `F-25`, `S-02` |
+| `CmakeFileApiAdapter` (`BuildModelPort`): zweite primaere Eingabequelle fuer Kernanalysen und initiale Target-Sicht; Einstieg mit Translation-Unit-Beobachtungen ohne `compile_commands.json`, TU-zu-Target-Zuordnung und targetbezogener Impact-Ausgabe | `F-05`, `F-18` bis `F-20`, `F-24`, `F-25`, `S-02` |
 | `HtmlReportAdapter`: HTML-Export                                                                                                                                 | `F-28`                                    |
 | `JsonReportAdapter` und `DotReportAdapter`: JSON- und DOT-Ausgaben                                                                                               | `F-29`, `F-30`, `NF-20`                   |
 | Erweiterte Plattformunterstuetzung                                                                                                                               | `NF-08`, `NF-09`                          |
@@ -116,6 +116,7 @@ Der MVP umfasst Phase 0 bis Phase 3, soweit die Ergebnisse direkt auf die Abnahm
 
 Nicht Bestandteil des MVP sind insbesondere:
 
+- zweite primaere Eingabequelle ueber die CMake File API
 - targetbezogene Zusatzanalysen mit optionalen Metadaten
 - HTML-Export
 - JSON- und DOT-Ausgaben
@@ -135,7 +136,7 @@ Nicht Bestandteil des MVP sind insbesondere:
 | Risiko                                             | Auswirkung auf die Roadmap                             |
 | -------------------------------------------------- | ------------------------------------------------------ |
 | Include-Datengrundlage ist schwerer als erwartet   | Phase 2 verzoegert sich oder wird funktional reduziert |
-| optionale Target-Metadaten sind uneinheitlich      | Phase 4 wird staerker experimentell                    |
+| CMake-File-API-Daten und Target-Zuordnungen sind uneinheitlich | Phase 4 wird staerker experimentell |
 | Performance reicht fuer Referenzprojekte nicht aus | Phase 3 braucht zusaetzliche Optimierungsschleifen     |
 
 ## 7. Planungsentscheidungen
@@ -143,4 +144,4 @@ Nicht Bestandteil des MVP sind insbesondere:
 - Fuer `NF-04` bis `NF-06` wird zuerst ein **versioniertes, synthetisches CMake-Referenzprojekt im Repository** verwendet. Es soll reproduzierbar mehrere Groessenstufen abdecken, mindestens `250`, `500` und `1.000` Translation Units, und zugleich als Grundlage fuer `NF-19` dienen.
 - Fuer das erste Translation-Unit-Ranking reicht als Minimalmenge die Kombination aus `arg_count`, `include_path_count` und `define_count`. Diese Kennzahlen sind direkt aus der Compile-Datenbank ableitbar und entkoppeln das erste Ranking von der heuristischen Include-Aufloesung.
 - Fuer den MVP ist der `SourceParsingIncludeAdapter` der risikoaermste `IncludeResolverPort`-Adapter. Er bleibt im MVP die einzige Implementierung; seine Ergebnisse werden als heuristisch gekennzeichnet.
-- Der Einstieg in targetbezogene Zusatzdaten lohnt sich erst nach stabilem MVP, also in Phase 4. Der erste Ausbauschritt soll mit `F-19` und `F-24` beginnen, bevor weitergehende Target-Graph-Analysen folgen.
+- Der Einstieg in eine zweite CMake-native Eingabequelle lohnt sich erst nach stabilem MVP, also in Phase 4. Der erste Ausbauschritt soll die Kernanalysen ueber die CMake File API oeffnen und zugleich mit `F-19` und `F-24` die erste Target-Sicht liefern, bevor weitergehende Target-Graph-Analysen folgen.

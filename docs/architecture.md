@@ -37,8 +37,8 @@ Dieser Stil wurde gewaehlt, weil:
 
 | Externe Quelle oder Senke | Rolle |
 |---|---|
-| `compile_commands.json` | primaere Eingabequelle fuer Translation Units und Compile-Aufrufe |
-| optionale Build-Metadaten | Zusatzquelle fuer targetbezogene Analysen |
+| `compile_commands.json` | exakte, compilernahe Eingabequelle fuer Translation Units und Compile-Aufrufe |
+| CMake File API (`codemodel`, `toolchains`) | zweite CMake-native Eingabequelle fuer Kernanalysen und Target-Sicht; liefert abgeleitete Compile-Kontexte auch ohne `compile_commands.json` |
 | Quelldateien / Header | Grundlage fuer Include- oder Abhaengigkeitsableitungen |
 | CLI-Nutzer | startet Analysen lokal |
 | CI-Systeme | fuehren Analysen automatisiert aus |
@@ -50,7 +50,7 @@ Dieser Stil wurde gewaehlt, weil:
 |---|---|
 | Linux als primaere Zielplattform | `NF-07`, `RB-01`, `RB-02`, `RB-03` |
 | reproduzierbare Analyseergebnisse | `NF-15` |
-| austauschbare Datengrundlagen fuer Include- und Target-Sicht | `F-05`, `F-12` bis `F-25`, `S-02` |
+| austauschbare Datengrundlagen fuer Kernanalysen, Include-Sicht und Target-Sicht | `F-05`, `F-12` bis `F-25`, `S-01`, `S-02` |
 | klare Fehlermeldungen und Exit-Codes | `F-03`, `F-33`, `F-34`, `NF-02` |
 | automatisierte Testbarkeit | `NF-10`, `NF-19` |
 
@@ -95,11 +95,11 @@ Der Kern enthaelt die gesamte Fachlogik. Er hat keine Abhaengigkeiten auf Dateis
 
 | Kernbaustein | Verantwortung | Relevante Kennungen |
 |---|---|---|
-| Compile Database Model | Normalisierte, formatunabhaengige Sicht auf Compile-Eintraege | `F-04`, `F-06` |
+| Build Observation Model | Normalisierte, quellenunabhaengige Sicht auf Translation-Unit-Beobachtungen, Compile-Kontexte und deren Herkunft | `F-04`, `F-05`, `F-06`, `F-09` |
 | Translation Unit Metrics | Berechnung und Ranking von Kennzahlen fuer auffaellige TUs | `F-07`, `F-08`, `F-09`, `F-10` |
 | Include Analysis | Auswertung von Include-Beziehungen und Hotspot-Ermittlung | `F-12` bis `F-17` |
 | Impact Engine | Ableitung betroffener TUs und spaeter Targets bei Dateiaenderungen | `F-21` bis `F-25` |
-| Target Model | Abbildung optionaler targetbezogener Metadaten | `F-18` bis `F-20` |
+| Target Model | Abbildung optionaler targetbezogener Metadaten innerhalb derselben Buildbeschreibung | `F-18` bis `F-20` |
 | Diagnostics | Querschnittsaspekt: sammelt Warnungen, Datenluecken und Unsicherheiten waehrend der Analyse und reicht sie an die Ergebnisse weiter | `F-03`, `F-09`, `F-23`, `NF-14`, `NF-15` |
 
 ### 3.3 Ports
@@ -118,9 +118,8 @@ Ports sind abstrakte Schnittstellen, die der Kern definiert. Sie beschreiben **w
 
 | Port | Verantwortung | Relevante Kennungen |
 |---|---|---|
-| `CompileDatabasePort` | Compile-Eintraege laden und validieren | `F-01` bis `F-05`, `F-41`, `S-01` |
+| `BuildModelPort` | Normalisierte Analyse-Eingaben aus `compile_commands.json` oder CMake File API laden | `F-01` bis `F-05`, `F-18` bis `F-20`, `F-24`, `F-41`, `S-01`, `S-02` |
 | `IncludeResolverPort` | Include-Beziehungen fuer Translation Units ermitteln | `F-12` bis `F-17` |
-| `TargetMetadataPort` | Optionale Target-Metadaten laden | `F-18` bis `F-20`, `S-02` |
 | `ReportWriterPort` | Analyseergebnisse in ein konkretes Format schreiben | `F-26` bis `F-30`, `NF-20` |
 
 ### 3.4 Adapter
@@ -141,15 +140,15 @@ Die folgende Tabelle beschreibt den Zielzustand fuer den **Gesamt-MVP** gemaess 
 
 | Adapter | Implementiert | Beschreibung | Gesamt-MVP (bis M3) |
 |---|---|---|---|
-| CompileCommandsJsonAdapter | `CompileDatabasePort` | Liest und validiert `compile_commands.json` | ja (ab Phase 1 / M1) |
-| SourceParsingIncludeAdapter | `IncludeResolverPort` | Parst Quelldateien entlang der `-I`-Pfade aus dem Compile-Aufruf; **experimentelle MVP-Heuristik** mit bekannten Einschraenkungen (siehe 6.1) und einzige Include-Adapter-Implementierung im MVP | ja (ab Phase 2 / M2; einziger Include-Adapter im Gesamt-MVP, experimentell) |
+| CompileCommandsJsonAdapter | `BuildModelPort` | Liest und validiert `compile_commands.json`; liefert `exact` Build-Beobachtungen | ja (ab Phase 1 / M1; erster Build-Input-Adapter) |
+| SourceParsingIncludeAdapter | `IncludeResolverPort` | Parst Quelldateien entlang der `-I`-Pfade aus dem Compile-Aufruf; **experimentelle MVP-Heuristik** mit bekannten Einschraenkungen (siehe 6.2) und einzige Include-Adapter-Implementierung im MVP | ja (ab Phase 2 / M2; einziger Include-Adapter im Gesamt-MVP, experimentell) |
 | CompilerDepsIncludeAdapter | `IncludeResolverPort` | Wertet `.d`-Dependency-Dateien oder compilergestuetzte `-M`-Ausgaben aus | spaeter |
 | ConsoleReportAdapter | `ReportWriterPort` | Schreibt Ergebnisse auf die Konsole | ja (ab Phase 2 / M2) |
 | MarkdownReportAdapter | `ReportWriterPort` | Erzeugt einen Markdown-Bericht | ja (ab Phase 3 / M3) |
 | HtmlReportAdapter | `ReportWriterPort` | Erzeugt einen HTML-Bericht | spaeter |
 | JsonReportAdapter | `ReportWriterPort` | Erzeugt JSON-Ausgabe mit Schema-Version | spaeter |
 | DotReportAdapter | `ReportWriterPort` | Erzeugt DOT/Graphviz-Ausgabe | spaeter |
-| CmakeFileApiAdapter | `TargetMetadataPort` | Liest Target-Informationen aus der CMake File API | spaeter |
+| CmakeFileApiAdapter | `BuildModelPort` | Liest CMake-File-API-Reply-Daten, leitet daraus Build-Beobachtungen und Target-Zuordnungen ab und liefert `derived` Beobachtungen | spaeter |
 
 Im Gesamt-MVP gibt es genau eine Implementierung des `IncludeResolverPort`; sie wird ab Phase 2 / M2 eingefuehrt. Weitere Include-Adapter werden erst nach Stabilisierung des MVP eingefuehrt, damit Portverhalten, Diagnostics und Ergebniskennzeichnung zunaechst an einer einzigen Datenstrategie geschaerft werden koennen.
 
@@ -167,12 +166,13 @@ cmake-xray/
 │   ├── hexagon/                                    # Application Core
 │   │   ├── CMakeLists.txt
 │   │   ├── model/                                  # Domaenmodelle und Datenstrukturen
-│   │   │   ├── compile_entry.h                     # Einzelner Eintrag aus der Compile-Datenbank
+│   │   │   ├── compile_entry.h                     # Eintrag aus einer compilernahen Eingabequelle
+│   │   │   ├── build_observation.h                 # Einzelne TU-Beobachtung aus beliebiger Eingabequelle
 │   │   │   ├── translation_unit.h                  # TU mit zugeordneten Kennzahlen
 │   │   │   ├── include_graph.h                     # Include-Beziehungen zwischen Dateien
 │   │   │   ├── impact_result.h                     # Ergebnis einer Impact-Analyse
 │   │   │   ├── analysis_result.h                   # Gesamtergebnis einer Projektanalyse
-│   │   │   ├── target_info.h                       # Optionale Target-Metadaten
+│   │   │   ├── target_info.h                       # Optionale Target-Metadaten innerhalb des Build-Modells
 │   │   │   └── diagnostic.h                        # Warnungen, Hinweise, Datenluecken
 │   │   │
 │   │   ├── ports/                                  # Port-Schnittstellen
@@ -181,9 +181,8 @@ cmake-xray/
 │   │   │   │   ├── analyze_impact_port.h
 │   │   │   │   └── generate_report_port.h
 │   │   │   └── driven/                             # Secondary Ports (Kern → Aussenwelt)
-│   │   │       ├── compile_database_port.h
+│   │   │       ├── build_model_port.h
 │   │   │       ├── include_resolver_port.h
-│   │   │       ├── target_metadata_port.h
 │   │   │       └── report_writer_port.h
 │   │   │
 │   │   └── services/                               # Anwendungslogik (implementiert Primary Ports)
@@ -203,6 +202,8 @@ cmake-xray/
 │       ├── input/                                  # Driven Adapter: Eingabequellen
 │       │   ├── compile_commands_json_adapter.h
 │       │   ├── compile_commands_json_adapter.cpp
+│       │   ├── cmake_file_api_adapter.h
+│       │   ├── cmake_file_api_adapter.cpp
 │       │   ├── source_parsing_include_adapter.h
 │       │   └── source_parsing_include_adapter.cpp
 │       └── output/                                 # Driven Adapter: Ausgabekanaele
@@ -262,14 +263,14 @@ Die Trennung in zwei Libraries stellt sicher, dass `xray_hexagon` **keine** exte
 - Header und Implementierung liegen im selben Verzeichnis.
 - Dateinamen verwenden `snake_case`.
 - Jeder Port ist ein einzelner Header mit einer abstrakten Klasse.
-- Spaetere Adapter (HTML, JSON, DOT, CMake File API) werden in `adapters/output/` bzw. `adapters/input/` ergaenzt, ohne bestehende Dateien zu aendern.
+- Spaetere Adapter (HTML, JSON, DOT) werden in `adapters/output/` ergaenzt; weitere Build-Eingabeadapter wie die CMake File API werden in `adapters/input/` ergaenzt, ohne bestehende Dateien fachlich zu koppeln.
 
 ## 5. Datenfluss
 
 1. Der **CLI Adapter** nimmt Kommando, Eingabepfade und Optionen entgegen und ruft den passenden Primary Port auf.
-2. Der Kern ruft ueber den `CompileDatabasePort` die Compile-Eintraege ab. Der Adapter validiert und normalisiert die Daten.
-3. Der Kern ruft ueber den `IncludeResolverPort` die Include-Beziehungen ab. Welcher Adapter dahinter steht, ist dem Kern nicht bekannt.
-4. Der Kern fuehrt die angeforderte Analyse durch (TU-Ranking, Hotspots, Impact) und sammelt dabei Diagnostics-Informationen.
+2. Der Kern ruft ueber den `BuildModelPort` die normalisierte Buildbeschreibung ab. Der aktive Adapter liest entweder `compile_commands.json` oder die CMake File API und ueberfuehrt die Daten in dieselben Kernmodelle.
+3. Der Kern ruft ueber den `IncludeResolverPort` die Include-Beziehungen fuer die geladenen Translation-Unit-Beobachtungen ab. Welcher Adapter dahinter steht, ist dem Kern nicht bekannt.
+4. Der Kern fuehrt die angeforderte Analyse durch (TU-Ranking, Hotspots, Impact, spaeter Targets) und sammelt dabei Diagnostics-Informationen einschliesslich der Herkunft der Datengrundlage.
 5. Der Kern reicht das Analyseergebnis (einschliesslich Diagnostics) an den `ReportWriterPort`. Der aktive Adapter erzeugt die Ausgabe im gewaehlten Format.
 6. Der **CLI Adapter** setzt den Exit-Code basierend auf dem Ergebnis.
 
@@ -284,6 +285,7 @@ CLI Adapter  ------->  Primary Ports  ------->  Application Core
                                                 Secondary Ports
                                                       |
 CompileCommandsJsonAdapter  <-------------------------+
+CmakeFileApiAdapter         <-------------------------+
 SourceParsingIncludeAdapter <-------------------------+
 ConsoleReportAdapter        <-------------------------+
 MarkdownReportAdapter       <-------------------------+
@@ -293,7 +295,35 @@ Kein Adapter kennt einen anderen Adapter. Der Kern kennt keine konkreten Adapter
 
 ## 6. Architekturelle Entscheidungen
 
-### 6.1 Include-Datenstrategie als austauschbarer Adapter
+### 6.1 Build-Eingaben als austauschbare Primaerquelle
+
+Die Kernanalysen sollen nicht auf `compile_commands.json` als einzig moegliche Datengrundlage festgelegt bleiben. Deshalb fuehrt die Architektur einen allgemeinen `BuildModelPort` ein, der unterschiedliche CMake-native Eingabequellen in dieselben Kernmodelle ueberfuehrt.
+
+Fuer den Zielzustand ab Phase 4 gelten zwei primaere Build-Eingabeadapter:
+
+- `CompileCommandsJsonAdapter` liefert **`exact`** Beobachtungen aus einer compilernahen Compilation Database
+- `CmakeFileApiAdapter` liefert **`derived`** Beobachtungen aus `codemodel`- und `toolchains`-Reply-Daten der CMake File API
+
+Die File API ist dabei nicht nur Zusatz fuer eine spaetere Target-Sicht, sondern eine **echte zweite Eingabequelle fuer die Kernanalysen**. Sie soll insbesondere fuer Generatoren nutzbar sein, bei denen CMake keine `compile_commands.json` erzeugt.
+
+Der gemeinsame Portvertrag muss mindestens transportieren:
+
+- identifizierbare Translation-Unit-Beobachtungen
+- einen fuer Ranking, Include-Analyse und Impact nutzbaren Compile-Kontext je Beobachtung
+- optionale Target-Zuordnungen und spaeter Target-Abhaengigkeiten
+- die Herkunft und Vertrauensklasse der Daten (`exact` vs. `derived`)
+
+Die CMake File API kann dafuer insbesondere Quellenlisten, `compileGroups`, `compileCommandFragments`, Include-Verzeichnisse und Toolchain-Informationen bereitstellen. Diese Daten werden im Adapter in denselben Kernkontext ueberfuehrt, ohne dass der Kern CMake-spezifische JSON-Strukturen kennen muss.
+
+Daraus folgt:
+
+- Kernlogik und Reporter arbeiten gegen ein quellenunabhaengiges Build-Modell.
+- Ergebnisse muessen die Datengrundlage sichtbar machen; `derived` darf nicht stillschweigend wie `exact` erscheinen.
+- Fehlt `compile_commands.json`, soll der Kern bei ausreichender File-API-Lage weiterarbeiten, statt allein wegen der fehlenden Compilation Database abzubrechen.
+
+Der bisherige `CompileDatabasePort` des fruehen MVP ist damit als erster Spezialfall des allgemeineren `BuildModelPort` zu verstehen.
+
+### 6.2 Include-Datenstrategie als austauschbarer Adapter
 
 Die offene Frage der Include-Datenherkunft wird durch den `IncludeResolverPort` architekturell geloest. Der Kern arbeitet gegen die Port-Abstraktion; der konkrete Adapter kann ausgetauscht werden, ohne den Kern zu aendern.
 
@@ -312,11 +342,11 @@ Bekannte Einschraenkungen:
 - **`-include`-Flags** (forced includes) und generierte Header sind im Quelltext nicht sichtbar.
 - **Systemabhaengige Aufloesung** (Compiler-interne Suchpfade, Frameworks unter macOS) wird nicht abgebildet.
 
-Daraus folgt: Ab Phase 2 / M2 und damit auch im spaeter lieferbaren Gesamt-MVP koennen die Ergebnisse von `F-12` bis `F-17` und `F-21` bis `F-25` unvollstaendig oder ueberzaehlig sein. Die Architektur muss sicherstellen, dass Analyseergebnisse, die auf diesem Adapter basieren, im Bericht als **heuristisch** gekennzeichnet werden (`F-09`, `F-23`, `NF-15`). Die Diagnostics-Infrastruktur (6.6) transportiert diese Einschraenkung an den Nutzer.
+Daraus folgt: Ab Phase 2 / M2 und damit auch im spaeter lieferbaren Gesamt-MVP koennen die Ergebnisse von `F-12` bis `F-17` und `F-21` bis `F-25` unvollstaendig oder ueberzaehlig sein. Die Architektur muss sicherstellen, dass Analyseergebnisse, die auf diesem Adapter basieren, im Bericht als **heuristisch** gekennzeichnet werden (`F-09`, `F-23`, `NF-15`). Die Diagnostics-Infrastruktur (6.7) transportiert diese Einschraenkung an den Nutzer.
 
 Alternative Adapter (compilergestuetzte Dependency-Informationen ueber `-M`-Flags, vorhandene `.d`-Dateien) sollen als weitere `IncludeResolverPort`-Implementierungen folgen und wuerden eine compilernahe Sicht liefern. Die Port-Abstraktion stellt sicher, dass der Wechsel ohne Kernaenderung moeglich ist.
 
-### 6.2 Stabilitaet der internen Modelle
+### 6.3 Stabilitaet der internen Modelle
 
 Interne Datenmodelle sollen:
 
@@ -327,13 +357,13 @@ Interne Datenmodelle sollen:
 
 Die Modelle gehoeren zum Kern und sind frei von Adapter-spezifischen Details. Die Port-Schnittstellen verwenden ausschliesslich Kernmodelle, keine adapterspezifischen Typen.
 
-### 6.3 Erweiterbarkeit
+### 6.4 Erweiterbarkeit
 
 Neue Analysearten erweitern den Kern und fuegen bei Bedarf neue Secondary Ports hinzu. Neue Ausgabeformate erfordern nur einen neuen `ReportWriterPort`-Adapter. Neue Eingabequellen erfordern nur einen neuen Adapter fuer den jeweiligen Secondary Port. In keinem Fall muss bestehender Adapter-Code geaendert werden.
 
-Fuer targetbezogene Zusatzdaten bleibt der `TargetMetadataPort` bereits im MVP Teil der Architektur, darf dort aber leer bleiben. Eine konkrete Implementierung lohnt sich erst nach stabilem MVP; der erste Ausbauschritt soll mit der TU-zu-Target-Zuordnung (`F-19`) und der targetbezogenen Ausgabe in der Impact-Analyse (`F-24`) beginnen. Weitergehende Target-Graph-Analysen (`F-18`, `F-20`, `F-25`) folgen danach.
+Fuer die zweite primaere Eingabequelle wird deshalb nicht nur ein Nebenport fuer Target-Metadaten eingefuehrt, sondern der gemeinsame `BuildModelPort` erweitert. Die CMake File API ist der erste Adapter fuer diesen erweiterten Port. Der erste Ausbauschritt nach dem MVP beginnt mit `derived` Translation-Unit-Beobachtungen aus der File API, der TU-zu-Target-Zuordnung (`F-19`) und der targetbezogenen Ausgabe in der Impact-Analyse (`F-24`). Weitergehende Target-Graph-Analysen (`F-18`, `F-20`, `F-25`) folgen danach.
 
-### 6.4 Externe Abhaengigkeiten
+### 6.5 Externe Abhaengigkeiten
 
 Externe Abhaengigkeiten sollen minimal gehalten werden (`RB-10`), um Build-Komplexitaet und Einstiegshuerde fuer Beitragende gering zu halten (`RB-06`, `RB-07`). Wo bewaehrte Bibliotheken einen klaren Vorteil gegenueber Eigenimplementierungen bieten, sollen sie bevorzugt werden. Fuer den MVP werden mindestens Entscheidungen zu folgenden Bereichen benoetigt:
 
@@ -343,7 +373,7 @@ Externe Abhaengigkeiten sollen minimal gehalten werden (`RB-10`), um Build-Kompl
 
 Externe Abhaengigkeiten duerfen nur in Adaptern oder in der Adapter-Verdrahtung auftreten, nicht im Kern.
 
-### 6.5 Testbarkeitsstrategie
+### 6.6 Testbarkeitsstrategie
 
 Die hexagonale Architektur unterstuetzt Testbarkeit direkt: Secondary Ports koennen durch Test-Doubles ersetzt werden, ohne Dateisystem oder CLI.
 
@@ -358,7 +388,7 @@ Die Referenzumgebung und Referenzprojekte aus `NF-04` bis `NF-06` und `NF-19` so
 
 Als erste gemeinsame Grundlage fuer Performance- und Testaussagen wird ein versioniertes synthetisches CMake-Referenzprojekt im Repository vorgesehen. Es soll reproduzierbar mehrere Groessenstufen, mindestens `250`, `500` und `1.000` Translation Units, sowie kontrollierte Include-Hotspots bereitstellen.
 
-### 6.6 Diagnostics als Querschnittsaspekt
+### 6.7 Diagnostics als Querschnittsaspekt
 
 Diagnostics ist kein eigener Port oder Adapter, sondern ein **Protokoll innerhalb des Kerns**. Analyseschritte fuegen Warnungen, Hinweise und Datenluecken an das Analyseergebnis an. Reporter-Adapter geben diese Informationen formatgerecht aus. Der CLI Adapter leitet daraus Exit-Codes ab.
 
@@ -366,8 +396,9 @@ Diagnostics ist kein eigener Port oder Adapter, sondern ein **Protokoll innerhal
 
 | Risiko | Auswirkung | Minderung durch Hexagonal |
 |---|---|---|
+| `compile_commands.json` ist generatorabhaengig nicht immer verfuegbar | Kernanalysen waeren sonst auf Makefile/Ninja beschraenkt | `BuildModelPort` erlaubt eine zweite primaere Eingabequelle ueber die CMake File API |
 | Include-Ableitung ist teuer oder unzuverlaessig | Performance- und Zuverlaessigkeitsprobleme | Adapter austauschbar; alternative Strategie ohne Kernaenderung moeglich |
-| Zusatzdaten fuer Targets fehlen oft | eingeschraenkte Target- und Impact-Sicht | `TargetMetadataPort` liefert leere Ergebnisse; Kern behandelt Fehlen explizit |
+| File-API-Daten koennen nur abgeleitete Compile-Kontexte liefern | Rankings und Impact muessen Herkunft und Unsicherheit sichtbar halten | Herkunftsklassen sind Teil des Build-Modells; Reporter kennzeichnen `exact` vs. `derived` explizit |
 | Reporter kennen zu viele Analyse-Interna | geringe Erweiterbarkeit | Reporter arbeiten nur gegen Kernmodelle ueber `ReportWriterPort` |
 | CLI und Analysekern sind zu eng gekoppelt | schlechte Testbarkeit | CLI ist nur ein Primary Adapter; Kern testbar ueber Ports ohne CLI |
 | Port-Abstraktionen werden zu frueh zu komplex | Over-Engineering | MVP startet mit je einer Implementierung pro Port; Abstraktion waechst mit den Anforderungen |
@@ -377,9 +408,8 @@ Diagnostics ist kein eigener Port oder Adapter, sondern ein **Protokoll innerhal
 | Architekturthema | Lastenheft-Kennungen |
 |---|---|
 | Application Core | `F-06` bis `F-25`, `NF-15` |
-| CompileDatabasePort / Adapter | `F-01` bis `F-05`, `F-41`, `S-01` |
+| BuildModelPort / Adapter | `F-01` bis `F-05`, `F-18` bis `F-20`, `F-24`, `F-41`, `S-01`, `S-02` |
 | IncludeResolverPort / Adapter | `F-12` bis `F-17`, `S-02` |
-| TargetMetadataPort / Adapter | `F-18` bis `F-20`, `S-02` |
 | ReportWriterPort / Adapter | `F-26` bis `F-30`, `NF-20` |
 | CLI Adapter | `F-31` bis `F-40`, `NF-01`, `NF-02` |
 | Diagnostics | `F-03`, `F-09`, `F-23`, `NF-02`, `NF-14`, `NF-15` |

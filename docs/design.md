@@ -42,6 +42,19 @@ Dieses Dokument definiert keine abschliessenden Klassen-, Modul- oder Build-Stru
 - Ein detailreicher Modus soll zusaetzliche Diagnoseinformationen liefern.
 - Fehlermeldungen sollen den konkreten Eingabefehler benennen und einen naechsten Schritt vorschlagen.
 
+### 2.3 Eingabegrundlagen
+
+Fuer die Kernanalysen werden langfristig zwei primaere CMake-Eingabequellen unterstuetzt:
+
+- `compile_commands.json` als compilernahe und nach Moeglichkeit exakte Datengrundlage
+- die CMake File API als zweite CMake-native Datengrundlage fuer Generatoren, bei denen keine `compile_commands.json` bereitsteht
+
+Beide Quellen sollen dieselben fachlichen Analysearten tragen koennen. Die Datengrundlage bleibt jedoch Teil des Ergebniskontexts:
+
+- Berichte sollen sichtbar machen, ob Kennzahlen und Ableitungen auf `exact` oder `derived` Beobachtungen beruhen.
+- Ergebnisse aus abgeleiteten Daten duerfen nicht stillschweigend denselben Praezisionsanspruch tragen wie compilernahe Eingaben.
+- Fehlt `compile_commands.json`, soll eine ausreichend vollstaendige CMake-File-API-Lage fuer die Kernanalysen genutzt werden, statt allein wegen der fehlenden Compilation Database abzubrechen.
+
 ## 3. Design der Analyseergebnisse
 
 ### 3.1 Translation-Unit-Auswertung
@@ -60,13 +73,13 @@ Geplante Ergebnisbausteine:
 | Kennzahlen | Werte, die zur Einstufung herangezogen wurden | `F-08`, `F-09` |
 | Kontext | Einordnung relativ zu anderen Dateien oder Grenzwerten | `F-09`, `F-10` |
 
-Fuer das erste Ranking werden standardmaessig drei compile-database-basierte Kennzahlen verwendet:
+Fuer das erste Ranking werden standardmaessig drei compile-kontext-basierte Kennzahlen verwendet:
 
 - `arg_count`: Anzahl der Argumente des Compile-Aufrufs
 - `include_path_count`: Anzahl erkannter Include-Suchpfade aus `-I`, `-isystem` und `-iquote`
 - `define_count`: Anzahl gesetzter Praeprozessor-Defines aus `-D`
 
-Diese Minimalmenge ist fuer den MVP ausreichend, weil sie ohne weitere Quelltext- oder Include-Heuristiken verfuegbar ist. Include-basierte Kennzahlen wie Anzahl aufgeloester Includes oder Include-Tiefe koennen spaeter als zusaetzlicher Kontext ergaenzt werden, sollen aber die erste Rangfolge nicht voraussetzen.
+Diese Minimalmenge ist fuer den MVP ausreichend, weil sie ohne weitere Quelltext- oder Include-Heuristiken aus einer compilernahen oder abgeleiteten Buildbeschreibung verfuegbar ist. Include-basierte Kennzahlen wie Anzahl aufgeloester Includes oder Include-Tiefe koennen spaeter als zusaetzlicher Kontext ergaenzt werden, sollen aber die erste Rangfolge nicht voraussetzen.
 
 ### 3.2 Include-Hotspots
 
@@ -115,6 +128,7 @@ Markdown ist das erste persistente Berichtsziel. Ein Bericht soll mindestens ent
 
 - Kontext der Analyse
 - Eingabedaten oder deren Herkunft
+- sichtbare Kennzeichnung der Datengrundlage (`exact` oder `derived`)
 - zentrale Ergebnisse je Analyseart
 - Hinweise auf fehlende oder unvollstaendige Daten
 
@@ -128,6 +142,7 @@ Dieses Produkt darf Unsicherheit nicht verstecken. Wenn Eingaben oder Ableitunge
 
 - Analyse abbrechen, wenn Pflichtdaten ungueltig sind
 - Analyse leer oder teilweise ausgeben, wenn Daten formal gueltig, aber inhaltlich unzureichend sind
+- Analyse nicht allein deshalb abbrechen, weil keine `compile_commands.json` vorliegt, wenn eine alternative CMake-native Datengrundlage fuer dieselben Kernanalysen ausreicht
 - fehlende Datengrundlagen explizit benennen
 - keine nicht belegbaren Target- oder Include-Aussagen vortaeuschen
 

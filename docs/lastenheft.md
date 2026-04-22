@@ -177,15 +177,15 @@ Fuer spaetere Releases gilt:
 ## 6. Funktionale Anforderungen
 
 ### 6.1 Verarbeitung von Eingabedaten
-Das System muss `compile_commands.json` einlesen und verarbeiten koennen.
+Das System muss `compile_commands.json` einlesen und verarbeiten koennen. Zusaetzlich sollen spaetere CMake-native Buildbeschreibungen fuer dieselben Kernanalysen nutzbar gemacht werden.
 
 | Kennung | Prioritaet | Anforderung |
 |---|---|---|
 | `F-01` | Muss | Einlesen und Validieren einer `compile_commands.json` |
 | `F-02` | Muss | Erkennung fehlender, fehlerhafter oder unvollstaendiger Eintraege |
 | `F-03` | Muss | Ausgabe einer konkreten Fehlermeldung bei ungueltigen Eingabedaten |
-| `F-04` | Muss | Extraktion mindestens von Quelldateipfad, Arbeitsverzeichnis und Compile-Aufruf je Eintrag |
-| `F-05` | Soll | Verarbeitung zusaetzlicher Build-Metadaten, wenn diese fuer targetbezogene Analysen bereitgestellt werden |
+| `F-04` | Muss | Extraktion mindestens von Quelldateipfad, Arbeitsverzeichnis und einem fuer die Analyse nutzbaren Compile-Kontext je Beobachtung; bei `compile_commands.json` ist dies der Compile-Aufruf |
+| `F-05` | Soll | Verarbeitung weiterer CMake-nativer Buildbeschreibungen, insbesondere der CMake File API, wenn diese fuer Kern- oder targetbezogene Analysen bereitgestellt werden |
 | `F-41` | Muss | Behandlung einer syntaktisch gueltigen, aber leeren `compile_commands.json` mit einer klaren Rueckmeldung und einem definierten Exit-Code |
 
 ### 6.2 Analyse von Translation Units
@@ -387,7 +387,7 @@ Das Produkt soll folgende Eingaben unterstuetzen:
 | Kennung | Typ | Schnittstelle |
 |---|---|---|
 | `S-01` | Eingabe | `compile_commands.json` |
-| `S-02` | Eingabe | optional weitere Build-Metadaten fuer targetbezogene Analysen, zum Beispiel aus der CMake File API oder anderen Build-Artefakten; nicht Bestandteil des MVP |
+| `S-02` | Eingabe | optionale weitere CMake-native Buildbeschreibungen und Build-Metadaten, insbesondere aus der CMake File API oder anderen Build-Artefakten; ausserhalb des MVP sowohl fuer Kern- als auch fuer targetbezogene Analysen nutzbar |
 | `S-03` | Eingabe | Dateipfade und Optionen ueber CLI-Parameter |
 
 ### 10.2 Ausgabeschnittstellen
