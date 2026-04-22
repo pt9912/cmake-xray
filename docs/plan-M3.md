@@ -54,8 +54,8 @@ Die fuer M2 ausreichende Report-Strecke ist fuer M3 zu schmal. Neben Konsolenaus
 
 Fuer M3 benoetigt der Report-Pfad mindestens:
 
-- eine explizite Repraesentation des gewuenschten Ausgabeformats, zum Beispiel `console` und `markdown`
-- eine einheitliche Repraesentation des generierten Reports, mindestens mit Textinhalt und Formatkennung
+- eine explizite Repraesentation des gewuenschten Ausgabeformats, zum Beispiel `console` und `markdown`; die CLI mappt `--format` auf ein Kernmodell wie `ReportFormat`
+- eine einheitliche Repraesentation des generierten Reports, mindestens mit Textinhalt und Formatkennung, zum Beispiel `RenderedReport`
 - getrennte, fachlich klare Eintrittspunkte fuer Projektanalyse und Impact-Analyse; bestehende M2-Entscheidungen dazu bleiben erhalten
 - eine stabile Verantwortungsgrenze: Der Report-Adapter erzeugt Text, die Entscheidung ueber `stdout` oder Dateipfad bleibt ausserhalb des Hexagons
 - dieselben Kernmodelle und Diagnostics fuer Konsole und Markdown; Reporter duerfen keine eigene Fachlogik oder abweichende Ergebnisaggregation einfuehren
@@ -63,7 +63,9 @@ Fuer M3 benoetigt der Report-Pfad mindestens:
 Wichtig:
 
 - das Hexagon bleibt frei von Dateisystem- und CLI-Typen
-- ein Port-Rename ist fuer M3 nicht erforderlich; wichtiger als die Benennung ist die saubere Verantwortungstrennung
+- die Formatauswahl zur Laufzeit wird fuer M3 explizit festgelegt: Die Composition Root verdrahtet `ConsoleReportAdapter` und `MarkdownReportAdapter` in einen einzelnen Dispatching-Adapter, zum Beispiel `ReportWriterDispatchAdapter`, der als einzige Laufzeit-Implementierung von `ReportWriterPort` das gewuenschte Format auswaehlt
+- die konkreten Format-Adapter bleiben reine Text-Renderer; sie kennen weder CLI-Optionen noch Dateisystem-Sinks und enthalten keine Dispatch-Logik
+- ein Port-Rename ist fuer M3 nicht erforderlich; wichtiger als die saubere Verantwortungstrennung ist, dass `GenerateReportPort` formatfaehig wird und der Dispatch ausserhalb der konkreten Renderer eindeutig verdrahtet ist
 - Ausgabe- oder Schreibfehler duerfen nicht als Eingabefehler maskiert werden; der bisher reservierte Exit-Code `1` wird in M3 fuer unerwartete Laufzeit- bzw. Report-Schreibfehler aktiviert
 - die Reihenfolge von Abschnitten, Listen und Diagnostics muss explizit dokumentiert und nicht vom Zufall der Eingabereihenfolge abhaengig sein
 
@@ -73,6 +75,8 @@ Vorgesehene Artefakte:
 - Anpassung von `src/hexagon/ports/driving/generate_report_port.h`
 - Anpassung von `src/hexagon/ports/driven/report_writer_port.h`
 - Anpassung von `src/hexagon/services/report_generator.*`
+- neue oder erweiterte Adapter-Dateien fuer den Format-Dispatch unter `src/adapters/output/`
+- Anpassung von `src/main.cpp`
 
 **Ergebnis**: Der Kern besitzt einen belastbaren, formatfaehigen Report-Vertrag, ohne fuer M3 einen zusaetzlichen Dateisystem-Port einzufuehren.
 
@@ -80,32 +84,52 @@ Vorgesehene Artefakte:
 
 M3 fuehrt den im Architekturzielbild vorgesehenen `MarkdownReportAdapter` ein. Der Adapter muss dieselben fachlichen Ergebnisse wie der Konsolenreport darstellen, aber in einer diffbaren, gut verlinkbaren und fuer CI-Artefakte geeigneten Struktur.
 
-Ein Markdown-Bericht fuer `analyze` soll mindestens enthalten:
+Ein Markdown-Bericht fuer `analyze` soll genau folgende Hauptteile in genau dieser Reihenfolge enthalten:
 
-- Titel und Report-Typ
-- Tool-Version
-- Pfad zur verwendeten `compile_commands.json`
-- Kurzuebersicht zur Analyse, einschliesslich Gesamtanzahl und ggf. Begrenzung via `--top`
-- Translation-Unit-Ranking mit Rang und Kennzahlen
-- Include-Hotspots mit Header-Bezeichnung, Anzahl betroffener Translation Units und vollstaendiger TU-Zuordnung
-- sichtbare Kennzeichnung heuristischer Ergebnisse
-- sichtbare Diagnostics und Datenluecken
+- Titelzeile exakt `# Project Analysis Report`
+- genau einen Leerblock
+- eine flache Uebersichts-Liste mit exakt diesen Labels in dieser Reihenfolge:
+  - `Report type: analyze`
+  - `Compile database: <display path>`
+  - `Translation units: <count>`
+  - `Top limit: <n|all>`
+  - `Include analysis heuristic: yes|no`
+- Abschnitt exakt `## Translation Unit Ranking`
+- Abschnitt exakt `## Include Hotspots`
+- Abschnitt exakt `## Diagnostics`
 
-Ein Markdown-Bericht fuer `impact` soll mindestens enthalten:
+Ein Markdown-Bericht fuer `impact` soll genau folgende Hauptteile in genau dieser Reihenfolge enthalten:
 
-- Titel und Report-Typ
-- Tool-Version
-- Pfad zur verwendeten `compile_commands.json`
-- angefragter `--changed-file`
-- betroffene Translation Units, mindestens getrennt nach direkter und heuristisch abgeleiteter Betroffenheit, sofern diese Unterscheidung im Kern verfuegbar ist
-- klaren Hinweis bei `0` betroffenen Translation Units
-- sichtbare Diagnostics und Datenluecken
+- Titelzeile exakt `# Impact Analysis Report`
+- genau einen Leerblock
+- eine flache Uebersichts-Liste mit exakt diesen Labels in dieser Reihenfolge:
+  - `Report type: impact`
+  - `Compile database: <display path>`
+  - `Changed file: <display path>`
+  - `Affected translation units: <count>`
+  - `Heuristic result: yes|no`
+- bei `0` betroffenen Translation Units direkt nach der Uebersicht die exakte Zeile `No affected translation units found.`
+- Abschnitt exakt `## Directly Affected Translation Units`
+- Abschnitt exakt `## Heuristically Affected Translation Units`
+- Abschnitt exakt `## Diagnostics`
 
 Formatregeln fuer M3:
 
 - Ausgabe als einfaches, breit kompatibles Markdown ohne HTML-Einbettung
+- in M3 werden bewusst nur ATX-Ueberschriften und Listen verwendet; Markdown-Tabellen gehoeren nicht zum Report-Vertrag
 - keine ANSI-Farben, keine Zeitstempel, keine Hostnamen und keine anderen volatilen Metadaten
+- `Tool version` wird bewusst nicht in den Report-Body aufgenommen; Release-Provenienz bleibt in `--help`, README, CHANGELOG und `application_info`, und reine Versionshebungen duerfen keine Report-Golden-Files invalidieren
 - deterministische Abschnitts- und Listensortierung
+- alle Listen werden exakt in der Reihenfolge der bereits im Kern vorliegenden Ergebnisvektoren ausgegeben; Reporter fuehren in M3 keine zusaetzliche Sortierschicht fuer `translation_units`, `include_hotspots`, deren `affected_translation_units` oder Diagnostics ein
+- der Abschnitt `Translation Unit Ranking` wird immer als geordnete Liste ausgegeben; jeder Eintrag besteht exakt aus einer Kopfzeile `<rank>. <source_path> [directory: <directory>]`, einer Metrikzeile `Metrics: arg_count=<n>, include_path_count=<n>, define_count=<n>` und optional einem unmittelbar folgenden `Diagnostics:`-Block mit ungeordneter Liste
+- der Abschnitt `Include Hotspots` wird immer als geordnete Liste ausgegeben; jeder Eintrag besteht exakt aus den Zeilen `Header: <path>`, `Affected translation units: <n>`, `Translation units:` sowie optional `Diagnostics:`; TU-Zuordnungen und Hotspot-Diagnostics stehen jeweils als ungeordnete Listen direkt darunter
+- die Impact-Abschnitte `Directly Affected Translation Units` und `Heuristically Affected Translation Units` werden immer als ungeordnete Listen ausgegeben; die Impact-Art wird nicht nochmals inline wiederholt, weil sie bereits ueber den Abschnittstitel kodiert ist
+- leere Abschnitte verwenden exakt diese Saetze: `No include hotspots found.`, `No directly affected translation units.`, `No heuristically affected translation units.`, `No diagnostics.`
+- pfadtragende Felder verwenden Anzeige-Pfade, nicht Vergleichsschluessel und nicht rohe CLI-Eingaben. Fuer M3 gilt die M2-Trennung unveraendert:
+  - `Compile database:` zeigt den lexikalisch normalisierten Aufrufpfad der uebergebenen `compile_commands.json`
+  - `Changed file:` zeigt denselben normalisierten Anzeige-Pfad wie die Konsolenausgabe; relative `--changed-file`-Eingaben werden fuer Vergleiche relativ zum Verzeichnis der `compile_commands.json` aufgeloest und erst danach als Anzeige-Pfad gerendert
+  - TU- und Header-Pfade werden mit derselben Anzeige-Helferlogik wie in der Konsole ausgegeben
+- dynamische Pfad- und Meldungstexte werden fuer Markdown maskiert; mindestens Backslash, Backtick, Stern, Unterstrich, eckige Klammern, fuehrende `#` sowie fuehrende Listenmarker werden escaped
 - Pfadangaben werden lexikalisch normalisiert und fuer Golden-Tests in einer kanonischen Aufrufform erzeugt: Die bytegenauen Referenzdateien entstehen aus einem festen Arbeitsverzeichnis mit fixture-relativen Eingabepfaden; Docker-Pruefungen verifizieren denselben Inhaltspfad funktional, aber nicht ueber identische Pfadstrings
 - genau ein abschliessender Zeilenumbruch
 - Heuristik-Hinweise und Datenluecken entweder inline am Ergebnis oder in einem unmittelbar folgenden Hinweisblock, nicht nur versteckt in einer Fussnote
@@ -121,6 +145,7 @@ cmake-xray impact --compile-commands <path> --changed-file <path> --format markd
 Vorgesehene Artefakte:
 
 - neue Dateien `src/adapters/output/markdown_report_adapter.h` und `src/adapters/output/markdown_report_adapter.cpp`
+- neue oder erweiterte Dateien fuer den Format-Dispatch, zum Beispiel `src/adapters/output/report_writer_dispatch_adapter.*`
 - Anpassung des bestehenden Konsolenreport-Adapters, falls gemeinsame Hilfsfunktionen fuer Layout, Diagnostics oder Pfaddarstellung sinnvoll sind
 - Anpassung von `src/adapters/CMakeLists.txt`
 
@@ -168,11 +193,11 @@ Mit M3 steigt die Regressionsempfindlichkeit: Schon kleine Aenderungen an Sortie
 
 Mindestens benoetigt:
 
-- Adapter-Tests fuer `MarkdownReportAdapter`, insbesondere fuer Abschnittsreihenfolge, Tabellen-/Listendarstellung, Heuristik-Kennzeichnung und Diagnostics
+- Adapter-Tests fuer `MarkdownReportAdapter`, insbesondere fuer feste Abschnittsreihenfolge, literal festgelegte Ueberschriften und Leersaetze, Listendarstellung, Markdown-Escaping, Heuristik-Kennzeichnung und Diagnostics
 - CLI-Tests fuer `--format markdown`, `--output`, ungueltige Kombinationen und Report-Schreibfehler
 - End-to-End-Tests, die zentrale Konsolen- und Markdown-Ausgaben gegen erwartete Dateien vergleichen
 - Golden-Outputs fuer zentrale Erfolgsfaelle von `analyze` und `impact`, jeweils fuer Konsole und Markdown
-- Tests dafuer, dass dieselben fachlichen Daten in Konsole und Markdown konsistent wiedergegeben werden
+- Tests dafuer, dass dieselben fachlichen Daten in Konsole und Markdown konsistent wiedergegeben werden und pfadtragende Felder dieselbe Anzeigesemantik verwenden
 
 Sinnvolle Referenzfaelle unter `tests/e2e/testdata/m3/` sind:
 
@@ -189,6 +214,8 @@ Golden-Output-Regeln fuer M3:
 
 - erwartete Konsolen- und Markdown-Dateien liegen versioniert im Repository
 - erwartete Ausgaben enthalten keine volatilen Werte wie Zeitstempel oder temporaere Verzeichnisse
+- reine Versionshebungen ohne Format- oder Inhaltsaenderung duerfen keine Regeneration von Report-Golden-Files oder `docs/examples/` erzwingen
+- die literal festgelegten Abschnittstitel, Leersaetze und Listenformen sind Teil des Golden-Vertrags und werden bytegenau abgesichert
 - pfadtragende Golden-Files und `docs/examples/` werden aus derselben kanonischen Aufrufform erzeugt; Docker-Smoke-Tests sind kein Ersatz fuer diese bytegenaue Referenzquelle
 - Vergleiche sollen byte-stabil sein oder hoechstens zeilenendungsbezogen auf LF normalisieren; fachliche Vergleiche "ungefaehr gleich" reichen fuer M3 nicht aus
 - Konsolen-Golden-Files duerfen gegenueber Markdown eigene Layout- und Wortlaut-Erwartungen haben; reine Inhaltsparitaet ersetzt keinen formatspezifischen Regressionstest
@@ -278,7 +305,7 @@ Folgende Dateien oder Dateigruppen sollen nach M3 voraussichtlich neu entstehen 
 | Driving Port | `src/hexagon/ports/driving/generate_report_port.h` |
 | Driven Port | `src/hexagon/ports/driven/report_writer_port.h` |
 | Service | `src/hexagon/services/report_generator.*` |
-| Output-Adapter | `src/adapters/output/console_report_adapter.*`, neue Dateien `src/adapters/output/markdown_report_adapter.*` |
+| Output-Adapter | `src/adapters/output/console_report_adapter.*`, neue Dateien `src/adapters/output/markdown_report_adapter.*`, zusaetzlich ein Dispatching-Adapter fuer die Laufzeit-Formatauswahl |
 | CLI | `src/adapters/cli/cli_adapter.*`, `src/adapters/cli/exit_codes.h` |
 | Composition Root | `src/main.cpp` |
 | Build | `src/adapters/CMakeLists.txt`, `tests/CMakeLists.txt` |
@@ -364,6 +391,8 @@ Die Pruefung soll insbesondere bestaetigen:
 - ungueltige Format-/Output-Kombinationen liefern Exit-Code `2`
 - Schreibfehler fuer Report-Dateien liefern Exit-Code `1`
 - Eingabefehler behalten ihre M1-/M2-Codes `3` und `4`
+- die literal festgelegten Markdown-Ueberschriften, Leersaetze und Listenformen werden eingehalten
+- pfadtragende Felder folgen der dokumentierten M2-/M3-Anzeigesemantik und geben keine rohen Vergleichsschluessel oder unnormalisierten CLI-Eingaben aus
 - Golden-Outputs fuer Konsole und Markdown bleiben stabil, einschliesslich regressionskritischer Faelle fuer TU-Identitaet, Pfadsemantik und permutierte Eingabereihenfolge
 - statische Analyse- und Metrik-Reports gemaess `docs/quality.md` bleiben erzeugbar, einschliesslich `summary.txt`, `clang-tidy.txt`, `lizard.txt` und `lizard-warnings.txt`
 - Coverage-Gate und Quality-Gate bleiben trotz Report-Ausbau gruen
@@ -387,10 +416,14 @@ Die Pruefung soll insbesondere bestaetigen:
 | Frage | Entscheidung | Verweis |
 |---|---|---|
 | Formatwahl in M3 | `analyze` und `impact` bleiben die einzigen Nutzerpfade; Report-Ausgabe wird ueber `--format console|markdown` erweitert | AP 1.3 |
+| Format-Dispatch in M3 | Die CLI mappt `--format` auf `ReportFormat`; die Composition Root verdrahtet `ConsoleReportAdapter` und `MarkdownReportAdapter` in einen einzelnen Dispatching-Adapter als Laufzeit-Implementierung von `ReportWriterPort` | AP 1.1, 1.3 |
 | Default-Ausgabe | Standard bleibt die Konsolenausgabe | AP 1.3 |
 | Dateiausgabe | `--output <path>` ist nur fuer Markdown zulaessig; ohne `--output` geht Markdown auf `stdout`, mit `--output` bleibt `stdout` bei Erfolg leer | AP 1.3 |
 | Schreibfehler | nicht beschreibbare Report-Pfade nutzen Exit-Code `1`; Eingabefehler behalten `3` und `4` | AP 1.1, 1.3 |
 | Verantwortung der Report-Strecke | Report-Adapter erzeugen Text; `stdout`/Dateisystem-Entscheidung bleibt ausserhalb des Hexagons | AP 1.1 |
+| Markdown-Vertrag | M3 fixiert literal die Ueberschriften, Abschnittsreihenfolge, Listenformen, Leersaetze und Escaping-Regeln; Reporter geben Ergebnisvektoren in Modellreihenfolge aus | AP 1.2, 1.4 |
+| Versionsdarstellung im Report | Die Tool-Version ist kein Bestandteil des Report-Bodys; reine Versionshebungen duerfen Report-Goldens nicht invalidieren | AP 1.2, 1.4 |
+| Pfaddarstellung im Report | Markdown nutzt dieselben Anzeige-Pfadregeln wie M2; Vergleichsschluessel bleiben intern, angezeigt werden normalisierte Display-Pfade | AP 1.2, 1.4 |
 | Markdown-Stil | einfaches, diffbares Markdown ohne HTML, Zeitstempel oder sonstige volatile Metadaten | AP 1.2 |
 | Golden-Outputs | versioniert im Repository und gegen stabile, nichtvolatile Ausgaben geprueft | AP 1.4 |
 | Referenzprojekt | versioniert im Repository unter `tests/reference/`; keine externen Benchmark-Abhaengigkeiten | AP 1.5 |
