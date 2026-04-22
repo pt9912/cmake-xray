@@ -7,10 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-04-22
-
 ### Added
 
+- Docker `coverage` stage with `gcovr`-based line coverage reporting
+- Docker `coverage-check` stage with configurable fail-under threshold during `docker build`
+- CMake option `XRAY_ENABLE_COVERAGE` for instrumented project builds
 - `compile_commands.json` parsing and validation via `CompileCommandsJsonAdapter`
 - CLI with `analyze` subcommand and `--compile-commands` option using CLI11
 - defined exit codes: `0` (success), `2` (CLI usage error), `3` (file not accessible), `4` (invalid input)

@@ -14,3 +14,4 @@ target_link_libraries(
         nlohmann_json::nlohmann_json
 )
 target_compile_features(xray_adapters PUBLIC cxx_std_20)
+xray_enable_coverage(xray_adapters)

@@ -1,5 +1,58 @@
 # Qualität
 
+
+## Testabdeckung
+
+Die Testabdeckung wird im Projekt Docker-basiert ermittelt. Dabei gilt:
+
+- `ctest` führt die Tests aus, berechnet aber die Abdeckung nicht selbst.
+- Die eigentliche Coverage-Auswertung übernimmt `gcovr`.
+- Die Instrumentierung wird über den CMake-Schalter `XRAY_ENABLE_COVERAGE=ON` aktiviert.
+- Die Auswertung ist auf den Projektcode unter `src/` gefiltert.
+
+### Docker-Workflow
+
+```bash
+docker build --target coverage -t cmake-xray:coverage .
+docker run --rm cmake-xray:coverage
+```
+
+Der `coverage`-Stage baut einen instrumentierten Build, führt `ctest` aus und gibt per Entrypoint beide Report-Dateien aus:
+
+- `/workspace/build-coverage/coverage/summary.txt`
+- `/workspace/build-coverage/coverage/coverage.txt`
+
+Für das eigentliche Build-Gate gibt es zusätzlich einen separaten Stage:
+
+```bash
+docker build --target coverage-check -t cmake-xray:coverage-check .
+docker build --target coverage-check \
+  --build-arg XRAY_COVERAGE_THRESHOLD=96 \
+  -t cmake-xray:coverage-check .
+```
+
+Die Trennung ist bewusst:
+
+- `coverage` erzeugt den Report und bleibt damit für Auswertung und Diagnose nutzbar.
+- `coverage-check` zieht den Schwellwert bereits während `docker build` und lässt den Build bei Unterschreitung scheitern.
+
+### Aktueller Stand
+
+| Metrik                 |        Wert |
+| ---------------------- | ----------: |
+| Line Coverage (`src/`) |       `95%` |
+| Ausgeführte Zeilen     | `173 / 182` |
+
+Größte erkennbare Lücke im aktuellen Report:
+
+- `src/adapters/cli/cli_adapter.cpp`: `85%`
+
+Einordnung:
+
+- Für den aktuellen M1-Umfang ist `95%` solide.
+- Die Restlücken liegen vor allem in CLI-Fehler- und Fallbackpfaden, nicht im JSON-Adapter oder in den Kernservices.
+- Die Zahl ist als Line-Coverage zu verstehen; Branch-Coverage wird derzeit nicht separat ausgewiesen.
+
 ## KI Prompt
 
 Analysiere den Code hinsichtlich seiner Qualität.
@@ -49,6 +102,7 @@ Das Ergebnis im Markdown-Format darstellen und wenn möglich Tabellen verwenden.
 | Tests        | Boundary-Check ist sinnvoll, Doctest-Setup ist sauber             | Bisher fast nur Smoke-Tests                                    |
 | Build/Docker | Multi-Stage-Dockerfile ist vernünftig, .dockerignore existiert    | Runtime als root, keine Härtung, keine Health-/User-Definition |
 | Sicherheit   | Keine direkten Injection-Stellen sichtbar                         | Supply-Chain- und Container-Härtung ausbaufähig                |
+
 
 ## Konkrete Verbesserungen
 

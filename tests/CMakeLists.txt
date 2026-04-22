@@ -14,6 +14,7 @@ target_link_libraries(
         xray_hexagon
         xray_adapters
 )
+xray_enable_coverage(xray_tests)
 
 add_test(NAME xray_tests COMMAND xray_tests)
 set_tests_properties(xray_tests PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
