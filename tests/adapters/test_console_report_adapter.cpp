@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <string>
+#include <string_view>
 
 #include "adapters/output/console_report_adapter.h"
 #include "hexagon/model/analysis_result.h"
@@ -67,6 +68,16 @@ AnalysisResult make_analysis_result() {
     return result;
 }
 
+std::size_t count_occurrences(std::string_view text, std::string_view needle) {
+    std::size_t count = 0;
+    std::size_t position = text.find(needle);
+    while (position != std::string_view::npos) {
+        ++count;
+        position = text.find(needle, position + needle.size());
+    }
+    return count;
+}
+
 }  // namespace
 
 TEST_CASE("console report adapter keeps full hotspot mapping for emitted hotspots") {
@@ -106,4 +117,86 @@ TEST_CASE("console report adapter disambiguates duplicate impact observations") 
           std::string::npos);
     CHECK(report.find("src/app/main.cpp [directory: build/release] [direct]") !=
           std::string::npos);
+}
+
+TEST_CASE("console report adapter keeps omitted translation-unit diagnostics visible with top limit") {
+    const ConsoleReportAdapter adapter;
+    auto result = make_analysis_result();
+    result.translation_units.push_back(
+        RankedTranslationUnit{
+            .reference = make_reference("src/tools/tool.cpp", "build/tools",
+                                        "src/tools/tool.cpp|build/tools"),
+            .rank = 2,
+            .arg_count = 2,
+            .include_path_count = 1,
+            .define_count = 0,
+            .diagnostics = {{{xray::hexagon::model::DiagnosticSeverity::warning,
+                              "could not resolve include \"generated/late.h\" from src/tools/tool.cpp"}}},
+        });
+    result.diagnostics = {
+        {xray::hexagon::model::DiagnosticSeverity::warning,
+         "could not resolve include \"generated/late.h\" from src/tools/tool.cpp"},
+        {xray::hexagon::model::DiagnosticSeverity::note,
+         "include-based results are heuristic; conditional or generated includes may be missing"},
+    };
+
+    const auto report = adapter.write_analysis_report(result, 1);
+
+    CHECK(report.find("top 1 of 2 translation units") != std::string::npos);
+    CHECK(report.find("warning: could not resolve include \"generated/late.h\" from src/tools/tool.cpp") !=
+          std::string::npos);
+    CHECK(count_occurrences(report,
+                            "could not resolve include \"generated/late.h\" from src/tools/tool.cpp") ==
+          1);
+}
+
+TEST_CASE("console report adapter deduplicates displayed diagnostics and handles empty hotspots") {
+    const ConsoleReportAdapter adapter;
+    auto result = make_analysis_result();
+    result.translation_units = {
+        RankedTranslationUnit{
+            .reference = make_reference("src/app/main.cpp", "build/debug",
+                                        "src/app/main.cpp|build/debug"),
+            .rank = 1,
+            .arg_count = 8,
+            .include_path_count = 2,
+            .define_count = 1,
+            .diagnostics =
+                {
+                    {xray::hexagon::model::DiagnosticSeverity::warning,
+                     "could not resolve include \"generated/version.h\" from src/app/main.cpp"},
+                },
+        },
+        RankedTranslationUnit{
+            .reference = make_reference("src/app/alt.cpp", "build/release",
+                                        "src/app/alt.cpp|build/release"),
+            .rank = 2,
+            .arg_count = 7,
+            .include_path_count = 2,
+            .define_count = 1,
+            .diagnostics =
+                {
+                    {xray::hexagon::model::DiagnosticSeverity::warning,
+                     "could not resolve include \"generated/version.h\" from src/app/main.cpp"},
+                },
+        },
+    };
+    result.translation_units[0].diagnostics = {
+        {xray::hexagon::model::DiagnosticSeverity::warning,
+         "could not resolve include \"generated/version.h\" from src/app/main.cpp"},
+    };
+    result.include_hotspots.clear();
+    result.diagnostics = {
+        {xray::hexagon::model::DiagnosticSeverity::warning,
+         "could not resolve include \"generated/version.h\" from src/app/main.cpp"},
+        {xray::hexagon::model::DiagnosticSeverity::note,
+         "include-based results are heuristic; conditional or generated includes may be missing"},
+    };
+
+    const auto report = adapter.write_analysis_report(result, 2);
+
+    CHECK(report.find("no include hotspots found") != std::string::npos);
+    CHECK(count_occurrences(
+              report,
+              "could not resolve include \"generated/version.h\" from src/app/main.cpp") == 2);
 }

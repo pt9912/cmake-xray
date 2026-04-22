@@ -1,6 +1,7 @@
 add_executable(
     xray_tests
     test_main.cpp
+    hexagon/test_analysis_support.cpp
     hexagon/test_project_analyzer.cpp
     hexagon/test_impact_analyzer.cpp
     adapters/test_port_wiring.cpp

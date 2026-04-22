@@ -150,6 +150,7 @@ TEST_CASE("project analyzer builds ranked translation units and hotspots") {
     CHECK(result.include_hotspots[0].affected_translation_units.size() == 3);
     CHECK(result.include_hotspots[1].header_path == "/project/include/common/shared.h");
     REQUIRE_FALSE(result.diagnostics.empty());
+    CHECK(result.diagnostics[0].message.find("generated/version.h") != std::string::npos);
     CHECK(result.diagnostics.back().message.find("heuristic") != std::string::npos);
 }
 

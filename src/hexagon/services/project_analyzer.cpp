@@ -1,10 +1,43 @@
 #include "services/project_analyzer.h"
 
+#include <algorithm>
+
 #include "model/application_info.h"
 #include "model/diagnostic.h"
 #include "services/analysis_support.h"
 
 namespace xray::hexagon::services {
+
+namespace {
+
+using xray::hexagon::model::AnalysisResult;
+using xray::hexagon::model::Diagnostic;
+
+bool diagnostics_equal(const Diagnostic& lhs, const Diagnostic& rhs) {
+    return lhs.severity == rhs.severity && lhs.message == rhs.message;
+}
+
+void append_unique_diagnostic(std::vector<Diagnostic>& target, const Diagnostic& diagnostic) {
+    const auto duplicate = std::any_of(target.begin(), target.end(), [&](const auto& existing) {
+        return diagnostics_equal(existing, diagnostic);
+    });
+    if (!duplicate) target.push_back(diagnostic);
+}
+
+void append_unique_diagnostics(std::vector<Diagnostic>& target,
+                               const std::vector<Diagnostic>& diagnostics) {
+    for (const auto& diagnostic : diagnostics) {
+        append_unique_diagnostic(target, diagnostic);
+    }
+}
+
+void append_translation_unit_diagnostics(AnalysisResult& result) {
+    for (const auto& translation_unit : result.translation_units) {
+        append_unique_diagnostics(result.diagnostics, translation_unit.diagnostics);
+    }
+}
+
+}  // namespace
 
 ProjectAnalyzer::ProjectAnalyzer(
     const ports::driven::CompileDatabasePort& compile_database_port,
@@ -29,9 +62,11 @@ model::AnalysisResult ProjectAnalyzer::analyze_project(
     result.include_hotspots =
         build_include_hotspots(observations, include_resolution, compile_commands_path);
     result.diagnostics = include_resolution.diagnostics;
+    append_translation_unit_diagnostics(result);
 
     if (result.include_analysis_heuristic) {
-        result.diagnostics.push_back(
+        append_unique_diagnostic(
+            result.diagnostics,
             {model::DiagnosticSeverity::note,
              "include-based results are heuristic; conditional or generated includes may be missing"});
     }

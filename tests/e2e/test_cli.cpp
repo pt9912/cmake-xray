@@ -149,6 +149,7 @@ TEST_CASE_FIXTURE(CliFixture, "impact success path for transitive header match i
     CHECK(out.str().find("impact analysis for include/common/shared.h [heuristic]") !=
           std::string::npos);
     CHECK(out.str().find("affected translation units: 3") != std::string::npos);
+    CHECK(out.str().find("warning: could not resolve include") != std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture, "impact path semantics normalize lexical relative paths") {

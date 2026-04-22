@@ -187,3 +187,24 @@ TEST_CASE("source parsing include adapter respects -iquote before -I and -I befo
                     include_header) != result.translation_units[0].headers.end());
     CHECK(result.translation_units[0].diagnostics.empty());
 }
+
+TEST_CASE("source parsing include adapter revisits fully visited headers without diagnostics") {
+    TempDir temp_dir{"cmake-xray-source-parsing-fully-visited"};
+    write_file(temp_dir.path() / "src/main.cpp",
+               "#include \"branch/a.h\"\n#include \"branch/b.h\"\n");
+    write_file(temp_dir.path() / "include/branch/a.h", "#include \"branch/shared.h\"\n");
+    write_file(temp_dir.path() / "include/branch/b.h", "#include \"branch/shared.h\"\n");
+    write_file(temp_dir.path() / "include/branch/shared.h", "#pragma once\n");
+
+    const auto observations = build_single_observation(
+        temp_dir.path(),
+        CompileEntry::from_arguments("../src/main.cpp", "build",
+                                     {"clang++", "-I../include", "-c", "../src/main.cpp"}));
+
+    const SourceParsingIncludeAdapter adapter;
+    const auto result = adapter.resolve_includes(observations);
+
+    REQUIRE(result.translation_units.size() == 1);
+    REQUIRE(result.translation_units[0].headers.size() == 3);
+    CHECK(result.translation_units[0].diagnostics.empty());
+}

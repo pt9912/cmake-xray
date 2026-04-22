@@ -54,7 +54,8 @@ public:
                         translation_units[0].reference.unique_key,
                         {"/project/include/common/config.h",
                          "/project/include/common/shared.h"},
-                        {},
+                        {{xray::hexagon::model::DiagnosticSeverity::warning,
+                          "could not resolve include \"generated/version.h\" from /project/src/main.cpp"}},
                     },
                     ResolvedTranslationUnitIncludes{
                         translation_units[1].reference.unique_key,
@@ -92,6 +93,7 @@ TEST_CASE("impact analyzer reports direct matches for duplicate translation-unit
     CHECK(result.affected_translation_units[1].kind == ImpactKind::direct);
     CHECK(result.affected_translation_units[0].reference.directory == "/project/build/debug");
     CHECK(result.affected_translation_units[1].reference.directory == "/project/build/release");
+    CHECK(result.diagnostics.empty());
 }
 
 TEST_CASE("impact analyzer reports heuristic header matches") {
@@ -108,6 +110,7 @@ TEST_CASE("impact analyzer reports heuristic header matches") {
     CHECK(result.affected_translation_units[0].kind == ImpactKind::heuristic);
     CHECK(result.changed_file == "/project/include/common/config.h");
     REQUIRE_FALSE(result.diagnostics.empty());
+    CHECK(result.diagnostics[0].message.find("generated/version.h") != std::string::npos);
     CHECK(result.diagnostics.back().message.find("generated includes") != std::string::npos);
 }
 
@@ -125,6 +128,7 @@ TEST_CASE("impact analyzer reports heuristic matches for transitively included h
     CHECK(result.affected_translation_units[0].kind == ImpactKind::heuristic);
     CHECK(result.changed_file == "/project/include/common/shared.h");
     REQUIRE_FALSE(result.diagnostics.empty());
+    CHECK(result.diagnostics[0].message.find("generated/version.h") != std::string::npos);
     CHECK(result.diagnostics.back().message.find("generated includes") != std::string::npos);
 }
 
@@ -140,5 +144,56 @@ TEST_CASE("impact analyzer reports missing matches as heuristic empty result") {
     CHECK(result.heuristic);
     CHECK(result.affected_translation_units.empty());
     REQUIRE_FALSE(result.diagnostics.empty());
+    CHECK(result.diagnostics[0].message.find("generated/version.h") != std::string::npos);
     CHECK(result.diagnostics.back().message.find("not present") != std::string::npos);
+}
+
+TEST_CASE("impact analyzer only keeps diagnostics for impacted translation units") {
+    class PartialIncludeResolverPort final : public xray::hexagon::ports::driven::IncludeResolverPort {
+    public:
+        IncludeResolutionResult resolve_includes(
+            const std::vector<xray::hexagon::model::TranslationUnitObservation>& translation_units)
+            const override {
+            return IncludeResolutionResult{
+                .heuristic = true,
+                .translation_units =
+                    {
+                        ResolvedTranslationUnitIncludes{
+                            translation_units[0].reference.unique_key,
+                            {"/project/include/common/partial.h"},
+                            {{xray::hexagon::model::DiagnosticSeverity::warning,
+                              "could not resolve include \"generated/partial.h\" from /project/src/main.cpp"}},
+                        },
+                        ResolvedTranslationUnitIncludes{
+                            translation_units[1].reference.unique_key,
+                            {},
+                            {{xray::hexagon::model::DiagnosticSeverity::warning,
+                              "could not resolve include \"generated/release.h\" from /project/src/main.cpp"}},
+                        },
+                        ResolvedTranslationUnitIncludes{
+                            translation_units[2].reference.unique_key,
+                            {},
+                            {{xray::hexagon::model::DiagnosticSeverity::warning,
+                              "could not resolve include \"generated/core.h\" from /project/src/core.cpp"}},
+                        },
+                    },
+                .diagnostics = {},
+            };
+        }
+    };
+
+    const StubCompileDatabasePort compile_database_port;
+    const PartialIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_database_port,
+                                                           include_resolver_port};
+
+    const auto result =
+        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/partial.h");
+
+    CHECK(result.heuristic);
+    REQUIRE(result.affected_translation_units.size() == 1);
+    REQUIRE(result.diagnostics.size() >= 2);
+    CHECK(result.diagnostics[0].message.find("generated/partial.h") != std::string::npos);
+    CHECK(result.diagnostics[0].message.find("generated/release.h") == std::string::npos);
+    CHECK(result.diagnostics[0].message.find("generated/core.h") == std::string::npos);
 }
