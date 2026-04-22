@@ -49,6 +49,11 @@ struct CliFixture {
     std::ostringstream err;
 
     int run(std::initializer_list<const char*> args) {
+        out.str({});
+        out.clear();
+        err.str({});
+        err.clear();
+
         std::vector<const char*> argv_vec = {"cmake-xray"};
         argv_vec.insert(argv_vec.end(), args);
         return cli.run(static_cast<int>(argv_vec.size()), argv_vec.data(), out, err);
@@ -56,6 +61,10 @@ struct CliFixture {
 };
 
 const std::string testdata = "tests/e2e/testdata/";
+
+std::string fixture_path(std::string_view relative_path) {
+    return testdata + std::string(relative_path);
+}
 
 class StubAnalyzeProjectPort final : public xray::hexagon::ports::driving::AnalyzeProjectPort {
 public:
@@ -111,8 +120,9 @@ TEST_CASE_FIXTURE(CliFixture, "impact --help returns exit 0 with help on stdout"
 }
 
 TEST_CASE_FIXTURE(CliFixture, "analyze success path renders ranking and hotspots") {
-    CHECK(run({"analyze", "--compile-commands",
-               (testdata + "m2/analyze/compile_commands.json").c_str(), "--top", "2"}) ==
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--top", "2"}) ==
           ExitCode::success);
     CHECK(out.str().find("translation unit ranking") != std::string::npos);
     CHECK(out.str().find("top 2 of 3 translation units") != std::string::npos);
@@ -122,37 +132,80 @@ TEST_CASE_FIXTURE(CliFixture, "analyze success path renders ranking and hotspots
 }
 
 TEST_CASE_FIXTURE(CliFixture, "impact success path for direct source match is not heuristic") {
-    CHECK(run({"impact", "--compile-commands",
-               (testdata + "m2/analyze/compile_commands.json").c_str(), "--changed-file",
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
                "src/app/main.cpp"}) == ExitCode::success);
     CHECK(out.str().find("impact analysis for src/app/main.cpp") != std::string::npos);
     CHECK(out.str().find("[heuristic]") == std::string::npos);
     CHECK(out.str().find("affected translation units: 1") != std::string::npos);
 }
 
-TEST_CASE_FIXTURE(CliFixture, "impact success path for header match is heuristic") {
-    CHECK(run({"impact", "--compile-commands",
-               (testdata + "m2/analyze/compile_commands.json").c_str(), "--changed-file",
-               "include/common/config.h"}) == ExitCode::success);
-    CHECK(out.str().find("impact analysis for include/common/config.h [heuristic]") !=
+TEST_CASE_FIXTURE(CliFixture, "impact success path for transitive header match is heuristic") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "include/common/shared.h"}) == ExitCode::success);
+    CHECK(out.str().find("impact analysis for include/common/shared.h [heuristic]") !=
           std::string::npos);
     CHECK(out.str().find("affected translation units: 3") != std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture, "impact path semantics normalize lexical relative paths") {
-    CHECK(run({"impact", "--compile-commands",
-               (testdata + "m2/analyze/compile_commands.json").c_str(), "--changed-file",
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
                "./include/common/../common/config.h"}) == ExitCode::success);
     CHECK(out.str().find("impact analysis for include/common/config.h [heuristic]") !=
           std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture, "impact missing file keeps exit 0 and explains missing data") {
-    CHECK(run({"impact", "--compile-commands",
-               (testdata + "m2/analyze/compile_commands.json").c_str(), "--changed-file",
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
                "include/generated/version.h"}) == ExitCode::success);
     CHECK(out.str().find("affected translation units: 0") != std::string::npos);
     CHECK(out.str().find("not present in the loaded compile database") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "analyze output stays identical for permuted compile commands") {
+    const auto baseline_compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    const auto permuted_compile_commands =
+        fixture_path("m2/permuted_compile_commands/compile_commands.json");
+
+    REQUIRE(run({"analyze", "--compile-commands", baseline_compile_commands.c_str(), "--top",
+                 "3"}) == ExitCode::success);
+    const auto baseline_output = out.str();
+
+    REQUIRE(run({"analyze", "--compile-commands", permuted_compile_commands.c_str(), "--top",
+                 "3"}) == ExitCode::success);
+    CHECK(out.str() == baseline_output);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze output disambiguates duplicate translation-unit observations") {
+    const auto compile_commands = fixture_path("m2/duplicate_tu_entries/compile_commands.json");
+
+    REQUIRE(run({"analyze", "--compile-commands", compile_commands.c_str(), "--top", "3"}) ==
+            ExitCode::success);
+    CHECK(out.str().find("src/app/main.cpp [directory: build/debug]") != std::string::npos);
+    CHECK(out.str().find("src/app/main.cpp [directory: build/release]") != std::string::npos);
+    CHECK(out.str().find("include/common/config.h (affected translation units: 3)") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "impact output keeps duplicate translation-unit observations") {
+    const auto compile_commands = fixture_path("m2/duplicate_tu_entries/compile_commands.json");
+
+    REQUIRE(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+                 "src/app/main.cpp"}) == ExitCode::success);
+    CHECK(out.str().find("affected translation units: 2") != std::string::npos);
+    CHECK(out.str().find("src/app/main.cpp [directory: build/debug] [direct]") !=
+          std::string::npos);
+    CHECK(out.str().find("src/app/main.cpp [directory: build/release] [direct]") !=
+          std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture, "missing analyze arguments returns exit 2") {
@@ -161,7 +214,7 @@ TEST_CASE_FIXTURE(CliFixture, "missing analyze arguments returns exit 2") {
 
 TEST_CASE_FIXTURE(CliFixture, "missing impact changed-file returns exit 2") {
     CHECK(run({"impact", "--compile-commands",
-               (testdata + "m2/analyze/compile_commands.json").c_str()}) ==
+               fixture_path("m2/basic_project/compile_commands.json").c_str()}) ==
           ExitCode::cli_usage_error);
 }
 

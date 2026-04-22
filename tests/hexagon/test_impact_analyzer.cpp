@@ -52,17 +52,20 @@ public:
                 {
                     ResolvedTranslationUnitIncludes{
                         translation_units[0].reference.unique_key,
-                        {"/project/include/common/config.h"},
+                        {"/project/include/common/config.h",
+                         "/project/include/common/shared.h"},
                         {},
                     },
                     ResolvedTranslationUnitIncludes{
                         translation_units[1].reference.unique_key,
-                        {"/project/include/common/config.h"},
+                        {"/project/include/common/config.h",
+                         "/project/include/common/shared.h"},
                         {},
                     },
                     ResolvedTranslationUnitIncludes{
                         translation_units[2].reference.unique_key,
-                        {"/project/include/common/config.h"},
+                        {"/project/include/common/config.h",
+                         "/project/include/common/shared.h"},
                         {},
                     },
                 },
@@ -104,6 +107,23 @@ TEST_CASE("impact analyzer reports heuristic header matches") {
     REQUIRE(result.affected_translation_units.size() == 3);
     CHECK(result.affected_translation_units[0].kind == ImpactKind::heuristic);
     CHECK(result.changed_file == "/project/include/common/config.h");
+    REQUIRE_FALSE(result.diagnostics.empty());
+    CHECK(result.diagnostics.back().message.find("generated includes") != std::string::npos);
+}
+
+TEST_CASE("impact analyzer reports heuristic matches for transitively included headers") {
+    const StubCompileDatabasePort compile_database_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_database_port,
+                                                           include_resolver_port};
+
+    const auto result =
+        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/shared.h");
+
+    CHECK(result.heuristic);
+    REQUIRE(result.affected_translation_units.size() == 3);
+    CHECK(result.affected_translation_units[0].kind == ImpactKind::heuristic);
+    CHECK(result.changed_file == "/project/include/common/shared.h");
     REQUIRE_FALSE(result.diagnostics.empty());
     CHECK(result.diagnostics.back().message.find("generated includes") != std::string::npos);
 }

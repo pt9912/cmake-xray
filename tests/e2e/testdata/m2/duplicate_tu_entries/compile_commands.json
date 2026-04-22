@@ -1,0 +1,33 @@
+[
+  {
+    "directory": "build/debug",
+    "arguments": [
+      "clang++",
+      "-I../../include",
+      "-DDEBUG=1",
+      "-c",
+      "../../src/app/main.cpp",
+      "-o",
+      "main.o"
+    ],
+    "file": "../../src/app/main.cpp"
+  },
+  {
+    "directory": "build/release",
+    "arguments": [
+      "clang++",
+      "-I../../include",
+      "-DREL=1",
+      "-c",
+      "../../src/app/main.cpp",
+      "-o",
+      "main.o"
+    ],
+    "file": "../../src/app/main.cpp"
+  },
+  {
+    "directory": "build/lib",
+    "command": "clang++ -I../../include -c ../../src/lib/core.cpp -o core.o",
+    "file": "../../src/lib/core.cpp"
+  }
+]

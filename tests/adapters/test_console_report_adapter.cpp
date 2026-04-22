@@ -1,0 +1,109 @@
+#include <doctest/doctest.h>
+
+#include <string>
+
+#include "adapters/output/console_report_adapter.h"
+#include "hexagon/model/analysis_result.h"
+#include "hexagon/model/application_info.h"
+#include "hexagon/model/compile_database_result.h"
+#include "hexagon/model/impact_result.h"
+#include "hexagon/model/include_hotspot.h"
+#include "hexagon/model/translation_unit.h"
+
+namespace {
+
+using xray::adapters::output::ConsoleReportAdapter;
+using xray::hexagon::model::AnalysisResult;
+using xray::hexagon::model::CompileDatabaseError;
+using xray::hexagon::model::CompileDatabaseResult;
+using xray::hexagon::model::ImpactKind;
+using xray::hexagon::model::ImpactResult;
+using xray::hexagon::model::ImpactedTranslationUnit;
+using xray::hexagon::model::IncludeHotspot;
+using xray::hexagon::model::RankedTranslationUnit;
+using xray::hexagon::model::TranslationUnitReference;
+
+TranslationUnitReference make_reference(std::string source_path, std::string directory,
+                                        std::string unique_key) {
+    return {
+        .source_path = std::move(source_path),
+        .directory = std::move(directory),
+        .source_path_key = unique_key,
+        .unique_key = std::move(unique_key),
+    };
+}
+
+AnalysisResult make_analysis_result() {
+    AnalysisResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.include_analysis_heuristic = true;
+    result.translation_units = {
+        RankedTranslationUnit{
+            .reference = make_reference("src/app/main.cpp", "build/debug",
+                                        "src/app/main.cpp|build/debug"),
+            .rank = 1,
+            .arg_count = 8,
+            .include_path_count = 2,
+            .define_count = 1,
+            .diagnostics = {},
+        },
+    };
+    result.include_hotspots = {
+        IncludeHotspot{
+            .header_path = "include/common/config.h",
+            .affected_translation_units =
+                {
+                    make_reference("src/app/main.cpp", "build/debug",
+                                   "src/app/main.cpp|build/debug"),
+                    make_reference("src/app/main.cpp", "build/release",
+                                   "src/app/main.cpp|build/release"),
+                    make_reference("src/lib/core.cpp", "build/lib",
+                                   "src/lib/core.cpp|build/lib"),
+                },
+            .diagnostics = {},
+        },
+    };
+    return result;
+}
+
+}  // namespace
+
+TEST_CASE("console report adapter keeps full hotspot mapping for emitted hotspots") {
+    const ConsoleReportAdapter adapter;
+
+    const auto report = adapter.write_analysis_report(make_analysis_result(), 1);
+
+    CHECK(report.find("include hotspots [heuristic]") != std::string::npos);
+    CHECK(report.find("top 1 of 1 include hotspots") != std::string::npos);
+    CHECK(report.find("src/app/main.cpp [directory: build/debug]") != std::string::npos);
+    CHECK(report.find("src/app/main.cpp [directory: build/release]") != std::string::npos);
+    CHECK(report.find("src/lib/core.cpp [directory: build/lib]") != std::string::npos);
+}
+
+TEST_CASE("console report adapter disambiguates duplicate impact observations") {
+    const ConsoleReportAdapter adapter;
+    ImpactResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.changed_file = "src/app/main.cpp";
+    result.affected_translation_units = {
+        ImpactedTranslationUnit{
+            make_reference("src/app/main.cpp", "build/debug", "src/app/main.cpp|build/debug"),
+            ImpactKind::direct,
+        },
+        ImpactedTranslationUnit{
+            make_reference("src/app/main.cpp", "build/release",
+                           "src/app/main.cpp|build/release"),
+            ImpactKind::direct,
+        },
+    };
+
+    const auto report = adapter.write_impact_report(result);
+
+    CHECK(report.find("affected translation units: 2") != std::string::npos);
+    CHECK(report.find("src/app/main.cpp [directory: build/debug] [direct]") !=
+          std::string::npos);
+    CHECK(report.find("src/app/main.cpp [directory: build/release] [direct]") !=
+          std::string::npos);
+}

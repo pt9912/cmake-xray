@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -112,4 +113,77 @@ TEST_CASE("source parsing include adapter handles cycles and unresolved includes
     REQUIRE_FALSE(result.translation_units[0].diagnostics.empty());
     CHECK(result.translation_units[0].diagnostics[0].message.find("could not resolve include") !=
           std::string::npos);
+}
+
+TEST_CASE("source parsing include adapter resolves relative -I, -iquote and -isystem paths") {
+    TempDir temp_dir{"cmake-xray-source-parsing-relative-include-paths"};
+    write_file(temp_dir.path() / "src/main.cpp",
+               "#include \"only_quote.h\"\n#include <only_public.h>\n#include <only_system.h>\n");
+    write_file(temp_dir.path() / "quoted/only_quote.h", "#pragma once\n");
+    write_file(temp_dir.path() / "include/only_public.h", "#pragma once\n");
+    write_file(temp_dir.path() / "system/only_system.h", "#pragma once\n");
+
+    const auto observations = build_single_observation(
+        temp_dir.path(),
+        CompileEntry::from_arguments(
+            "../src/main.cpp", "build",
+            {"clang++", "-iquote../quoted", "-I../include", "-isystem", "../system", "-c",
+             "../src/main.cpp"}));
+
+    const SourceParsingIncludeAdapter adapter;
+    const auto result = adapter.resolve_includes(observations);
+    const auto quoted_header =
+        xray::hexagon::services::normalize_path(temp_dir.path() / "quoted/only_quote.h");
+    const auto include_header =
+        xray::hexagon::services::normalize_path(temp_dir.path() / "include/only_public.h");
+    const auto system_header =
+        xray::hexagon::services::normalize_path(temp_dir.path() / "system/only_system.h");
+
+    REQUIRE(result.translation_units.size() == 1);
+    REQUIRE(result.translation_units[0].headers.size() == 3);
+    CHECK(std::find(result.translation_units[0].headers.begin(),
+                    result.translation_units[0].headers.end(),
+                    quoted_header) != result.translation_units[0].headers.end());
+    CHECK(std::find(result.translation_units[0].headers.begin(),
+                    result.translation_units[0].headers.end(),
+                    include_header) != result.translation_units[0].headers.end());
+    CHECK(std::find(result.translation_units[0].headers.begin(),
+                    result.translation_units[0].headers.end(),
+                    system_header) != result.translation_units[0].headers.end());
+    CHECK(result.translation_units[0].diagnostics.empty());
+}
+
+TEST_CASE("source parsing include adapter respects -iquote before -I and -I before -isystem") {
+    TempDir temp_dir{"cmake-xray-source-parsing-search-precedence"};
+    write_file(temp_dir.path() / "src/main.cpp",
+               "#include \"same/header.h\"\n#include <same/system.h>\n");
+    write_file(temp_dir.path() / "quoted/same/header.h", "#pragma once\n");
+    write_file(temp_dir.path() / "include/same/header.h", "#pragma once\n");
+    write_file(temp_dir.path() / "system/same/header.h", "#pragma once\n");
+    write_file(temp_dir.path() / "include/same/system.h", "#pragma once\n");
+    write_file(temp_dir.path() / "system/same/system.h", "#pragma once\n");
+
+    const auto observations = build_single_observation(
+        temp_dir.path(),
+        CompileEntry::from_arguments(
+            "../src/main.cpp", "build",
+            {"clang++", "-iquote../quoted", "-I../include", "-isystem", "../system", "-c",
+             "../src/main.cpp"}));
+
+    const SourceParsingIncludeAdapter adapter;
+    const auto result = adapter.resolve_includes(observations);
+    const auto quoted_header =
+        xray::hexagon::services::normalize_path(temp_dir.path() / "quoted/same/header.h");
+    const auto include_header =
+        xray::hexagon::services::normalize_path(temp_dir.path() / "include/same/system.h");
+
+    REQUIRE(result.translation_units.size() == 1);
+    REQUIRE(result.translation_units[0].headers.size() == 2);
+    CHECK(std::find(result.translation_units[0].headers.begin(),
+                    result.translation_units[0].headers.end(),
+                    quoted_header) != result.translation_units[0].headers.end());
+    CHECK(std::find(result.translation_units[0].headers.begin(),
+                    result.translation_units[0].headers.end(),
+                    include_header) != result.translation_units[0].headers.end());
+    CHECK(result.translation_units[0].diagnostics.empty());
 }

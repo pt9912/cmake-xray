@@ -404,20 +404,13 @@ Mindestens benoetigt:
 
 #### Referenzdaten
 
-Sinnvoll sind kleine, versionierte Referenzprojekte unter `tests/e2e/testdata/`, zum Beispiel:
+Im Repo hinterlegt und fuer die M2-Abnahme genutzt werden kleine, versionierte Referenzprojekte unter `tests/e2e/testdata/`, insbesondere:
 
-- `m2/basic_project/` mit wenigen TUs und klaren Compile-Argumenten
-- `m2/hotspots/` mit einem bewusst haeufig inkludierten Header
-- `m2/impact_header/` mit transitiven Includes
-- `m2/impact_source/` fuer direkte TU-Betroffenheit
+- `m2/basic_project/` mit wenigen TUs, klaren Compile-Argumenten, transitiven Includes, relativen `--changed-file`-Pfaden und einem bewusst unaufloesbaren Include
 - `m2/duplicate_tu_entries/` fuer mehrfach vorkommende Quelldateipfade bei unterschiedlichen TU-Beobachtungen
-- `m2/include_relative_paths/` fuer relative Include-Suchpfade aus Compile-Argumenten
-- `m2/include_search_order/` fuer gleichnamige Header und die dokumentierte MVP-Suchreihenfolge
-- `m2/include_cycle/` fuer zyklische Includes ohne Analyseabbruch
-- `m2/command_tokenizer_edgecases/` fuer best-effort-Diagnostics bei schwierigen `command`-Strings
-- `m2/path_semantics/` fuer relative, absolute und lexikalisch aequivalente Pfade
-- `m2/unresolved_include/` fuer Diagnostics und Heuristik-Hinweise
 - `m2/permuted_compile_commands/` als inhaltlich identische, anders sortierte Datenbasis zur Reproduzierbarkeitspruefung
+
+Ergaenzend werden Include-Suchpfade, Suchreihenfolge, Zyklen und Tokenizer-Edgecases ueber gezielte Unit- und Adapter-Tests mit temporaren Testdaten abgedeckt.
 
 Nicht automatisiert abgedeckt in M2:
 
@@ -529,10 +522,13 @@ cmake --build build
 ./build/cmake-xray impact --help
 ./build/cmake-xray analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json
 ./build/cmake-xray analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --top 3
-./build/cmake-xray impact --compile-commands tests/e2e/testdata/m2/impact_source/compile_commands.json --changed-file src/app/main.cpp
-./build/cmake-xray impact --compile-commands tests/e2e/testdata/m2/impact_header/compile_commands.json --changed-file include/common/config.h
-./build/cmake-xray impact --compile-commands tests/e2e/testdata/m2/path_semantics/compile_commands.json --changed-file ./include/common/../common/config.h
-./build/cmake-xray impact --compile-commands tests/e2e/testdata/m2/unresolved_include/compile_commands.json --changed-file include/generated/version.h
+./build/cmake-xray analyze --compile-commands tests/e2e/testdata/m2/permuted_compile_commands/compile_commands.json --top 3
+./build/cmake-xray analyze --compile-commands tests/e2e/testdata/m2/duplicate_tu_entries/compile_commands.json --top 3
+./build/cmake-xray impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file src/app/main.cpp
+./build/cmake-xray impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h
+./build/cmake-xray impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file ./include/common/../common/config.h
+./build/cmake-xray impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/generated/version.h
+./build/cmake-xray impact --compile-commands tests/e2e/testdata/m2/duplicate_tu_entries/compile_commands.json --changed-file src/app/main.cpp
 ctest --test-dir build --output-on-failure
 ```
 
@@ -549,10 +545,25 @@ docker run --rm \
   cmake-xray analyze --compile-commands /data/basic_project/compile_commands.json --top 3
 docker run --rm \
   -v "$PWD/tests/e2e/testdata/m2:/data:ro" \
-  cmake-xray impact --compile-commands /data/impact_header/compile_commands.json --changed-file include/common/config.h
+  cmake-xray analyze --compile-commands /data/permuted_compile_commands/compile_commands.json --top 3
 docker run --rm \
   -v "$PWD/tests/e2e/testdata/m2:/data:ro" \
-  cmake-xray impact --compile-commands /data/path_semantics/compile_commands.json --changed-file ./include/common/../common/config.h
+  cmake-xray analyze --compile-commands /data/duplicate_tu_entries/compile_commands.json --top 3
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata/m2:/data:ro" \
+  cmake-xray impact --compile-commands /data/basic_project/compile_commands.json --changed-file src/app/main.cpp
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata/m2:/data:ro" \
+  cmake-xray impact --compile-commands /data/basic_project/compile_commands.json --changed-file include/common/shared.h
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata/m2:/data:ro" \
+  cmake-xray impact --compile-commands /data/basic_project/compile_commands.json --changed-file ./include/common/../common/config.h
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata/m2:/data:ro" \
+  cmake-xray impact --compile-commands /data/basic_project/compile_commands.json --changed-file include/generated/version.h
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata/m2:/data:ro" \
+  cmake-xray impact --compile-commands /data/duplicate_tu_entries/compile_commands.json --changed-file src/app/main.cpp
 ```
 
 Die lokale und Docker-Pruefung sollen insbesondere bestaetigen:

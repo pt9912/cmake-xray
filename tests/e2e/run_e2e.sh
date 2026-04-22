@@ -62,19 +62,38 @@ assert_exit "impact --help exits 0" 0 "$BINARY" impact --help
 assert_stdout_contains "impact --help shows --changed-file" "changed-file" "$BINARY" impact --help
 
 # Analyze success path
-assert_exit "M2 analyze exits 0" 0 "$BINARY" analyze --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --top 2
-assert_stdout_contains "M2 analyze shows ranking" "translation unit ranking" "$BINARY" analyze --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --top 2
-assert_stdout_contains "M2 analyze shows top limit" "top 2 of 3 translation units" "$BINARY" analyze --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --top 2
-assert_stdout_contains "M2 analyze shows hotspots" "include hotspots" "$BINARY" analyze --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --top 2
+assert_exit "M2 analyze exits 0" 0 "$BINARY" analyze --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --top 2
+assert_stdout_contains "M2 analyze shows ranking" "translation unit ranking" "$BINARY" analyze --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --top 2
+assert_stdout_contains "M2 analyze shows top limit" "top 2 of 3 translation units" "$BINARY" analyze --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --top 2
+assert_stdout_contains "M2 analyze shows hotspots" "include hotspots" "$BINARY" analyze --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --top 2
 
 # Impact success path
-assert_exit "impact source exits 0" 0 "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file src/app/main.cpp
-assert_stdout_contains "impact source shows one affected TU" "affected translation units: 1" "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file src/app/main.cpp
-assert_exit "impact header exits 0" 0 "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file include/common/config.h
-assert_stdout_contains "impact header is heuristic" "impact analysis for include/common/config.h \[heuristic\]" "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file include/common/config.h
-assert_stdout_contains "impact header shows three affected TUs" "affected translation units: 3" "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file include/common/config.h
-assert_exit "impact missing file exits 0" 0 "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file include/generated/version.h
-assert_stdout_contains "impact missing file shows zero affected TUs" "affected translation units: 0" "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file include/generated/version.h
+assert_exit "impact source exits 0" 0 "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --changed-file src/app/main.cpp
+assert_stdout_contains "impact source shows one affected TU" "affected translation units: 1" "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --changed-file src/app/main.cpp
+assert_exit "impact transitive header exits 0" 0 "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --changed-file include/common/shared.h
+assert_stdout_contains "impact transitive header is heuristic" "impact analysis for include/common/shared.h \[heuristic\]" "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --changed-file include/common/shared.h
+assert_stdout_contains "impact transitive header shows three affected TUs" "affected translation units: 3" "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --changed-file include/common/shared.h
+assert_exit "impact path semantics exits 0" 0 "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --changed-file ./include/common/../common/config.h
+assert_stdout_contains "impact path semantics normalizes lexical path" "impact analysis for include/common/config.h \[heuristic\]" "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --changed-file ./include/common/../common/config.h
+assert_exit "impact missing file exits 0" 0 "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --changed-file include/generated/version.h
+assert_stdout_contains "impact missing file shows zero affected TUs" "affected translation units: 0" "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --changed-file include/generated/version.h
+
+# Reproducibility and duplicate TU observations
+assert_stdout_contains "duplicate analyze shows debug observation" "src/app/main.cpp \[directory: build/debug\]" "$BINARY" analyze --compile-commands "$TESTDATA/m2/duplicate_tu_entries/compile_commands.json" --top 3
+assert_stdout_contains "duplicate analyze shows release observation" "src/app/main.cpp \[directory: build/release\]" "$BINARY" analyze --compile-commands "$TESTDATA/m2/duplicate_tu_entries/compile_commands.json" --top 3
+assert_exit "duplicate impact exits 0" 0 "$BINARY" impact --compile-commands "$TESTDATA/m2/duplicate_tu_entries/compile_commands.json" --changed-file src/app/main.cpp
+assert_stdout_contains "duplicate impact shows two affected observations" "affected translation units: 2" "$BINARY" impact --compile-commands "$TESTDATA/m2/duplicate_tu_entries/compile_commands.json" --changed-file src/app/main.cpp
+assert_stdout_contains "duplicate impact shows debug observation" "src/app/main.cpp \[directory: build/debug\] \[direct\]" "$BINARY" impact --compile-commands "$TESTDATA/m2/duplicate_tu_entries/compile_commands.json" --changed-file src/app/main.cpp
+assert_stdout_contains "duplicate impact shows release observation" "src/app/main.cpp \[directory: build/release\] \[direct\]" "$BINARY" impact --compile-commands "$TESTDATA/m2/duplicate_tu_entries/compile_commands.json" --changed-file src/app/main.cpp
+
+basic_output=$("$BINARY" analyze --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json" --top 3 2>/dev/null) || true
+permuted_output=$("$BINARY" analyze --compile-commands "$TESTDATA/m2/permuted_compile_commands/compile_commands.json" --top 3 2>/dev/null) || true
+if [ "$basic_output" = "$permuted_output" ]; then
+    echo "PASS: permuted compile_commands produce identical analyze output"
+else
+    echo "FAIL: permuted compile_commands produce identical analyze output — stdout differed" >&2
+    failures=$((failures + 1))
+fi
 
 # M1 compatibility
 assert_exit "legacy valid input exits 0" 0 "$BINARY" analyze --compile-commands "$TESTDATA/valid/compile_commands.json"
@@ -84,7 +103,7 @@ assert_exit "empty_arguments_with_command exits 0" 0 "$BINARY" analyze --compile
 
 # CLI usage error
 assert_exit "missing --compile-commands exits 2" 2 "$BINARY" analyze
-assert_exit "impact missing --changed-file exits 2" 2 "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json"
+assert_exit "impact missing --changed-file exits 2" 2 "$BINARY" impact --compile-commands "$TESTDATA/m2/basic_project/compile_commands.json"
 
 # Input file errors
 assert_exit "nonexistent file exits 3" 3 "$BINARY" analyze --compile-commands /nonexistent/compile_commands.json

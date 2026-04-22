@@ -5,6 +5,7 @@ add_executable(
     hexagon/test_impact_analyzer.cpp
     adapters/test_port_wiring.cpp
     adapters/test_compile_commands_json.cpp
+    adapters/test_console_report_adapter.cpp
     adapters/test_source_parsing_include_adapter.cpp
     e2e/test_cli.cpp
 )
