@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M3 `cmake-xray` |
-| Version | `0.4` |
+| Version | `0.5` |
 | Stand | `2026-04-22` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M2](./plan-M2.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -21,7 +21,7 @@ M3 gilt als erreicht, wenn:
 - Markdown-Berichte die M2-Ergebnisse vollstaendig und reproduzierbar abbilden: Analysekontext, TU-Ranking, Include-Hotspots, Impact-Ergebnis sowie Diagnostics und Heuristik-Hinweise
 - versionierte Referenzdaten und erwartete Konsolen- bzw. Markdown-Ausgaben fuer die zentralen Analysepfade sowie fuer regressionskritische M2-Randfaelle zu Pfadsemantik, TU-Identitaet und deterministischer Sortierung vorliegen und automatisiert geprueft werden
 - README, Beispielausgaben, CHANGELOG und Release-Dokumentation den M3-/MVP-Stand widerspiegeln
-- eine dokumentierte Referenzumgebung sowie Baseline-Messwerte fuer `250`, `500` und `1.000` Translation Units fuer den gemeinsamen Analysekern von `analyze` vorliegen, zusaetzlich dokumentierte Stichproben fuer die neuen M3-Reportpfade `analyze --format markdown` und `impact --format markdown` vorhanden sind und die Soll-Ziele aus `NF-04` und `NF-05` explizit bewertet werden
+- eine dokumentierte Referenzumgebung sowie Baseline-Messwerte fuer `250`, `500` und `1.000` Translation Units fuer `analyze` in den MVP-relevanten Ausgabeformaten `console` und `markdown` vorliegen, zusaetzlich dokumentierte Stichproben fuer `impact --format markdown` vorhanden sind und die Soll-Ziele aus `NF-04` und `NF-05` explizit bewertet werden
 - die Docker-Pruefpfade fuer Test, Coverage-Gate, statische Analyse-/Metrik-Reports und Quality-Gate mit dem M3-Stand erfolgreich durchlaufen
 
 Relevante Kennungen: `F-26`, `F-27`, `F-35`, `F-36`, `F-42`, `NF-04`, `NF-05`, `NF-06`, `NF-10`, `NF-18`, `NF-19`, `AK-03`, `AK-04`, `AK-05`, `AK-06`, `AK-08`, `AK-09`
@@ -54,7 +54,7 @@ Die fuer M2 ausreichende Report-Strecke ist fuer M3 zu schmal. Neben Konsolenaus
 
 Fuer M3 benoetigt der Report-Pfad mindestens:
 
-- eine explizite Repraesentation des gewuenschten Ausgabeformats, zum Beispiel `console` und `markdown`; die CLI mappt `--format` auf ein Kernmodell wie `ReportFormat`
+- eine explizite Repraesentation des gewuenschten Ausgabeformats, zum Beispiel `console` und `markdown`; die CLI mappt `--format` auf ein Modell wie `ReportFormat`
 - eine einheitliche Repraesentation des generierten Reports, mindestens mit Textinhalt und Formatkennung, zum Beispiel `RenderedReport`
 - getrennte, fachlich klare Eintrittspunkte fuer Projektanalyse und Impact-Analyse; bestehende M2-Entscheidungen dazu bleiben erhalten
 - eine stabile Verantwortungsgrenze: Der Report-Adapter erzeugt Text, die Entscheidung ueber `stdout` oder Dateipfad bleibt ausserhalb des Hexagons
@@ -63,9 +63,9 @@ Fuer M3 benoetigt der Report-Pfad mindestens:
 Wichtig:
 
 - das Hexagon bleibt frei von Dateisystem- und CLI-Typen
-- die Formatauswahl zur Laufzeit wird fuer M3 explizit festgelegt: Die Composition Root verdrahtet `ConsoleReportAdapter` und `MarkdownReportAdapter` in einen einzelnen Dispatching-Adapter, zum Beispiel `ReportWriterDispatchAdapter`, der als einzige Laufzeit-Implementierung von `ReportWriterPort` das gewuenschte Format auswaehlt
+- die Formatauswahl zur Laufzeit wird fuer M3 explizit festgelegt: Die CLI mappt `--format` auf `ReportFormat`; die oberste Verdrahtung waehlt damit die passende formatgebundene Report-Strecke fuer `ConsoleReportAdapter` oder `MarkdownReportAdapter`, ohne dass ein Adapter einen anderen Adapter kennt
 - die konkreten Format-Adapter bleiben reine Text-Renderer; sie kennen weder CLI-Optionen noch Dateisystem-Sinks und enthalten keine Dispatch-Logik
-- ein Port-Rename ist fuer M3 nicht erforderlich; wichtiger als die saubere Verantwortungstrennung ist, dass `GenerateReportPort` formatfaehig wird und der Dispatch ausserhalb der konkreten Renderer eindeutig verdrahtet ist
+- ein Port-Rename ist fuer M3 nicht erforderlich; wichtiger als maximale Abstraktion ist, dass der Report-Vertrag einen gerenderten Report klar beschreibt und die Formatauswahl ausserhalb der konkreten Renderer eindeutig erfolgt
 - Ausgabe- oder Schreibfehler duerfen nicht als Eingabefehler maskiert werden; der bisher reservierte Exit-Code `1` wird in M3 fuer unerwartete Laufzeit- bzw. Report-Schreibfehler aktiviert
 - die Reihenfolge von Abschnitten, Listen und Diagnostics muss explizit dokumentiert und nicht vom Zufall der Eingabereihenfolge abhaengig sein
 
@@ -75,10 +75,10 @@ Vorgesehene Artefakte:
 - Anpassung von `src/hexagon/ports/driving/generate_report_port.h`
 - Anpassung von `src/hexagon/ports/driven/report_writer_port.h`
 - Anpassung von `src/hexagon/services/report_generator.*`
-- neue oder erweiterte Adapter-Dateien fuer den Format-Dispatch unter `src/adapters/output/`
+- Anpassung der CLI-/Composition-Root-Verdrahtung fuer die Formatwahl
 - Anpassung von `src/main.cpp`
 
-**Ergebnis**: Der Kern besitzt einen belastbaren, formatfaehigen Report-Vertrag, ohne fuer M3 einen zusaetzlichen Dateisystem-Port einzufuehren.
+**Ergebnis**: Der Kern besitzt einen belastbaren Report-Vertrag, ohne fuer M3 einen zusaetzlichen Dateisystem-Port oder einen Adapter-zu-Adapter-Dispatcher einzufuehren.
 
 ### 1.2 `MarkdownReportAdapter` fuer Projekt- und Impact-Berichte umsetzen
 
@@ -123,7 +123,7 @@ Formatregeln fuer M3:
 
 - Ausgabe als einfaches, breit kompatibles Markdown ohne HTML-Einbettung
 - in M3 werden bewusst nur ATX-Ueberschriften und Listen verwendet; Markdown-Tabellen gehoeren nicht zum Report-Vertrag
-- die Uebersichts-Liste und der globale Abschnitt `## Diagnostics` verwenden immer ungeordnete Listen; jede Eintragszeile beginnt exakt mit `- `
+- die Uebersichts-Liste verwendet immer eine ungeordnete Liste; `## Diagnostics` sowie die Impact-Abschnitte verwenden bei vorhandenen Eintraegen ungeordnete Listen; jede Eintragszeile beginnt exakt mit `- `
 - keine ANSI-Farben, keine Zeitstempel, keine Hostnamen und keine anderen volatilen Metadaten
 - `Tool version` wird bewusst nicht in den Report-Body aufgenommen; Release-Provenienz bleibt in `--help`, README, CHANGELOG und `application_info`, und reine Versionshebungen duerfen keine Report-Golden-Files invalidieren
 - zwischen Titel, Uebersichts-Liste und jedem `##`-Abschnitt steht jeweils genau ein Leerblock; innerhalb eines Abschnitts gibt es keine zusaetzlichen Leerzeilen zwischen Geschwistern derselben Liste
@@ -132,11 +132,11 @@ Formatregeln fuer M3:
 - `Top limit: <n>` gibt immer den konfigurierten numerischen CLI-Wert wieder; ob Ranking- oder Hotspot-Listen vollstaendig sind, wird ausschliesslich ueber `Translation unit ranking entries: <shown> of <total>` und `Include hotspot entries: <shown> of <total>` ausgewiesen, nicht ueber einen synthetischen Wert wie `all`
 - der Abschnitt `Translation Unit Ranking` wird immer als geordnete Liste ausgegeben; jeder Eintrag besteht exakt aus einer ersten Zeile `<rank>. <source_path> [directory: <directory>]`, einer unmittelbar folgenden und exakt mit vier Leerzeichen eingerueckten Zeile `Metrics: arg_count=<n>, include_path_count=<n>, define_count=<n>` und optional einem unmittelbar folgenden, ebenfalls mit vier Leerzeichen eingerueckten Block `Diagnostics:`; jede Diagnostikzeile ist dann ebenfalls exakt mit vier Leerzeichen eingerueckt und lautet `- <severity>: <message>`
 - der Abschnitt `Include Hotspots` wird immer als geordnete Liste ausgegeben; jeder Eintrag besteht exakt aus einer ersten Zeile `<index>. Header: <path>`, danach aus den jeweils mit vier Leerzeichen eingerueckten Zeilen `Affected translation units: <n>` und `Translation units:`; jede TU-Zeile ist danach ebenfalls exakt mit vier Leerzeichen eingerueckt und lautet `- <source_path> [directory: <directory>]`; ein optionaler `Diagnostics:`-Block folgt ebenfalls mit vier Leerzeichen eingerueckt, und jede Diagnostikzeile lautet dann ebenfalls mit vier Leerzeichen eingerueckt `- <severity>: <message>`
-- die Impact-Abschnitte `Directly Affected Translation Units` und `Heuristically Affected Translation Units` werden immer als ungeordnete Listen ausgegeben; jeder Eintrag besteht exakt aus `- <source_path> [directory: <directory>]`, die Impact-Art wird nicht nochmals inline wiederholt, weil sie bereits ueber den Abschnittstitel kodiert ist
-- der Abschnitt `## Diagnostics` wird immer als ungeordnete Liste ausgegeben und enthaelt ausschliesslich reportweite Diagnostics aus `AnalysisResult::diagnostics` bzw. `ImpactResult::diagnostics` in Modellreihenfolge; jeder Eintrag besteht exakt aus `- <severity>: <message>`
+- die Impact-Abschnitte `Directly Affected Translation Units` und `Heuristically Affected Translation Units` werden bei vorhandenen Eintraegen als ungeordnete Listen ausgegeben; jeder Eintrag besteht exakt aus `- <source_path> [directory: <directory>]`, die Impact-Art wird nicht nochmals inline wiederholt, weil sie bereits ueber den Abschnittstitel kodiert ist
+- der Abschnitt `## Diagnostics` wird bei vorhandenen Eintraegen als ungeordnete Liste ausgegeben und enthaelt ausschliesslich reportweite Diagnostics aus `AnalysisResult::diagnostics` bzw. `ImpactResult::diagnostics` in Modellreihenfolge; jeder Eintrag besteht exakt aus `- <severity>: <message>`
 - inline `Diagnostics:`-Bloecke sind nur fuer elementbezogene Diagnostics zulaessig, also bei einzelnen Ranking-Eintraegen oder Include-Hotspots; solche Diagnostics werden in M3 nicht zusaetzlich im globalen Abschnitt `## Diagnostics` wiederholt
 - fuer `impact` gibt es in M3 keine elementbezogenen Diagnostics pro betroffener Translation Unit; Heuristik-Hinweise und Datenluecken dieses Analysepfads erscheinen deshalb ausschliesslich im reportweiten Abschnitt `## Diagnostics`
-- leere Abschnitte verwenden exakt diese Saetze: `No include hotspots found.`, `No directly affected translation units.`, `No heuristically affected translation units.`, `No diagnostics.`
+- leere Abschnitte sind die einzige Ausnahme von den Listenregeln und verwenden exakt diese Saetze: `No include hotspots found.`, `No directly affected translation units.`, `No heuristically affected translation units.`, `No diagnostics.`
 - pfadtragende Felder verwenden Anzeige-Pfade, nicht Vergleichsschluessel und nicht rohe CLI-Eingaben. Fuer M3 gilt die M2-Trennung unveraendert:
   - `Compile database:` zeigt den lexikalisch normalisierten Aufrufpfad der uebergebenen `compile_commands.json`
   - `Changed file:` zeigt denselben normalisierten Anzeige-Pfad wie die Konsolenausgabe; relative `--changed-file`-Eingaben werden fuer Vergleiche relativ zum Verzeichnis der `compile_commands.json` aufgeloest und erst danach als Anzeige-Pfad gerendert
@@ -157,7 +157,7 @@ cmake-xray impact --compile-commands <path> --changed-file <path> --format markd
 Vorgesehene Artefakte:
 
 - neue Dateien `src/adapters/output/markdown_report_adapter.h` und `src/adapters/output/markdown_report_adapter.cpp`
-- neue oder erweiterte Dateien fuer den Format-Dispatch, zum Beispiel `src/adapters/output/report_writer_dispatch_adapter.*`
+- Anpassung der CLI-/Composition-Root-Verdrahtung fuer die Wahl zwischen formatgebundenen Report-Strecken
 - Anpassung des bestehenden Konsolenreport-Adapters, falls gemeinsame Hilfsfunktionen fuer Layout, Diagnostics oder Pfaddarstellung sinnvoll sind
 - Anpassung von `src/adapters/CMakeLists.txt`
 
@@ -215,8 +215,9 @@ Mindestens benoetigt:
 Fuer M3 gilt eine klare Referenzquellen-Regel:
 
 - `tests/reference/` ist die verbindliche Rohdatenbasis fuer versionierte Referenzprojekte, Generatoren und Performance-Szenarien
-- `tests/e2e/testdata/m3/` enthaelt daraus abgeleitete oder explizit kuratierte Kleinfixturen fuer bytegenaue CLI- und Markdown-Golden-Tests; diese Fixtures sind die einzige Wahrheitsquelle fuer Golden-Dateien und `docs/examples/`
-- wenn ein regressionskritischer M2-Randfall fuer M3 weiterverwendet wird, wird entweder die bestehende M2-Fixture direkt referenziert oder einmalig in `tests/e2e/testdata/m3/` gespiegelt; danach darf keine zweite fachlich abweichende Variante gepflegt werden
+- fuer bytegenaue Goldens und `docs/examples/` gibt es pro Testfall genau eine kanonische Fixture-Quelle
+- neue M3-spezifische Golden-Faelle liegen unter `tests/e2e/testdata/m3/`
+- wenn ein regressionskritischer M2-Randfall fuer M3 weiterverwendet wird, wird entweder die bestehende M2-Fixture direkt als kanonische Quelle referenziert oder einmalig in `tests/e2e/testdata/m3/` gespiegelt; nach dieser Entscheidung duerfen Goldens, Beispiele und Regenerationspfade nur noch die gewaehlte Quelle verwenden
 
 Sinnvolle Referenzfaelle unter `tests/e2e/testdata/m3/` sind:
 
@@ -265,15 +266,16 @@ Die Messmethodik fuer M3 soll mindestens dokumentieren:
 - wie viele Messlaeufe in die Baseline eingehen
 - wie Laufzeit und Speicher erhoben werden
 - ob und wie `--top` die gemessene Ausgabe begrenzt
-- welche Messungen als `NF-04`-/`NF-05`-Baseline gelten und welche nur als dokumentierte Stichproben fuer die neuen M3-Reportpfade zaehlen
-- welche festen Eingaben und Artefaktpfade fuer die dokumentierten Stichproben von `analyze --format markdown` und `impact --format markdown` verwendet werden
+- welche Messungen als `NF-04`-/`NF-05`-Baselines fuer `analyze --format console` und `analyze --format markdown` gelten und welche nur als dokumentierte Stichproben fuer `impact --format markdown` zaehlen
+- welche festen Eingaben und Artefaktpfade fuer die Baselines von `analyze --format console` und `analyze --format markdown` sowie fuer die dokumentierten Stichproben von `impact --format markdown` verwendet werden
 
 Pragmatische Entscheidung fuer M3:
 
 - die Performance-Baseline ist reproduzierbar zu messen, aber nicht Teil jedes Standard-`ctest`-Laufs
 - sie wird als eigener dokumentierter Pruefpfad behandelt, lokal oder in einem separaten CI-Workflow
-- die Bewertung gegen `NF-04` und `NF-05` erfolgt auf Basis der `analyze`-Baseline; fuer `analyze --format markdown` und `impact --format markdown` werden zusaetzliche Stichproben dokumentiert
-- fuer diese dokumentierten Stichproben werden feste M3-Fixtures verwendet: `tests/e2e/testdata/m3/report_project/compile_commands.json` fuer `analyze --format markdown` sowie `tests/e2e/testdata/m3/report_impact_header/compile_commands.json` zusammen mit `--changed-file include/common/config.h` fuer `impact --format markdown`; die Artefakte liegen nachvollziehbar unter `build/reports/performance/`
+- die Bewertung gegen `NF-04` und `NF-05` erfolgt fuer `analyze` sowohl fuer `--format console` als auch fuer `--format markdown`
+- fuer diese Baselines werden dieselben versionierten Referenzprojekte `tests/reference/scale_250/`, `tests/reference/scale_500/` und `tests/reference/scale_1000/` jeweils in beiden Ausgabeformaten gemessen
+- fuer dokumentierte Stichproben des separaten Impact-Pfads werden feste M3-Fixtures verwendet: `tests/e2e/testdata/m3/report_impact_header/compile_commands.json` zusammen mit `--changed-file include/common/config.h`; die Artefakte liegen nachvollziehbar unter `build/reports/performance/`
 - Nichterreichen darf nicht stillschweigend uebergangen werden, sondern muss in der Dokumentation sichtbar sein
 - Referenzumgebung, Messmethodik, Messartefakte und Soll-Ist-Bewertung werden verbindlich in `docs/performance.md` festgehalten
 
@@ -327,7 +329,7 @@ Folgende Dateien oder Dateigruppen sollen nach M3 voraussichtlich neu entstehen 
 | Driving Port | `src/hexagon/ports/driving/generate_report_port.h` |
 | Driven Port | `src/hexagon/ports/driven/report_writer_port.h` |
 | Service | `src/hexagon/services/report_generator.*` |
-| Output-Adapter | `src/adapters/output/console_report_adapter.*`, neue Dateien `src/adapters/output/markdown_report_adapter.*`, zusaetzlich ein Dispatching-Adapter fuer die Laufzeit-Formatauswahl |
+| Output-Adapter | `src/adapters/output/console_report_adapter.*`, neue Dateien `src/adapters/output/markdown_report_adapter.*`; die Laufzeit-Formatauswahl bleibt in der CLI-/Composition-Root-Verdrahtung |
 | CLI | `src/adapters/cli/cli_adapter.*`, `src/adapters/cli/exit_codes.h` |
 | Composition Root | `src/main.cpp` |
 | Build | `src/adapters/CMakeLists.txt`, `tests/CMakeLists.txt` |
@@ -398,10 +400,12 @@ docker run --rm \
 
 ```bash
 mkdir -p build/reports/performance
-/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_250/compile_commands.json --top 10 > build/reports/performance/xray-250.stdout.txt 2> build/reports/performance/xray-250.time.txt
-/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_500/compile_commands.json --top 10 > build/reports/performance/xray-500.stdout.txt 2> build/reports/performance/xray-500.time.txt
-/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_1000/compile_commands.json --top 10 > build/reports/performance/xray-1000.stdout.txt 2> build/reports/performance/xray-1000.time.txt
-/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --format markdown > build/reports/performance/xray-analyze-markdown-sample.stdout.md 2> build/reports/performance/xray-analyze-markdown-sample.time.txt
+/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_250/compile_commands.json --top 10 > build/reports/performance/xray-250-console.stdout.txt 2> build/reports/performance/xray-250-console.time.txt
+/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_500/compile_commands.json --top 10 > build/reports/performance/xray-500-console.stdout.txt 2> build/reports/performance/xray-500-console.time.txt
+/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_1000/compile_commands.json --top 10 > build/reports/performance/xray-1000-console.stdout.txt 2> build/reports/performance/xray-1000-console.time.txt
+/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_250/compile_commands.json --top 10 --format markdown > build/reports/performance/xray-250-markdown.stdout.md 2> build/reports/performance/xray-250-markdown.time.txt
+/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_500/compile_commands.json --top 10 --format markdown > build/reports/performance/xray-500-markdown.stdout.md 2> build/reports/performance/xray-500-markdown.time.txt
+/usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_1000/compile_commands.json --top 10 --format markdown > build/reports/performance/xray-1000-markdown.stdout.md 2> build/reports/performance/xray-1000-markdown.time.txt
 /usr/bin/time -v ./build/cmake-xray impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --format markdown > build/reports/performance/xray-impact-markdown-sample.stdout.md 2> build/reports/performance/xray-impact-markdown-sample.time.txt
 ```
 
@@ -419,7 +423,7 @@ Die Pruefung soll insbesondere bestaetigen:
 - Golden-Outputs fuer Konsole und Markdown bleiben stabil, einschliesslich regressionskritischer Faelle fuer TU-Identitaet, Pfadsemantik und permutierte Eingabereihenfolge
 - statische Analyse- und Metrik-Reports gemaess `docs/quality.md` bleiben erzeugbar, einschliesslich `summary.txt`, `clang-tidy.txt`, `lizard.txt` und `lizard-warnings.txt`
 - Coverage-Gate und Quality-Gate bleiben trotz Report-Ausbau gruen
-- Referenzumgebung, Messwerte und Bewertung gegen `NF-04` und `NF-05` sind in `docs/performance.md` dokumentiert; `stdout`- und `time`-Artefakte der `analyze`-Baseline sowie dokumentierte Stichproben fuer `analyze --format markdown` und `impact --format markdown` liegen nachvollziehbar vor
+- Referenzumgebung, Messwerte und Bewertung gegen `NF-04` und `NF-05` sind in `docs/performance.md` dokumentiert; `stdout`- und `time`-Artefakte der Baselines fuer `analyze --format console` und `analyze --format markdown` sowie dokumentierte Stichproben fuer `impact --format markdown` liegen nachvollziehbar vor
 
 ## 5. Rueckverfolgbarkeit
 
@@ -439,20 +443,20 @@ Die Pruefung soll insbesondere bestaetigen:
 | Frage | Entscheidung | Verweis |
 |---|---|---|
 | Formatwahl in M3 | `analyze` und `impact` bleiben die einzigen Nutzerpfade; Report-Ausgabe wird ueber `--format console|markdown` erweitert | AP 1.3 |
-| Format-Dispatch in M3 | Die CLI mappt `--format` auf `ReportFormat`; die Composition Root verdrahtet `ConsoleReportAdapter` und `MarkdownReportAdapter` in einen einzelnen Dispatching-Adapter als Laufzeit-Implementierung von `ReportWriterPort` | AP 1.1, 1.3 |
+| Format-Dispatch in M3 | Die CLI mappt `--format` auf `ReportFormat`; die Formatwahl erfolgt in der obersten Verdrahtung ueber formatgebundene Report-Strecken fuer `ConsoleReportAdapter` und `MarkdownReportAdapter`, ohne einen Adapter-zu-Adapter-Dispatcher im Output-Layer | AP 1.1, 1.3 |
 | Default-Ausgabe | Standard bleibt die Konsolenausgabe | AP 1.3 |
 | Dateiausgabe | `--output <path>` ist nur fuer Markdown zulaessig; ohne `--output` geht Markdown auf `stdout`, mit `--output` bleibt `stdout` bei Erfolg leer; der Zielpfad wird nur nach vollstaendig erfolgreichem Schreiben ersetzt | AP 1.3 |
 | Schreibfehler | nicht beschreibbare Report-Pfade nutzen Exit-Code `1`; Eingabefehler behalten `3` und `4` | AP 1.1, 1.3 |
 | Verantwortung der Report-Strecke | Report-Adapter erzeugen Text; `stdout`/Dateisystem-Entscheidung bleibt ausserhalb des Hexagons | AP 1.1 |
-| Markdown-Vertrag | M3 fixiert literal die Ueberschriften, Abschnittsreihenfolge, Listenformen einschliesslich Einrueckung und Eintragsformat, Leersaetze, `--top`-Vollstaendigkeitsangaben und Escaping-Regeln; Reporter geben Ergebnisvektoren in Modellreihenfolge aus | AP 1.2, 1.4 |
+| Markdown-Vertrag | M3 fixiert literal die Ueberschriften, Abschnittsreihenfolge, Listenformen einschliesslich Einrueckung und Eintragsformat, die expliziten Leer-Saetze als Ausnahme fuer leere Abschnitte, `--top`-Vollstaendigkeitsangaben und Escaping-Regeln; Reporter geben Ergebnisvektoren in Modellreihenfolge aus | AP 1.2, 1.4 |
 | Heuristik-Semantik fuer `impact` | `Heuristic result: yes` umfasst im Markdown-Report bewusst sowohl include-basierte Treffer als auch Null-Treffer ohne direkte TU-Zuordnung; `no` ist nur fuer rein direkte Quelldatei-Treffer zulaessig | AP 1.2, 1.4 |
 | Platzierung von Diagnostics | reportweite Diagnostics stehen ausschliesslich im Abschnitt `## Diagnostics`; elementbezogene Diagnostics bleiben inline und werden nicht gespiegelt | AP 1.2, 1.4 |
 | Versionsdarstellung im Report | Die Tool-Version ist kein Bestandteil des Report-Bodys; reine Versionshebungen duerfen Report-Goldens nicht invalidieren | AP 1.2, 1.4 |
 | Pfaddarstellung im Report | Markdown nutzt dieselben Anzeige-Pfadregeln wie M2; Vergleichsschluessel bleiben intern, angezeigt werden normalisierte Display-Pfade | AP 1.2, 1.4 |
 | Markdown-Stil | einfaches, diffbares Markdown ohne HTML, Zeitstempel oder sonstige volatile Metadaten | AP 1.2 |
 | Golden-Outputs | versioniert im Repository und gegen stabile, nichtvolatile Ausgaben geprueft | AP 1.4 |
-| Referenzquellen fuer Goldens und Performance | `tests/reference/` ist Rohdatenbasis fuer Referenzprojekte und Performance; `tests/e2e/testdata/m3/` ist die einzige Wahrheitsquelle fuer bytegenaue Goldens und `docs/examples/` | AP 1.4, 1.5 |
-| Performance-Pfad | reproduzierbar dokumentiert, aber kein Pflichtbestandteil jedes `ctest`-Laufs; `NF-04`/`NF-05` werden ueber die `analyze`-Baseline bewertet, die Reportpfade `analyze --format markdown` und `impact --format markdown` werden zusaetzlich ueber feste Stichproben dokumentiert | AP 1.5 |
+| Referenzquellen fuer Goldens und Performance | `tests/reference/` ist Rohdatenbasis fuer Referenzprojekte und Performance; fuer bytegenaue Goldens und `docs/examples/` gibt es pro Fall genau eine kanonische Fixture-Quelle, entweder unter `tests/e2e/testdata/m3/` oder bewusst weiterverwendet am gewaehlten M2-Pfad | AP 1.4, 1.5 |
+| Performance-Pfad | reproduzierbar dokumentiert, aber kein Pflichtbestandteil jedes `ctest`-Laufs; `NF-04`/`NF-05` werden ueber Baselines fuer `analyze --format console` und `analyze --format markdown` bewertet, der separate Impact-Reportpfad wird zusaetzlich ueber feste Stichproben dokumentiert | AP 1.5 |
 | Nicht-MVP-Formate | HTML, JSON und DOT bleiben ausserhalb von M3 | AP 0.3 |
 
 ### 6.2 Offen
