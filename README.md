@@ -124,7 +124,7 @@ Das Projekt nutzt ein Multi-Stage-`Dockerfile`:
 - `build`: konfiguriert und baut das Projekt
 - `test`: fuehrt `ctest` in der Referenzumgebung aus
 - `coverage`: baut mit Coverage-Instrumentierung, fuehrt `ctest` aus und erzeugt einen `gcovr`-Report
-- `coverage-check`: prueft waehrend `docker build`, ob ein konfigurierbarer Coverage-Schwellwert erreicht wurde
+- `coverage-check`: prueft waehrend `docker build`, ob ein konfigurierbarer Coverage-Schwellwert erreicht wurde (Standard: `100`)
 - `runtime`: enthaelt nur das Binary und noetige Laufzeitpakete
 
 Build und Test der Docker-Stages:
@@ -132,7 +132,7 @@ Build und Test der Docker-Stages:
 ```bash
 docker build --target test -t cmake-xray:test .
 docker build --target coverage -t cmake-xray:coverage .
-docker build --target coverage-check -t cmake-xray:coverage-check .
+docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
 docker build --target runtime -t cmake-xray .
 ```
 
@@ -145,9 +145,9 @@ docker run --rm cmake-xray:coverage
 Coverage-Gate waehrend des Docker-Builds ausfuehren:
 
 ```bash
-docker build --target coverage-check -t cmake-xray:coverage-check .
+docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
 docker build --target coverage-check \
-  --build-arg XRAY_COVERAGE_THRESHOLD=96 \
+  --build-arg XRAY_COVERAGE_THRESHOLD=101 \
   -t cmake-xray:coverage-check .
 ```
 

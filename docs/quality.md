@@ -25,9 +25,9 @@ Der `coverage`-Stage baut einen instrumentierten Build, führt `ctest` aus und g
 Für das eigentliche Build-Gate gibt es zusätzlich einen separaten Stage:
 
 ```bash
-docker build --target coverage-check -t cmake-xray:coverage-check .
+docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
 docker build --target coverage-check \
-  --build-arg XRAY_COVERAGE_THRESHOLD=96 \
+  --build-arg XRAY_COVERAGE_THRESHOLD=101 \
   -t cmake-xray:coverage-check .
 ```
 
@@ -40,17 +40,17 @@ Die Trennung ist bewusst:
 
 | Metrik                 |        Wert |
 | ---------------------- | ----------: |
-| Line Coverage (`src/`) |       `95%` |
-| Ausgeführte Zeilen     | `173 / 182` |
+| Line Coverage (`src/`) |      `100%` |
+| Ausgeführte Zeilen     | `183 / 183` |
 
 Größte erkennbare Lücke im aktuellen Report:
 
-- `src/adapters/cli/cli_adapter.cpp`: `85%`
+- keine verbleibende Luecke im aktuell gemessenen Report unter `src/`
 
 Einordnung:
 
-- Für den aktuellen M1-Umfang ist `95%` solide.
-- Die Restlücken liegen vor allem in CLI-Fehler- und Fallbackpfaden, nicht im JSON-Adapter oder in den Kernservices.
+- Fuer den aktuellen Stand liegt die gemessene Line-Coverage unter `src/` bei `100%`.
+- Das Build-Gate kann deshalb sinnvoll auf `100` gesetzt werden, ohne den aktuellen Stand kuenstlich zu lockern.
 - Die Zahl ist als Line-Coverage zu verstehen; Branch-Coverage wird derzeit nicht separat ausgewiesen.
 
 ## KI Prompt

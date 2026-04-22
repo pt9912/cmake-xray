@@ -9,10 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- GitHub Actions workflows for Docker-based build and test validation
+- CI artifact upload for coverage reports (`summary.txt` and `coverage.txt`)
+
 ### Changed
+
+- `coverage-check` now enforces a default minimum line coverage threshold of `100%`
+- coverage and release documentation now use the Docker-based coverage gate consistently
 
 ### Fixed
 
+- CLI exit-code mapping now handles unexpected compile database errors consistently
+- CLI and E2E tests now cover additional help, diagnostic truncation, and unexpected-error paths, raising line coverage under `src/` to `100%`
 
 ## [0.2.0] - 2026-04-22
 

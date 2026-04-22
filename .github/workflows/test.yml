@@ -25,7 +25,7 @@ jobs:
         run: docker build --target test -t cmake-xray:test .
 
       - name: Enforce coverage threshold
-        run: docker build --target coverage-check -t cmake-xray:coverage-check .
+        run: docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
 
       - name: Build coverage report image
         run: docker build --target coverage -t cmake-xray:coverage .

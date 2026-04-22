@@ -3,10 +3,15 @@
 #include <cstdlib>
 #include <sstream>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "adapters/cli/cli_adapter.h"
 #include "adapters/cli/exit_codes.h"
 #include "adapters/input/compile_commands_json_adapter.h"
+#include "hexagon/model/application_info.h"
+#include "hexagon/model/compile_database_result.h"
+#include "hexagon/ports/driving/analyze_project_port.h"
 #include "hexagon/services/project_analyzer.h"
 
 namespace {
@@ -14,6 +19,10 @@ namespace {
 using xray::adapters::cli::CliAdapter;
 using xray::adapters::cli::ExitCode;
 using xray::adapters::input::CompileCommandsJsonAdapter;
+using xray::hexagon::model::AnalysisResult;
+using xray::hexagon::model::CompileDatabaseError;
+using xray::hexagon::model::CompileDatabaseResult;
+using xray::hexagon::model::EntryDiagnostic;
 using xray::hexagon::services::ProjectAnalyzer;
 
 struct CliFixture {
@@ -32,9 +41,28 @@ struct CliFixture {
 
 const std::string testdata = "tests/e2e/testdata/";
 
+class StubAnalyzeProjectPort final : public xray::hexagon::ports::driving::AnalyzeProjectPort {
+public:
+    explicit StubAnalyzeProjectPort(AnalysisResult result) : result_(std::move(result)) {}
+
+    AnalysisResult analyze_project(std::string_view /*compile_commands_path*/) const override {
+        return result_;
+    }
+
+private:
+    AnalysisResult result_;
+};
+
 }  // namespace
 
 // --- Help ---
+
+TEST_CASE_FIXTURE(CliFixture, "no subcommand returns exit 0 with help on stdout") {
+    CHECK(run({}) == ExitCode::success);
+    CHECK(out.str().find("cmake-xray") != std::string::npos);
+    CHECK(out.str().find("analyze") != std::string::npos);
+    CHECK(err.str().empty());
+}
 
 TEST_CASE_FIXTURE(CliFixture, "main --help returns exit 0 with help on stdout") {
     CHECK(run({"--help"}) == ExitCode::success);
@@ -128,4 +156,56 @@ TEST_CASE_FIXTURE(CliFixture, "mixed valid and invalid returns exit 4") {
                (testdata + "mixed_valid_invalid/compile_commands.json").c_str()}) ==
           ExitCode::input_invalid);
     CHECK(err.str().find("1 invalid entries") != std::string::npos);
+}
+
+TEST_CASE("invalid entries report is truncated after 20 diagnostics") {
+    std::vector<EntryDiagnostic> diagnostics;
+    diagnostics.reserve(20);
+    for (std::size_t index = 0; index < 20; ++index) {
+        diagnostics.emplace_back(index, "missing field");
+    }
+
+    const StubAnalyzeProjectPort analyze_project_port{
+        AnalysisResult{
+            .application = xray::hexagon::model::application_info(),
+            .compile_database = CompileDatabaseResult{
+                CompileDatabaseError::invalid_entries,
+                "compile_commands.json contains 23 invalid entries: /tmp/compile_commands.json",
+                {},
+                diagnostics,
+                23,
+            },
+        },
+    };
+    const CliAdapter cli{analyze_project_port};
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray", "analyze", "--compile-commands",
+                          "/tmp/compile_commands.json"};
+
+    CHECK(cli.run(4, argv, out, err) == ExitCode::input_invalid);
+    CHECK(err.str().find("entry 19") != std::string::npos);
+    CHECK(err.str().find("... and 3 more invalid entries") != std::string::npos);
+}
+
+TEST_CASE("unexpected compile database errors map to exit code 1") {
+    const StubAnalyzeProjectPort analyze_project_port{
+        AnalysisResult{
+            .application = xray::hexagon::model::application_info(),
+            .compile_database = CompileDatabaseResult{
+                static_cast<CompileDatabaseError>(999),
+                "unexpected compile database failure",
+                {},
+                {},
+            },
+        },
+    };
+    const CliAdapter cli{analyze_project_port};
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray", "analyze", "--compile-commands",
+                          "/tmp/compile_commands.json"};
+
+    CHECK(cli.run(4, argv, out, err) == ExitCode::unexpected_error);
+    CHECK(err.str().find("unexpected compile database failure") != std::string::npos);
 }

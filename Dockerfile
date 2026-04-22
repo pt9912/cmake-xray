@@ -59,7 +59,7 @@ ENTRYPOINT ["/usr/local/bin/show-coverage"]
 
 FROM coverage AS coverage-check
 
-ARG XRAY_COVERAGE_THRESHOLD=95
+ARG XRAY_COVERAGE_THRESHOLD=100
 
 RUN coverage_percent="$(awk '$1 == "TOTAL" { gsub("%", "", $4); print $4 }' /workspace/build-coverage/coverage/summary.txt)" \
     && test -n "$coverage_percent" \

@@ -27,7 +27,7 @@ Vor Tagging und Release-Erstellung muessen die Docker-Pfade erfolgreich sein:
 
 ```bash
 docker build --target test -t cmake-xray:test .
-docker build --target coverage-check -t cmake-xray:coverage-check .
+docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
 docker build --target runtime -t cmake-xray .
 docker run --rm cmake-xray --help
 ```

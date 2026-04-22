@@ -15,6 +15,8 @@ using xray::hexagon::model::CompileDatabaseError;
 
 int map_error_to_exit_code(CompileDatabaseError error) {
     switch (error) {
+    case CompileDatabaseError::none:
+        return ExitCode::success;
     case CompileDatabaseError::file_not_accessible:
         return ExitCode::input_not_accessible;
     case CompileDatabaseError::invalid_json:
@@ -22,10 +24,9 @@ int map_error_to_exit_code(CompileDatabaseError error) {
     case CompileDatabaseError::empty_database:
     case CompileDatabaseError::invalid_entries:
         return ExitCode::input_invalid;
-    case CompileDatabaseError::none:
-        return ExitCode::success;
+    default:
+        return ExitCode::unexpected_error;
     }
-    return ExitCode::unexpected_error;
 }
 
 constexpr std::size_t max_displayed_entry_errors = 20;
@@ -62,7 +63,7 @@ void format_error(std::ostream& err, const xray::hexagon::model::CompileDatabase
         err << "hint: fix or regenerate the compilation database before running "
                "cmake-xray analyze\n";
         break;
-    case CompileDatabaseError::none:
+    default:
         break;
     }
 }
@@ -105,7 +106,7 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
 
     out << "compile database loaded: " << result.compile_database.entries().size()
         << " entries\n";
-    return ExitCode::success;
+    return map_error_to_exit_code(result.compile_database.error());
 }
 
 }  // namespace xray::adapters::cli
