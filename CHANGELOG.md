@@ -9,22 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- GitHub Actions workflows for Docker-based build and test validation
-- CI artifact upload for coverage reports (`summary.txt` and `coverage.txt`)
-- Docker `quality` stage with `clang-tidy` and `lizard` reports
-- Docker `quality-check` stage for static-analysis and metrics gates
-- repository-wide `.clang-tidy` baseline configuration
 
 ### Changed
 
-- `coverage-check` now enforces a default minimum line coverage threshold of `100%`
-- coverage and release documentation now use the Docker-based coverage gate consistently
-- CI now publishes quality artifacts alongside coverage artifacts
 
 ### Fixed
-
-- CLI exit-code mapping now handles unexpected compile database errors consistently
-- CLI and E2E tests now cover additional help, diagnostic truncation, and unexpected-error paths, raising line coverage under `src/` to `100%`
 
 ## [0.3.0] - 2026-04-22
 
@@ -36,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SourceParsingIncludeAdapter` with recursive include traversal, search-path handling, cycle protection, and unresolved-include diagnostics
 - `ConsoleReportAdapter` for structured `analyze` and `impact` console output
 - M2 adapter, hexagon, CLI, and binary E2E coverage for ranking, hotspots, impact, path semantics, and heuristic messaging
+- GitHub Actions workflows for Docker-based build and test validation
+- CI artifact upload for coverage reports (`summary.txt` and `coverage.txt`)
+- Docker `quality` stage with `clang-tidy` and `lizard` reports
+- Docker `quality-check` stage for static-analysis and metrics gates
+- repository-wide `.clang-tidy` baseline configuration
 
 ### Changed
 
@@ -43,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ProjectAnalyzer` now returns ranked translation units, include hotspots, and inline diagnostics in `AnalysisResult`
 - `AnalyzeImpactPort`, `ReportWriterPort`, and `GenerateReportPort` now operate on typed M2 result models instead of placeholder strings
 - application and project version bumped to `0.3.0`
+- `coverage-check` now enforces a default minimum line coverage threshold of `100%`
+- coverage and release documentation now use the Docker-based coverage gate consistently
+- CI now publishes quality artifacts alongside coverage artifacts
+
+### Fixed
+
+- `analyze` preserves TU-local diagnostics even when `--top` hides lower-ranked translation units
+- `impact` now surfaces concrete include-resolution diagnostics alongside heuristic results
+- CLI exit-code mapping now handles unexpected compile database errors consistently
+- CLI and E2E tests now cover additional help, diagnostic truncation, and unexpected-error paths, raising line coverage under `src/` to `100%`
 
 ## [0.2.0] - 2026-04-22
 
