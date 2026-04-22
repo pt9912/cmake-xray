@@ -153,6 +153,7 @@ Der Adapter soll mindestens:
 - von jeder Translation Unit ausgehend Quelldateien lesen und `#include`-Direktiven erkennen
 - direkte Includes rekursiv verfolgen, um einen fuer Hotspots und Impact nutzbaren Include-Graphen zu erhalten
 - Includes gegen die Compile-Eintrag-spezifischen Suchpfade aus `-I`, `-isystem` und `-iquote` sowie gegen den lokalen Quelldateikontext aufloesen
+- relative Suchpfade aus `-I`, `-isystem` und `-iquote` vor der Verwendung reproduzierbar gegen das `directory` des jeweiligen Compile-Eintrags aufloesen
 - Zyklen erkennen und Traversierung dagegen absichern
 - fehlende oder nicht aufloesbare Includes als Diagnostic erfassen, nicht als fatalen Analysefehler
 - die Heuristik-Natur des gesamten Ergebnisses explizit markieren
@@ -172,12 +173,22 @@ Fuer M2 reicht ein pragmatischer Parser:
 - Kommentare und offensichtliche Nicht-Include-Zeilen werden ignoriert
 - tiefere Praeprozessor-Semantik bleibt ausserhalb des Scopes
 
+#### Dokumentierte Suchreihenfolge fuer Includes
+
+Damit die Include-Aufloesung in M2 bei gleichnamigen Headern reproduzierbar bleibt, wird eine feste MVP-Suchreihenfolge definiert:
+
+- fuer `#include "header.h"` wird zuerst relativ zur aktuell analysierten Datei gesucht, danach in `-iquote`-Pfaden in ihrer Auftretensreihenfolge im Compile-Aufruf, danach in `-I`-Pfaden in ihrer Auftretensreihenfolge und zuletzt in `-isystem`-Pfaden in ihrer Auftretensreihenfolge
+- fuer `#include <header.h>` wird nicht relativ zur aktuell analysierten Datei gesucht; stattdessen werden `-I`-Pfad, dann `-isystem`-Pfade jeweils in ihrer Auftretensreihenfolge im Compile-Aufruf durchsucht
+- pro Include-Direktive gewinnt der erste erfolgreich aufgeloeste Pfad; nur dieser Pfad geht in Include-Graph, Hotspots und Impact-Analyse ein
+- diese Suchreihenfolge ist bewusst als dokumentierte MVP-Heuristik zu verstehen; Abweichungen von compilergenauer Aufloesung sind fuer M2 akzeptiert, muessen aber nichtdeterministisches Verhalten ausschliessen
+
 #### Pfadkanonisierung und Vergleich
 
 Damit Ranking, Hotspots und Impact bei realen Daten reproduzierbar funktionieren, legt M2 eine einheitliche Vergleichssemantik fuer Pfade fest:
 
 - Compile-Database-Quelldateien werden fuer Vergleiche gegen das jeweilige `directory` des Eintrags aufgeloest, falls `file` relativ ist
 - ein aufgeloester Header wird fuer Vergleiche als normalisierter Pfadschluessel gespeichert; Grundlage ist der tatsaechlich erfolgreiche Aufloesungspfad ueber Dateikontext und Include-Suchpfade
+- relative Include-Suchpfade aus `-I`, `-iquote` und `-isystem` werden vor der Traversierung gegen das jeweilige `directory` des Compile-Eintrags aufgeloest und anschliessend in dieselbe lexikalische Normalform ueberfuehrt wie TU- und Header-Pfade
 - `--changed-file` wird, falls relativ angegeben, relativ zum Verzeichnis der uebergebenen `compile_commands.json` interpretiert
 - vor Vergleichen werden mindestens `.`- und `..`-Segmente sowie triviale Separatorunterschiede lexikalisch normalisiert
 - eine Aufloesung ueber Symlinks oder Dateisystem-Kanonisierung ist fuer M2 nicht erforderlich; M2 arbeitet mit einer stabilen lexikalischen Normalform
@@ -216,11 +227,11 @@ Die Konsolenausgabe muss mindestens enthalten:
 - Anzahl betroffener Translation Units
 - eine sichtbare Zuordnung zu betroffenen Translation Units; bei Pfadkollisionen muss die Ausgabe die TU-Beobachtungen disambiguieren, zum Beispiel ueber Arbeitsverzeichnis oder einen stabilen TU-Schluessel
 
-Da die Liste betroffener Translation Units gross werden kann, soll M2 fuer die Konsole eine kompakte Vorschau definieren:
+Damit `F-15` und `AK-04` in M2 vollstaendig erfuellt werden, gilt fuer die Konsole:
 
-- pro Hotspot wird standardmaessig nur eine begrenzte Zahl betroffener Translation Units voll ausgeschrieben
-- uebrige Eintraege werden als Restanzahl angezeigt, zum Beispiel `... and 7 more translation units`
-- die Gesamtzahl betroffener Translation Units bleibt immer sichtbar
+- fuer jeden ausgegebenen Hotspot wird die vollstaendige Menge betroffener Translation Units ausgegeben; M2 darf die Zuordnung nicht auf eine Vorschau oder Restanzahl verkuerzen
+- die Darstellung darf kompakt formatiert sein, zum Beispiel eine TU pro Zeile oder als stabil gruppierte Liste, solange keine betroffenen TU-Beobachtungen ausgelassen werden
+- `--top` begrenzt in M2 nur die Anzahl ausgegebener Ranking- bzw. Hotspot-Eintraege, nicht die TU-Zuordnung innerhalb eines bereits ausgegebenen Hotspots
 
 Die gesamte Hotspot-Sektion muss als heuristisch gekennzeichnet werden, solange sie auf dem `SourceParsingIncludeAdapter` beruht. Die Kennzeichnung soll im Abschnitt selbst sichtbar sein, nicht nur in `--help`.
 
@@ -228,7 +239,7 @@ Vorgesehene Artefakte:
 
 - Kernlogik fuer Hotspot-Aggregation im Umfeld von `ProjectAnalyzer`
 - Hotspot-Modelle unter `src/hexagon/model/`
-- Reporter-Unterstuetzung fuer kompakte TU-Vorschauen
+- Reporter-Unterstuetzung fuer vollstaendige, disambiguierte TU-Zuordnungen je Hotspot
 
 **Ergebnis**: `AK-04` wird ueber eine reproduzierbare, heuristisch gekennzeichnete Hotspot-Liste erfuellt.
 
@@ -324,7 +335,7 @@ Entscheidung fuer M2:
 
 - Standardwert fuer `--top` ist `10`
 - die Ausgabe nennt bei Begrenzung immer die Gesamtanzahl, zum Beispiel `top 10 of 37 translation units`
-- die Begrenzung betrifft die Hauptlisten fuer TU-Ranking und Hotspots; Impact-Ergebnisse werden in M2 voll ausgegeben
+- die Begrenzung betrifft nur die Hauptlisten fuer TU-Ranking und Hotspots; die TU-Zuordnung innerhalb eines ausgegebenen Hotspots sowie Impact-Ergebnisse werden in M2 voll ausgegeben
 - Analyse-Diagnostics mit gueltiger Datengrundlage fuehren nicht zu neuen Exit-Codes; sie erscheinen inline im Report
 - die Hilfe fuer `impact` nennt explizit, dass relative `--changed-file`-Pfade relativ zur uebergebenen `compile_commands.json` interpretiert werden
 
@@ -354,6 +365,7 @@ Mindestens benoetigt:
 - Tests fuer Metrikextraktion aus `command`
 - Tests fuer reproduzierbare Rangfolge bei verschiedenen Eingabereihenfolgen
 - Tests dafuer, dass `command`-basierte Eintraege ihre Provenienz bis zur Tokenisierung behalten
+- Tests fuer unklare oder unvollstaendige `command`-Tokenisierung, bei denen die Analyse best effort fortgesetzt und eine Diagnostic erzeugt wird
 - Tests fuer Hotspot-Aggregation, eindeutige TU-Zaehlung und stabile Sortierung
 - Tests fuer Pfadkanonisierung bei relativen, absoluten und lexikalisch aequivalenten Pfaden
 - Tests fuer Impact-Analyse bei direkter TU-Betroffenheit
@@ -366,8 +378,11 @@ Mindestens benoetigt:
 
 - Include-Adapter-Tests fuer direkte Includes
 - Include-Adapter-Tests fuer transitive Includes
+- Include-Adapter-Tests fuer relative Include-Suchpfade aus `-I`, `-iquote` und `-isystem`
+- Include-Adapter-Tests fuer dokumentierte Suchreihenfolge bei gleichnamigen Headern
+- Include-Adapter-Tests fuer Include-Zyklen ohne Endlosschleife und mit stabiler Ergebnisbildung
 - Include-Adapter-Tests fuer unaufloesbare Includes mit Diagnostics
-- Reporter-Tests fuer begrenzte Listen, Heuristik-Kennzeichnung und kompakte TU-Vorschau
+- Reporter-Tests fuer begrenzte Listen, Heuristik-Kennzeichnung und vollstaendige TU-Zuordnung je ausgegebenem Hotspot
 
 #### 1.7c CLI- und End-to-End-Tests
 
@@ -392,6 +407,10 @@ Sinnvoll sind kleine, versionierte Referenzprojekte unter `tests/e2e/testdata/`,
 - `m2/impact_header/` mit transitiven Includes
 - `m2/impact_source/` fuer direkte TU-Betroffenheit
 - `m2/duplicate_tu_entries/` fuer mehrfach vorkommende Quelldateipfade bei unterschiedlichen TU-Beobachtungen
+- `m2/include_relative_paths/` fuer relative Include-Suchpfade aus Compile-Argumenten
+- `m2/include_search_order/` fuer gleichnamige Header und die dokumentierte MVP-Suchreihenfolge
+- `m2/include_cycle/` fuer zyklische Includes ohne Analyseabbruch
+- `m2/command_tokenizer_edgecases/` fuer best-effort-Diagnostics bei schwierigen `command`-Strings
 - `m2/path_semantics/` fuer relative, absolute und lexikalisch aequivalente Pfade
 - `m2/unresolved_include/` fuer Diagnostics und Heuristik-Hinweise
 - `m2/permuted_compile_commands/` als inhaltlich identische, anders sortierte Datenbasis zur Reproduzierbarkeitspruefung
@@ -409,11 +428,16 @@ Mindestens abzudeckende Testmatrix:
 | ------------------------------------------------------------ | ------------------------------------------------------------------------- |
 | `arguments` mit `-I`, `-isystem`, `-iquote`, `-D`            | korrekte Kennzahlen                                                       |
 | `command` mit Quotes und Leerzeichen                         | Tokenizer liefert reproduzierbar nutzbare Argumente                       |
+| unklare `command`-Tokenisierung                              | Analyse laeuft best effort weiter und erzeugt eine Diagnostic             |
 | `command`-basierter Eintrag                                  | Herkunft des Compile-Aufrufs bleibt bis zur Tokenisierung erhalten        |
 | identische Datenbasis in anderer Reihenfolge                 | identisches Ranking und identische Hotspot-Reihenfolge                    |
 | zwei Compile-Eintraege mit gleichem Quelldateipfad           | beide TU-Beobachtungen bleiben erhalten, Ausgabe bleibt eindeutig         |
 | direkter Include-Hotspot in mehreren TUs                     | Header wird mit korrekter TU-Anzahl ausgewiesen                           |
+| Hotspot mit vielen betroffenen TUs                           | jeder ausgegebene Hotspot zeigt die vollstaendige TU-Zuordnung            |
 | zwei TUs mit gleichem Quelldateipfad und gemeinsamem Header  | Hotspot zaehlt beide TU-Beobachtungen, Ausgabe bleibt disambiguiert       |
+| relative Include-Suchpfade in Compile-Argumenten             | Aufloesung erfolgt reproduzierbar relativ zum Compile-`directory`         |
+| gleichnamiger Header in lokalem Kontext und Suchpfaden       | dokumentierte Suchreihenfolge liefert stabil denselben Treffer            |
+| zyklische Includes                                           | Analyse terminiert reproduzierbar ohne Endlosschleife                     |
 | transitive Includes ueber mehrere Header-Stufen              | Impact-Analyse findet betroffene TUs                                      |
 | `impact` mit relativem `--changed-file`                      | Pfad wird relativ zur `compile_commands.json` korrekt aufgeloest          |
 | `impact` mit lexikalisch aequivalentem Pfad (`./`, `..`)     | gleiches fachliches Ergebnis wie mit kanonischer Schreibweise             |
@@ -532,6 +556,8 @@ Die lokale und Docker-Pruefung sollen insbesondere bestaetigen:
 - Exit-Code `0` fuer erfolgreiche `analyze`- und `impact`-Aufrufe mit gueltiger Datengrundlage
 - unveraenderte M1-Fehlercodes fuer ungueltige oder unlesbare Eingaben
 - sichtbare Heuristik-Kennzeichnung in Hotspot- und Header-basierten Impact-Ausgaben
+- vollstaendige TU-Zuordnung fuer jeden ausgegebenen Include-Hotspot
+- dokumentierte Suchreihenfolge und relative Include-Suchpfade fuehren zu reproduzierbaren Header-Treffern
 - reproduzierbare Pfadvergleiche fuer relative und lexikalisch aequivalente `--changed-file`-Angaben
 - reproduzierbare Ausgabe unabhaengig von der Reihenfolge in `compile_commands.json`
 
