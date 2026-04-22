@@ -1,0 +1,12 @@
+[
+  {
+    "directory": "/project/build"
+  },
+  {
+    "file": "/project/src/main.cpp"
+  },
+  {
+    "file": "/project/src/util.cpp",
+    "directory": "/project/build"
+  }
+]

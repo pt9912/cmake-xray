@@ -1,6 +1,8 @@
 add_library(
     xray_adapters
+    cli/cli_adapter.cpp
     cli/placeholder_cli_adapter.cpp
+    input/compile_commands_json_adapter.cpp
     input/json_dependency_probe.cpp
     output/placeholder_report_adapter.cpp
 )

@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include <string_view>
+
 #include "adapters/cli/placeholder_cli_adapter.h"
 #include "adapters/input/json_dependency_probe.h"
 #include "adapters/output/placeholder_report_adapter.h"
@@ -14,11 +16,11 @@ namespace {
 
 class StubAnalyzeProjectPort final : public xray::hexagon::ports::driving::AnalyzeProjectPort {
 public:
-    xray::hexagon::model::AnalysisResult analyze_project() const override {
+    xray::hexagon::model::AnalysisResult analyze_project(
+        std::string_view /*compile_commands_path*/) const override {
         return {
             .application = xray::hexagon::model::application_info(),
-            .compile_database = {.dependency_available = true},
-            .summary = "placeholder binary for milestone M0",
+            .compile_database = {},
         };
     }
 };
@@ -39,11 +41,9 @@ TEST_CASE("driven adapters satisfy their hexagon port interfaces") {
     const xray::hexagon::services::ProjectAnalyzer analyzer{compile_database_adapter};
     const xray::hexagon::services::ReportGenerator generator{report_adapter};
 
-    const auto analysis_result = analyzer.analyze_project();
+    const auto analysis_result = analyzer.analyze_project("");
 
-    CHECK(analysis_result.compile_database.dependency_available);
-    CHECK(generator.generate_report(analysis_result) ==
-          "cmake-xray v0.1.0 placeholder binary for milestone M0");
+    CHECK(analysis_result.compile_database.is_success());
 }
 
 TEST_CASE("cli adapter drives the hexagon through primary ports") {

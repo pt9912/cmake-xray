@@ -6,7 +6,8 @@
 
 namespace xray::adapters::input {
 
-class JsonDependencyProbe final : public xray::hexagon::ports::driven::CompileDatabasePort {
+class CompileCommandsJsonAdapter final
+    : public xray::hexagon::ports::driven::CompileDatabasePort {
 public:
     xray::hexagon::model::CompileDatabaseResult load_compile_database(
         std::string_view path) const override;

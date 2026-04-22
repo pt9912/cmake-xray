@@ -24,7 +24,7 @@ std::string PlaceholderCliAdapter::description() const {
 
 std::string PlaceholderCliAdapter::run() const {
     [[maybe_unused]] const auto app = make_placeholder_app();
-    const auto analysis_result = analyze_project_port_.analyze_project();
+    const auto analysis_result = analyze_project_port_.analyze_project("");
     return generate_report_port_.generate_report(analysis_result);
 }
 

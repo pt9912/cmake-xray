@@ -1,6 +1,8 @@
 #pragma once
 
-#include "hexagon/model/compile_database_status.h"
+#include <string_view>
+
+#include "hexagon/model/compile_database_result.h"
 
 namespace xray::hexagon::ports::driven {
 
@@ -8,7 +10,7 @@ class CompileDatabasePort {
 public:
     virtual ~CompileDatabasePort() = default;
 
-    virtual model::CompileDatabaseStatus load_compile_database() const = 0;
+    virtual model::CompileDatabaseResult load_compile_database(std::string_view path) const = 0;
 };
 
 }  // namespace xray::hexagon::ports::driven

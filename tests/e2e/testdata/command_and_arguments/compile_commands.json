@@ -1,0 +1,8 @@
+[
+  {
+    "directory": "/project/build",
+    "command": "g++ -old-style",
+    "arguments": ["g++", "-std=c++20", "-o", "main.cpp.o", "-c", "/project/src/main.cpp"],
+    "file": "/project/src/main.cpp"
+  }
+]

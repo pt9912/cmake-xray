@@ -3,6 +3,8 @@ add_executable(
     test_main.cpp
     hexagon/test_project_analyzer.cpp
     adapters/test_port_wiring.cpp
+    adapters/test_compile_commands_json.cpp
+    e2e/test_cli.cpp
 )
 
 target_link_libraries(
@@ -14,6 +16,7 @@ target_link_libraries(
 )
 
 add_test(NAME xray_tests COMMAND xray_tests)
+set_tests_properties(xray_tests PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
 add_test(
     NAME hexagon_boundary_check

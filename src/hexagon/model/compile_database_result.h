@@ -1,0 +1,34 @@
+#pragma once
+
+#include <cstddef>
+#include <string>
+#include <vector>
+
+#include "compile_entry.h"
+
+namespace xray::hexagon::model {
+
+enum class CompileDatabaseError {
+    none,
+    file_not_accessible,
+    invalid_json,
+    not_an_array,
+    empty_database,
+    invalid_entries,
+};
+
+struct EntryDiagnostic {
+    std::size_t index;
+    std::string message;
+};
+
+struct CompileDatabaseResult {
+    CompileDatabaseError error{CompileDatabaseError::none};
+    std::string error_description;
+    std::vector<CompileEntry> entries;
+    std::vector<EntryDiagnostic> entry_diagnostics;
+
+    bool is_success() const { return error == CompileDatabaseError::none; }
+};
+
+}  // namespace xray::hexagon::model

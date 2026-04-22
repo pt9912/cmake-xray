@@ -4,11 +4,11 @@
 
 namespace xray::adapters::input {
 
-hexagon::model::CompileDatabaseStatus JsonDependencyProbe::load_compile_database() const {
+hexagon::model::CompileDatabaseResult JsonDependencyProbe::load_compile_database(
+    std::string_view /*path*/) const {
     const auto probe = nlohmann::json::object();
-    return {
-        .dependency_available = probe.is_object(),
-    };
+    static_cast<void>(probe);
+    return {};
 }
 
 }  // namespace xray::adapters::input
