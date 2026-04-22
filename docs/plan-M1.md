@@ -2,12 +2,12 @@
 
 ## 0. Dokumenteninformationen
 
-| Feld | Wert |
-|---|---|
-| Dokument | Plan M1 `cmake-xray` |
-| Version | `0.6` |
-| Stand | `2026-04-22` |
-| Status | Entwurf |
+| Feld       | Wert                                                                                                                                                                   |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dokument   | Plan M1 `cmake-xray`                                                                                                                                                   |
+| Version    | `0.6`                                                                                                                                                                  |
+| Stand      | `2026-04-22`                                                                                                                                                           |
+| Status     | Abgeschlossen                                                                                                                                                          |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M0](./plan-M0.md), [Qualitaet](./quality.md) |
 
 ### 0.1 Zweck
@@ -201,13 +201,13 @@ Fuer M1 reicht eine kleine feste Menge dokumentierter Codes. Wichtiger als die k
 
 Vorgeschlagene M1-Exit-Codes:
 
-| Code | Bedeutung | Typischer Ausloeser |
-|---|---|---|
-| `0` | Erfolg | gueltige CLI-Verwendung und gueltige Eingabedaten |
-| `1` | (reserviert) | unerwartete Laufzeitfehler — wird in M1 nicht aktiv vergeben, bleibt als Auffangcode frei |
-| `2` | CLI-Verwendungsfehler | unbekanntes Unterkommando, fehlendes Pflichtargument |
-| `3` | Eingabedatei nicht lesbar | Datei fehlt, kein Zugriff, Pfad ungueltig |
-| `4` | Eingabedaten ungueltig | JSON fehlerhaft, kein Array, leer, Pflichtfelder fehlen |
+| Code | Bedeutung                 | Typischer Ausloeser                                                                       |
+| ---- | ------------------------- | ----------------------------------------------------------------------------------------- |
+| `0`  | Erfolg                    | gueltige CLI-Verwendung und gueltige Eingabedaten                                         |
+| `1`  | (reserviert)              | unerwartete Laufzeitfehler — wird in M1 nicht aktiv vergeben, bleibt als Auffangcode frei |
+| `2`  | CLI-Verwendungsfehler     | unbekanntes Unterkommando, fehlendes Pflichtargument                                      |
+| `3`  | Eingabedatei nicht lesbar | Datei fehlt, kein Zugriff, Pfad ungueltig                                                 |
+| `4`  | Eingabedaten ungueltig    | JSON fehlerhaft, kein Array, leer, Pflichtfelder fehlen                                   |
 
 Fehlermeldungen sollen nach einem einheitlichen Muster aufgebaut sein:
 
@@ -312,38 +312,38 @@ Adapter-Tests fuer feinere Randfaelle (z.B. `arguments: [""]`, leeres `arguments
 
 #### Empfohlene Testaufteilung
 
-| Ebene | Fokus | Beispiel |
-|---|---|---|
-| Hexagon-Test | Modell und Statusauswertung ohne Dateisystem | Validierungsstatus fuer leer oder gueltig |
-| Adapter-Test | JSON-Datei lesen, validieren, normalisieren | fehlendes `file`, fehlendes `directory`, nur `arguments` |
-| CLI-Test | Hilfe, Fehlertexte, Exit-Codes | fehlender Pfad, ungueltige Datei, Erfolg |
-| End-to-End-Test | Binary mit Referenzdateien | `analyze --compile-commands ...` gegen Testdaten |
+| Ebene           | Fokus                                        | Beispiel                                                 |
+| --------------- | -------------------------------------------- | -------------------------------------------------------- |
+| Hexagon-Test    | Modell und Statusauswertung ohne Dateisystem | Validierungsstatus fuer leer oder gueltig                |
+| Adapter-Test    | JSON-Datei lesen, validieren, normalisieren  | fehlendes `file`, fehlendes `directory`, nur `arguments` |
+| CLI-Test        | Hilfe, Fehlertexte, Exit-Codes               | fehlender Pfad, ungueltige Datei, Erfolg                 |
+| End-to-End-Test | Binary mit Referenzdateien                   | `analyze --compile-commands ...` gegen Testdaten         |
 
 #### Testmatrix
 
 Mindestens abzudeckende Testmatrix:
 
-| Fall | Erwartung |
-|---|---|
-| gueltiger Compile-Eintrag (Hexagon) | Modell enthaelt Quelldatei, Arbeitsverzeichnis und Compile-Aufruf |
-| leere Eingabeliste (Hexagon) | Diagnosestatus zeigt leere Datenbasis an |
-| Eingabeliste mit Fehlern (Hexagon) | Diagnosestatus enthaelt Fehlerkategorie und betroffene Eintraege |
-| gueltige Datei mit einem Eintrag | Exit `0`, Ausgabe der Anzahl geladener Eintraege |
-| Datei nicht vorhanden | Exit `3`, klare Fehlermeldung |
-| syntaktisch fehlerhafte JSON-Datei | Exit `4`, Hinweis auf Syntaxfehler |
-| JSON-Wurzel ist kein Array | Exit `4`, Hinweis auf erwartetes Array |
-| leeres Array | Exit `4`, klare Rueckmeldung zu leerer Datenbasis |
-| Eintrag ohne `file` | Exit `4`, Eintragsfehler benannt |
-| Eintrag ohne `directory` | Exit `4`, Eintragsfehler benannt |
-| Eintrag ohne `command` und ohne `arguments` | Exit `4`, Eintragsfehler benannt |
-| Eintrag nur mit `command`, kein `arguments` | Exit `0`, `command` wird verwendet |
-| Eintrag mit `command` und `arguments` | Exit `0`, `arguments` bevorzugt |
-| Eintrag mit leerem `arguments` (`[]`) und gueltigem `command` | Exit `0`, Fallback auf `command` |
-| Eintrag mit leerem `arguments` (`[]`) und ohne `command` | Exit `4`, Eintragsfehler benannt |
-| gemischt gueltige und ungueltige Eintraege | Exit `4`, alle Fehler gesammelt, Datenbasis abgelehnt |
-| `--help` fuer Hauptkommando | Exit `0`, Hilfetext auf `stdout` |
-| `analyze --help` | Exit `0`, Hilfetext auf `stdout` |
-| fehlendes Pflichtargument `--compile-commands` | Exit `2`, Nutzungsfehler |
+| Fall                                                          | Erwartung                                                         |
+| ------------------------------------------------------------- | ----------------------------------------------------------------- |
+| gueltiger Compile-Eintrag (Hexagon)                           | Modell enthaelt Quelldatei, Arbeitsverzeichnis und Compile-Aufruf |
+| leere Eingabeliste (Hexagon)                                  | Diagnosestatus zeigt leere Datenbasis an                          |
+| Eingabeliste mit Fehlern (Hexagon)                            | Diagnosestatus enthaelt Fehlerkategorie und betroffene Eintraege  |
+| gueltige Datei mit einem Eintrag                              | Exit `0`, Ausgabe der Anzahl geladener Eintraege                  |
+| Datei nicht vorhanden                                         | Exit `3`, klare Fehlermeldung                                     |
+| syntaktisch fehlerhafte JSON-Datei                            | Exit `4`, Hinweis auf Syntaxfehler                                |
+| JSON-Wurzel ist kein Array                                    | Exit `4`, Hinweis auf erwartetes Array                            |
+| leeres Array                                                  | Exit `4`, klare Rueckmeldung zu leerer Datenbasis                 |
+| Eintrag ohne `file`                                           | Exit `4`, Eintragsfehler benannt                                  |
+| Eintrag ohne `directory`                                      | Exit `4`, Eintragsfehler benannt                                  |
+| Eintrag ohne `command` und ohne `arguments`                   | Exit `4`, Eintragsfehler benannt                                  |
+| Eintrag nur mit `command`, kein `arguments`                   | Exit `0`, `command` wird verwendet                                |
+| Eintrag mit `command` und `arguments`                         | Exit `0`, `arguments` bevorzugt                                   |
+| Eintrag mit leerem `arguments` (`[]`) und gueltigem `command` | Exit `0`, Fallback auf `command`                                  |
+| Eintrag mit leerem `arguments` (`[]`) und ohne `command`      | Exit `4`, Eintragsfehler benannt                                  |
+| gemischt gueltige und ungueltige Eintraege                    | Exit `4`, alle Fehler gesammelt, Datenbasis abgelehnt             |
+| `--help` fuer Hauptkommando                                   | Exit `0`, Hilfetext auf `stdout`                                  |
+| `analyze --help`                                              | Exit `0`, Hilfetext auf `stdout`                                  |
+| fehlendes Pflichtargument `--compile-commands`                | Exit `2`, Nutzungsfehler                                          |
 
 **Ergebnis**: Die M1-Anforderungen sind nicht nur manuell, sondern automatisiert gegen Referenzdaten abgesichert.
 
@@ -367,36 +367,36 @@ Zusaetzlich ist die Versionsnummer in `application_info.h` und in der Root-`CMak
 
 Folgende Dateien oder Dateigruppen sollen nach M1 voraussichtlich neu entstehen oder substanziell ueberarbeitet sein:
 
-| Bereich | Zielartefakte |
-|---|---|
-| Kernmodell | `src/hexagon/model/compile_entry.h`, erweiterte Status- oder Diagnosemodelle |
-| Driven Port | `src/hexagon/ports/driven/compile_database_port.h` |
-| Driving Port | `src/hexagon/ports/driving/analyze_project_port.h` |
-| Input-Adapter | `src/adapters/input/compile_commands_json_adapter.h`, `src/adapters/input/compile_commands_json_adapter.cpp` |
-| CLI-Adapter | `src/adapters/cli/cli_adapter.h`, `src/adapters/cli/cli_adapter.cpp`, optional `src/adapters/cli/exit_codes.h` |
-| Composition Root | `src/main.cpp` |
-| Version | `src/hexagon/model/application_info.h` — Versionsnummer auf `v0.2.0` aktualisieren |
-| Version | Root-`CMakeLists.txt` — Projektversionsnummer auf `0.2.0` aktualisieren |
-| Build-Konfiguration | `src/adapters/CMakeLists.txt` — Quelldateien fuer umbenannte Adapter anpassen |
-| Build-Konfiguration | `tests/CMakeLists.txt` — neue Testdateien und E2E-Targets aufnehmen |
-| Adapter-Tests | `tests/adapters/test_compile_commands_json.cpp` |
-| CLI-/E2E-Tests | neue Tests unter `tests/e2e/` mit Referenzdaten unter `tests/e2e/testdata/` |
-| Dokumentation | `README.md`, gegebenenfalls `CHANGELOG.md` bei Releaseabschluss |
+| Bereich             | Zielartefakte                                                                                                  |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Kernmodell          | `src/hexagon/model/compile_entry.h`, erweiterte Status- oder Diagnosemodelle                                   |
+| Driven Port         | `src/hexagon/ports/driven/compile_database_port.h`                                                             |
+| Driving Port        | `src/hexagon/ports/driving/analyze_project_port.h`                                                             |
+| Input-Adapter       | `src/adapters/input/compile_commands_json_adapter.h`, `src/adapters/input/compile_commands_json_adapter.cpp`   |
+| CLI-Adapter         | `src/adapters/cli/cli_adapter.h`, `src/adapters/cli/cli_adapter.cpp`, optional `src/adapters/cli/exit_codes.h` |
+| Composition Root    | `src/main.cpp`                                                                                                 |
+| Version             | `src/hexagon/model/application_info.h` — Versionsnummer auf `v0.2.0` aktualisieren                             |
+| Version             | Root-`CMakeLists.txt` — Projektversionsnummer auf `0.2.0` aktualisieren                                        |
+| Build-Konfiguration | `src/adapters/CMakeLists.txt` — Quelldateien fuer umbenannte Adapter anpassen                                  |
+| Build-Konfiguration | `tests/CMakeLists.txt` — neue Testdateien und E2E-Targets aufnehmen                                            |
+| Adapter-Tests       | `tests/adapters/test_compile_commands_json.cpp`                                                                |
+| CLI-/E2E-Tests      | neue Tests unter `tests/e2e/` mit Referenzdaten unter `tests/e2e/testdata/`                                    |
+| Dokumentation       | `README.md`, gegebenenfalls `CHANGELOG.md` bei Releaseabschluss                                                |
 
 Hinweis: Die konkreten Dateinamen duerfen von dieser Zielstruktur abweichen, wenn die hexagonale Trennung und die Rueckverfolgbarkeit zu `F-01` bis `F-04`, `F-31` bis `F-34` erhalten bleiben.
 
 ## 3. Reihenfolge
 
-| Schritt | Arbeitspaket | Abhaengig von |
-|---|---|---|
-| 1a | 1.1 Compile-Database-Modell im Kern schaerfen | M0 |
-| 1b | 1.4 Exit-Codes und Fehlermeldungsregeln festlegen | M0 |
-| 2a | 1.2 `CompileCommandsJsonAdapter` umsetzen | 1a |
-| 2b | 1.6a Adapter-Tests fuer M1 | 2a |
-| 3 | 1.3 CLI-Grundstruktur fuer M1 aufbauen | 1a, 1b, 2a |
-| 4 | 1.5 Konfigurierbare Eingabepfade vorbereiten | 3 |
-| 5 | 1.6b CLI- und End-to-End-Tests fuer M1 | 3, 4 |
-| 6 | 1.7 README, CHANGELOG und Nutzungsbeispiele aktualisieren | 3, 4, 5 |
+| Schritt | Arbeitspaket                                              | Abhaengig von |
+| ------- | --------------------------------------------------------- | ------------- |
+| 1a      | 1.1 Compile-Database-Modell im Kern schaerfen             | M0            |
+| 1b      | 1.4 Exit-Codes und Fehlermeldungsregeln festlegen         | M0            |
+| 2a      | 1.2 `CompileCommandsJsonAdapter` umsetzen                 | 1a            |
+| 2b      | 1.6a Adapter-Tests fuer M1                                | 2a            |
+| 3       | 1.3 CLI-Grundstruktur fuer M1 aufbauen                    | 1a, 1b, 2a    |
+| 4       | 1.5 Konfigurierbare Eingabepfade vorbereiten              | 3             |
+| 5       | 1.6b CLI- und End-to-End-Tests fuer M1                    | 3, 4          |
+| 6       | 1.7 README, CHANGELOG und Nutzungsbeispiele aktualisieren | 3, 4, 5       |
 
 Schritte 1a und 1b koennen parallel bearbeitet werden. Die Exit-Code-Regeln (1b) sind eine reine Konventionsentscheidung ohne Code-Abhaengigkeit zum Kernmodell und sollten frueh feststehen, damit Adapter und CLI sie von Anfang an korrekt verwenden. Schritte 2a und 2b koennen ebenfalls parallel bearbeitet werden, sofern der Adapter frueher fertig ist; Adapter-Tests (2b) koennen direkt nach dem Adapter geschrieben werden, ohne auf die CLI zu warten. CLI- und End-to-End-Tests (5) setzen die fertige CLI voraus.
 
@@ -449,38 +449,38 @@ Hinweis: Falls das Runtime-Image bewusst schlank bleiben soll, werden Referenzda
 
 ## 5. Rueckverfolgbarkeit
 
-| Planbereich | Lastenheft-Kennungen |
-|---|---|
-| Compile-Database-Modell und Adapter | `F-01`, `F-02`, `F-03`, `F-04`, `F-41` |
-| CLI-Struktur und Hilfe | `F-31`, `F-32`, `AK-09`, `NF-01` |
-| Exit-Codes und Fehlermeldungen | `F-33`, `F-34`, `AK-02`, `NF-02`, `NF-14` |
-| Pfadsteuerung | `F-35`, vorbereitend `F-36` |
-| Tests und Referenzdaten | `AK-01`, `AK-02`, `AK-09`, `NF-10` |
+| Planbereich                         | Lastenheft-Kennungen                      |
+| ----------------------------------- | ----------------------------------------- |
+| Compile-Database-Modell und Adapter | `F-01`, `F-02`, `F-03`, `F-04`, `F-41`    |
+| CLI-Struktur und Hilfe              | `F-31`, `F-32`, `AK-09`, `NF-01`          |
+| Exit-Codes und Fehlermeldungen      | `F-33`, `F-34`, `AK-02`, `NF-02`, `NF-14` |
+| Pfadsteuerung                       | `F-35`, vorbereitend `F-36`               |
+| Tests und Referenzdaten             | `AK-01`, `AK-02`, `AK-09`, `NF-10`        |
 
 ## 6. Entschiedene und offene Punkte
 
 ### 6.1 Entschieden
 
-| Frage | Entscheidung | Verweis |
-|---|---|---|
-| Exit-Code-Mapping | `0`/`2`/`3`/`4` gemaess Tabelle in AP 1.4 | AP 1.4 |
-| `command` vs. `arguments` | Beide akzeptiert; `arguments` bevorzugt wenn beide vorhanden, `command` als Fallback — kein Hinweis bei Koexistenz | AP 1.2 |
-| Standardpfad in M1 | Optional, kein Abschlusskriterium — kuenftiges Breaking Change (`--compile-commands` wird optional) ist akzeptiert | AP 1.5 |
-| Minimalverhalten bei Erfolg | Ausgabe der Anzahl geladener Eintraege (`entries`, nicht `translation units` — eine TU kann mehrere Eintraege haben, und umgekehrt koennen Duplikate denselben Quellpfad mehrfach beschreiben, siehe Entscheidung "Duplikate in Eingabedaten"); Format `compile database loaded: <n> entries`, Plural auch bei n=1 | AP 1.3 |
-| Diagnose-zu-Exit-Code-Zuordnung | Liegt im CLI-Adapter, nicht im Hexagon | AP 1.1, 1.4 |
-| JSON-Parsing-Strategie | DOM-Parsing mit nlohmann/json, kein Groessenlimit fuer M1 | AP 1.2 |
-| Gemischt gueltige/ungueltige Eintraege | Alle Fehler sammeln und zusammen auf `stderr` melden, Exit `4` — gesamte Datenbasis wird abgelehnt (kein Teilerfolg), vermeidet Korrekturschleifen bei systematischen Problemen | AP 1.2, 1.4 |
-| Leeres `arguments`-Array | Gilt als "nicht vorhanden"; ist zusaetzlich kein `command` gesetzt, ist der Eintrag ungueltig | AP 1.2 |
-| Optionale Felder (`output`) | Werden fuer M1 weder ausgewertet noch im Modell `compile_entry.h` gefuehrt; koennen in spaeteren Milestones bei Bedarf ergaenzt werden | AP 1.1, 1.2 |
-| Exit-Code `1` | Reserviert fuer unerwartete Laufzeitfehler, wird in M1 nicht aktiv vergeben | AP 1.4 |
-| CLI11-Exit-Code-Mapping | CLI11-Parse-Fehler werden abgefangen und auf Exit-Code `2` gemappt | AP 1.3 |
-| Fehlersammlungs-Obergrenze | Ab 20 gesammelten Eintragsfehler wird die Ausgabe abgeschnitten, Gesamtzahl angezeigt — als benannte Konstante im Adapter, fuer M1 nicht per CLI konfigurierbar | AP 1.2 |
-| `arguments` mit leeren Strings | `[""]` gilt als nicht leer und wird akzeptiert; tiefere Inhaltsvalidierung nicht in M1 | AP 1.2 |
-| `GenerateReportPort` in M1 | Nicht vom CLI-Adapter angesteuert; Service und Adapter bleiben im Code, werden spaeter wieder eingebunden | AP 1.3 |
-| Minimalausgabe bei Erfolg | Bewusst temporaer; wird in M2 durch echte Analyseergebnisse ersetzt, betroffene Tests muessen dann angepasst werden | AP 1.3 |
-| `command`-Splitting | Der `command`-String wird als Ganzes gespeichert; Splitting in einzelne Argumente ist nicht Bestandteil von M1 | AP 1.2 |
-| Pfadnormalisierung | `file` und `directory` werden nicht aufgeloest oder normalisiert; geprueft wird nur Vorhandensein und Nicht-Leer-Sein | AP 1.2 |
-| Duplikate in Eingabedaten | Mehrfach vorkommende Quelldateien (z.B. Multi-Config-Builds) werden akzeptiert und unveraendert uebernommen — keine Deduplizierung in M1 | AP 1.2 |
+| Frage                                  | Entscheidung                                                                                                                                                                                                                                                                                                       | Verweis     |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
+| Exit-Code-Mapping                      | `0`/`2`/`3`/`4` gemaess Tabelle in AP 1.4                                                                                                                                                                                                                                                                          | AP 1.4      |
+| `command` vs. `arguments`              | Beide akzeptiert; `arguments` bevorzugt wenn beide vorhanden, `command` als Fallback — kein Hinweis bei Koexistenz                                                                                                                                                                                                 | AP 1.2      |
+| Standardpfad in M1                     | Optional, kein Abschlusskriterium — kuenftiges Breaking Change (`--compile-commands` wird optional) ist akzeptiert                                                                                                                                                                                                 | AP 1.5      |
+| Minimalverhalten bei Erfolg            | Ausgabe der Anzahl geladener Eintraege (`entries`, nicht `translation units` — eine TU kann mehrere Eintraege haben, und umgekehrt koennen Duplikate denselben Quellpfad mehrfach beschreiben, siehe Entscheidung "Duplikate in Eingabedaten"); Format `compile database loaded: <n> entries`, Plural auch bei n=1 | AP 1.3      |
+| Diagnose-zu-Exit-Code-Zuordnung        | Liegt im CLI-Adapter, nicht im Hexagon                                                                                                                                                                                                                                                                             | AP 1.1, 1.4 |
+| JSON-Parsing-Strategie                 | DOM-Parsing mit nlohmann/json, kein Groessenlimit fuer M1                                                                                                                                                                                                                                                          | AP 1.2      |
+| Gemischt gueltige/ungueltige Eintraege | Alle Fehler sammeln und zusammen auf `stderr` melden, Exit `4` — gesamte Datenbasis wird abgelehnt (kein Teilerfolg), vermeidet Korrekturschleifen bei systematischen Problemen                                                                                                                                    | AP 1.2, 1.4 |
+| Leeres `arguments`-Array               | Gilt als "nicht vorhanden"; ist zusaetzlich kein `command` gesetzt, ist der Eintrag ungueltig                                                                                                                                                                                                                      | AP 1.2      |
+| Optionale Felder (`output`)            | Werden fuer M1 weder ausgewertet noch im Modell `compile_entry.h` gefuehrt; koennen in spaeteren Milestones bei Bedarf ergaenzt werden                                                                                                                                                                             | AP 1.1, 1.2 |
+| Exit-Code `1`                          | Reserviert fuer unerwartete Laufzeitfehler, wird in M1 nicht aktiv vergeben                                                                                                                                                                                                                                        | AP 1.4      |
+| CLI11-Exit-Code-Mapping                | CLI11-Parse-Fehler werden abgefangen und auf Exit-Code `2` gemappt                                                                                                                                                                                                                                                 | AP 1.3      |
+| Fehlersammlungs-Obergrenze             | Ab 20 gesammelten Eintragsfehler wird die Ausgabe abgeschnitten, Gesamtzahl angezeigt — als benannte Konstante im Adapter, fuer M1 nicht per CLI konfigurierbar                                                                                                                                                    | AP 1.2      |
+| `arguments` mit leeren Strings         | `[""]` gilt als nicht leer und wird akzeptiert; tiefere Inhaltsvalidierung nicht in M1                                                                                                                                                                                                                             | AP 1.2      |
+| `GenerateReportPort` in M1             | Nicht vom CLI-Adapter angesteuert; Service und Adapter bleiben im Code, werden spaeter wieder eingebunden                                                                                                                                                                                                          | AP 1.3      |
+| Minimalausgabe bei Erfolg              | Bewusst temporaer; wird in M2 durch echte Analyseergebnisse ersetzt, betroffene Tests muessen dann angepasst werden                                                                                                                                                                                                | AP 1.3      |
+| `command`-Splitting                    | Der `command`-String wird als Ganzes gespeichert; Splitting in einzelne Argumente ist nicht Bestandteil von M1                                                                                                                                                                                                     | AP 1.2      |
+| Pfadnormalisierung                     | `file` und `directory` werden nicht aufgeloest oder normalisiert; geprueft wird nur Vorhandensein und Nicht-Leer-Sein                                                                                                                                                                                              | AP 1.2      |
+| Duplikate in Eingabedaten              | Mehrfach vorkommende Quelldateien (z.B. Multi-Config-Builds) werden akzeptiert und unveraendert uebernommen — keine Deduplizierung in M1                                                                                                                                                                           | AP 1.2      |
 
 ### 6.2 Offen
 
