@@ -1,6 +1,8 @@
 #include <doctest/doctest.h>
 
 #include <cstddef>
+#include <cstdio>
+#include <fstream>
 #include <string>
 
 #include "adapters/input/compile_commands_json_adapter.h"
@@ -150,4 +152,23 @@ TEST_CASE("entry with empty arguments and no command is invalid") {
     REQUIRE(result.entry_diagnostics().size() >= 3);
     CHECK(result.entry_diagnostics()[2].index() == 2);
     CHECK(result.entry_diagnostics()[2].message().find("\"command\"") != std::string::npos);
+}
+
+TEST_CASE("entry with empty arguments array and no command is rejected") {
+    // Inline JSON: arguments is [], no command field — must fail with exit 4
+    // This covers the testmatrix case from plan-M1.md:342 explicitly.
+    const std::string path = "tests/e2e/testdata/empty_args_no_cmd.json";
+    // Write inline test file
+    {
+        std::ofstream f(path);
+        f << R"([{"file": "main.cpp", "directory": "/project", "arguments": []}])";
+    }
+    const CompileCommandsJsonAdapter adapter;
+    const auto result = adapter.load_compile_database(path);
+    std::remove(path.c_str());
+
+    CHECK_FALSE(result.is_success());
+    CHECK(result.error() == CompileDatabaseError::invalid_entries);
+    REQUIRE(result.entry_diagnostics().size() == 1);
+    CHECK(result.entry_diagnostics()[0].message().find("\"command\"") != std::string::npos);
 }

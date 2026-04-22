@@ -68,6 +68,34 @@ TEST_CASE("project analyzer propagates compile database errors") {
     CHECK(result.compile_database.error() == CompileDatabaseError::empty_database);
 }
 
+TEST_CASE("project analyzer propagates entry diagnostics from driven port") {
+    class InvalidEntriesPort final
+        : public xray::hexagon::ports::driven::CompileDatabasePort {
+    public:
+        CompileDatabaseResult load_compile_database(std::string_view /*path*/) const override {
+            return CompileDatabaseResult{
+                CompileDatabaseError::invalid_entries,
+                "2 invalid entries",
+                {},
+                {xray::hexagon::model::EntryDiagnostic{0, "missing \"file\" field"},
+                 xray::hexagon::model::EntryDiagnostic{3, "missing \"command\" and \"arguments\""}},
+                2};
+        }
+    };
+
+    const InvalidEntriesPort compile_database_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{compile_database_port};
+
+    const auto result = analyzer.analyze_project("/path/to/compile_commands.json");
+
+    CHECK_FALSE(result.compile_database.is_success());
+    CHECK(result.compile_database.error() == CompileDatabaseError::invalid_entries);
+    CHECK(result.compile_database.total_invalid_entries() == 2);
+    REQUIRE(result.compile_database.entry_diagnostics().size() == 2);
+    CHECK(result.compile_database.entry_diagnostics()[0].index() == 0);
+    CHECK(result.compile_database.entry_diagnostics()[1].index() == 3);
+}
+
 TEST_CASE("report generator delegates rendering to the report writer port") {
     const StubReportWriterPort report_writer_port;
     const xray::hexagon::services::ReportGenerator generator{report_writer_port};
