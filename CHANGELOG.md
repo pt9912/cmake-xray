@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [1.0.0] - 2026-04-22
+
+### Added
+
 - `MarkdownReportAdapter` with deterministic `analyze` and `impact` reports for human-readable artifacts and CI goldens
 - CLI report selection via `--format console|markdown` and atomic markdown file output via `--output <path>`
 - versioned M3 report fixtures, markdown golden files, example reports under `docs/examples/`, and E2E byte-compare coverage for console and markdown
