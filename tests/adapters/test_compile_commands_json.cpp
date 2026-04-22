@@ -22,10 +22,10 @@ TEST_CASE("valid compile_commands.json loads successfully") {
     const auto result = adapter.load_compile_database(testdata + "valid/compile_commands.json");
 
     CHECK(result.is_success());
-    REQUIRE(result.entries.size() == 1);
-    CHECK(result.entries[0].file() == "/project/src/main.cpp");
-    CHECK(result.entries[0].directory() == "/project/build");
-    CHECK_FALSE(result.entries[0].arguments().empty());
+    REQUIRE(result.entries().size() == 1);
+    CHECK(result.entries()[0].file() == "/project/src/main.cpp");
+    CHECK(result.entries()[0].directory() == "/project/build");
+    CHECK_FALSE(result.entries()[0].arguments().empty());
 }
 
 TEST_CASE("entry with only command field loads successfully") {
@@ -34,9 +34,9 @@ TEST_CASE("entry with only command field loads successfully") {
         adapter.load_compile_database(testdata + "only_command/compile_commands.json");
 
     CHECK(result.is_success());
-    REQUIRE(result.entries.size() == 1);
-    CHECK(result.entries[0].arguments().size() == 1);
-    CHECK(result.entries[0].arguments()[0] ==
+    REQUIRE(result.entries().size() == 1);
+    CHECK(result.entries()[0].arguments().size() == 1);
+    CHECK(result.entries()[0].arguments()[0] ==
           "g++ -std=c++20 -o main.cpp.o -c /project/src/main.cpp");
 }
 
@@ -46,9 +46,9 @@ TEST_CASE("entry with command and arguments uses arguments") {
         adapter.load_compile_database(testdata + "command_and_arguments/compile_commands.json");
 
     CHECK(result.is_success());
-    REQUIRE(result.entries.size() == 1);
-    CHECK(result.entries[0].arguments().size() == 6);
-    CHECK(result.entries[0].arguments()[0] == "g++");
+    REQUIRE(result.entries().size() == 1);
+    CHECK(result.entries()[0].arguments().size() == 6);
+    CHECK(result.entries()[0].arguments()[0] == "g++");
 }
 
 TEST_CASE("entry with empty arguments array falls back to command") {
@@ -57,8 +57,8 @@ TEST_CASE("entry with empty arguments array falls back to command") {
         testdata + "empty_arguments_with_command/compile_commands.json");
 
     CHECK(result.is_success());
-    REQUIRE(result.entries.size() == 1);
-    CHECK(result.entries[0].arguments().size() == 1);
+    REQUIRE(result.entries().size() == 1);
+    CHECK(result.entries()[0].arguments().size() == 1);
 }
 
 // --- Error cases ---
@@ -68,8 +68,8 @@ TEST_CASE("file not found returns file_not_accessible error") {
     const auto result = adapter.load_compile_database("/nonexistent/compile_commands.json");
 
     CHECK_FALSE(result.is_success());
-    CHECK(result.error == CompileDatabaseError::file_not_accessible);
-    CHECK(result.error_description.find("/nonexistent/") != std::string::npos);
+    CHECK(result.error() == CompileDatabaseError::file_not_accessible);
+    CHECK(result.error_description().find("/nonexistent/") != std::string::npos);
 }
 
 TEST_CASE("syntactically invalid JSON returns invalid_json error") {
@@ -78,7 +78,7 @@ TEST_CASE("syntactically invalid JSON returns invalid_json error") {
         adapter.load_compile_database(testdata + "invalid_syntax/compile_commands.json");
 
     CHECK_FALSE(result.is_success());
-    CHECK(result.error == CompileDatabaseError::invalid_json);
+    CHECK(result.error() == CompileDatabaseError::invalid_json);
 }
 
 TEST_CASE("root is not an array returns not_an_array error") {
@@ -87,7 +87,7 @@ TEST_CASE("root is not an array returns not_an_array error") {
         adapter.load_compile_database(testdata + "not_an_array/compile_commands.json");
 
     CHECK_FALSE(result.is_success());
-    CHECK(result.error == CompileDatabaseError::not_an_array);
+    CHECK(result.error() == CompileDatabaseError::not_an_array);
 }
 
 TEST_CASE("empty array returns empty_database error") {
@@ -96,7 +96,7 @@ TEST_CASE("empty array returns empty_database error") {
         adapter.load_compile_database(testdata + "empty/compile_commands.json");
 
     CHECK_FALSE(result.is_success());
-    CHECK(result.error == CompileDatabaseError::empty_database);
+    CHECK(result.error() == CompileDatabaseError::empty_database);
 }
 
 TEST_CASE("entries with missing fields return invalid_entries error") {
@@ -105,9 +105,9 @@ TEST_CASE("entries with missing fields return invalid_entries error") {
         adapter.load_compile_database(testdata + "missing_fields/compile_commands.json");
 
     CHECK_FALSE(result.is_success());
-    CHECK(result.error == CompileDatabaseError::invalid_entries);
-    CHECK(result.entries.empty());
-    CHECK(result.entry_diagnostics.size() == 3);
+    CHECK(result.error() == CompileDatabaseError::invalid_entries);
+    CHECK(result.entries().empty());
+    CHECK(result.entry_diagnostics().size() == 3);
 }
 
 TEST_CASE("mixed valid and invalid entries rejects entire database") {
@@ -116,10 +116,10 @@ TEST_CASE("mixed valid and invalid entries rejects entire database") {
         adapter.load_compile_database(testdata + "mixed_valid_invalid/compile_commands.json");
 
     CHECK_FALSE(result.is_success());
-    CHECK(result.error == CompileDatabaseError::invalid_entries);
-    CHECK(result.entries.empty());
-    REQUIRE(result.entry_diagnostics.size() == 1);
-    CHECK(result.entry_diagnostics[0].index() == 1);
+    CHECK(result.error() == CompileDatabaseError::invalid_entries);
+    CHECK(result.entries().empty());
+    REQUIRE(result.entry_diagnostics().size() == 1);
+    CHECK(result.entry_diagnostics()[0].index() == 1);
 }
 
 TEST_CASE("entry missing file field is diagnosed") {
@@ -127,9 +127,9 @@ TEST_CASE("entry missing file field is diagnosed") {
     const auto result =
         adapter.load_compile_database(testdata + "missing_fields/compile_commands.json");
 
-    REQUIRE(!result.entry_diagnostics.empty());
-    CHECK(result.entry_diagnostics[0].index() == 0);
-    CHECK(result.entry_diagnostics[0].message().find("\"file\"") != std::string::npos);
+    REQUIRE(!result.entry_diagnostics().empty());
+    CHECK(result.entry_diagnostics()[0].index() == 0);
+    CHECK(result.entry_diagnostics()[0].message().find("\"file\"") != std::string::npos);
 }
 
 TEST_CASE("entry missing directory field is diagnosed") {
@@ -137,9 +137,9 @@ TEST_CASE("entry missing directory field is diagnosed") {
     const auto result =
         adapter.load_compile_database(testdata + "missing_fields/compile_commands.json");
 
-    REQUIRE(result.entry_diagnostics.size() >= 2);
-    CHECK(result.entry_diagnostics[1].index() == 1);
-    CHECK(result.entry_diagnostics[1].message().find("\"directory\"") != std::string::npos);
+    REQUIRE(result.entry_diagnostics().size() >= 2);
+    CHECK(result.entry_diagnostics()[1].index() == 1);
+    CHECK(result.entry_diagnostics()[1].message().find("\"directory\"") != std::string::npos);
 }
 
 TEST_CASE("entry with empty arguments and no command is invalid") {
@@ -147,7 +147,7 @@ TEST_CASE("entry with empty arguments and no command is invalid") {
     const auto result =
         adapter.load_compile_database(testdata + "missing_fields/compile_commands.json");
 
-    REQUIRE(result.entry_diagnostics.size() >= 3);
-    CHECK(result.entry_diagnostics[2].index() == 2);
-    CHECK(result.entry_diagnostics[2].message().find("\"command\"") != std::string::npos);
+    REQUIRE(result.entry_diagnostics().size() >= 3);
+    CHECK(result.entry_diagnostics()[2].index() == 2);
+    CHECK(result.entry_diagnostics()[2].message().find("\"command\"") != std::string::npos);
 }

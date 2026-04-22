@@ -22,12 +22,7 @@ using xray::hexagon::model::EntryDiagnostic;
 constexpr std::size_t max_reported_entry_errors = 20;
 
 CompileDatabaseResult make_error(CompileDatabaseError error, std::string description) {
-    return {
-        .error = error,
-        .error_description = std::move(description),
-        .entries = {},
-        .entry_diagnostics = {},
-    };
+    return CompileDatabaseResult{error, std::move(description), {}, {}};
 }
 
 struct EntryValidation {
@@ -140,20 +135,13 @@ CompileDatabaseResult CompileCommandsJsonAdapter::load_compile_database(
         std::string description = "compile_commands.json contains " +
                                   std::to_string(total_invalid) +
                                   " invalid entries: " + std::string(path);
-        return {
-            .error = CompileDatabaseError::invalid_entries,
-            .error_description = std::move(description),
-            .entries = {},
-            .entry_diagnostics = std::move(diagnostics),
-        };
+        return CompileDatabaseResult{CompileDatabaseError::invalid_entries,
+                                     std::move(description), {},
+                                     std::move(diagnostics), total_invalid};
     }
 
-    return {
-        .error = CompileDatabaseError::none,
-        .error_description = {},
-        .entries = std::move(entries),
-        .entry_diagnostics = {},
-    };
+    return CompileDatabaseResult{CompileDatabaseError::none, {},
+                                 std::move(entries), {}};
 }
 
 }  // namespace xray::adapters::input

@@ -31,13 +31,34 @@ private:
     std::string message_;
 };
 
-struct CompileDatabaseResult {
-    CompileDatabaseError error{CompileDatabaseError::none};
-    std::string error_description;
-    std::vector<CompileEntry> entries;
-    std::vector<EntryDiagnostic> entry_diagnostics;
+class CompileDatabaseResult {
+public:
+    CompileDatabaseResult(CompileDatabaseError error, std::string error_description,
+                          std::vector<CompileEntry> entries,
+                          std::vector<EntryDiagnostic> entry_diagnostics,
+                          std::size_t total_invalid_entries = 0)
+        : error_(error),
+          error_description_(std::move(error_description)),
+          entries_(std::move(entries)),
+          entry_diagnostics_(std::move(entry_diagnostics)),
+          total_invalid_entries_(total_invalid_entries) {}
 
-    bool is_success() const { return error == CompileDatabaseError::none; }
+    CompileDatabaseResult() = default;
+
+    bool is_success() const { return error_ == CompileDatabaseError::none; }
+
+    CompileDatabaseError error() const { return error_; }
+    const std::string& error_description() const { return error_description_; }
+    const std::vector<CompileEntry>& entries() const { return entries_; }
+    const std::vector<EntryDiagnostic>& entry_diagnostics() const { return entry_diagnostics_; }
+    std::size_t total_invalid_entries() const { return total_invalid_entries_; }
+
+private:
+    CompileDatabaseError error_{CompileDatabaseError::none};
+    std::string error_description_;
+    std::vector<CompileEntry> entries_;
+    std::vector<EntryDiagnostic> entry_diagnostics_;
+    std::size_t total_invalid_entries_{0};
 };
 
 }  // namespace xray::hexagon::model

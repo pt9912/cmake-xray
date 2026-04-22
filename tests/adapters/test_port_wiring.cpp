@@ -18,7 +18,7 @@ TEST_CASE("driven input adapter satisfies compile database port") {
         adapter.load_compile_database("tests/e2e/testdata/valid/compile_commands.json");
 
     CHECK(result.is_success());
-    CHECK(result.entries.size() == 1);
+    CHECK(result.entries().size() == 1);
 }
 
 TEST_CASE("full M1 pipeline wires from CLI through hexagon to adapter") {

@@ -12,18 +12,16 @@
 
 namespace {
 
+using xray::hexagon::model::CompileDatabaseError;
+using xray::hexagon::model::CompileDatabaseResult;
+using xray::hexagon::model::CompileEntry;
+
 class StubCompileDatabasePort final : public xray::hexagon::ports::driven::CompileDatabasePort {
 public:
-    xray::hexagon::model::CompileDatabaseResult load_compile_database(
-        std::string_view /*path*/) const override {
-        return {
-            .error = xray::hexagon::model::CompileDatabaseError::none,
-            .error_description = {},
-            .entries = {
-                xray::hexagon::model::CompileEntry{"main.cpp", "/project", {"g++", "main.cpp"}},
-            },
-            .entry_diagnostics = {},
-        };
+    CompileDatabaseResult load_compile_database(std::string_view /*path*/) const override {
+        return CompileDatabaseResult{
+            CompileDatabaseError::none, {},
+            {CompileEntry{"main.cpp", "/project", {"g++", "main.cpp"}}}, {}};
     }
 };
 
@@ -32,7 +30,7 @@ public:
     std::string write_report(
         const xray::hexagon::model::AnalysisResult& analysis_result) const override {
         return std::string(analysis_result.application.name) + "::" +
-               std::to_string(analysis_result.compile_database.entries.size()) + " entries";
+               std::to_string(analysis_result.compile_database.entries().size()) + " entries";
     }
 };
 
@@ -47,22 +45,17 @@ TEST_CASE("project analyzer loads compile database through driven port") {
     CHECK(result.application.name == std::string_view{"cmake-xray"});
     CHECK(result.application.version == std::string_view{"v0.2.0"});
     CHECK(result.compile_database.is_success());
-    CHECK(result.compile_database.entries.size() == 1);
-    CHECK(result.compile_database.entries[0].file() == "main.cpp");
+    CHECK(result.compile_database.entries().size() == 1);
+    CHECK(result.compile_database.entries()[0].file() == "main.cpp");
 }
 
 TEST_CASE("project analyzer propagates compile database errors") {
     class ErrorCompileDatabasePort final
         : public xray::hexagon::ports::driven::CompileDatabasePort {
     public:
-        xray::hexagon::model::CompileDatabaseResult load_compile_database(
-            std::string_view /*path*/) const override {
-            return {
-                .error = xray::hexagon::model::CompileDatabaseError::empty_database,
-                .error_description = "compile_commands.json is empty",
-                .entries = {},
-                .entry_diagnostics = {},
-            };
+        CompileDatabaseResult load_compile_database(std::string_view /*path*/) const override {
+            return CompileDatabaseResult{CompileDatabaseError::empty_database,
+                                         "compile_commands.json is empty", {}, {}};
         }
     };
 
@@ -72,8 +65,7 @@ TEST_CASE("project analyzer propagates compile database errors") {
     const auto result = analyzer.analyze_project("/path/to/compile_commands.json");
 
     CHECK_FALSE(result.compile_database.is_success());
-    CHECK(result.compile_database.error ==
-          xray::hexagon::model::CompileDatabaseError::empty_database);
+    CHECK(result.compile_database.error() == CompileDatabaseError::empty_database);
 }
 
 TEST_CASE("report generator delegates rendering to the report writer port") {
@@ -81,14 +73,9 @@ TEST_CASE("report generator delegates rendering to the report writer port") {
     const xray::hexagon::services::ReportGenerator generator{report_writer_port};
     const xray::hexagon::model::AnalysisResult analysis_result{
         .application = xray::hexagon::model::application_info(),
-        .compile_database = {
-            .error = xray::hexagon::model::CompileDatabaseError::none,
-            .error_description = {},
-            .entries = {
-                xray::hexagon::model::CompileEntry{"main.cpp", "/project", {"g++", "main.cpp"}},
-            },
-            .entry_diagnostics = {},
-        },
+        .compile_database = CompileDatabaseResult{
+            CompileDatabaseError::none, {},
+            {CompileEntry{"main.cpp", "/project", {"g++", "main.cpp"}}}, {}},
     };
 
     CHECK(generator.generate_report(analysis_result) == "cmake-xray::1 entries");

@@ -31,24 +31,24 @@ int map_error_to_exit_code(CompileDatabaseError error) {
 constexpr std::size_t max_displayed_entry_errors = 20;
 
 void format_error(std::ostream& err, const xray::hexagon::model::CompileDatabaseResult& result) {
-    err << "error: " << result.error_description << '\n';
+    err << "error: " << result.error_description() << '\n';
 
-    if (!result.entry_diagnostics.empty()) {
+    if (!result.entry_diagnostics().empty()) {
         std::size_t displayed = 0;
-        for (const auto& diag : result.entry_diagnostics) {
+        for (const auto& diag : result.entry_diagnostics()) {
             if (displayed >= max_displayed_entry_errors) break;
             err << "  entry " << diag.index() << ": " << diag.message() << '\n';
             ++displayed;
         }
 
-        const auto total = result.entry_diagnostics.size();
+        const auto total = result.total_invalid_entries();
         if (total > max_displayed_entry_errors) {
             err << "  ... and " << (total - max_displayed_entry_errors)
                 << " more invalid entries\n";
         }
     }
 
-    switch (result.error) {
+    switch (result.error()) {
     case CompileDatabaseError::file_not_accessible:
         err << "hint: check the path or generate the compilation database before running "
                "cmake-xray analyze\n";
@@ -100,10 +100,11 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
 
     if (!result.compile_database.is_success()) {
         format_error(err, result.compile_database);
-        return map_error_to_exit_code(result.compile_database.error);
+        return map_error_to_exit_code(result.compile_database.error());
     }
 
-    out << "compile database loaded: " << result.compile_database.entries.size() << " entries\n";
+    out << "compile database loaded: " << result.compile_database.entries().size()
+        << " entries\n";
     return ExitCode::success;
 }
 
