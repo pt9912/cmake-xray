@@ -30,6 +30,8 @@ struct EntryValidation {
     std::string file;
     std::string directory;
     std::vector<std::string> arguments;
+    std::string command;
+    bool uses_arguments{false};
     std::string error_message;
     bool valid{true};
 };
@@ -73,20 +75,19 @@ std::vector<std::string> read_arguments(const nlohmann::json& obj) {
     return arguments;
 }
 
-bool try_read_command(const nlohmann::json& obj, std::vector<std::string>& arguments) {
-    std::string command;
-    if (!try_read_required_string(obj, "command", command)) return false;
-
-    arguments = {std::move(command)};
-    return true;
+bool try_read_command(const nlohmann::json& obj, std::string& command) {
+    return try_read_required_string(obj, "command", command);
 }
 
 void validate_arguments(const nlohmann::json& obj, EntryValidation& result,
                         std::string& problems) {
     result.arguments = read_arguments(obj);
-    if (!result.arguments.empty()) return;
+    if (!result.arguments.empty()) {
+        result.uses_arguments = true;
+        return;
+    }
 
-    if (try_read_command(obj, result.arguments)) return;
+    if (try_read_command(obj, result.command)) return;
 
     append_problem(problems, "missing \"command\" and \"arguments\"");
 }
@@ -126,8 +127,15 @@ CompileDatabaseResult build_entry_result(const nlohmann::json& root, std::string
             continue;
         }
 
-        entries.emplace_back(std::move(validation.file), std::move(validation.directory),
-                             std::move(validation.arguments));
+        if (validation.uses_arguments) {
+            entries.push_back(CompileEntry::from_arguments(
+                std::move(validation.file), std::move(validation.directory),
+                std::move(validation.arguments)));
+        } else {
+            entries.push_back(CompileEntry::from_command(
+                std::move(validation.file), std::move(validation.directory),
+                std::move(validation.command)));
+        }
     }
 
     if (total_invalid == 0) {

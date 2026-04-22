@@ -26,6 +26,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI exit-code mapping now handles unexpected compile database errors consistently
 - CLI and E2E tests now cover additional help, diagnostic truncation, and unexpected-error paths, raising line coverage under `src/` to `100%`
 
+## [0.3.0] - 2026-04-22
+
+### Added
+
+- `analyze --top <n>` with deterministic translation-unit ranking based on `arg_count`, `include_path_count`, and `define_count`
+- heuristically marked include-hotspot analysis with full translation-unit assignment per hotspot
+- `impact --compile-commands <path> --changed-file <path>` for direct and include-derived translation-unit impact analysis
+- `SourceParsingIncludeAdapter` with recursive include traversal, search-path handling, cycle protection, and unresolved-include diagnostics
+- `ConsoleReportAdapter` for structured `analyze` and `impact` console output
+- M2 adapter, hexagon, CLI, and binary E2E coverage for ranking, hotspots, impact, path semantics, and heuristic messaging
+
+### Changed
+
+- `CompileEntry` now preserves whether compile data originated from `arguments` or raw `command`
+- `ProjectAnalyzer` now returns ranked translation units, include hotspots, and inline diagnostics in `AnalysisResult`
+- `AnalyzeImpactPort`, `ReportWriterPort`, and `GenerateReportPort` now operate on typed M2 result models instead of placeholder strings
+- application and project version bumped to `0.3.0`
+
 ## [0.2.0] - 2026-04-22
 
 ### Added

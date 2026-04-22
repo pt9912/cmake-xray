@@ -2,29 +2,29 @@
 
 Build visibility for CMake projects.
 
-`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Der aktuelle Stand `v0.2.0` liest `compile_commands.json` ein, validiert die Eingabedaten und meldet Fehler mit klaren Diagnosen und definierten Exit-Codes.
+`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Der aktuelle Stand `v0.3.0` liest `compile_commands.json`, rankt auffaellige Translation Units, leitet heuristische Include-Hotspots ab und bietet eine dateibasierte Impact-Analyse fuer Translation Units.
 
 ## Status
 
-Das Repository enthaelt die umgesetzten Meilensteine M0 und M1 aus [docs/plan-M0.md](./docs/plan-M0.md) und [docs/plan-M1.md](./docs/plan-M1.md).
+Das Repository enthaelt die umgesetzten Meilensteine M0, M1 und M2 aus [docs/plan-M0.md](./docs/plan-M0.md), [docs/plan-M1.md](./docs/plan-M1.md) und [docs/plan-M2.md](./docs/plan-M2.md).
 
 Der aktuelle Umfang:
 
 - baubares C++20/CMake-Projekt mit hexagonaler Grundstruktur
-- CLI mit `analyze`-Unterkommando und `--compile-commands`-Option
+- CLI mit `analyze`- und `impact`-Unterkommandos
 - Einlesen und Validieren von `compile_commands.json`
+- Translation-Unit-Ranking auf Basis von `arg_count`, `include_path_count` und `define_count`
+- Include-Hotspots mit heuristischer Source-Parsing-Aufloesung
+- dateibasierte Impact-Analyse fuer Translation Units
+- begrenzbare Konsolenausgabe via `--top`
 - definierte Exit-Codes und Fehlermeldungen
 - Adapter-, Hexagon- und End-to-End-Tests
 - Multi-Stage-`Dockerfile` mit `build`, `test` und `runtime`
 
 ## Geplanter Umfang
 
-Fuer das erste Release ist vorgesehen:
+Fuer das erste Release ist weiterhin vorgesehen:
 
-- Einlesen und Validieren von `compile_commands.json`
-- Analyse auffaelliger Translation Units
-- Include-Hotspot-Analyse
-- dateibasierte Rebuild-Impact-Analyse
 - Konsolen- und Markdown-Reports
 - Nutzung auf Linux in lokalen Umgebungen und in CI
 
@@ -86,19 +86,54 @@ cmake --build build --target xray_tests
 ```bash
 cmake-xray --help
 cmake-xray analyze --help
+cmake-xray impact --help
 ```
 
 ### Projektanalyse
 
 ```bash
-cmake-xray analyze --compile-commands path/to/compile_commands.json
+cmake-xray analyze --compile-commands path/to/compile_commands.json --top 10
 ```
 
-Bei gueltiger Eingabe:
+Beispielausgabe:
 
 ```text
-compile database loaded: 42 entries
+translation unit ranking
+based on metrics: arg_count + include_path_count + define_count
+top 3 of 17 translation units
+1. src/app/main.cpp [directory: build/app]
+   arg_count=8 include_path_count=2 define_count=1
+
+include hotspots [heuristic]
+top 2 of 4 include hotspots
+- include/common/config.h (affected translation units: 3)
+  src/app/main.cpp [directory: build/app]
+  src/lib/core.cpp [directory: build/lib]
 ```
+
+Die Ranking-Basis ist in der Standardausgabe sichtbar. Include-Hotspots sind in M2 bewusst heuristisch und werden inline als solche gekennzeichnet.
+
+### Impact-Analyse
+
+```bash
+cmake-xray impact \
+  --compile-commands path/to/compile_commands.json \
+  --changed-file include/common/config.h
+```
+
+Relative `--changed-file`-Pfade werden relativ zur uebergebenen `compile_commands.json` interpretiert.
+
+Beispielausgabe:
+
+```text
+impact analysis for include/common/config.h [heuristic]
+affected translation units: 3
+  src/app/main.cpp [directory: build/app] [heuristic]
+  src/lib/core.cpp [directory: build/lib] [heuristic]
+note: conditional or generated includes may be missing from this result
+```
+
+Impact-Ergebnisse fuer Header beruhen in M2 auf derselben heuristischen Include-Aufloesung wie die Hotspots. Direkte Treffer auf bekannte Quelldateien werden ohne Heuristik-Kennzeichnung ausgegeben.
 
 Bei ungueltiger Eingabe:
 
@@ -186,9 +221,13 @@ Lauf des Runtime-Images:
 ```bash
 docker run --rm cmake-xray --help
 docker run --rm cmake-xray analyze --help
+docker run --rm cmake-xray impact --help
 docker run --rm \
   -v "$PWD/tests/e2e/testdata:/data:ro" \
-  cmake-xray analyze --compile-commands /data/valid/compile_commands.json
+  cmake-xray analyze --compile-commands /data/m2/analyze/compile_commands.json --top 2
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata:/data:ro" \
+  cmake-xray impact --compile-commands /data/m2/analyze/compile_commands.json --changed-file include/common/config.h
 ```
 
 ## Dokumente
@@ -201,6 +240,7 @@ Die fachliche und technische Planung ist in `docs/` abgelegt:
 - [docs/roadmap.md](./docs/roadmap.md): inkrementelle Lieferplanung
 - [docs/plan-M0.md](./docs/plan-M0.md): Detailplanung fuer den ersten Meilenstein
 - [docs/plan-M1.md](./docs/plan-M1.md): Detailplanung fuer den zweiten Meilenstein
+- [docs/plan-M2.md](./docs/plan-M2.md): Detailplanung fuer den Kernanalyse-Meilenstein
 - [docs/releasing.md](./docs/releasing.md): minimaler Release-Ablauf fuer Build, Test und Tagging
 
 ## Lizenz

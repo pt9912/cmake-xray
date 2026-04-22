@@ -6,6 +6,7 @@
 #include <string>
 
 #include "adapters/input/compile_commands_json_adapter.h"
+#include "hexagon/model/compile_entry.h"
 #include "hexagon/model/compile_database_result.h"
 
 namespace {
@@ -27,7 +28,10 @@ TEST_CASE("valid compile_commands.json loads successfully") {
     REQUIRE(result.entries().size() == 1);
     CHECK(result.entries()[0].file() == "/project/src/main.cpp");
     CHECK(result.entries()[0].directory() == "/project/build");
-    CHECK_FALSE(result.entries()[0].arguments().empty());
+    CHECK(result.entries()[0].command_source() ==
+          xray::hexagon::model::CompileCommandSource::command);
+    CHECK(result.entries()[0].command() ==
+          "g++ -std=c++20 -o main.cpp.o -c /project/src/main.cpp");
 }
 
 TEST_CASE("entry with only command field loads successfully") {
@@ -37,8 +41,10 @@ TEST_CASE("entry with only command field loads successfully") {
 
     CHECK(result.is_success());
     REQUIRE(result.entries().size() == 1);
-    CHECK(result.entries()[0].arguments().size() == 1);
-    CHECK(result.entries()[0].arguments()[0] ==
+    CHECK(result.entries()[0].command_source() ==
+          xray::hexagon::model::CompileCommandSource::command);
+    CHECK(result.entries()[0].arguments().empty());
+    CHECK(result.entries()[0].command() ==
           "g++ -std=c++20 -o main.cpp.o -c /project/src/main.cpp");
 }
 
@@ -49,8 +55,11 @@ TEST_CASE("entry with command and arguments uses arguments") {
 
     CHECK(result.is_success());
     REQUIRE(result.entries().size() == 1);
+    CHECK(result.entries()[0].command_source() ==
+          xray::hexagon::model::CompileCommandSource::arguments);
     CHECK(result.entries()[0].arguments().size() == 6);
     CHECK(result.entries()[0].arguments()[0] == "g++");
+    CHECK(result.entries()[0].command().empty());
 }
 
 TEST_CASE("entry with empty arguments array falls back to command") {
@@ -60,7 +69,11 @@ TEST_CASE("entry with empty arguments array falls back to command") {
 
     CHECK(result.is_success());
     REQUIRE(result.entries().size() == 1);
-    CHECK(result.entries()[0].arguments().size() == 1);
+    CHECK(result.entries()[0].command_source() ==
+          xray::hexagon::model::CompileCommandSource::command);
+    CHECK(result.entries()[0].arguments().empty());
+    CHECK(result.entries()[0].command() ==
+          "g++ -std=c++20 -o main.cpp.o -c /project/src/main.cpp");
 }
 
 // --- Error cases ---

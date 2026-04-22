@@ -10,7 +10,7 @@ struct ApplicationInfo {
 };
 
 constexpr ApplicationInfo application_info() {
-    return {"cmake-xray", "v0.2.0"};
+    return {"cmake-xray", "v0.3.0"};
 }
 
 }  // namespace xray::hexagon::model

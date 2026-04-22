@@ -2,7 +2,8 @@ add_library(
     xray_adapters
     cli/cli_adapter.cpp
     input/compile_commands_json_adapter.cpp
-    output/placeholder_report_adapter.cpp
+    input/source_parsing_include_adapter.cpp
+    output/console_report_adapter.cpp
 )
 
 target_include_directories(xray_adapters PUBLIC ${PROJECT_SOURCE_DIR}/src)

@@ -7,7 +7,7 @@
 | Dokument   | Plan M2 `cmake-xray`                                                                                                                                                   |
 | Version    | `0.3`                                                                                                                                                                  |
 | Stand      | `2026-04-22`                                                                                                                                                           |
-| Status     | Entwurf                                                                                                                                                                |
+| Status     | Abgeschlossen                                                                                                                                                          |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M1](./plan-M1.md), [Qualitaet](./quality.md) |
 
 ### 0.1 Zweck

@@ -50,20 +50,41 @@ assert_stderr_contains() {
 assert_exit "--help exits 0" 0 "$BINARY" --help
 assert_stdout_contains "--help shows cmake-xray" "cmake-xray" "$BINARY" --help
 assert_stdout_contains "--help shows analyze subcommand" "analyze" "$BINARY" --help
+assert_stdout_contains "--help shows impact subcommand" "impact" "$BINARY" --help
 
 # analyze --help
 assert_exit "analyze --help exits 0" 0 "$BINARY" analyze --help
 assert_stdout_contains "analyze --help shows --compile-commands" "compile-commands" "$BINARY" analyze --help
+assert_stdout_contains "analyze --help shows --top" "top" "$BINARY" analyze --help
 
-# Success path
-assert_exit "valid input exits 0" 0 "$BINARY" analyze --compile-commands "$TESTDATA/valid/compile_commands.json"
-assert_stdout_contains "valid input shows entry count" "1 entries" "$BINARY" analyze --compile-commands "$TESTDATA/valid/compile_commands.json"
+# impact --help
+assert_exit "impact --help exits 0" 0 "$BINARY" impact --help
+assert_stdout_contains "impact --help shows --changed-file" "changed-file" "$BINARY" impact --help
+
+# Analyze success path
+assert_exit "M2 analyze exits 0" 0 "$BINARY" analyze --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --top 2
+assert_stdout_contains "M2 analyze shows ranking" "translation unit ranking" "$BINARY" analyze --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --top 2
+assert_stdout_contains "M2 analyze shows top limit" "top 2 of 3 translation units" "$BINARY" analyze --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --top 2
+assert_stdout_contains "M2 analyze shows hotspots" "include hotspots" "$BINARY" analyze --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --top 2
+
+# Impact success path
+assert_exit "impact source exits 0" 0 "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file src/app/main.cpp
+assert_stdout_contains "impact source shows one affected TU" "affected translation units: 1" "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file src/app/main.cpp
+assert_exit "impact header exits 0" 0 "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file include/common/config.h
+assert_stdout_contains "impact header is heuristic" "impact analysis for include/common/config.h \[heuristic\]" "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file include/common/config.h
+assert_stdout_contains "impact header shows three affected TUs" "affected translation units: 3" "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file include/common/config.h
+assert_exit "impact missing file exits 0" 0 "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file include/generated/version.h
+assert_stdout_contains "impact missing file shows zero affected TUs" "affected translation units: 0" "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json" --changed-file include/generated/version.h
+
+# M1 compatibility
+assert_exit "legacy valid input exits 0" 0 "$BINARY" analyze --compile-commands "$TESTDATA/valid/compile_commands.json"
 assert_exit "only_command exits 0" 0 "$BINARY" analyze --compile-commands "$TESTDATA/only_command/compile_commands.json"
 assert_exit "command_and_arguments exits 0" 0 "$BINARY" analyze --compile-commands "$TESTDATA/command_and_arguments/compile_commands.json"
 assert_exit "empty_arguments_with_command exits 0" 0 "$BINARY" analyze --compile-commands "$TESTDATA/empty_arguments_with_command/compile_commands.json"
 
 # CLI usage error
 assert_exit "missing --compile-commands exits 2" 2 "$BINARY" analyze
+assert_exit "impact missing --changed-file exits 2" 2 "$BINARY" impact --compile-commands "$TESTDATA/m2/analyze/compile_commands.json"
 
 # Input file errors
 assert_exit "nonexistent file exits 3" 3 "$BINARY" analyze --compile-commands /nonexistent/compile_commands.json
@@ -71,6 +92,7 @@ assert_stderr_contains "nonexistent file error message" "cannot open" "$BINARY" 
 
 # Invalid input data
 assert_exit "invalid JSON exits 4" 4 "$BINARY" analyze --compile-commands "$TESTDATA/invalid_syntax/compile_commands.json"
+assert_exit "impact invalid JSON exits 4" 4 "$BINARY" impact --compile-commands "$TESTDATA/invalid_syntax/compile_commands.json" --changed-file src/main.cpp
 assert_exit "not an array exits 4" 4 "$BINARY" analyze --compile-commands "$TESTDATA/not_an_array/compile_commands.json"
 assert_exit "empty array exits 4" 4 "$BINARY" analyze --compile-commands "$TESTDATA/empty/compile_commands.json"
 assert_exit "missing fields exits 4" 4 "$BINARY" analyze --compile-commands "$TESTDATA/missing_fields/compile_commands.json"
