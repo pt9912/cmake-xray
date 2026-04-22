@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M3 `cmake-xray` |
-| Version | `0.1` |
+| Version | `0.3` |
 | Stand | `2026-04-22` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M2](./plan-M2.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -21,8 +21,8 @@ M3 gilt als erreicht, wenn:
 - Markdown-Berichte die M2-Ergebnisse vollstaendig und reproduzierbar abbilden: Analysekontext, TU-Ranking, Include-Hotspots, Impact-Ergebnis sowie Diagnostics und Heuristik-Hinweise
 - versionierte Referenzdaten und erwartete Konsolen- bzw. Markdown-Ausgaben fuer die zentralen Analysepfade vorliegen und automatisiert geprueft werden
 - README, Beispielausgaben, CHANGELOG und Release-Dokumentation den M3-/MVP-Stand widerspiegeln
-- eine dokumentierte Referenzumgebung sowie Messwerte fuer `250`, `500` und `1.000` Translation Units vorliegen und die Soll-Ziele aus `NF-04` und `NF-05` explizit bewertet werden
-- die Docker-Pruefpfade fuer Test, Coverage-Gate und Quality-Gate mit dem M3-Stand erfolgreich durchlaufen
+- eine dokumentierte Referenzumgebung sowie Baseline-Messwerte fuer `250`, `500` und `1.000` Translation Units fuer den gemeinsamen Analysekern von `analyze` vorliegen, zusaetzlich dokumentierte Stichproben fuer die neuen M3-Pfade `analyze --format markdown` und `impact` vorhanden sind und die Soll-Ziele aus `NF-04` und `NF-05` explizit bewertet werden
+- die Docker-Pruefpfade fuer Test, Coverage-Gate, statische Analyse-/Metrik-Reports und Quality-Gate mit dem M3-Stand erfolgreich durchlaufen
 
 Relevante Kennungen: `F-26`, `F-27`, `F-35`, `F-36`, `F-42`, `NF-04`, `NF-05`, `NF-06`, `NF-10`, `NF-18`, `NF-19`, `AK-03`, `AK-04`, `AK-05`, `AK-06`, `AK-08`, `AK-09`
 
@@ -39,7 +39,7 @@ Bestandteil von M3 sind:
 Nicht Bestandteil von M3 sind:
 
 - neue fachliche Analysearten jenseits von M2
-- targetbezogene Zusatzdaten und Target-Impact (`F-18` bis `F-25`)
+- targetbezogene Zusatzdaten und targetbezogene Impact-Erweiterungen (`F-18` bis `F-20`, `F-24`, `F-25`)
 - HTML-, JSON- oder DOT-Ausgaben (`F-28` bis `F-30`)
 - `--quiet` sowie ein umfassender `--verbose`-Ausbau (`F-39`, `F-40`), sofern dies nicht zur M3-Dokumentation oder Fehlersichtbarkeit zwingend noetig ist
 - Schema- oder Formatversionierung fuer maschinenlesbare Ausgabeformate (`NF-20`)
@@ -106,6 +106,7 @@ Formatregeln fuer M3:
 - Ausgabe als einfaches, breit kompatibles Markdown ohne HTML-Einbettung
 - keine ANSI-Farben, keine Zeitstempel, keine Hostnamen und keine anderen volatilen Metadaten
 - deterministische Abschnitts- und Listensortierung
+- Pfadangaben werden lexikalisch normalisiert und fuer Golden-Tests in einer kanonischen Aufrufform erzeugt: Die bytegenauen Referenzdateien entstehen aus einem festen Arbeitsverzeichnis mit fixture-relativen Eingabepfaden; Docker-Pruefungen verifizieren denselben Inhaltspfad funktional, aber nicht ueber identische Pfadstrings
 - genau ein abschliessender Zeilenumbruch
 - Heuristik-Hinweise und Datenluecken entweder inline am Ergebnis oder in einem unmittelbar folgenden Hinweisblock, nicht nur versteckt in einer Fussnote
 
@@ -135,7 +136,7 @@ Entscheidung fuer M3:
 - unterstuetzte Werte fuer `--format` sind `console` und `markdown`
 - `--output <path>` ist nur in Verbindung mit `--format markdown` zulaessig
 - wenn `--format markdown` ohne `--output` verwendet wird, wird der Markdown-Text auf `stdout` geschrieben
-- wenn `--output <path>` verwendet wird, schreibt die CLI den Report dorthin und gibt hoechstens eine knappe Erfolgsbestaetigung auf `stdout` aus
+- wenn `--output <path>` verwendet wird, schreibt die CLI den Report ausschliesslich dorthin; bei Erfolg bleibt `stdout` leer
 - ein ungueltiges Format oder eine unzulaessige Optionskombination bleibt ein CLI-Verwendungsfehler mit Exit-Code `2`
 - ein nicht beschreibbarer Report-Pfad oder ein Schreibfehler liefert Exit-Code `1`
 - bestehende Eingabefehler fuer `compile_commands.json` behalten ihre M1-/M2-Codes `3` und `4`
@@ -186,6 +187,7 @@ Golden-Output-Regeln fuer M3:
 
 - erwartete Konsolen- und Markdown-Dateien liegen versioniert im Repository
 - erwartete Ausgaben enthalten keine volatilen Werte wie Zeitstempel oder temporaere Verzeichnisse
+- pfadtragende Golden-Files und `docs/examples/` werden aus derselben kanonischen Aufrufform erzeugt; Docker-Smoke-Tests sind kein Ersatz fuer diese bytegenaue Referenzquelle
 - Vergleiche sollen byte-stabil sein oder hoechstens zeilenendungsbezogen auf LF normalisieren; fachliche Vergleiche "ungefaehr gleich" reichen fuer M3 nicht aus
 - Konsolen-Golden-Files duerfen gegenueber Markdown eigene Layout- und Wortlaut-Erwartungen haben; reine Inhaltsparitaet ersetzt keinen formatspezifischen Regressionstest
 
@@ -214,12 +216,14 @@ Die Messmethodik fuer M3 soll mindestens dokumentieren:
 - wie viele Messlaeufe in die Baseline eingehen
 - wie Laufzeit und Speicher erhoben werden
 - ob und wie `--top` die gemessene Ausgabe begrenzt
+- welche Messungen als `NF-04`-/`NF-05`-Baseline gelten und welche nur als dokumentierte Stichproben fuer die neuen M3-Pfade zaehlen
 
 Pragmatische Entscheidung fuer M3:
 
 - die Performance-Baseline ist reproduzierbar zu messen, aber nicht Teil jedes Standard-`ctest`-Laufs
 - sie wird als eigener dokumentierter Pruefpfad behandelt, lokal oder in einem separaten CI-Workflow
-- die Ergebnisse werden gegen `NF-04` und `NF-05` bewertet; Nichterreichen darf nicht stillschweigend uebergangen werden, sondern muss in der Dokumentation sichtbar sein
+- die Bewertung gegen `NF-04` und `NF-05` erfolgt auf Basis der `analyze`-Baseline; fuer `analyze --format markdown` und `impact` werden zusaetzliche Stichproben dokumentiert
+- Nichterreichen darf nicht stillschweigend uebergangen werden, sondern muss in der Dokumentation sichtbar sein
 
 Vorgesehene Artefakte:
 
@@ -318,11 +322,13 @@ mkdir -p build/reports
 ctest --test-dir build --output-on-failure
 ```
 
-**Docker / Quality Gates**:
+**Docker / Reports und Gates**:
 
 ```bash
 docker build --target test -t cmake-xray:test .
 docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
+docker build --target quality -t cmake-xray:quality .
+docker run --rm cmake-xray:quality
 docker build --target quality-check -t cmake-xray:quality-check .
 docker build --target runtime -t cmake-xray .
 docker run --rm cmake-xray --help
@@ -343,19 +349,22 @@ mkdir -p build/reports/performance
 /usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_250/compile_commands.json --top 10 > build/reports/performance/xray-250.stdout.txt 2> build/reports/performance/xray-250.time.txt
 /usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_500/compile_commands.json --top 10 > build/reports/performance/xray-500.stdout.txt 2> build/reports/performance/xray-500.time.txt
 /usr/bin/time -v ./build/cmake-xray analyze --compile-commands tests/reference/scale_1000/compile_commands.json --top 10 > build/reports/performance/xray-1000.stdout.txt 2> build/reports/performance/xray-1000.time.txt
+# zusaetzlich: mindestens ein dokumentierter Stichprobenlauf fuer analyze --format markdown
+# zusaetzlich: mindestens ein dokumentierter Stichprobenlauf fuer impact
 ```
 
 Die Pruefung soll insbesondere bestaetigen:
 
 - Konsole und Markdown verwenden dieselbe fachliche Datengrundlage
 - `--format markdown` funktioniert fuer `analyze` und `impact`
-- `--output` schreibt Reports reproduzierbar und mit passender Fehlerbehandlung
+- `--output` schreibt Reports reproduzierbar und mit passender Fehlerbehandlung; bei Erfolg bleibt `stdout` leer
 - ungueltige Format-/Output-Kombinationen liefern Exit-Code `2`
 - Schreibfehler fuer Report-Dateien liefern Exit-Code `1`
 - Eingabefehler behalten ihre M1-/M2-Codes `3` und `4`
 - Golden-Outputs fuer Konsole und Markdown bleiben stabil
-- Coverage- und Quality-Gates bleiben trotz Report-Ausbau gruen
-- Referenzumgebung, Messwerte und Bewertung gegen `NF-04` und `NF-05` sind dokumentiert; `stdout`- und `time`-Artefakte der Baseline liegen nachvollziehbar vor
+- statische Analyse- und Metrik-Reports gemaess `docs/quality.md` bleiben erzeugbar, einschliesslich `summary.txt`, `clang-tidy.txt`, `lizard.txt` und `lizard-warnings.txt`
+- Coverage-Gate und Quality-Gate bleiben trotz Report-Ausbau gruen
+- Referenzumgebung, Messwerte und Bewertung gegen `NF-04` und `NF-05` sind dokumentiert; `stdout`- und `time`-Artefakte der `analyze`-Baseline sowie dokumentierte Stichproben fuer Markdown und Impact liegen nachvollziehbar vor
 
 ## 5. Rueckverfolgbarkeit
 
@@ -364,7 +373,7 @@ Die Pruefung soll insbesondere bestaetigen:
 | Markdown-Report und Report-Vertraege | `F-27`, `AK-06`, `NF-13` |
 | Konsolen-/Markdown-Paritaet und Ergebnisbegrenzung | `F-26`, `F-42`, `AK-03`, `AK-04`, `AK-05`, `NF-15` |
 | CLI fuer Format und Ausgabepfad | `F-31`, `F-32`, `F-33`, `F-34`, `F-35`, `F-36`, `AK-09`, `NF-02`, `NF-14` |
-| Referenzdaten und Golden-Outputs | `NF-10`, `NF-18`, `NF-19`, `AK-08` |
+| Referenzdaten und Golden-Outputs | `NF-10`, `NF-18`, `NF-19` |
 | Referenzumgebung und Performance-Baseline | `NF-04`, `NF-05`, `NF-06` |
 | Release- und Produktdokumentation | `NF-16`, `NF-17`, `NF-18`, `AK-08` |
 
@@ -376,13 +385,13 @@ Die Pruefung soll insbesondere bestaetigen:
 |---|---|---|
 | Formatwahl in M3 | `analyze` und `impact` bleiben die einzigen Nutzerpfade; Report-Ausgabe wird ueber `--format console|markdown` erweitert | AP 1.3 |
 | Default-Ausgabe | Standard bleibt die Konsolenausgabe | AP 1.3 |
-| Dateiausgabe | `--output <path>` ist nur fuer Markdown zulaessig; ohne `--output` geht Markdown auf `stdout` | AP 1.3 |
+| Dateiausgabe | `--output <path>` ist nur fuer Markdown zulaessig; ohne `--output` geht Markdown auf `stdout`, mit `--output` bleibt `stdout` bei Erfolg leer | AP 1.3 |
 | Schreibfehler | nicht beschreibbare Report-Pfade nutzen Exit-Code `1`; Eingabefehler behalten `3` und `4` | AP 1.1, 1.3 |
 | Verantwortung der Report-Strecke | Report-Adapter erzeugen Text; `stdout`/Dateisystem-Entscheidung bleibt ausserhalb des Hexagons | AP 1.1 |
 | Markdown-Stil | einfaches, diffbares Markdown ohne HTML, Zeitstempel oder sonstige volatile Metadaten | AP 1.2 |
 | Golden-Outputs | versioniert im Repository und gegen stabile, nichtvolatile Ausgaben geprueft | AP 1.4 |
 | Referenzprojekt | versioniert im Repository unter `tests/reference/`; keine externen Benchmark-Abhaengigkeiten | AP 1.5 |
-| Performance-Pfad | reproduzierbar dokumentiert, aber kein Pflichtbestandteil jedes `ctest`-Laufs | AP 1.5 |
+| Performance-Pfad | reproduzierbar dokumentiert, aber kein Pflichtbestandteil jedes `ctest`-Laufs; `NF-04`/`NF-05` werden ueber die `analyze`-Baseline bewertet, Markdown und Impact zusaetzlich stichprobenartig dokumentiert | AP 1.5 |
 | Nicht-MVP-Formate | HTML, JSON und DOT bleiben ausserhalb von M3 | AP 0.3 |
 
 ### 6.2 Offen
