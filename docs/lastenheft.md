@@ -5,8 +5,8 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Lastenheft `cmake-xray` |
-| Version | `0.7` |
-| Stand | `2026-04-21` |
+| Version | `0.8` |
+| Stand | `2026-04-23` |
 | Status | Arbeitsstand |
 
 ### 0.1 Aenderungshistorie
@@ -20,6 +20,7 @@
 | `0.5` | `2026-04-21` | Datengrundlage der Include-Analyse geklaert, NF-Prioritaeten ergaenzt und Eingabeverhalten weiter praezisiert |
 | `0.6` | `2026-04-21` | Verweis auf Folgedokumente ergaenzt |
 | `0.7` | `2026-04-21` | `F-42` (Ergebnisbegrenzung) und `RB-10` (Abhaengigkeitsminimierung) ergaenzt |
+| `0.8` | `2026-04-23` | Anforderungen fuer versionierte Release-Artefakte und OCI-Container-Bereitstellung ergaenzt |
 
 ## 1. Einleitung
 
@@ -125,6 +126,7 @@ Das Produkt soll:
 4. Reports in menschenlesbaren Formaten erzeugen
 5. lokal sowie in CI-Umgebungen einsetzbar sein
 6. in einem klar abgegrenzten ersten Release nutzbaren Mehrwert liefern
+7. fuer Releases als direkt nutzbares Linux-CLI-Artefakt sowie als OCI-kompatibles Container-Image bereitgestellt werden
 
 ### 3.2 Nicht-Ziele
 Das Produkt soll zunaechst **nicht**:
@@ -268,6 +270,14 @@ Das System soll konfigurierbar sein.
 | `F-38` | Soll | Konfiguration von Schwellenwerten oder Grenzwerten fuer Auswertungen |
 | `F-42` | Soll | Begrenzung der Ergebnisausgabe auf eine konfigurierbare Anzahl der auffaelligsten Eintraege, mit Angabe der Gesamtanzahl analysierter Eintraege |
 
+### 6.9 Bereitstellung
+Das Produkt soll fuer reale Nutzung nicht nur aus einem lokalen Build-Verzeichnis heraus, sondern als versionierte Auslieferung verfuegbar sein.
+
+| Kennung | Prioritaet | Anforderung |
+|---|---|---|
+| `F-43` | Muss | Bereitstellung mindestens eines versionierten Linux-Release-Artefakts fuer die CLI, das ausserhalb eines lokalen Build-Verzeichnisses direkt nutzbar ist, zum Beispiel als Archiv mit ausfuehrbarer Datei und Begleitdokumentation |
+| `F-44` | Muss | Bereitstellung mindestens eines OCI-kompatiblen Container-Images, ueber das die CLI in lokalen Umgebungen und CI ohne lokale Toolchain nutzbar ist |
+
 ---
 
 ## 7. Beispielhafte Anwendungsfaelle
@@ -346,6 +356,7 @@ Diese Werte gelten als Mindestanforderung fuer den ersten Meilenstein. Fuer spae
 | `NF-18` | Soll | Beispielausgaben fuer die wichtigsten Analysearten sollen vorhanden sein. |
 | `NF-19` | Soll | Fuer zentrale Analysearten sollen Referenzprojekte oder Referenzdaten mit erwarteten Ergebnissen fuer automatisierte Tests vorhanden sein. |
 | `NF-20` | Soll | Fuer maschinenlesbare Ausgabeformate muessen Formatversion oder Schema-Version dokumentiert werden. |
+| `NF-21` | Muss | Release-Artefakte und Container-Bereitstellung muessen so dokumentiert sein, dass Nutzer nicht auf interne Build-Pfade wie `./build/cmake-xray` angewiesen sind. |
 
 ---
 
@@ -410,6 +421,14 @@ Das Produkt soll in folgende Umgebungen integrierbar sein:
 | `S-10` | Integration | GitHub Actions |
 | `S-11` | Integration | andere CI-Pipelines |
 
+### 10.4 Bereitstellungsschnittstellen
+Das Produkt soll fuer Releases ueber folgende Bereitstellungswege verfuegbar sein:
+
+| Kennung | Typ | Schnittstelle |
+|---|---|---|
+| `S-12` | Bereitstellung | versioniertes Linux-CLI-Release-Artefakt, zum Beispiel als Archiv mit ausfuehrbarer Datei |
+| `S-13` | Bereitstellung | OCI-kompatibles Container-Image fuer lokale Ausfuehrung und CI |
+
 ---
 
 ## 11. Qualitaetsziele
@@ -448,6 +467,8 @@ Folgende Funktionen sind fuer spaetere Versionen vorgesehen:
 - tiefgehende Build-Zeit-Messungen
 - automatische Optimierungsvorschlaege mit Refactoring
 - Unterstuetzung weiterer Build-Systeme
+- versionierte Release-Artefakte ausserhalb lokaler Build-Verzeichnisse
+- OCI-kompatible Container-Bereitstellung als offizieller Release-Pfad
 
 ---
 

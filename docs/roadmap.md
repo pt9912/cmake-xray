@@ -5,8 +5,8 @@
 | Feld       | Wert                                                                                   |
 | ---------- | -------------------------------------------------------------------------------------- |
 | Dokument   | Phasenplan `cmake-xray`                                                                |
-| Version    | `0.6`                                                                                  |
-| Stand      | `2026-04-22`                                                                           |
+| Version    | `0.7`                                                                                  |
+| Stand      | `2026-04-23`                                                                           |
 | Status     | Entwurf                                                                                |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md) |
 
@@ -93,7 +93,6 @@ Ziel: Ergebnisse werden fuer reale Nutzung, Dokumentation und Absicherung stabil
 | Referenzdaten und automatisierte Tests                                                    | `NF-10`, `NF-19`          |
 | Performance-Baseline und Referenzumgebung mit versioniertem Referenzprojekt im Repository | `NF-04`, `NF-05`, `NF-06` |
 | Beispielausgaben und Nutzungsdokumentation                                                | `NF-18`, `AK-08`          |
-
 **Milestone M3 / MVP (`v1.0.0`)**: Alle Abnahmekriterien `AK-01` bis `AK-09` sind erfuellt. Ein Markdown-Report kann erzeugt werden, die README enthaelt Installations- und Nutzungsbeispiele, automatisierte Tests laufen gegen Referenzdaten, und die Performance-Baseline ist dokumentiert. Das Produkt ist als MVP lieferbar.
 
 ### 3.5 Phase 4 - Erweiterungen
@@ -105,6 +104,7 @@ Ziel: nicht-MVP-Funktionen kontrolliert aufbauen.
 | `CmakeFileApiAdapter` (`BuildModelPort`): zweite primaere Eingabequelle fuer Kernanalysen und initiale Target-Sicht; Einstieg mit Translation-Unit-Beobachtungen ohne `compile_commands.json`, TU-zu-Target-Zuordnung und targetbezogener Impact-Ausgabe | `F-05`, `F-18` bis `F-20`, `F-24`, `F-25`, `S-02` |
 | `HtmlReportAdapter`: HTML-Export                                                                                                                                 | `F-28`                                    |
 | `JsonReportAdapter` und `DotReportAdapter`: JSON- und DOT-Ausgaben                                                                                               | `F-29`, `F-30`, `NF-20`                   |
+| Versionierte Release-Artefakte fuer Linux-CLI, OCI-kompatibles Container-Image und tag-basierter Release-Workflow                                               | `F-43`, `F-44`, `NF-21`, `S-12`, `S-13`   |
 | Erweiterte Plattformunterstuetzung                                                                                                                               | `NF-08`, `NF-09`                          |
 | Detail- und Quiet-Modi                                                                                                                                           | `F-39`, `F-40`                            |
 
@@ -132,6 +132,8 @@ Nicht Bestandteil des MVP sind insbesondere:
 - HTML-Export
 - JSON- und DOT-Ausgaben
 - weitergehende Plattformziele ausser Linux
+- versionierte Release-Artefakte ausserhalb lokaler Build-Verzeichnisse
+- OCI-kompatible Container-Bereitstellung als offizieller Release-Pfad
 
 ## 5. Abhaengigkeiten zwischen Phasen
 
@@ -167,5 +169,5 @@ Die Beschreibungen von Phase 0 bis Phase 4 bleiben bewusst am bisherigen Plansta
 | `S-01`, `S-03`, `NF-01`, `NF-02`, `NF-14` | Phase 1 | Eingabe-, CLI- und Fehlervertraege des MVP-Einstiegs |
 | `F-42`, `S-04`, `NF-03` | Phase 2 | Ergebnisbegrenzung und nutzbare Standard-Konsolenausgabe des umgesetzten Analysepfads |
 | `S-05`, `S-09`, `S-10`, `S-11` | Phase 3 | Markdown-Ausgabe sowie Nutzungs- und Integrationsbeispiele des MVP |
-| `S-06`, `S-07`, `S-08` | Phase 4 | kuenftige HTML-, JSON- und DOT-Schnittstellen innerhalb des bestehenden Erweiterungsblocks |
+| `S-06`, `S-07`, `S-08`, `F-43`, `F-44`, `NF-21`, `S-12`, `S-13` | Phase 4 | kuenftige HTML-, JSON- und DOT-Schnittstellen sowie offizielle Release-Bereitstellung innerhalb des laufenden Erweiterungsblocks |
 | `F-10`, `F-11`, `F-16`, `F-17`, `F-37`, `F-38` | Phase 5 | weitere Ausbaupunkte nach dem bereits geplanten M4-Umfang |

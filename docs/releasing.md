@@ -23,6 +23,7 @@ Vor einem Release:
 - bei Aenderungen am Analyse- oder Report-Pfad die Performance-Artefakte unter `build/reports/performance/` und `docs/performance.md` aktualisieren
 - sicherstellen, dass nur beabsichtigte Dateien fuer den Release-Commit vorgemerkt sind
 - falls Release-Artefakte mit veroefentlicht werden sollen, `./release-assets/` vorbereiten
+- fuer tag-basierte Veroeffentlichung sicherstellen, dass `.github/workflows/release.yml` zum geplanten Artefaktumfang passt
 
 ## Verifikation
 
@@ -64,6 +65,14 @@ git commit -m "docs: finalize release $TAG"
 git tag -a "$TAG" -m "Release $TAG"
 ```
 
+Nach `git push origin main "$TAG"` startet der Release-Workflow unter `.github/workflows/release.yml`. Er:
+
+- verifiziert Test-, Coverage-, Quality- und Runtime-Pfade erneut
+- paketiert ein versioniertes Linux-CLI-Release-Artefakt als `.tar.gz`
+- erstellt eine SHA-256-Pruefsumme fuer das Archiv
+- veroeffentlicht ein OCI-kompatibles Container-Image nach `ghcr.io/<owner>/<repo>:<tag>`
+- aktualisiert oder erstellt den GitHub-Release und laedt die erzeugten Assets hoch
+
 ## Release-Notes aus dem Changelog
 
 Den Abschnitt fuer die Zielversion aus `CHANGELOG.md` extrahieren:
@@ -88,7 +97,7 @@ fi
 
 ## GitHub-Release
 
-Wichtig: Zuerst pruefen, ob der Release bereits existiert. Der `release-homebrew.yml`-Workflow kann den GitHub-Release bereits beim Tag-Push anlegen. In diesem Fall darf nicht erneut `gh release create` aufgerufen werden.
+Der Standardpfad ist der automatisierte Release-Workflow beim Tag-Push. Die folgenden Befehle sind als manueller Fallback gedacht, falls die Workflow-Ausfuehrung absichtlich ueberschrieben oder nach einer fehlgeschlagenen Veroeffentlichung gezielt repariert werden soll.
 
 ```bash
 if gh release view "$TAG" >/dev/null 2>&1; then
@@ -115,3 +124,4 @@ Falls kein Asset-Upload erforderlich ist, koennen die `./release-assets/*`-Argum
 - Der `coverage`-Stage dient dem Report; das eigentliche Build-Gate fuer Mindestabdeckung liegt in `coverage-check`.
 - Der `quality`-Stage dient dem Report; das eigentliche Build-Gate fuer statische Analyse und Metriken liegt in `quality-check`.
 - Fuer `v1.0.0` gehoeren Markdown-Smoke-Tests, Golden-Output-Konsistenz, `docs/examples/` und `docs/performance.md` zum Release-Check.
+- Fuer regulare Releases soll das Container-Image zusaetzlich als `latest` veroeffentlicht werden; Vorabversionen mit Suffix wie `-rc1` bleiben auf ihren Versions-Tag beschraenkt.
