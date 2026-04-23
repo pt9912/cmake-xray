@@ -271,7 +271,8 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
         const TargetInfo target_info{target_name, target_type, target_unique_key};
 
         // Resolve build directory for this target
-        const auto dir_index = target.value("directoryIndex", 0);
+        const auto dir_index =
+            static_cast<std::size_t>(target.value("directoryIndex", 0));
         const auto dir_build = (dir_index < directory_build_paths.size())
                                    ? directory_build_paths[dir_index]
                                    : ".";
@@ -383,7 +384,6 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
 
     // Determine target metadata status and add diagnostics
     const auto total_targets = config["targets"].size();
-    const auto mapped_targets = total_targets - targets_without_sources;
     const auto is_partial = targets_without_sources > 0;
 
     if (is_partial) {
