@@ -13,7 +13,9 @@ public:
     ProjectAnalyzer(const ports::driven::BuildModelPort& build_model_port,
                     const ports::driven::IncludeResolverPort& include_resolver_port);
 
-    model::AnalysisResult analyze_project(std::string_view compile_commands_path) const override;
+    model::AnalysisResult analyze_project(
+        std::string_view compile_commands_path,
+        std::string_view cmake_file_api_path) const override;
 
 private:
     const ports::driven::BuildModelPort& build_model_port_;

@@ -87,7 +87,7 @@ TEST_CASE("impact analyzer reports direct matches for duplicate translation-unit
                                                            include_resolver_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/src/main.cpp");
+        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/src/main.cpp", "");
 
     CHECK(result.compile_database.is_success());
     CHECK(result.compile_database_path == "/tmp/compile_commands.json");
@@ -107,7 +107,7 @@ TEST_CASE("impact analyzer reports heuristic header matches") {
                                                            include_resolver_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/config.h");
+        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/config.h", "");
 
     CHECK(result.heuristic);
     REQUIRE(result.affected_translation_units.size() == 3);
@@ -125,7 +125,7 @@ TEST_CASE("impact analyzer reports heuristic matches for transitively included h
                                                            include_resolver_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/shared.h");
+        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/shared.h", "");
 
     CHECK(result.heuristic);
     REQUIRE(result.affected_translation_units.size() == 3);
@@ -143,7 +143,7 @@ TEST_CASE("impact analyzer reports missing matches as heuristic empty result") {
                                                            include_resolver_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/generated/version.h");
+        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/generated/version.h", "");
 
     CHECK(result.heuristic);
     CHECK(result.affected_translation_units.empty());
@@ -193,7 +193,7 @@ TEST_CASE("impact analyzer only keeps diagnostics for impacted translation units
                                                            include_resolver_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/partial.h");
+        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/partial.h", "");
 
     CHECK(result.heuristic);
     REQUIRE(result.affected_translation_units.size() == 1);
@@ -244,7 +244,7 @@ TEST_CASE("impact analyzer sorts report-wide diagnostics deterministically") {
                                                            include_resolver_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/config.h");
+        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/config.h", "");
 
     REQUIRE(result.diagnostics.size() == 4);
     CHECK(result.diagnostics[0].message == "alpha warning");

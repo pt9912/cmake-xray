@@ -112,7 +112,9 @@ class StubAnalyzeProjectPort final : public xray::hexagon::ports::driving::Analy
 public:
     explicit StubAnalyzeProjectPort(AnalysisResult result) : result_(std::move(result)) {}
 
-    AnalysisResult analyze_project(std::string_view /*compile_commands_path*/) const override {
+    AnalysisResult analyze_project(
+        std::string_view /*compile_commands_path*/,
+        std::string_view /*cmake_file_api_path*/) const override {
         return result_;
     }
 
@@ -122,8 +124,10 @@ private:
 
 class StubAnalyzeImpactPort final : public xray::hexagon::ports::driving::AnalyzeImpactPort {
 public:
-    ImpactResult analyze_impact(std::string_view /*compile_commands_path*/,
-                                const std::filesystem::path& /*changed_path*/) const override {
+    ImpactResult analyze_impact(
+        std::string_view /*compile_commands_path*/,
+        const std::filesystem::path& /*changed_path*/,
+        std::string_view /*cmake_file_api_path*/) const override {
         return {};
     }
 };
@@ -150,6 +154,7 @@ TEST_CASE_FIXTURE(CliFixture, "no subcommand returns exit 0 with help on stdout"
 TEST_CASE_FIXTURE(CliFixture, "analyze --help returns exit 0 with help on stdout") {
     CHECK(run({"analyze", "--help"}) == ExitCode::success);
     CHECK(out.str().find("--compile-commands") != std::string::npos);
+    CHECK(out.str().find("--cmake-file-api") != std::string::npos);
     CHECK(out.str().find("--top") != std::string::npos);
     CHECK(out.str().find("--format") != std::string::npos);
     CHECK(out.str().find("--output") != std::string::npos);
@@ -158,6 +163,8 @@ TEST_CASE_FIXTURE(CliFixture, "analyze --help returns exit 0 with help on stdout
 
 TEST_CASE_FIXTURE(CliFixture, "impact --help returns exit 0 with help on stdout") {
     CHECK(run({"impact", "--help"}) == ExitCode::success);
+    CHECK(out.str().find("--compile-commands") != std::string::npos);
+    CHECK(out.str().find("--cmake-file-api") != std::string::npos);
     CHECK(out.str().find("--changed-file") != std::string::npos);
     CHECK(out.str().find("--format") != std::string::npos);
     CHECK(out.str().find("--output") != std::string::npos);
@@ -358,8 +365,16 @@ TEST_CASE_FIXTURE(CliFixture, "impact output keeps duplicate translation-unit ob
           std::string::npos);
 }
 
-TEST_CASE_FIXTURE(CliFixture, "missing analyze arguments returns exit 2") {
+TEST_CASE_FIXTURE(CliFixture, "analyze without any input source returns exit 2") {
     CHECK(run({"analyze"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("at least one input source") != std::string::npos);
+    CHECK(err.str().find("--compile-commands") != std::string::npos);
+    CHECK(err.str().find("--cmake-file-api") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "impact without any input source returns exit 2") {
+    CHECK(run({"impact", "--changed-file", "src/main.cpp"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("at least one input source") != std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture, "missing impact changed-file returns exit 2") {

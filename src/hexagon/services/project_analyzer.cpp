@@ -22,7 +22,8 @@ ProjectAnalyzer::ProjectAnalyzer(
       include_resolver_port_(include_resolver_port) {}
 
 model::AnalysisResult ProjectAnalyzer::analyze_project(
-    std::string_view compile_commands_path) const {
+    std::string_view compile_commands_path,
+    [[maybe_unused]] std::string_view cmake_file_api_path) const {
     model::AnalysisResult result;
     result.application = model::application_info();
     result.compile_database_path = display_compile_commands_path(compile_commands_path);

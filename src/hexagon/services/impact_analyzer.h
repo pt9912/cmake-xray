@@ -14,8 +14,10 @@ public:
     ImpactAnalyzer(const ports::driven::BuildModelPort& build_model_port,
                    const ports::driven::IncludeResolverPort& include_resolver_port);
 
-    model::ImpactResult analyze_impact(std::string_view compile_commands_path,
-                                       const std::filesystem::path& changed_path) const override;
+    model::ImpactResult analyze_impact(
+        std::string_view compile_commands_path,
+        const std::filesystem::path& changed_path,
+        std::string_view cmake_file_api_path) const override;
 
 private:
     const ports::driven::BuildModelPort& build_model_port_;

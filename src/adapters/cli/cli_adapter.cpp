@@ -28,6 +28,7 @@ enum class ReportFormat {
 
 struct CliOptions {
     std::string compile_commands_path;
+    std::string cmake_file_api_path;
     std::string changed_file_path;
     std::string output_path;
     std::string report_format{"console"};
@@ -112,11 +113,19 @@ void format_error(std::ostream& err, const xray::hexagon::model::CompileDatabase
     }
 }
 
+void configure_input_options(CLI::App& command, CliOptions& options) {
+    command.add_option("--compile-commands", options.compile_commands_path,
+                       "Path to compile_commands.json");
+    command.add_option(
+        "--cmake-file-api", options.cmake_file_api_path,
+        "Path to CMake File API reply data: either a build directory containing "
+        ".cmake/api/v1/reply or the reply directory itself. "
+        "Provides target metadata; without --compile-commands, also serves as primary input source");
+}
+
 void configure_analyze_command(CLI::App& app, CliOptions& options, CLI::App*& analyze_cmd) {
     analyze_cmd = app.add_subcommand("analyze", "Analyze a CMake project");
-    analyze_cmd->add_option("--compile-commands", options.compile_commands_path,
-                            "Path to compile_commands.json")
-        ->required();
+    configure_input_options(*analyze_cmd, options);
     analyze_cmd
         ->add_option("--top", options.top_limit,
                      "Limit ranking and hotspot output to the top N")
@@ -127,15 +136,26 @@ void configure_analyze_command(CLI::App& app, CliOptions& options, CLI::App*& an
 
 void configure_impact_command(CLI::App& app, CliOptions& options, CLI::App*& impact_cmd) {
     impact_cmd = app.add_subcommand("impact", "Analyze the translation-unit impact of a file");
-    impact_cmd->add_option("--compile-commands", options.compile_commands_path,
-                           "Path to compile_commands.json")
-        ->required();
+    configure_input_options(*impact_cmd, options);
     impact_cmd
         ->add_option("--changed-file", options.changed_file_path,
                      "Changed file path; relative paths are interpreted relative to the "
-                     "provided compile_commands.json")
+                     "compile_commands.json directory (with --compile-commands) or the "
+                     "top-level source directory from the codemodel (with --cmake-file-api only)")
         ->required();
     configure_report_options(*impact_cmd, options);
+}
+
+std::optional<int> validate_input_options(const CliOptions& options, std::ostream& err) {
+    if (!options.compile_commands_path.empty() || !options.cmake_file_api_path.empty()) {
+        return std::nullopt;
+    }
+
+    err << "error: at least one input source is required: "
+           "--compile-commands or --cmake-file-api\n";
+    err << "hint: provide --compile-commands for compile database analysis, "
+           "--cmake-file-api for target metadata, or both\n";
+    return ExitCode::cli_usage_error;
 }
 
 std::optional<int> validate_report_options(const CliOptions& options, std::ostream& err) {
@@ -308,22 +328,29 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
         return *validation_error;
     }
 
+    if (!analyze_cmd->parsed() && !impact_cmd->parsed()) {
+        out << app.help();
+        return ExitCode::success;
+    }
+
+    if (const auto validation_error = validate_input_options(options, err);
+        validation_error.has_value()) {
+        return *validation_error;
+    }
+
     OutputStreams streams{out, err};
     const auto report_format = parse_report_format(options.report_format);
     const auto& report_port = select_report_port(report_format, report_ports_);
 
     if (impact_cmd->parsed()) {
-        const auto result = analyze_impact_port_.analyze_impact(options.compile_commands_path,
-                                                                options.changed_file_path);
+        const auto result = analyze_impact_port_.analyze_impact(
+            options.compile_commands_path, options.changed_file_path,
+            options.cmake_file_api_path);
         return handle_impact_result(result, report_port, options, streams);
     }
 
-    if (!analyze_cmd->parsed()) {
-        out << app.help();
-        return ExitCode::success;
-    }
-
-    const auto result = analyze_project_port_.analyze_project(options.compile_commands_path);
+    const auto result = analyze_project_port_.analyze_project(
+        options.compile_commands_path, options.cmake_file_api_path);
     return handle_analysis_result(result, report_port, options, streams);
 }
 

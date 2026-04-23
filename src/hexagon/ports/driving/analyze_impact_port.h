@@ -11,8 +11,10 @@ class AnalyzeImpactPort {
 public:
     virtual ~AnalyzeImpactPort() = default;
 
-    virtual model::ImpactResult analyze_impact(std::string_view compile_commands_path,
-                                               const std::filesystem::path& changed_path) const = 0;
+    virtual model::ImpactResult analyze_impact(
+        std::string_view compile_commands_path,
+        const std::filesystem::path& changed_path,
+        std::string_view cmake_file_api_path) const = 0;
 };
 
 }  // namespace xray::hexagon::ports::driving

@@ -125,8 +125,10 @@ ImpactAnalyzer::ImpactAnalyzer(
     : build_model_port_(build_model_port),
       include_resolver_port_(include_resolver_port) {}
 
-ImpactResult ImpactAnalyzer::analyze_impact(std::string_view compile_commands_path,
-                                            const std::filesystem::path& changed_path) const {
+ImpactResult ImpactAnalyzer::analyze_impact(
+    std::string_view compile_commands_path,
+    const std::filesystem::path& changed_path,
+    [[maybe_unused]] std::string_view cmake_file_api_path) const {
     ImpactResult result;
     result.application = model::application_info();
     result.compile_database_path = display_compile_commands_path(compile_commands_path);
