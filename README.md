@@ -6,8 +6,6 @@ Build visibility for CMake projects.
 
 ## Status
 
-Das Repository enthaelt die umgesetzten Meilensteine M0 bis M3 aus [docs/plan-M0.md](./docs/plan-M0.md), [docs/plan-M1.md](./docs/plan-M1.md), [docs/plan-M2.md](./docs/plan-M2.md) und [docs/plan-M3.md](./docs/plan-M3.md).
-
 Der MVP-Umfang umfasst:
 
 - CLI mit `analyze` und `impact`
@@ -127,13 +125,13 @@ Die Beispiele stammen aus denselben kanonischen M3-Fixtures wie die E2E-Golden-F
 
 ## Exit-Codes
 
-| Code | Bedeutung | Typischer Ausloeser |
-|---|---|---|
-| `0` | Erfolg | gueltige CLI-Verwendung und gueltige Eingabedaten |
-| `1` | Laufzeit- oder Report-Schreibfehler | nicht beschreibbarer `--output`-Pfad, unerwarteter Fehler |
-| `2` | CLI-Verwendungsfehler | unbekanntes Unterkommando, fehlendes Pflichtargument, ungueltige Optionskombination |
-| `3` | Eingabedatei nicht lesbar | Datei fehlt, kein Zugriff, Pfad ungueltig |
-| `4` | Eingabedaten ungueltig | JSON fehlerhaft, kein Array, leer, Pflichtfelder fehlen |
+| Code | Bedeutung                           | Typischer Ausloeser                                                                 |
+| ---- | ----------------------------------- | ----------------------------------------------------------------------------------- |
+| `0`  | Erfolg                              | gueltige CLI-Verwendung und gueltige Eingabedaten                                   |
+| `1`  | Laufzeit- oder Report-Schreibfehler | nicht beschreibbarer `--output`-Pfad, unerwarteter Fehler                           |
+| `2`  | CLI-Verwendungsfehler               | unbekanntes Unterkommando, fehlendes Pflichtargument, ungueltige Optionskombination |
+| `3`  | Eingabedatei nicht lesbar           | Datei fehlt, kein Zugriff, Pfad ungueltig                                           |
+| `4`  | Eingabedaten ungueltig              | JSON fehlerhaft, kein Array, leer, Pflichtfelder fehlen                             |
 
 ## Tests und Quality Gates
 
