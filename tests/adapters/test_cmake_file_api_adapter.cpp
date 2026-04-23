@@ -156,13 +156,16 @@ TEST_CASE("file api adapter assigns shared source to multiple targets with corre
 
 TEST_CASE("file api adapter skips sources without compile group index") {
     const CmakeFileApiAdapter adapter;
-    const auto result = adapter.load_build_model(testdata + "file_api_only/build");
+    // partial_targets has 2 targets: app (1 source with compileGroupIndex) and
+    // iface (1 header-only source without compileGroupIndex)
+    const auto result = adapter.load_build_model(testdata + "partial_targets/build");
 
-    // Only sources with compileGroupIndex produce entries
     CHECK(result.compile_database.is_success());
-    for (const auto& entry : result.compile_database.entries()) {
-        CHECK_FALSE(entry.file().empty());
-    }
+    // Only app's source produces an entry; iface's header is skipped
+    CHECK(result.compile_database.entries().size() == 1);
+    CHECK(result.compile_database.entries()[0].file().find("main.cpp") != std::string::npos);
+    // iface target produced no entries, so metadata is partial
+    CHECK(result.target_metadata == TargetMetadataStatus::partial);
 }
 
 // --- Reply selection ---

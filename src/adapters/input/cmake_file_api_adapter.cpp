@@ -126,21 +126,6 @@ std::string resolve_source_path(const std::string& source_path_raw,
     return normalize_path(source_root / source_path);
 }
 
-struct ParsedTarget {
-    TargetInfo info;
-    std::vector<CompileEntry> entries;
-    // Maps each entry's index to the target info for assignment building
-};
-
-struct ParsedCodemodel {
-    std::string source_root;
-    std::string build_root;
-    std::vector<std::string> target_json_files;
-    std::vector<std::string> target_names;
-    // directories[].build for each target's directoryIndex
-    std::vector<std::string> target_build_dirs;
-};
-
 BuildModelResult parse_and_load(const std::filesystem::path& reply_dir,
                                const std::string& previous_suffix);
 
@@ -226,14 +211,6 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
                                   "cmake file api codemodel configuration contains no targets");
     }
 
-    // Extract directories for build path resolution
-    std::vector<std::string> directory_build_paths;
-    if (config.contains("directories") && config["directories"].is_array()) {
-        for (const auto& dir : config["directories"]) {
-            directory_build_paths.push_back(dir.value("build", "."));
-        }
-    }
-
     // Step 5: parse targets
     const std::filesystem::path source_root_path{source_root};
     const std::filesystem::path build_root_path{build_root};
@@ -270,14 +247,16 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
         const auto target_unique_key = target_name + "::" + target_type;
         const TargetInfo target_info{target_name, target_type, target_unique_key};
 
-        // Resolve build directory for this target
-        const auto dir_index =
-            static_cast<std::size_t>(target.value("directoryIndex", 0));
-        const auto dir_build = (dir_index < directory_build_paths.size())
-                                   ? directory_build_paths[dir_index]
-                                   : ".";
+        // Resolve build directory from target's paths.build (relative to
+        // top-level build dir). The CMake File API spec places paths.build on
+        // the target detail reply, not directoryIndex (which is only on the
+        // codemodel target reference and indexes into the directories array).
+        const auto target_build_rel =
+            (target.contains("paths") && target["paths"].contains("build"))
+                ? target["paths"]["build"].get<std::string>()
+                : ".";
         const auto resolved_directory =
-            normalize_path(build_root_path / dir_build);
+            normalize_path(build_root_path / target_build_rel);
 
         if (!target.contains("sources") || !target["sources"].is_array() ||
             !target.contains("compileGroups") || !target["compileGroups"].is_array()) {
@@ -356,7 +335,11 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
     std::sort(all_entries.begin(), all_entries.end(),
               [](const CompileEntry& a, const CompileEntry& b) {
                   if (a.file() != b.file()) return a.file() < b.file();
-                  return a.directory() < b.directory();
+                  if (a.directory() != b.directory()) return a.directory() < b.directory();
+                  // Tiebreaker for same source in same directory from different targets:
+                  // higher argument count first so the most complex entry survives
+                  // downstream emplace() on unique_key.
+                  return a.arguments().size() > b.arguments().size();
               });
 
     // Assemble result
