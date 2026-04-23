@@ -22,13 +22,12 @@ ProjectAnalyzer::ProjectAnalyzer(
       include_resolver_port_(include_resolver_port) {}
 
 model::AnalysisResult ProjectAnalyzer::analyze_project(
-    std::string_view compile_commands_path,
-    [[maybe_unused]] std::string_view cmake_file_api_path) const {
+    ports::driving::AnalyzeProjectRequest request) const {
     model::AnalysisResult result;
     result.application = model::application_info();
-    result.compile_database_path = display_compile_commands_path(compile_commands_path);
+    result.compile_database_path = display_compile_commands_path(request.compile_commands_path);
 
-    const auto build_model = build_model_port_.load_build_model(compile_commands_path);
+    const auto build_model = build_model_port_.load_build_model(request.compile_commands_path);
     result.compile_database = build_model.compile_database;
     result.observation_source = build_model.source;
     result.target_metadata = build_model.target_metadata;
@@ -36,14 +35,14 @@ model::AnalysisResult ProjectAnalyzer::analyze_project(
 
     if (!result.compile_database.is_success()) return result;
 
-    const auto observations =
-        build_translation_unit_observations(result.compile_database.entries(), compile_commands_path);
+    const auto observations = build_translation_unit_observations(
+        result.compile_database.entries(), request.compile_commands_path);
     const auto include_resolution = include_resolver_port_.resolve_includes(observations);
 
     result.include_analysis_heuristic = include_resolution.heuristic;
     result.translation_units = build_ranked_translation_units(observations, include_resolution);
     result.include_hotspots =
-        build_include_hotspots(observations, include_resolution, compile_commands_path);
+        build_include_hotspots(observations, include_resolution, request.compile_commands_path);
     result.diagnostics = include_resolution.diagnostics;
 
     if (result.include_analysis_heuristic) {

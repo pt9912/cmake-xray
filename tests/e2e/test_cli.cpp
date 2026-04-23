@@ -113,8 +113,7 @@ public:
     explicit StubAnalyzeProjectPort(AnalysisResult result) : result_(std::move(result)) {}
 
     AnalysisResult analyze_project(
-        std::string_view /*compile_commands_path*/,
-        std::string_view /*cmake_file_api_path*/) const override {
+        xray::hexagon::ports::driving::AnalyzeProjectRequest /*request*/) const override {
         return result_;
     }
 

@@ -77,9 +77,8 @@ void configure_report_options(CLI::App& command, CliOptions& options) {
                        "Write a markdown report atomically to this path; valid only with --format markdown");
 }
 
-void format_error(std::ostream& err, const xray::hexagon::model::CompileDatabaseResult& result) {
-    err << "error: " << result.error_description() << '\n';
-
+void append_entry_diagnostics(std::ostream& err,
+                              const xray::hexagon::model::CompileDatabaseResult& result) {
     if (!result.entry_diagnostics().empty()) {
         std::size_t displayed = 0;
         for (const auto& diag : result.entry_diagnostics()) {
@@ -94,33 +93,38 @@ void format_error(std::ostream& err, const xray::hexagon::model::CompileDatabase
                 << " more invalid entries\n";
         }
     }
+}
 
-    switch (result.error()) {
+std::string_view error_hint(CompileDatabaseError error) {
+    switch (error) {
     case CompileDatabaseError::file_not_accessible:
-        err << "hint: check the path or generate the compilation database before running "
-               "cmake-xray analyze or impact\n";
-        break;
+        return "hint: check the path or generate the compilation database before running "
+               "cmake-xray analyze or impact";
     case CompileDatabaseError::empty_database:
-        err << "hint: generate the compilation database before running cmake-xray analyze or "
-               "impact\n";
-        break;
+        return "hint: generate the compilation database before running cmake-xray analyze or "
+               "impact";
     case CompileDatabaseError::invalid_json:
     case CompileDatabaseError::not_an_array:
     case CompileDatabaseError::invalid_entries:
-        err << "hint: fix or regenerate the compilation database before running "
-               "cmake-xray analyze or impact\n";
-        break;
+        return "hint: fix or regenerate the compilation database before running "
+               "cmake-xray analyze or impact";
     case CompileDatabaseError::file_api_not_accessible:
-        err << "hint: check the --cmake-file-api path; provide either the build directory "
-               "or the .cmake/api/v1/reply directory\n";
-        break;
+        return "hint: check the --cmake-file-api path; provide either the build directory "
+               "or the .cmake/api/v1/reply directory";
     case CompileDatabaseError::file_api_invalid:
-        err << "hint: ensure cmake has been configured with file api query files "
-               "and that reply data is complete and up to date\n";
-        break;
+        return "hint: ensure cmake has been configured with file api query files "
+               "and that reply data is complete and up to date";
     default:
-        break;
+        return {};
     }
+}
+
+void format_error(std::ostream& err, const xray::hexagon::model::CompileDatabaseResult& result) {
+    err << "error: " << result.error_description() << '\n';
+    append_entry_diagnostics(err, result);
+
+    const auto hint = error_hint(result.error());
+    if (!hint.empty()) err << hint << '\n';
 }
 
 void configure_input_options(CLI::App& command, CliOptions& options) {
@@ -360,7 +364,7 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
     }
 
     const auto result = analyze_project_port_.analyze_project(
-        options.compile_commands_path, options.cmake_file_api_path);
+        {options.compile_commands_path, options.cmake_file_api_path});
     return handle_analysis_result(result, report_port, options, streams);
 }
 

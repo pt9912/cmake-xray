@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -126,24 +127,58 @@ std::string resolve_source_path(const std::string& source_path_raw,
     return normalize_path(source_root / source_path);
 }
 
+struct ParsedReplyIndex {
+    ReplyCandidate latest;
+    nlohmann::json index;
+};
+
+struct ParsedCodemodel {
+    std::string latest_suffix;
+    std::string source_root;
+    std::filesystem::path source_root_path;
+    std::filesystem::path build_root_path;
+    nlohmann::json target_refs;
+    std::size_t total_targets{0};
+};
+
+struct CodemodelPaths {
+    std::string source_root;
+    std::string build_root;
+};
+
+struct ParsedTargets {
+    std::vector<CompileEntry> entries;
+    std::map<std::string, std::vector<TargetInfo>> assignments;
+    std::size_t targets_without_sources{0};
+};
+
+struct SourceEntryContext {
+    const nlohmann::json& compile_groups;
+    const std::filesystem::path& source_root_path;
+    const std::string& resolved_directory;
+    const TargetInfo& target_info;
+};
+
 BuildModelResult parse_and_load(const std::filesystem::path& reply_dir,
                                const std::string& previous_suffix);
 
-BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
-                                        const std::string& previous_suffix) {
-    // Step 2: find reply entry
+std::optional<BuildModelResult> load_latest_index_reply(const std::filesystem::path& reply_dir,
+                                                        const std::string& previous_suffix,
+                                                        ParsedReplyIndex& parsed_reply) {
     bool scan_ok = false;
     const auto candidates = scan_reply_candidates(reply_dir, scan_ok);
     if (!scan_ok) {
         return make_file_api_error(CompileDatabaseError::file_api_not_accessible,
-                                  "cannot read cmake file api reply directory: " +
-                                      reply_dir.string());
+                                   "cannot read cmake file api reply directory: " +
+                                       reply_dir.string());
     }
+
     const auto* latest = find_latest_candidate(candidates);
     if (latest == nullptr) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
-                                  "no index or error reply found in " + reply_dir.string());
+                                   "no index or error reply found in " + reply_dir.string());
     }
+
     if (!previous_suffix.empty() && latest->suffix <= previous_suffix) {
         return make_file_api_error(
             CompileDatabaseError::file_api_invalid,
@@ -151,188 +186,263 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
     }
     if (latest->is_error) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
-                                  "cmake file api error reply is the most recent entry: " +
-                                      latest->path.string());
+                                   "cmake file api error reply is the most recent entry: " +
+                                       latest->path.string());
     }
 
-    // Parse index
     bool parse_ok = false;
     const auto index = parse_json_file(latest->path, parse_ok);
     if (!parse_ok) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
-                                  "cmake file api index is not valid JSON: " +
-                                      latest->path.string());
+                                   "cmake file api index is not valid JSON: " +
+                                       latest->path.string());
     }
 
-    // Step 3: find codemodel reference
-    const auto codemodel_json_file = find_codemodel_json_file(index);
-    if (codemodel_json_file.empty()) {
+    parsed_reply = ParsedReplyIndex{*latest, index};
+    return std::nullopt;
+}
+
+std::optional<BuildModelResult> parse_codemodel_json(const std::filesystem::path& codemodel_path,
+                                                     nlohmann::json& codemodel) {
+    bool parse_ok = false;
+    codemodel = parse_json_file(codemodel_path, parse_ok);
+    if (parse_ok) return std::nullopt;
+
+    return make_file_api_error(CompileDatabaseError::file_api_invalid,
+                               "cmake file api codemodel is not valid JSON: " +
+                                   codemodel_path.string());
+}
+
+std::optional<BuildModelResult> extract_codemodel_paths(const nlohmann::json& codemodel,
+                                                        CodemodelPaths& paths_out) {
+    if (!codemodel.contains("paths")) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
-                                  "cmake file api index does not contain a codemodel object");
+                                   "cmake file api codemodel is missing paths.source or paths.build");
     }
 
-    // Step 4: parse codemodel
-    const auto codemodel_path = reply_dir / codemodel_json_file;
-    const auto codemodel = parse_json_file(codemodel_path, parse_ok);
-    if (!parse_ok) {
+    const auto& paths = codemodel["paths"];
+    if (!paths.contains("source") || !paths.contains("build")) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
-                                  "cmake file api codemodel is not valid JSON: " +
-                                      codemodel_path.string());
+                                   "cmake file api codemodel is missing paths.source or paths.build");
     }
 
-    if (!codemodel.contains("paths") || !codemodel["paths"].contains("source") ||
-        !codemodel["paths"].contains("build")) {
+    paths_out.source_root = paths["source"].get<std::string>();
+    paths_out.build_root = paths["build"].get<std::string>();
+    return std::nullopt;
+}
+
+std::optional<BuildModelResult> extract_target_refs_from_codemodel(const nlohmann::json& codemodel,
+                                                                   nlohmann::json& target_refs) {
+    if (!codemodel.contains("configurations") || !codemodel["configurations"].is_array()) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
-                                  "cmake file api codemodel is missing paths.source or paths.build");
+                                   "cmake file api codemodel contains no configurations");
     }
 
-    const auto source_root = codemodel["paths"]["source"].get<std::string>();
-    const auto build_root = codemodel["paths"]["build"].get<std::string>();
-
-    if (!codemodel.contains("configurations") || !codemodel["configurations"].is_array() ||
-        codemodel["configurations"].empty()) {
+    const auto& configurations = codemodel["configurations"];
+    if (configurations.empty()) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
-                                  "cmake file api codemodel contains no configurations");
+                                   "cmake file api codemodel contains no configurations");
     }
-
-    if (codemodel["configurations"].size() > 1) {
+    if (configurations.size() > 1) {
         return make_file_api_error(
             CompileDatabaseError::file_api_invalid,
             "cmake file api codemodel contains " +
-                std::to_string(codemodel["configurations"].size()) +
+                std::to_string(configurations.size()) +
                 " configurations; multi-config generators are not supported in this version");
     }
 
-    const auto& config = codemodel["configurations"][0];
-
+    const auto& config = configurations[0];
     if (!config.contains("targets") || !config["targets"].is_array() ||
         config["targets"].empty()) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
-                                  "cmake file api codemodel configuration contains no targets");
+                                   "cmake file api codemodel configuration contains no targets");
     }
 
-    // Step 5: parse targets
-    const std::filesystem::path source_root_path{source_root};
-    const std::filesystem::path build_root_path{build_root};
-    std::vector<CompileEntry> all_entries;
-    std::vector<Diagnostic> diagnostics;
-    // observation_key -> list of targets
-    std::map<std::string, std::vector<TargetInfo>> assignments;
-    std::size_t targets_without_sources = 0;
+    target_refs = config["targets"];
+    return std::nullopt;
+}
 
-    for (const auto& target_ref : config["targets"]) {
-        if (!target_ref.contains("jsonFile")) continue;
-
-        const auto target_json_file = target_ref["jsonFile"].get<std::string>();
-        const auto target_path = reply_dir / target_json_file;
-        const auto target = parse_json_file(target_path, parse_ok);
-
-        if (!parse_ok) {
-            // GCOVR_EXCL_START: requires two successive stale indexes with missing targets.
-            if (!previous_suffix.empty()) {
-                return make_file_api_error(
-                    CompileDatabaseError::file_api_invalid,
-                    "cmake file api target reply is not accessible after retry: " +
-                        target_path.string());
-            }
-            // GCOVR_EXCL_STOP
-            // Retry: re-scan for newer index, passing current suffix for comparison
-            return parse_and_load(reply_dir, latest->suffix);
-        }
-
-        const auto target_name = target.value("name", "");
-        const auto target_type = target.value("type", "");
-        if (target_name.empty()) continue;
-
-        const auto target_unique_key = target_name + "::" + target_type;
-        const TargetInfo target_info{target_name, target_type, target_unique_key};
-
-        // Resolve build directory from target's paths.build (relative to
-        // top-level build dir). The CMake File API spec places paths.build on
-        // the target detail reply, not directoryIndex (which is only on the
-        // codemodel target reference and indexes into the directories array).
-        const auto target_build_rel =
-            (target.contains("paths") && target["paths"].contains("build"))
-                ? target["paths"]["build"].get<std::string>()
-                : ".";
-        const auto resolved_directory =
-            normalize_path(build_root_path / target_build_rel);
-
-        if (!target.contains("sources") || !target["sources"].is_array() ||
-            !target.contains("compileGroups") || !target["compileGroups"].is_array()) {
-            ++targets_without_sources;
-            continue;
-        }
-
-        const auto& sources = target["sources"];
-        const auto& compile_groups = target["compileGroups"];
-        const auto entries_before = all_entries.size();
-
-        for (const auto& source : sources) {
-            if (!source.contains("compileGroupIndex")) continue;
-
-            const auto group_index = source["compileGroupIndex"].get<std::size_t>();
-            if (group_index >= compile_groups.size()) continue;
-
-            const auto source_path_raw = source.value("path", "");
-            if (source_path_raw.empty()) continue;
-
-            const auto resolved_source =
-                resolve_source_path(source_path_raw, source_root_path);
-
-            // Build arguments from structured fields only
-            const auto& group = compile_groups[group_index];
-            const auto language = group.value("language", "CXX");
-            std::vector<std::string> arguments;
-            arguments.push_back(language == "CXX" ? "c++" : "cc");
-
-            if (group.contains("includes") && group["includes"].is_array()) {
-                for (const auto& inc : group["includes"]) {
-                    const auto inc_path = inc.value("path", "");
-                    if (inc_path.empty()) continue;
-                    const auto is_system = inc.value("isSystem", false);
-                    arguments.push_back(is_system ? "-isystem" : "-I");
-                    arguments.push_back(inc_path);
-                }
-            }
-
-            if (group.contains("defines") && group["defines"].is_array()) {
-                for (const auto& def : group["defines"]) {
-                    const auto define = def.value("define", "");
-                    if (!define.empty()) {
-                        arguments.push_back("-D" + define);
-                    }
-                }
-            }
-
-            arguments.push_back("-c");
-            arguments.push_back(resolved_source);
-
-            // Use resolved absolute source path as file so that downstream
-            // analysis_support.cpp resolves the same key as our observation_key.
-            all_entries.push_back(
-                CompileEntry::from_arguments(resolved_source, resolved_directory,
-                                             std::move(arguments)));
-
-            // Track target assignment by observation key
-            const auto observation_key = resolved_source + "|" + resolved_directory;
-            assignments[observation_key].push_back(target_info);
-        }
-
-        if (all_entries.size() == entries_before) {
-            ++targets_without_sources;
-        }
-    }
-
-    if (all_entries.empty()) {
+std::optional<BuildModelResult> load_codemodel_reply(const std::filesystem::path& reply_dir,
+                                                     const ParsedReplyIndex& parsed_reply,
+                                                     ParsedCodemodel& parsed_codemodel) {
+    const auto codemodel_json_file = find_codemodel_json_file(parsed_reply.index);
+    if (codemodel_json_file.empty()) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
-                                  "cmake file api contains no compilable sources");
+                                   "cmake file api index does not contain a codemodel object");
     }
 
-    // Sort entries deterministically so that permuted target order in the
-    // codemodel produces identical results. Downstream emplace() on unique_key
-    // keeps the first match, so stable entry order matters.
-    std::sort(all_entries.begin(), all_entries.end(),
+    const auto codemodel_path = reply_dir / codemodel_json_file;
+    nlohmann::json codemodel;
+    if (const auto error = parse_codemodel_json(codemodel_path, codemodel); error.has_value())
+        return error;
+
+    CodemodelPaths paths;
+    if (const auto error = extract_codemodel_paths(codemodel, paths); error.has_value())
+        return error;
+
+    nlohmann::json target_refs;
+    if (const auto error = extract_target_refs_from_codemodel(codemodel, target_refs);
+        error.has_value())
+        return error;
+
+    parsed_codemodel = ParsedCodemodel{
+        .latest_suffix = parsed_reply.latest.suffix,
+        .source_root = paths.source_root,
+        .source_root_path = std::filesystem::path{paths.source_root},
+        .build_root_path = std::filesystem::path{paths.build_root},
+        .target_refs = target_refs,
+        .total_targets = target_refs.size(),
+    };
+    return std::nullopt;
+}
+
+std::string resolve_target_directory(const nlohmann::json& target,
+                                     const std::filesystem::path& build_root_path) {
+    const auto target_build_rel =
+        (target.contains("paths") && target["paths"].contains("build"))
+            ? target["paths"]["build"].get<std::string>()
+            : ".";
+    return normalize_path(build_root_path / target_build_rel);
+}
+
+void append_group_include_arguments(const nlohmann::json& group,
+                                    std::vector<std::string>& arguments) {
+    if (!group.contains("includes") || !group["includes"].is_array()) return;
+
+    for (const auto& inc : group["includes"]) {
+        const auto inc_path = inc.value("path", "");
+        if (inc_path.empty()) continue;
+        const auto is_system = inc.value("isSystem", false);
+        arguments.push_back(is_system ? "-isystem" : "-I");
+        arguments.push_back(inc_path);
+    }
+}
+
+void append_group_define_arguments(const nlohmann::json& group,
+                                   std::vector<std::string>& arguments) {
+    if (!group.contains("defines") || !group["defines"].is_array()) return;
+
+    for (const auto& def : group["defines"]) {
+        const auto define = def.value("define", "");
+        if (!define.empty()) arguments.push_back("-D" + define);
+    }
+}
+
+std::string compile_driver(const nlohmann::json& group) {
+    return group.value("language", "CXX") == "CXX" ? "c++" : "cc";
+}
+
+void append_compile_source_argument(std::vector<std::string>& arguments,
+                                    const std::string& resolved_source) {
+    arguments.push_back("-c");
+    arguments.push_back(resolved_source);
+}
+
+std::vector<std::string> build_compile_arguments(const nlohmann::json& group,
+                                                 const std::string& resolved_source) {
+    std::vector<std::string> arguments{compile_driver(group)};
+    append_group_include_arguments(group, arguments);
+    append_group_define_arguments(group, arguments);
+    append_compile_source_argument(arguments, resolved_source);
+    return arguments;
+}
+
+const nlohmann::json* find_compile_group(const SourceEntryContext& context,
+                                         const nlohmann::json& source) {
+    if (!source.contains("compileGroupIndex")) return nullptr;
+
+    const auto group_index = source["compileGroupIndex"].get<std::size_t>();
+    if (group_index >= context.compile_groups.size()) return nullptr;
+    return &context.compile_groups[group_index];
+}
+
+std::optional<std::string> resolve_entry_source_path(const nlohmann::json& source,
+                                                     const std::filesystem::path& source_root_path) {
+    const auto source_path_raw = source.value("path", "");
+    if (source_path_raw.empty()) return std::nullopt;
+    return resolve_source_path(source_path_raw, source_root_path);
+}
+
+void append_target_assignment(ParsedTargets& parsed_targets, const std::string& resolved_source,
+                              const SourceEntryContext& context) {
+    parsed_targets.assignments[resolved_source + "|" + context.resolved_directory].push_back(
+        context.target_info);
+}
+
+bool append_source_entry(const nlohmann::json& source, const SourceEntryContext& context,
+                         ParsedTargets& parsed_targets) {
+    const auto* group = find_compile_group(context, source);
+    if (group == nullptr) return false;
+
+    const auto resolved_source = resolve_entry_source_path(source, context.source_root_path);
+    if (!resolved_source.has_value()) return false;
+
+    auto arguments = build_compile_arguments(*group, *resolved_source);
+    parsed_targets.entries.push_back(
+        CompileEntry::from_arguments(*resolved_source, context.resolved_directory,
+                                     std::move(arguments)));
+    append_target_assignment(parsed_targets, *resolved_source, context);
+    return true;
+}
+
+void append_target_entries(const nlohmann::json& target, const ParsedCodemodel& parsed_codemodel,
+                           const TargetInfo& target_info, ParsedTargets& parsed_targets) {
+    if (!target.contains("sources") || !target["sources"].is_array() ||
+        !target.contains("compileGroups") || !target["compileGroups"].is_array()) {
+        ++parsed_targets.targets_without_sources;
+        return;
+    }
+
+    const auto resolved_directory =
+        resolve_target_directory(target, parsed_codemodel.build_root_path);
+    const auto& sources = target["sources"];
+    const SourceEntryContext context{target["compileGroups"], parsed_codemodel.source_root_path,
+                                     resolved_directory, target_info};
+    const auto entries_before = parsed_targets.entries.size();
+
+    for (const auto& source : sources) {
+        append_source_entry(source, context, parsed_targets);
+    }
+
+    if (parsed_targets.entries.size() == entries_before) {
+        ++parsed_targets.targets_without_sources;
+    }
+}
+
+std::optional<BuildModelResult> append_target_reply(const std::filesystem::path& reply_dir,
+                                                    const ParsedCodemodel& parsed_codemodel,
+                                                    const std::string& previous_suffix,
+                                                    const nlohmann::json& target_ref,
+                                                    ParsedTargets& parsed_targets) {
+    if (!target_ref.contains("jsonFile")) return std::nullopt;
+
+    const auto target_json_file = target_ref["jsonFile"].get<std::string>();
+    const auto target_path = reply_dir / target_json_file;
+    bool parse_ok = false;
+    const auto target = parse_json_file(target_path, parse_ok);
+
+    if (!parse_ok) {
+        if (!previous_suffix.empty()) {
+            return make_file_api_error(CompileDatabaseError::file_api_invalid,
+                                       "cmake file api target reply is not accessible after retry: " +
+                                           target_path.string());
+        }
+
+        return parse_and_load(reply_dir, parsed_codemodel.latest_suffix);
+    }
+
+    const auto target_name = target.value("name", "");
+    if (target_name.empty()) return std::nullopt;
+
+    const auto target_type = target.value("type", "");
+    append_target_entries(target, parsed_codemodel,
+                          TargetInfo{target_name, target_type, target_name + "::" + target_type},
+                          parsed_targets);
+    return std::nullopt;
+}
+
+void sort_compile_entries(std::vector<CompileEntry>& entries) {
+    std::sort(entries.begin(), entries.end(),
               [](const CompileEntry& a, const CompileEntry& b) {
                   if (a.file() != b.file()) return a.file() < b.file();
                   if (a.directory() != b.directory()) return a.directory() < b.directory();
@@ -341,16 +451,15 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
                   // downstream emplace() on unique_key.
                   return a.arguments().size() > b.arguments().size();
               });
+}
 
-    // Assemble result
-    // Deduplicate targets per assignment and sort deterministically
+std::vector<TargetAssignment> build_target_assignments(
+    std::map<std::string, std::vector<TargetInfo>> assignments) {
     std::vector<TargetAssignment> target_assignments;
     for (auto& [key, targets] : assignments) {
-        // Sort targets deterministically by (display_name, type)
         std::sort(targets.begin(), targets.end(), [](const auto& a, const auto& b) {
             return a.unique_key < b.unique_key;
         });
-        // Remove duplicate targets (same name+type from same observation)
         targets.erase(std::unique(targets.begin(), targets.end(),
                                   [](const auto& a, const auto& b) {
                                       return a.unique_key == b.unique_key;
@@ -359,33 +468,70 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
         target_assignments.push_back({key, std::move(targets)});
     }
 
-    // Sort assignments deterministically
     std::sort(target_assignments.begin(), target_assignments.end(),
               [](const auto& a, const auto& b) {
                   return a.observation_key < b.observation_key;
               });
+    return target_assignments;
+}
 
-    // Determine target metadata status and add diagnostics
-    const auto total_targets = config["targets"].size();
-    const auto is_partial = targets_without_sources > 0;
+std::vector<Diagnostic> build_partial_target_diagnostics(const ParsedCodemodel& parsed_codemodel,
+                                                         const ParsedTargets& parsed_targets) {
+    if (parsed_targets.targets_without_sources == 0) return {};
 
-    if (is_partial) {
-        diagnostics.push_back(
-            {DiagnosticSeverity::note,
-             std::to_string(targets_without_sources) + " of " + std::to_string(total_targets) +
-                 " targets have no compilable sources and are not included in the analysis"});
-    }
+    return {{DiagnosticSeverity::note,
+             std::to_string(parsed_targets.targets_without_sources) + " of " +
+                 std::to_string(parsed_codemodel.total_targets) +
+                 " targets have no compilable sources and are not included in the analysis"}};
+}
+
+BuildModelResult build_success_result(const ParsedCodemodel& parsed_codemodel,
+                                      ParsedTargets parsed_targets) {
+    sort_compile_entries(parsed_targets.entries);
 
     BuildModelResult result;
     result.source = ObservationSource::derived;
-    result.target_metadata =
-        is_partial ? TargetMetadataStatus::partial : TargetMetadataStatus::loaded;
+    result.target_metadata = parsed_targets.targets_without_sources > 0
+                                 ? TargetMetadataStatus::partial
+                                 : TargetMetadataStatus::loaded;
     result.compile_database =
-        CompileDatabaseResult{CompileDatabaseError::none, {}, std::move(all_entries), {}};
-    result.target_assignments = std::move(target_assignments);
-    result.source_root = source_root;
-    result.diagnostics = std::move(diagnostics);
+        CompileDatabaseResult{CompileDatabaseError::none, {}, std::move(parsed_targets.entries), {}};
+    result.target_assignments = build_target_assignments(std::move(parsed_targets.assignments));
+    result.source_root = parsed_codemodel.source_root;
+    result.diagnostics = build_partial_target_diagnostics(parsed_codemodel, parsed_targets);
     return result;
+}
+
+BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
+                                        const std::string& previous_suffix) {
+    ParsedReplyIndex parsed_reply;
+    if (const auto error =
+            load_latest_index_reply(reply_dir, previous_suffix, parsed_reply);
+        error.has_value()) {
+        return *error;
+    }
+
+    ParsedCodemodel parsed_codemodel;
+    if (const auto error = load_codemodel_reply(reply_dir, parsed_reply, parsed_codemodel);
+        error.has_value()) {
+        return *error;
+    }
+
+    ParsedTargets parsed_targets;
+    for (const auto& target_ref : parsed_codemodel.target_refs) {
+        if (const auto error = append_target_reply(reply_dir, parsed_codemodel, previous_suffix,
+                                                   target_ref, parsed_targets);
+            error.has_value()) {
+            return *error;
+        }
+    }
+
+    if (parsed_targets.entries.empty()) {
+        return make_file_api_error(CompileDatabaseError::file_api_invalid,
+                                   "cmake file api contains no compilable sources");
+    }
+
+    return build_success_result(parsed_codemodel, std::move(parsed_targets));
 }
 
 BuildModelResult parse_and_load(const std::filesystem::path& reply_dir,

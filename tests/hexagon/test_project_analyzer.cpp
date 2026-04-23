@@ -139,7 +139,7 @@ TEST_CASE("project analyzer builds ranked translation units and hotspots") {
     const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port,
                                                             include_resolver_port};
 
-    const auto result = analyzer.analyze_project("/tmp/compile_commands.json", "");
+    const auto result = analyzer.analyze_project({"/tmp/compile_commands.json", ""});
 
     CHECK(result.application.name == std::string_view{"cmake-xray"});
     CHECK(result.application.version == std::string_view{"v1.0.0"});
@@ -192,7 +192,7 @@ TEST_CASE("project analyzer propagates compile database errors") {
     const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port,
                                                             include_resolver_port};
 
-    const auto result = analyzer.analyze_project("/path/to/compile_commands.json", "");
+    const auto result = analyzer.analyze_project({"/path/to/compile_commands.json", ""});
 
     CHECK_FALSE(result.compile_database.is_success());
     CHECK(result.compile_database.error() == CompileDatabaseError::empty_database);
@@ -208,8 +208,10 @@ TEST_CASE("project analyzer ranking is stable for permuted compile database entr
     const xray::hexagon::services::ProjectAnalyzer permuted_analyzer{permuted_build_model_port,
                                                                      include_resolver_port};
 
-    const auto baseline_result = baseline_analyzer.analyze_project("/tmp/compile_commands.json", "");
-    const auto permuted_result = permuted_analyzer.analyze_project("/tmp/compile_commands.json", "");
+    const auto baseline_result =
+        baseline_analyzer.analyze_project({"/tmp/compile_commands.json", ""});
+    const auto permuted_result =
+        permuted_analyzer.analyze_project({"/tmp/compile_commands.json", ""});
 
     REQUIRE(baseline_result.translation_units.size() == 3);
     REQUIRE(permuted_result.translation_units.size() == 3);
@@ -231,7 +233,7 @@ TEST_CASE("project analyzer tokenizes quoted command arguments with spaces") {
     const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port,
                                                             include_resolver_port};
 
-    const auto result = analyzer.analyze_project("/tmp/compile_commands.json", "");
+    const auto result = analyzer.analyze_project({"/tmp/compile_commands.json", ""});
 
     REQUIRE(result.translation_units.size() == 1);
     CHECK(result.translation_units[0].arg_count == 7);
@@ -248,7 +250,7 @@ TEST_CASE("project analyzer keeps best effort metrics for unmatched command quot
     const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port,
                                                             include_resolver_port};
 
-    const auto result = analyzer.analyze_project("/tmp/compile_commands.json", "");
+    const auto result = analyzer.analyze_project({"/tmp/compile_commands.json", ""});
 
     REQUIRE(result.translation_units.size() == 1);
     CHECK(result.translation_units[0].arg_count == 3);
