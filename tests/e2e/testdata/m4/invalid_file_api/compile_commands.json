@@ -1,0 +1,7 @@
+[
+  {
+    "directory": "/project/build",
+    "file": "/project/src/main.cpp",
+    "arguments": ["c++", "-I", "/project/include", "-c", "/project/src/main.cpp"]
+  }
+]

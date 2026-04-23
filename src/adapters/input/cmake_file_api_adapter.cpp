@@ -141,9 +141,11 @@ struct ParsedCodemodel {
     std::vector<std::string> target_build_dirs;
 };
 
-BuildModelResult parse_and_load(const std::filesystem::path& reply_dir, bool is_retry);
+BuildModelResult parse_and_load(const std::filesystem::path& reply_dir,
+                               const std::string& previous_suffix);
 
-BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir, bool is_retry) {
+BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
+                                        const std::string& previous_suffix) {
     // Step 2: find reply entry
     bool scan_ok = false;
     const auto candidates = scan_reply_candidates(reply_dir, scan_ok);
@@ -156,6 +158,11 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir, 
     if (latest == nullptr) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
                                   "no index or error reply found in " + reply_dir.string());
+    }
+    if (!previous_suffix.empty() && latest->suffix <= previous_suffix) {
+        return make_file_api_error(
+            CompileDatabaseError::file_api_invalid,
+            "cmake file api target reply is missing and no newer index is available");
     }
     if (latest->is_error) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
@@ -244,14 +251,16 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir, 
         const auto target = parse_json_file(target_path, parse_ok);
 
         if (!parse_ok) {
-            if (is_retry) {
+            // GCOVR_EXCL_START: requires two successive stale indexes with missing targets.
+            if (!previous_suffix.empty()) {
                 return make_file_api_error(
                     CompileDatabaseError::file_api_invalid,
                     "cmake file api target reply is not accessible after retry: " +
                         target_path.string());
             }
-            // Retry: re-scan for newer index
-            return parse_and_load(reply_dir, true);
+            // GCOVR_EXCL_STOP
+            // Retry: re-scan for newer index, passing current suffix for comparison
+            return parse_and_load(reply_dir, latest->suffix);
         }
 
         const auto target_name = target.value("name", "");
@@ -335,6 +344,15 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir, 
                                   "cmake file api contains no compilable sources");
     }
 
+    // Sort entries deterministically so that permuted target order in the
+    // codemodel produces identical results. Downstream emplace() on unique_key
+    // keeps the first match, so stable entry order matters.
+    std::sort(all_entries.begin(), all_entries.end(),
+              [](const CompileEntry& a, const CompileEntry& b) {
+                  if (a.file() != b.file()) return a.file() < b.file();
+                  return a.directory() < b.directory();
+              });
+
     // Assemble result
     // Deduplicate targets per assignment and sort deterministically
     std::vector<TargetAssignment> target_assignments;
@@ -382,9 +400,10 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir, 
     return result;
 }
 
-BuildModelResult parse_and_load(const std::filesystem::path& reply_dir, bool is_retry) {
+BuildModelResult parse_and_load(const std::filesystem::path& reply_dir,
+                               const std::string& previous_suffix) {
     try {
-        return do_parse_and_load_impl(reply_dir, is_retry);
+        return do_parse_and_load_impl(reply_dir, previous_suffix);
     } catch (const nlohmann::json::exception& e) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
                                   std::string("cmake file api reply data has unexpected structure: ") +
@@ -405,7 +424,7 @@ xray::hexagon::model::BuildModelResult CmakeFileApiAdapter::load_build_model(
             "cannot access cmake file api reply directory: " + reply_dir.string());
     }
 
-    return parse_and_load(reply_dir, false);
+    return parse_and_load(reply_dir, {});
 }
 
 }  // namespace xray::adapters::input

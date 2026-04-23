@@ -1,2 +1,2 @@
 #include "common/config.h"
-int main() { return 0; }
+void shared_init() {}

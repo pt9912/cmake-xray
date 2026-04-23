@@ -192,7 +192,7 @@ TEST_CASE("file api adapter returns file_api_invalid for missing target reply af
 
     CHECK_FALSE(result.compile_database.is_success());
     CHECK(result.compile_database.error() == CompileDatabaseError::file_api_invalid);
-    CHECK(result.compile_database.error_description().find("not accessible") !=
+    CHECK(result.compile_database.error_description().find("no newer index") !=
           std::string::npos);
 }
 
@@ -351,5 +351,29 @@ TEST_CASE("file api adapter target assignments are sorted deterministically") {
     for (std::size_t i = 1; i < result.target_assignments.size(); ++i) {
         CHECK(result.target_assignments[i - 1].observation_key <
               result.target_assignments[i].observation_key);
+    }
+}
+
+TEST_CASE("file api adapter produces identical results for permuted target order") {
+    const CmakeFileApiAdapter adapter;
+    const auto baseline = adapter.load_build_model(testdata + "file_api_only/build");
+    const auto permuted = adapter.load_build_model(testdata + "permuted_targets/build");
+
+    REQUIRE(baseline.compile_database.is_success());
+    REQUIRE(permuted.compile_database.is_success());
+
+    REQUIRE(baseline.compile_database.entries().size() ==
+            permuted.compile_database.entries().size());
+    for (std::size_t i = 0; i < baseline.compile_database.entries().size(); ++i) {
+        CHECK(baseline.compile_database.entries()[i].file() ==
+              permuted.compile_database.entries()[i].file());
+        CHECK(baseline.compile_database.entries()[i].directory() ==
+              permuted.compile_database.entries()[i].directory());
+    }
+
+    REQUIRE(baseline.target_assignments.size() == permuted.target_assignments.size());
+    for (std::size_t i = 0; i < baseline.target_assignments.size(); ++i) {
+        CHECK(baseline.target_assignments[i].observation_key ==
+              permuted.target_assignments[i].observation_key);
     }
 }
