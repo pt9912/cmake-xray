@@ -1,6 +1,7 @@
 add_library(
     xray_adapters
     cli/cli_adapter.cpp
+    input/cmake_file_api_adapter.cpp
     input/compile_commands_json_adapter.cpp
     input/source_parsing_include_adapter.cpp
     output/console_report_adapter.cpp

@@ -48,11 +48,13 @@ struct ReportWriteError {
 int map_error_to_exit_code(CompileDatabaseError error) {
     switch (error) {
     case CompileDatabaseError::file_not_accessible:
+    case CompileDatabaseError::file_api_not_accessible:
         return ExitCode::input_not_accessible;
     case CompileDatabaseError::invalid_json:
     case CompileDatabaseError::not_an_array:
     case CompileDatabaseError::empty_database:
     case CompileDatabaseError::invalid_entries:
+    case CompileDatabaseError::file_api_invalid:
         return ExitCode::input_invalid;
     default:
         return ExitCode::unexpected_error;
@@ -107,6 +109,14 @@ void format_error(std::ostream& err, const xray::hexagon::model::CompileDatabase
     case CompileDatabaseError::invalid_entries:
         err << "hint: fix or regenerate the compilation database before running "
                "cmake-xray analyze or impact\n";
+        break;
+    case CompileDatabaseError::file_api_not_accessible:
+        err << "hint: check the --cmake-file-api path; provide either the build directory "
+               "or the .cmake/api/v1/reply directory\n";
+        break;
+    case CompileDatabaseError::file_api_invalid:
+        err << "hint: ensure cmake has been configured with file api query files "
+               "and that reply data is complete and up to date\n";
         break;
     default:
         break;

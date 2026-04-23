@@ -16,6 +16,8 @@ enum class CompileDatabaseError {
     not_an_array,
     empty_database,
     invalid_entries,
+    file_api_not_accessible,
+    file_api_invalid,
 };
 
 class EntryDiagnostic {

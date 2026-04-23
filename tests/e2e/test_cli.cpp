@@ -475,3 +475,65 @@ TEST_CASE("unexpected compile database errors map to exit code 1") {
     CHECK(cli.run(4, argv, out, err) == ExitCode::unexpected_error);
     CHECK(err.str().find("unexpected compile database failure") != std::string::npos);
 }
+
+TEST_CASE("file api not accessible maps to exit code 3 with file api hint") {
+    const StubAnalyzeProjectPort analyze_project_port{
+        [] {
+            AnalysisResult result;
+            result.application = xray::hexagon::model::application_info();
+            result.compile_database = CompileDatabaseResult{
+                CompileDatabaseError::file_api_not_accessible,
+                "cannot access cmake file api reply directory: /nonexistent",
+                {},
+                {},
+            };
+            return result;
+        }(),
+    };
+    const StubAnalyzeImpactPort analyze_impact_port;
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port};
+    const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray", "analyze", "--compile-commands",
+                          "/tmp/compile_commands.json"};
+
+    CHECK(cli.run(4, argv, out, err) == ExitCode::input_not_accessible);
+    CHECK(err.str().find("cmake file api") != std::string::npos);
+    CHECK(err.str().find("hint:") != std::string::npos);
+    CHECK(err.str().find("--cmake-file-api") != std::string::npos);
+}
+
+TEST_CASE("file api invalid maps to exit code 4 with file api hint") {
+    const StubAnalyzeProjectPort analyze_project_port{
+        [] {
+            AnalysisResult result;
+            result.application = xray::hexagon::model::application_info();
+            result.compile_database = CompileDatabaseResult{
+                CompileDatabaseError::file_api_invalid,
+                "cmake file api codemodel is not valid JSON: /tmp/reply/codemodel.json",
+                {},
+                {},
+            };
+            return result;
+        }(),
+    };
+    const StubAnalyzeImpactPort analyze_impact_port;
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port};
+    const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray", "analyze", "--compile-commands",
+                          "/tmp/compile_commands.json"};
+
+    CHECK(cli.run(4, argv, out, err) == ExitCode::input_invalid);
+    CHECK(err.str().find("cmake file api") != std::string::npos);
+    CHECK(err.str().find("hint:") != std::string::npos);
+    CHECK(err.str().find("reply data") != std::string::npos);
+}
