@@ -1,0 +1,9 @@
+{
+  "name": "iface",
+  "id": "iface::@5678",
+  "type": "INTERFACE_LIBRARY",
+  "paths": {"source": ".", "build": "."},
+  "sources": [
+    {"path": "include/iface.h"}
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "cmake": {"version": {"major": 3, "minor": 28}},
+  "objects": [
+    {"kind": "codemodel", "version": {"major": 2, "minor": 6}, "jsonFile": "codemodel-v2-nocs.json"}
+  ],
+  "reply": {}
+}

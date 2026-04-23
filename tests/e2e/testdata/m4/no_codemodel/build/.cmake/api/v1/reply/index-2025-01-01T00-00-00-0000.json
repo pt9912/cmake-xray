@@ -1,0 +1,17 @@
+{
+  "cmake": {
+    "version": {
+      "major": 3
+    }
+  },
+  "objects": [
+    {
+      "kind": "cache",
+      "version": {
+        "major": 2
+      },
+      "jsonFile": "cache-v2.json"
+    }
+  ],
+  "reply": {}
+}

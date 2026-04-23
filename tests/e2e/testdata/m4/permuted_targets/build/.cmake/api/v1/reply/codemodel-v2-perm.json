@@ -1,0 +1,14 @@
+{
+  "kind": "codemodel",
+  "version": {"major": 2, "minor": 6},
+  "paths": {"source": "/project", "build": "/project/build"},
+  "configurations": [{
+    "name": "",
+    "directories": [{"source": ".", "build": ".", "projectIndex": 0, "childIndexes": [], "targetIndexes": [0, 1]}],
+    "projects": [{"name": "myproject", "directoryIndexes": [0], "targetIndexes": [0, 1]}],
+    "targets": [
+      {"name": "core", "id": "core::@5678", "directoryIndex": 0, "projectIndex": 0, "jsonFile": "target-core-ghi789.json"},
+      {"name": "app", "id": "app::@1234", "directoryIndex": 0, "projectIndex": 0, "jsonFile": "target-app-def456.json"}
+    ]
+  }]
+}

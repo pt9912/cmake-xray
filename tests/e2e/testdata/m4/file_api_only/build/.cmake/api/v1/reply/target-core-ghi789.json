@@ -1,0 +1,26 @@
+{
+  "name": "core",
+  "id": "core::@5678",
+  "type": "STATIC_LIBRARY",
+  "paths": {"source": ".", "build": "."},
+  "sources": [
+    {
+      "path": "src/core.cpp",
+      "compileGroupIndex": 0
+    }
+  ],
+  "compileGroups": [
+    {
+      "sourceIndexes": [0],
+      "language": "CXX",
+      "includes": [
+        {
+          "path": "/project/include",
+          "isSystem": false
+        }
+      ],
+      "defines": [],
+      "compileCommandFragments": []
+    }
+  ]
+}

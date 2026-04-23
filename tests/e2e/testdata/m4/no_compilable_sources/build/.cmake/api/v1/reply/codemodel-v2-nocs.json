@@ -1,0 +1,13 @@
+{
+  "kind": "codemodel",
+  "version": {"major": 2, "minor": 6},
+  "paths": {"source": "/project", "build": "/project/build"},
+  "configurations": [{
+    "name": "",
+    "directories": [{"source": ".", "build": ".", "projectIndex": 0}],
+    "projects": [{"name": "headeronly", "directoryIndexes": [0], "targetIndexes": [0]}],
+    "targets": [
+      {"name": "headerlib", "id": "headerlib::@1234", "directoryIndex": 0, "projectIndex": 0, "jsonFile": "target-headerlib.json"}
+    ]
+  }]
+}

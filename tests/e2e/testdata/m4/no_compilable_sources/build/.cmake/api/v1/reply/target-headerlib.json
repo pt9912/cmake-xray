@@ -1,0 +1,10 @@
+{
+  "name": "headerlib",
+  "id": "headerlib::@1234",
+  "type": "INTERFACE_LIBRARY",
+  "paths": {"source": ".", "build": "."},
+  "sources": [
+    {"path": "include/header.h"}
+  ],
+  "compileGroups": []
+}

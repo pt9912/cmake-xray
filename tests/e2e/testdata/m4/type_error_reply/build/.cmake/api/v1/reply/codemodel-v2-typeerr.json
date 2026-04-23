@@ -1,0 +1,6 @@
+{
+  "kind": "codemodel",
+  "version": {"major": 2, "minor": 6},
+  "paths": {"source": 42, "build": true},
+  "configurations": "not an array"
+}

@@ -1,0 +1,12 @@
+{
+  "kind": "codemodel",
+  "version": {
+    "major": 2
+  },
+  "configurations": [
+    {
+      "name": "",
+      "targets": []
+    }
+  ]
+}
