@@ -59,7 +59,8 @@ struct ReplyCandidate {
     bool is_error{false};
 };
 
-std::vector<ReplyCandidate> scan_reply_candidates(const std::filesystem::path& reply_dir) {
+std::vector<ReplyCandidate> scan_reply_candidates(const std::filesystem::path& reply_dir,
+                                                  bool& scan_ok) {
     std::vector<ReplyCandidate> candidates;
     std::error_code ec;
     for (const auto& entry : std::filesystem::directory_iterator(reply_dir, ec)) {
@@ -75,6 +76,7 @@ std::vector<ReplyCandidate> scan_reply_candidates(const std::filesystem::path& r
                 candidates.push_back({entry.path(), std::move(suffix), true});
         }
     }
+    scan_ok = !ec;
     return candidates;
 }
 
@@ -141,9 +143,15 @@ struct ParsedCodemodel {
 
 BuildModelResult parse_and_load(const std::filesystem::path& reply_dir, bool is_retry);
 
-BuildModelResult do_parse_and_load(const std::filesystem::path& reply_dir, bool is_retry) {
+BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir, bool is_retry) {
     // Step 2: find reply entry
-    const auto candidates = scan_reply_candidates(reply_dir);
+    bool scan_ok = false;
+    const auto candidates = scan_reply_candidates(reply_dir, scan_ok);
+    if (!scan_ok) {
+        return make_file_api_error(CompileDatabaseError::file_api_not_accessible,
+                                  "cannot read cmake file api reply directory: " +
+                                      reply_dir.string());
+    }
     const auto* latest = find_latest_candidate(candidates);
     if (latest == nullptr) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
@@ -223,8 +231,10 @@ BuildModelResult do_parse_and_load(const std::filesystem::path& reply_dir, bool 
     const std::filesystem::path source_root_path{source_root};
     const std::filesystem::path build_root_path{build_root};
     std::vector<CompileEntry> all_entries;
+    std::vector<Diagnostic> diagnostics;
     // observation_key -> list of targets
     std::map<std::string, std::vector<TargetInfo>> assignments;
+    std::size_t targets_without_sources = 0;
 
     for (const auto& target_ref : config["targets"]) {
         if (!target_ref.contains("jsonFile")) continue;
@@ -259,8 +269,11 @@ BuildModelResult do_parse_and_load(const std::filesystem::path& reply_dir, bool 
         const auto resolved_directory =
             normalize_path(build_root_path / dir_build);
 
-        if (!target.contains("sources") || !target["sources"].is_array()) continue;
-        if (!target.contains("compileGroups") || !target["compileGroups"].is_array()) continue;
+        if (!target.contains("sources") || !target["sources"].is_array() ||
+            !target.contains("compileGroups") || !target["compileGroups"].is_array()) {
+            ++targets_without_sources;
+            continue;
+        }
 
         const auto& sources = target["sources"];
         const auto& compile_groups = target["compileGroups"];
@@ -305,8 +318,10 @@ BuildModelResult do_parse_and_load(const std::filesystem::path& reply_dir, bool 
             arguments.push_back("-c");
             arguments.push_back(resolved_source);
 
+            // Use resolved absolute source path as file so that downstream
+            // analysis_support.cpp resolves the same key as our observation_key.
             all_entries.push_back(
-                CompileEntry::from_arguments(source_path_raw, resolved_directory,
+                CompileEntry::from_arguments(resolved_source, resolved_directory,
                                              std::move(arguments)));
 
             // Track target assignment by observation key
@@ -343,18 +358,38 @@ BuildModelResult do_parse_and_load(const std::filesystem::path& reply_dir, bool 
                   return a.observation_key < b.observation_key;
               });
 
+    // Determine target metadata status and add diagnostics
+    const auto total_targets = config["targets"].size();
+    const auto mapped_targets = total_targets - targets_without_sources;
+    const auto is_partial = targets_without_sources > 0;
+
+    if (is_partial) {
+        diagnostics.push_back(
+            {DiagnosticSeverity::note,
+             std::to_string(targets_without_sources) + " of " + std::to_string(total_targets) +
+                 " targets have no compilable sources and are not included in the analysis"});
+    }
+
     BuildModelResult result;
     result.source = ObservationSource::derived;
-    result.target_metadata = TargetMetadataStatus::loaded;
+    result.target_metadata =
+        is_partial ? TargetMetadataStatus::partial : TargetMetadataStatus::loaded;
     result.compile_database =
         CompileDatabaseResult{CompileDatabaseError::none, {}, std::move(all_entries), {}};
     result.target_assignments = std::move(target_assignments);
     result.source_root = source_root;
+    result.diagnostics = std::move(diagnostics);
     return result;
 }
 
 BuildModelResult parse_and_load(const std::filesystem::path& reply_dir, bool is_retry) {
-    return do_parse_and_load(reply_dir, is_retry);
+    try {
+        return do_parse_and_load_impl(reply_dir, is_retry);
+    } catch (const nlohmann::json::exception& e) {
+        return make_file_api_error(CompileDatabaseError::file_api_invalid,
+                                  std::string("cmake file api reply data has unexpected structure: ") +
+                                      e.what());
+    }
 }
 
 }  // namespace

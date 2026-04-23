@@ -8,6 +8,7 @@ RUN apt-get update \
         ca-certificates \
         cmake \
         git \
+        libcap-dev \
         time \
     && rm -rf /var/lib/apt/lists/*
 

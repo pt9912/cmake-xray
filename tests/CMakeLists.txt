@@ -19,6 +19,7 @@ target_link_libraries(
         doctest::doctest
         xray_hexagon
         xray_adapters
+        cap
 )
 xray_enable_coverage(xray_tests)
 

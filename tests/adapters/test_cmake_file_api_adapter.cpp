@@ -1,19 +1,47 @@
 #include <doctest/doctest.h>
 
+#include <filesystem>
 #include <string>
+#include <system_error>
+
+#include <sys/capability.h>
 
 #include "adapters/input/cmake_file_api_adapter.h"
+#include "adapters/input/compile_commands_json_adapter.h"
 #include "hexagon/model/compile_database_result.h"
 #include "hexagon/model/observation_source.h"
+#include "hexagon/services/analysis_support.h"
 
 namespace {
 
 using xray::adapters::input::CmakeFileApiAdapter;
+using xray::adapters::input::CompileCommandsJsonAdapter;
 using xray::hexagon::model::CompileDatabaseError;
 using xray::hexagon::model::ObservationSource;
 using xray::hexagon::model::TargetMetadataStatus;
 
 const std::string testdata = "tests/e2e/testdata/m4/";
+
+struct ScopedDropDacCapabilities {
+    ScopedDropDacCapabilities() {
+        cap_t caps = cap_get_proc();
+        cap_value_t cap_list[] = {CAP_DAC_READ_SEARCH, CAP_DAC_OVERRIDE};
+        cap_set_flag(caps, CAP_EFFECTIVE, 2, cap_list, CAP_CLEAR);
+        cap_set_proc(caps);
+        cap_free(caps);
+    }
+
+    ~ScopedDropDacCapabilities() {
+        cap_t caps = cap_get_proc();
+        cap_value_t cap_list[] = {CAP_DAC_READ_SEARCH, CAP_DAC_OVERRIDE};
+        cap_set_flag(caps, CAP_EFFECTIVE, 2, cap_list, CAP_SET);
+        cap_set_proc(caps);
+        cap_free(caps);
+    }
+
+    ScopedDropDacCapabilities(const ScopedDropDacCapabilities&) = delete;
+    ScopedDropDacCapabilities& operator=(const ScopedDropDacCapabilities&) = delete;
+};
 
 }  // namespace
 
@@ -118,6 +146,29 @@ TEST_CASE("file api adapter selects lexicographically latest index among multipl
 
 // --- Error cases ---
 
+TEST_CASE("file api adapter returns file_api_not_accessible for unreadable reply directory") {
+    const auto unreadable_dir =
+        std::filesystem::temp_directory_path() / "cmake-xray-unreadable-reply";
+    const auto reply_dir = unreadable_dir / ".cmake" / "api" / "v1" / "reply";
+    std::filesystem::create_directories(reply_dir);
+    std::filesystem::permissions(reply_dir, std::filesystem::perms::none);
+
+    const CmakeFileApiAdapter adapter;
+    xray::hexagon::model::BuildModelResult result;
+    {
+        const ScopedDropDacCapabilities guard;
+        result = adapter.load_build_model(unreadable_dir.string());
+    }
+
+    std::filesystem::permissions(reply_dir, std::filesystem::perms::all);
+    std::error_code ec;
+    std::filesystem::remove_all(unreadable_dir, ec);
+
+    CHECK_FALSE(result.compile_database.is_success());
+    CHECK(result.compile_database.error() == CompileDatabaseError::file_api_not_accessible);
+    CHECK(result.compile_database.error_description().find("cannot read") != std::string::npos);
+}
+
 TEST_CASE("file api adapter returns file_api_not_accessible for nonexistent path") {
     const CmakeFileApiAdapter adapter;
     const auto result = adapter.load_build_model("/nonexistent/build");
@@ -221,6 +272,16 @@ TEST_CASE("file api adapter returns file_api_invalid for codemodel with empty ta
     CHECK(result.compile_database.error_description().find("no targets") != std::string::npos);
 }
 
+TEST_CASE("file api adapter returns file_api_invalid for structurally invalid reply data") {
+    const CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(testdata + "type_error_reply/build");
+
+    CHECK_FALSE(result.compile_database.is_success());
+    CHECK(result.compile_database.error() == CompileDatabaseError::file_api_invalid);
+    CHECK(result.compile_database.error_description().find("unexpected structure") !=
+          std::string::npos);
+}
+
 TEST_CASE("file api adapter returns file_api_invalid when targets have no compilable sources") {
     const CmakeFileApiAdapter adapter;
     const auto result = adapter.load_build_model(testdata + "no_compilable_sources/build");
@@ -229,6 +290,55 @@ TEST_CASE("file api adapter returns file_api_invalid when targets have no compil
     CHECK(result.compile_database.error() == CompileDatabaseError::file_api_invalid);
     CHECK(result.compile_database.error_description().find("no compilable sources") !=
           std::string::npos);
+}
+
+TEST_CASE("file api adapter reports partial target metadata when some targets lack sources") {
+    const CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(testdata + "partial_targets/build");
+
+    CHECK(result.compile_database.is_success());
+    CHECK(result.target_metadata == TargetMetadataStatus::partial);
+    CHECK(result.compile_database.entries().size() == 1);
+    REQUIRE(!result.diagnostics.empty());
+    CHECK(result.diagnostics[0].message.find("1 of 2 targets") != std::string::npos);
+}
+
+// --- Cross-adapter key consistency ---
+
+TEST_CASE("file api adapter target_assignment keys match downstream observation keys") {
+    // The File API adapter computes observation_key = resolved_source|resolved_directory.
+    // Downstream, analysis_support builds unique_key from CompileEntry via the same
+    // normalization. The keys must match so that target assignments can be looked up.
+    const CmakeFileApiAdapter file_api_adapter;
+    const auto result = file_api_adapter.load_build_model(testdata + "file_api_only/build");
+
+    REQUIRE(result.compile_database.is_success());
+    REQUIRE(!result.compile_database.entries().empty());
+    REQUIRE(!result.target_assignments.empty());
+
+    // File API entries use absolute paths for file and directory.
+    // build_translation_unit_observations needs a compile_commands_path to derive
+    // the base directory; for absolute-path entries we pass a dummy path whose
+    // parent equals the entry directory so that resolve_path is a no-op.
+    const auto& first_entry = result.compile_database.entries()[0];
+    const auto dummy_compile_commands =
+        first_entry.directory() + "/compile_commands.json";
+
+    const auto observations =
+        xray::hexagon::services::build_translation_unit_observations(
+            result.compile_database.entries(), dummy_compile_commands);
+
+    for (const auto& assignment : result.target_assignments) {
+        bool key_found = false;
+        for (const auto& obs : observations) {
+            if (obs.reference.unique_key == assignment.observation_key) {
+                key_found = true;
+                break;
+            }
+        }
+        CHECK_MESSAGE(key_found, "target assignment key must match an observation key: ",
+                      assignment.observation_key);
+    }
 }
 
 // --- Determinism ---
