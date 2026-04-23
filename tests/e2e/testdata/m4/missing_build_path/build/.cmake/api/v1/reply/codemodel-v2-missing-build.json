@@ -1,0 +1,10 @@
+{
+  "kind": "codemodel",
+  "version": {
+    "major": 2
+  },
+  "paths": {
+    "source": "/project"
+  },
+  "configurations": []
+}

@@ -1,0 +1,23 @@
+{
+  "kind": "codemodel",
+  "version": {
+    "major": 2,
+    "minor": 6
+  },
+  "paths": {
+    "source": "/project",
+    "build": "/project/build"
+  },
+  "configurations": [
+    {
+      "name": "",
+      "targets": [
+        {
+          "name": "app",
+          "id": "app::@1234",
+          "jsonFile": ""
+        }
+      ]
+    }
+  ]
+}

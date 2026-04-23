@@ -1,0 +1,26 @@
+[
+  {
+    "directory": "/project/build/debug",
+    "file": "/project/src/main.cpp",
+    "arguments": [
+      "c++",
+      "-I",
+      "/project/include",
+      "-DDEBUG=1",
+      "-c",
+      "/project/src/main.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build/release",
+    "file": "/project/src/main.cpp",
+    "arguments": [
+      "c++",
+      "-I",
+      "/project/include",
+      "-DNDEBUG=1",
+      "-c",
+      "/project/src/main.cpp"
+    ]
+  }
+]

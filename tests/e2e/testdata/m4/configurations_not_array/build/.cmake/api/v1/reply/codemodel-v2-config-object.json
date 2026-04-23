@@ -1,0 +1,13 @@
+{
+  "kind": "codemodel",
+  "version": {
+    "major": 2
+  },
+  "paths": {
+    "source": "/project",
+    "build": "/project/build"
+  },
+  "configurations": {
+    "name": "Debug"
+  }
+}

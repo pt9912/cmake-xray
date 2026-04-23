@@ -1,0 +1,8 @@
+{
+  "objects": [
+    {
+      "kind": "codemodel",
+      "jsonFile": "codemodel-v2-config-object.json"
+    }
+  ]
+}

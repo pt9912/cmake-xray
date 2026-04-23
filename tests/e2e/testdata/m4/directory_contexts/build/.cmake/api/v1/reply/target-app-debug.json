@@ -1,0 +1,33 @@
+{
+  "name": "app-debug",
+  "id": "app-debug::@1234",
+  "type": "EXECUTABLE",
+  "paths": {
+    "source": ".",
+    "build": "debug"
+  },
+  "sources": [
+    {
+      "path": "src/main.cpp",
+      "compileGroupIndex": 0
+    }
+  ],
+  "compileGroups": [
+    {
+      "sourceIndexes": [0],
+      "language": "CXX",
+      "includes": [
+        {
+          "path": "/project/include",
+          "isSystem": false
+        }
+      ],
+      "defines": [
+        {
+          "define": "DEBUG=1"
+        }
+      ],
+      "compileCommandFragments": []
+    }
+  ]
+}

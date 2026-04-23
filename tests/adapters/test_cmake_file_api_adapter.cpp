@@ -1,8 +1,11 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <system_error>
+#include <vector>
 
 #include <sys/capability.h>
 
@@ -42,6 +45,24 @@ struct ScopedDropDacCapabilities {
     ScopedDropDacCapabilities(const ScopedDropDacCapabilities&) = delete;
     ScopedDropDacCapabilities& operator=(const ScopedDropDacCapabilities&) = delete;
 };
+
+std::vector<std::string> observation_keys_for_source(
+    const xray::hexagon::model::BuildModelResult& result,
+    std::string_view compile_commands_path,
+    std::string_view source_fragment) {
+    const auto observations = xray::hexagon::services::build_translation_unit_observations(
+        result.compile_database.entries(), compile_commands_path);
+
+    std::vector<std::string> keys;
+    for (const auto& observation : observations) {
+        if (observation.reference.source_path_key.find(source_fragment) != std::string::npos) {
+            keys.push_back(observation.reference.unique_key);
+        }
+    }
+
+    std::sort(keys.begin(), keys.end());
+    return keys;
+}
 
 }  // namespace
 
@@ -84,6 +105,20 @@ TEST_CASE("file api adapter produces identical results from build dir and reply 
         CHECK(from_build.target_assignments[i].observation_key ==
               from_reply.target_assignments[i].observation_key);
     }
+}
+
+TEST_CASE("file api adapter accepts reply directory path with trailing slash") {
+    const CmakeFileApiAdapter adapter;
+    const auto from_build = adapter.load_build_model(testdata + "file_api_only/build");
+    const auto from_reply =
+        adapter.load_build_model(testdata + "file_api_only/build/.cmake/api/v1/reply/");
+
+    REQUIRE(from_build.compile_database.is_success());
+    REQUIRE(from_reply.compile_database.is_success());
+    CHECK(from_reply.source_root == from_build.source_root);
+    CHECK(from_reply.compile_database.entries().size() ==
+          from_build.compile_database.entries().size());
+    CHECK(from_reply.target_assignments.size() == from_build.target_assignments.size());
 }
 
 TEST_CASE("file api adapter extracts target assignments") {
@@ -278,9 +313,28 @@ TEST_CASE("file api adapter returns file_api_invalid for codemodel without paths
     CHECK(result.compile_database.error_description().find("paths") != std::string::npos);
 }
 
+TEST_CASE("file api adapter returns file_api_invalid for codemodel paths missing build") {
+    const CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(testdata + "missing_build_path/build");
+
+    CHECK_FALSE(result.compile_database.is_success());
+    CHECK(result.compile_database.error() == CompileDatabaseError::file_api_invalid);
+    CHECK(result.compile_database.error_description().find("paths") != std::string::npos);
+}
+
 TEST_CASE("file api adapter returns file_api_invalid for codemodel without configurations") {
     const CmakeFileApiAdapter adapter;
     const auto result = adapter.load_build_model(testdata + "no_configurations/build");
+
+    CHECK_FALSE(result.compile_database.is_success());
+    CHECK(result.compile_database.error() == CompileDatabaseError::file_api_invalid);
+    CHECK(result.compile_database.error_description().find("no configurations") !=
+          std::string::npos);
+}
+
+TEST_CASE("file api adapter returns file_api_invalid for codemodel configurations of wrong type") {
+    const CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(testdata + "configurations_not_array/build");
 
     CHECK_FALSE(result.compile_database.is_success());
     CHECK(result.compile_database.error() == CompileDatabaseError::file_api_invalid);
@@ -305,6 +359,36 @@ TEST_CASE("file api adapter returns file_api_invalid for codemodel with empty ta
     CHECK_FALSE(result.compile_database.is_success());
     CHECK(result.compile_database.error() == CompileDatabaseError::file_api_invalid);
     CHECK(result.compile_database.error_description().find("no targets") != std::string::npos);
+}
+
+TEST_CASE("file api adapter returns file_api_invalid for target reference without jsonFile") {
+    const CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(testdata + "invalid_target_ref/build");
+
+    CHECK_FALSE(result.compile_database.is_success());
+    CHECK(result.compile_database.error() == CompileDatabaseError::file_api_invalid);
+    CHECK(result.compile_database.error_description().find("target reference") !=
+          std::string::npos);
+}
+
+TEST_CASE("file api adapter returns file_api_invalid for target reference with empty jsonFile") {
+    const CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(testdata + "empty_target_json_file/build");
+
+    CHECK_FALSE(result.compile_database.is_success());
+    CHECK(result.compile_database.error() == CompileDatabaseError::file_api_invalid);
+    CHECK(result.compile_database.error_description().find("target reference") !=
+          std::string::npos);
+}
+
+TEST_CASE("file api adapter returns file_api_invalid for target reply without name") {
+    const CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(testdata + "missing_target_name/build");
+
+    CHECK_FALSE(result.compile_database.is_success());
+    CHECK(result.compile_database.error() == CompileDatabaseError::file_api_invalid);
+    CHECK(result.compile_database.error_description().find("missing name") !=
+          std::string::npos);
 }
 
 TEST_CASE("file api adapter returns file_api_invalid for structurally invalid reply data") {
@@ -374,6 +458,48 @@ TEST_CASE("file api adapter target_assignment keys match downstream observation 
         CHECK_MESSAGE(key_found, "target assignment key must match an observation key: ",
                       assignment.observation_key);
     }
+}
+
+TEST_CASE("file api adapter and compile commands adapter derive the same key for the same context") {
+    const CmakeFileApiAdapter file_api_adapter;
+    const CompileCommandsJsonAdapter compile_commands_adapter;
+    const auto file_api_result = file_api_adapter.load_build_model(testdata + "file_api_only/build");
+    const auto compile_commands_result =
+        compile_commands_adapter.load_build_model(testdata + "partial_targets/compile_commands.json");
+
+    REQUIRE(file_api_result.compile_database.is_success());
+    REQUIRE(compile_commands_result.compile_database.is_success());
+
+    const auto file_api_keys = observation_keys_for_source(
+        file_api_result, testdata + "partial_targets/compile_commands.json", "main.cpp");
+    const auto compile_commands_keys = observation_keys_for_source(
+        compile_commands_result, testdata + "partial_targets/compile_commands.json", "main.cpp");
+
+    REQUIRE(file_api_keys.size() == 1);
+    REQUIRE(compile_commands_keys.size() == 1);
+    CHECK(file_api_keys[0] == compile_commands_keys[0]);
+}
+
+TEST_CASE("file api adapter and compile commands adapter keep different directory contexts distinct") {
+    const CmakeFileApiAdapter file_api_adapter;
+    const CompileCommandsJsonAdapter compile_commands_adapter;
+    const auto file_api_result =
+        file_api_adapter.load_build_model(testdata + "directory_contexts/build");
+    const auto compile_commands_result =
+        compile_commands_adapter.load_build_model(testdata + "directory_contexts/compile_commands.json");
+
+    REQUIRE(file_api_result.compile_database.is_success());
+    REQUIRE(compile_commands_result.compile_database.is_success());
+
+    const auto file_api_keys = observation_keys_for_source(
+        file_api_result, testdata + "directory_contexts/compile_commands.json", "main.cpp");
+    const auto compile_commands_keys = observation_keys_for_source(
+        compile_commands_result, testdata + "directory_contexts/compile_commands.json", "main.cpp");
+
+    REQUIRE(file_api_keys.size() == 2);
+    REQUIRE(compile_commands_keys.size() == 2);
+    CHECK(file_api_keys == compile_commands_keys);
+    CHECK(file_api_keys[0] != file_api_keys[1]);
 }
 
 // --- Determinism ---

@@ -42,8 +42,12 @@ BuildModelResult make_file_api_error(CompileDatabaseError error, std::string des
 }
 
 std::filesystem::path resolve_reply_directory(const std::filesystem::path& path) {
-    if (path.filename() == "reply") return path;
-    return path / ".cmake" / "api" / "v1" / "reply";
+    auto path_text = path.generic_string();
+    if (path_text.ends_with("/reply/")) path_text.pop_back();
+    if (path_text == "reply" || path_text.ends_with("/reply")) {
+        return std::filesystem::path{path_text}.lexically_normal();
+    }
+    return (path / ".cmake" / "api" / "v1" / "reply").lexically_normal();
 }
 
 std::string extract_suffix(const std::string& filename, std::string_view prefix) {
@@ -117,7 +121,9 @@ std::string find_codemodel_json_file(const nlohmann::json& index) {
 }
 
 std::string normalize_path(const std::filesystem::path& path) {
-    return std::filesystem::absolute(path).lexically_normal().generic_string();
+    auto normalized = std::filesystem::absolute(path).lexically_normal().generic_string();
+    if (normalized.size() > 1 && normalized.ends_with('/')) normalized.pop_back();
+    return normalized;
 }
 
 std::string resolve_source_path(const std::string& source_path_raw,
@@ -414,25 +420,39 @@ std::optional<BuildModelResult> append_target_reply(const std::filesystem::path&
                                                     const std::string& previous_suffix,
                                                     const nlohmann::json& target_ref,
                                                     ParsedTargets& parsed_targets) {
-    if (!target_ref.contains("jsonFile")) return std::nullopt;
+    if (!target_ref.contains("jsonFile") || !target_ref["jsonFile"].is_string()) {
+        return make_file_api_error(CompileDatabaseError::file_api_invalid,
+                                   "cmake file api target reference is missing jsonFile");
+    }
 
     const auto target_json_file = target_ref["jsonFile"].get<std::string>();
+    if (target_json_file.empty()) {
+        return make_file_api_error(CompileDatabaseError::file_api_invalid,
+                                   "cmake file api target reference is missing jsonFile");
+    }
     const auto target_path = reply_dir / target_json_file;
     bool parse_ok = false;
     const auto target = parse_json_file(target_path, parse_ok);
 
     if (!parse_ok) {
+        // GCOVR_EXCL_START: requires a concurrent CMake rerun that publishes a newer
+        // reply index between the first failed target read and the retry scan.
         if (!previous_suffix.empty()) {
             return make_file_api_error(CompileDatabaseError::file_api_invalid,
                                        "cmake file api target reply is not accessible after retry: " +
                                            target_path.string());
         }
+        // GCOVR_EXCL_STOP
 
         return parse_and_load(reply_dir, parsed_codemodel.latest_suffix);
     }
 
     const auto target_name = target.value("name", "");
-    if (target_name.empty()) return std::nullopt;
+    if (target_name.empty()) {
+        return make_file_api_error(CompileDatabaseError::file_api_invalid,
+                                   "cmake file api target reply is missing name: " +
+                                       target_path.string());
+    }
 
     const auto target_type = target.value("type", "");
     append_target_entries(target, parsed_codemodel,
@@ -489,17 +509,19 @@ BuildModelResult build_success_result(const ParsedCodemodel& parsed_codemodel,
                                       ParsedTargets parsed_targets) {
     sort_compile_entries(parsed_targets.entries);
 
-    BuildModelResult result;
-    result.source = ObservationSource::derived;
-    result.target_metadata = parsed_targets.targets_without_sources > 0
-                                 ? TargetMetadataStatus::partial
-                                 : TargetMetadataStatus::loaded;
-    result.compile_database =
-        CompileDatabaseResult{CompileDatabaseError::none, {}, std::move(parsed_targets.entries), {}};
-    result.target_assignments = build_target_assignments(std::move(parsed_targets.assignments));
-    result.source_root = parsed_codemodel.source_root;
-    result.diagnostics = build_partial_target_diagnostics(parsed_codemodel, parsed_targets);
-    return result;
+    const auto target_metadata = parsed_targets.targets_without_sources > 0
+                                     ? TargetMetadataStatus::partial
+                                     : TargetMetadataStatus::loaded;
+    const auto diagnostics = build_partial_target_diagnostics(parsed_codemodel, parsed_targets);
+
+    // Aggregate return avoids a gcov NRVO artifact on the closing brace.
+    return {ObservationSource::derived,
+            target_metadata,
+            CompileDatabaseResult{CompileDatabaseError::none, {}, std::move(parsed_targets.entries),
+                                  {}},
+            build_target_assignments(std::move(parsed_targets.assignments)),
+            parsed_codemodel.source_root,
+            std::move(diagnostics)};
 }
 
 BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
