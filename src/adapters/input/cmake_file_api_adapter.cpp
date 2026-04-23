@@ -286,6 +286,7 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
 
         const auto& sources = target["sources"];
         const auto& compile_groups = target["compileGroups"];
+        const auto entries_before = all_entries.size();
 
         for (const auto& source : sources) {
             if (!source.contains("compileGroupIndex")) continue;
@@ -336,6 +337,10 @@ BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
             // Track target assignment by observation key
             const auto observation_key = resolved_source + "|" + resolved_directory;
             assignments[observation_key].push_back(target_info);
+        }
+
+        if (all_entries.size() == entries_before) {
+            ++targets_without_sources;
         }
     }
 

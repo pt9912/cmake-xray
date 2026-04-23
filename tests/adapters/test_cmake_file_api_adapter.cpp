@@ -58,13 +58,32 @@ TEST_CASE("file api adapter loads valid reply from build directory") {
     REQUIRE(result.compile_database.entries().size() == 2);
 }
 
-TEST_CASE("file api adapter loads valid reply from reply directory directly") {
+TEST_CASE("file api adapter produces identical results from build dir and reply dir") {
     const CmakeFileApiAdapter adapter;
-    const auto result =
+    const auto from_build = adapter.load_build_model(testdata + "file_api_only/build");
+    const auto from_reply =
         adapter.load_build_model(testdata + "file_api_only/build/.cmake/api/v1/reply");
 
-    CHECK(result.compile_database.is_success());
-    REQUIRE(result.compile_database.entries().size() == 2);
+    REQUIRE(from_build.compile_database.is_success());
+    REQUIRE(from_reply.compile_database.is_success());
+    REQUIRE(from_build.compile_database.entries().size() ==
+            from_reply.compile_database.entries().size());
+
+    for (std::size_t i = 0; i < from_build.compile_database.entries().size(); ++i) {
+        CHECK(from_build.compile_database.entries()[i].file() ==
+              from_reply.compile_database.entries()[i].file());
+        CHECK(from_build.compile_database.entries()[i].directory() ==
+              from_reply.compile_database.entries()[i].directory());
+        CHECK(from_build.compile_database.entries()[i].arguments().size() ==
+              from_reply.compile_database.entries()[i].arguments().size());
+    }
+
+    CHECK(from_build.source_root == from_reply.source_root);
+    REQUIRE(from_build.target_assignments.size() == from_reply.target_assignments.size());
+    for (std::size_t i = 0; i < from_build.target_assignments.size(); ++i) {
+        CHECK(from_build.target_assignments[i].observation_key ==
+              from_reply.target_assignments[i].observation_key);
+    }
 }
 
 TEST_CASE("file api adapter extracts target assignments") {
@@ -102,7 +121,7 @@ TEST_CASE("file api adapter synthesizes entries with correct include and define 
     CHECK(found_core);
 }
 
-TEST_CASE("file api adapter assigns shared source to multiple targets") {
+TEST_CASE("file api adapter assigns shared source to multiple targets with correct types") {
     const CmakeFileApiAdapter adapter;
     const auto result = adapter.load_build_model(testdata + "multi_target/build");
 
@@ -110,12 +129,25 @@ TEST_CASE("file api adapter assigns shared source to multiple targets") {
     // main.cpp (app only) + shared.cpp (app) + shared.cpp (core) = 3 entries
     CHECK(result.compile_database.entries().size() == 3);
 
+    // All three entries produce valid observations downstream
+    const auto& first_entry = result.compile_database.entries()[0];
+    const auto dummy_compile_commands = first_entry.directory() + "/compile_commands.json";
+    const auto observations =
+        xray::hexagon::services::build_translation_unit_observations(
+            result.compile_database.entries(), dummy_compile_commands);
+    CHECK(observations.size() == 3);
+
     // Find the assignment for shared.cpp
     bool found_shared_assignment = false;
     for (const auto& assignment : result.target_assignments) {
         if (assignment.observation_key.find("shared.cpp") != std::string::npos) {
             // shared.cpp in same directoryIndex -> one key, two targets
-            CHECK(assignment.targets.size() == 2);
+            REQUIRE(assignment.targets.size() == 2);
+            // Sorted deterministically: app before core
+            CHECK(assignment.targets[0].display_name == "app");
+            CHECK(assignment.targets[0].type == "EXECUTABLE");
+            CHECK(assignment.targets[1].display_name == "core");
+            CHECK(assignment.targets[1].type == "STATIC_LIBRARY");
             found_shared_assignment = true;
         }
     }
