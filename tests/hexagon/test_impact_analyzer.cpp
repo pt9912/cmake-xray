@@ -6,7 +6,7 @@
 #include "hexagon/model/compile_database_result.h"
 #include "hexagon/model/compile_entry.h"
 #include "hexagon/model/include_resolution.h"
-#include "hexagon/ports/driven/compile_database_port.h"
+#include "hexagon/ports/driven/build_model_port.h"
 #include "hexagon/ports/driven/include_resolver_port.h"
 #include "hexagon/services/impact_analyzer.h"
 
@@ -19,10 +19,12 @@ using xray::hexagon::model::ImpactKind;
 using xray::hexagon::model::IncludeResolutionResult;
 using xray::hexagon::model::ResolvedTranslationUnitIncludes;
 
-class StubCompileDatabasePort final : public xray::hexagon::ports::driven::CompileDatabasePort {
+class StubBuildModelPort final : public xray::hexagon::ports::driven::BuildModelPort {
 public:
-    CompileDatabaseResult load_compile_database(std::string_view /*path*/) const override {
-        return CompileDatabaseResult{
+    xray::hexagon::model::BuildModelResult load_build_model(
+        std::string_view /*path*/) const override {
+        xray::hexagon::model::BuildModelResult result;
+        result.compile_database = CompileDatabaseResult{
             CompileDatabaseError::none,
             {},
             {
@@ -38,6 +40,7 @@ public:
             },
             {},
         };
+        return result;
     }
 };
 
@@ -78,9 +81,9 @@ public:
 }  // namespace
 
 TEST_CASE("impact analyzer reports direct matches for duplicate translation-unit observations") {
-    const StubCompileDatabasePort compile_database_port;
+    const StubBuildModelPort build_model_port;
     const StubIncludeResolverPort include_resolver_port;
-    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_database_port,
+    const xray::hexagon::services::ImpactAnalyzer analyzer{build_model_port,
                                                            include_resolver_port};
 
     const auto result =
@@ -98,9 +101,9 @@ TEST_CASE("impact analyzer reports direct matches for duplicate translation-unit
 }
 
 TEST_CASE("impact analyzer reports heuristic header matches") {
-    const StubCompileDatabasePort compile_database_port;
+    const StubBuildModelPort build_model_port;
     const StubIncludeResolverPort include_resolver_port;
-    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_database_port,
+    const xray::hexagon::services::ImpactAnalyzer analyzer{build_model_port,
                                                            include_resolver_port};
 
     const auto result =
@@ -116,9 +119,9 @@ TEST_CASE("impact analyzer reports heuristic header matches") {
 }
 
 TEST_CASE("impact analyzer reports heuristic matches for transitively included headers") {
-    const StubCompileDatabasePort compile_database_port;
+    const StubBuildModelPort build_model_port;
     const StubIncludeResolverPort include_resolver_port;
-    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_database_port,
+    const xray::hexagon::services::ImpactAnalyzer analyzer{build_model_port,
                                                            include_resolver_port};
 
     const auto result =
@@ -134,9 +137,9 @@ TEST_CASE("impact analyzer reports heuristic matches for transitively included h
 }
 
 TEST_CASE("impact analyzer reports missing matches as heuristic empty result") {
-    const StubCompileDatabasePort compile_database_port;
+    const StubBuildModelPort build_model_port;
     const StubIncludeResolverPort include_resolver_port;
-    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_database_port,
+    const xray::hexagon::services::ImpactAnalyzer analyzer{build_model_port,
                                                            include_resolver_port};
 
     const auto result =
@@ -184,9 +187,9 @@ TEST_CASE("impact analyzer only keeps diagnostics for impacted translation units
         }
     };
 
-    const StubCompileDatabasePort compile_database_port;
+    const StubBuildModelPort build_model_port;
     const PartialIncludeResolverPort include_resolver_port;
-    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_database_port,
+    const xray::hexagon::services::ImpactAnalyzer analyzer{build_model_port,
                                                            include_resolver_port};
 
     const auto result =
@@ -235,9 +238,9 @@ TEST_CASE("impact analyzer sorts report-wide diagnostics deterministically") {
         }
     };
 
-    const StubCompileDatabasePort compile_database_port;
+    const StubBuildModelPort build_model_port;
     const SortingIncludeResolverPort include_resolver_port;
-    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_database_port,
+    const xray::hexagon::services::ImpactAnalyzer analyzer{build_model_port,
                                                            include_resolver_port};
 
     const auto result =

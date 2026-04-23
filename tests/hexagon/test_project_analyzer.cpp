@@ -9,7 +9,7 @@
 #include "hexagon/model/compile_database_result.h"
 #include "hexagon/model/compile_entry.h"
 #include "hexagon/model/impact_result.h"
-#include "hexagon/ports/driven/compile_database_port.h"
+#include "hexagon/ports/driven/build_model_port.h"
 #include "hexagon/ports/driven/include_resolver_port.h"
 #include "hexagon/ports/driven/report_writer_port.h"
 #include "hexagon/services/project_analyzer.h"
@@ -51,13 +51,17 @@ std::vector<CompileEntry> permuted_stub_entries() {
     };
 }
 
-class StubCompileDatabasePort final : public xray::hexagon::ports::driven::CompileDatabasePort {
+class StubBuildModelPort final : public xray::hexagon::ports::driven::BuildModelPort {
 public:
-    explicit StubCompileDatabasePort(std::vector<CompileEntry> entries = stub_entries())
+    explicit StubBuildModelPort(std::vector<CompileEntry> entries = stub_entries())
         : entries_(std::move(entries)) {}
 
-    CompileDatabaseResult load_compile_database(std::string_view /*path*/) const override {
-        return CompileDatabaseResult{CompileDatabaseError::none, {}, entries_, {}};
+    xray::hexagon::model::BuildModelResult load_build_model(
+        std::string_view /*path*/) const override {
+        xray::hexagon::model::BuildModelResult result;
+        result.compile_database =
+            CompileDatabaseResult{CompileDatabaseError::none, {}, entries_, {}};
+        return result;
     }
 
 private:
@@ -130,9 +134,9 @@ public:
 }  // namespace
 
 TEST_CASE("project analyzer builds ranked translation units and hotspots") {
-    const StubCompileDatabasePort compile_database_port;
+    const StubBuildModelPort build_model_port;
     const StubIncludeResolverPort include_resolver_port;
-    const xray::hexagon::services::ProjectAnalyzer analyzer{compile_database_port,
+    const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port,
                                                             include_resolver_port};
 
     const auto result = analyzer.analyze_project("/tmp/compile_commands.json");
@@ -162,12 +166,16 @@ TEST_CASE("project analyzer builds ranked translation units and hotspots") {
 }
 
 TEST_CASE("project analyzer propagates compile database errors") {
-    class ErrorCompileDatabasePort final
-        : public xray::hexagon::ports::driven::CompileDatabasePort {
+    class ErrorBuildModelPort final
+        : public xray::hexagon::ports::driven::BuildModelPort {
     public:
-        CompileDatabaseResult load_compile_database(std::string_view /*path*/) const override {
-            return CompileDatabaseResult{CompileDatabaseError::empty_database,
-                                         "compile_commands.json is empty", {}, {}};
+        xray::hexagon::model::BuildModelResult load_build_model(
+            std::string_view /*path*/) const override {
+            xray::hexagon::model::BuildModelResult result;
+            result.compile_database =
+                CompileDatabaseResult{CompileDatabaseError::empty_database,
+                                      "compile_commands.json is empty", {}, {}};
+            return result;
         }
     };
 
@@ -179,9 +187,9 @@ TEST_CASE("project analyzer propagates compile database errors") {
         }
     };
 
-    const ErrorCompileDatabasePort compile_database_port;
+    const ErrorBuildModelPort build_model_port;
     const UnusedIncludeResolverPort include_resolver_port;
-    const xray::hexagon::services::ProjectAnalyzer analyzer{compile_database_port,
+    const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port,
                                                             include_resolver_port};
 
     const auto result = analyzer.analyze_project("/path/to/compile_commands.json");
@@ -192,12 +200,12 @@ TEST_CASE("project analyzer propagates compile database errors") {
 }
 
 TEST_CASE("project analyzer ranking is stable for permuted compile database entries") {
-    const StubCompileDatabasePort baseline_compile_database_port;
-    const StubCompileDatabasePort permuted_compile_database_port{permuted_stub_entries()};
+    const StubBuildModelPort baseline_build_model_port;
+    const StubBuildModelPort permuted_build_model_port{permuted_stub_entries()};
     const EmptyIncludeResolverPort include_resolver_port;
-    const xray::hexagon::services::ProjectAnalyzer baseline_analyzer{baseline_compile_database_port,
+    const xray::hexagon::services::ProjectAnalyzer baseline_analyzer{baseline_build_model_port,
                                                                      include_resolver_port};
-    const xray::hexagon::services::ProjectAnalyzer permuted_analyzer{permuted_compile_database_port,
+    const xray::hexagon::services::ProjectAnalyzer permuted_analyzer{permuted_build_model_port,
                                                                      include_resolver_port};
 
     const auto baseline_result = baseline_analyzer.analyze_project("/tmp/compile_commands.json");
@@ -215,12 +223,12 @@ TEST_CASE("project analyzer ranking is stable for permuted compile database entr
 }
 
 TEST_CASE("project analyzer tokenizes quoted command arguments with spaces") {
-    const StubCompileDatabasePort compile_database_port{{CompileEntry::from_command(
+    const StubBuildModelPort build_model_port{{CompileEntry::from_command(
         "/project/src/main file.cpp", "/project/build",
         "clang++ -I\"/project/include path\" -iquote '/project/src quoted' -DMODE=fast -c "
         "'/project/src/main file.cpp'")}};
     const EmptyIncludeResolverPort include_resolver_port;
-    const xray::hexagon::services::ProjectAnalyzer analyzer{compile_database_port,
+    const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port,
                                                             include_resolver_port};
 
     const auto result = analyzer.analyze_project("/tmp/compile_commands.json");
@@ -233,11 +241,11 @@ TEST_CASE("project analyzer tokenizes quoted command arguments with spaces") {
 }
 
 TEST_CASE("project analyzer keeps best effort metrics for unmatched command quotes") {
-    const StubCompileDatabasePort compile_database_port{{CompileEntry::from_command(
+    const StubBuildModelPort build_model_port{{CompileEntry::from_command(
         "/project/src/main.cpp", "/project/build",
         "clang++ -I/project/include -DNAME=\"unterminated -c /project/src/main.cpp")}};
     const EmptyIncludeResolverPort include_resolver_port;
-    const xray::hexagon::services::ProjectAnalyzer analyzer{compile_database_port,
+    const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port,
                                                             include_resolver_port};
 
     const auto result = analyzer.analyze_project("/tmp/compile_commands.json");

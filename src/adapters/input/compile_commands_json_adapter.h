@@ -2,14 +2,14 @@
 
 #include <string_view>
 
-#include "hexagon/ports/driven/compile_database_port.h"
+#include "hexagon/ports/driven/build_model_port.h"
 
 namespace xray::adapters::input {
 
 class CompileCommandsJsonAdapter final
-    : public xray::hexagon::ports::driven::CompileDatabasePort {
+    : public xray::hexagon::ports::driven::BuildModelPort {
 public:
-    xray::hexagon::model::CompileDatabaseResult load_compile_database(
+    xray::hexagon::model::BuildModelResult load_build_model(
         std::string_view path) const override;
 };
 

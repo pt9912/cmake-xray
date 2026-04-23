@@ -13,13 +13,15 @@
 #include "hexagon/services/project_analyzer.h"
 #include "hexagon/services/report_generator.h"
 
-TEST_CASE("driven input adapter satisfies compile database port") {
+TEST_CASE("driven input adapter satisfies build model port") {
     const xray::adapters::input::CompileCommandsJsonAdapter adapter;
     const auto result =
-        adapter.load_compile_database("tests/e2e/testdata/valid/compile_commands.json");
+        adapter.load_build_model("tests/e2e/testdata/valid/compile_commands.json");
 
-    CHECK(result.is_success());
-    CHECK(result.entries().size() == 1);
+    CHECK(result.compile_database.is_success());
+    CHECK(result.compile_database.entries().size() == 1);
+    CHECK(result.source == xray::hexagon::model::ObservationSource::exact);
+    CHECK(result.target_metadata == xray::hexagon::model::TargetMetadataStatus::not_loaded);
 }
 
 TEST_CASE("full M2 analyze pipeline wires from CLI through hexagon to adapters") {

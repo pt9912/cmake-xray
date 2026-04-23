@@ -8,6 +8,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "hexagon/model/build_model_result.h"
 #include "hexagon/model/compile_database_result.h"
 #include "hexagon/model/compile_entry.h"
 
@@ -148,10 +149,7 @@ CompileDatabaseResult build_entry_result(const nlohmann::json& root, std::string
                                  std::move(diagnostics), total_invalid};
 }
 
-}  // namespace
-
-CompileDatabaseResult CompileCommandsJsonAdapter::load_compile_database(
-    std::string_view path) const {
+CompileDatabaseResult load_compile_database(std::string_view path) {
     const auto path_str = std::string(path);
     std::ifstream file(path_str);
     if (!file.is_open()) {
@@ -178,6 +176,18 @@ CompileDatabaseResult CompileCommandsJsonAdapter::load_compile_database(
     }
 
     return build_entry_result(root, path);
+}
+
+}  // namespace
+
+xray::hexagon::model::BuildModelResult CompileCommandsJsonAdapter::load_build_model(
+    std::string_view path) const {
+    // source=exact, no target metadata; remaining fields (target_assignments,
+    // source_root, diagnostics) are populated by CmakeFileApiAdapter in M4.
+    // Aggregate return avoids a gcov NRVO artifact on the closing brace.
+    return {xray::hexagon::model::ObservationSource::exact,
+            xray::hexagon::model::TargetMetadataStatus::not_loaded,
+            load_compile_database(path), {}, {}, {}};
 }
 
 }  // namespace xray::adapters::input

@@ -16,9 +16,9 @@ using xray::hexagon::model::AnalysisResult;
 }  // namespace
 
 ProjectAnalyzer::ProjectAnalyzer(
-    const ports::driven::CompileDatabasePort& compile_database_port,
+    const ports::driven::BuildModelPort& build_model_port,
     const ports::driven::IncludeResolverPort& include_resolver_port)
-    : compile_database_port_(compile_database_port),
+    : build_model_port_(build_model_port),
       include_resolver_port_(include_resolver_port) {}
 
 model::AnalysisResult ProjectAnalyzer::analyze_project(
@@ -26,7 +26,12 @@ model::AnalysisResult ProjectAnalyzer::analyze_project(
     model::AnalysisResult result;
     result.application = model::application_info();
     result.compile_database_path = display_compile_commands_path(compile_commands_path);
-    result.compile_database = compile_database_port_.load_compile_database(compile_commands_path);
+
+    const auto build_model = build_model_port_.load_build_model(compile_commands_path);
+    result.compile_database = build_model.compile_database;
+    result.observation_source = build_model.source;
+    result.target_metadata = build_model.target_metadata;
+    result.target_assignments = build_model.target_assignments;
 
     if (!result.compile_database.is_success()) return result;
 
