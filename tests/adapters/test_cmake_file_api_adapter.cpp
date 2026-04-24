@@ -7,7 +7,9 @@
 #include <system_error>
 #include <vector>
 
+#ifdef XRAY_HAS_LIBCAP
 #include <sys/capability.h>
+#endif
 
 #include "adapters/input/cmake_file_api_adapter.h"
 #include "adapters/input/compile_commands_json_adapter.h"
@@ -25,6 +27,7 @@ using xray::hexagon::model::TargetMetadataStatus;
 
 const std::string testdata = "tests/e2e/testdata/m4/";
 
+#ifdef XRAY_HAS_LIBCAP
 struct ScopedDropDacCapabilities {
     ScopedDropDacCapabilities() {
         cap_t caps = cap_get_proc();
@@ -45,6 +48,7 @@ struct ScopedDropDacCapabilities {
     ScopedDropDacCapabilities(const ScopedDropDacCapabilities&) = delete;
     ScopedDropDacCapabilities& operator=(const ScopedDropDacCapabilities&) = delete;
 };
+#endif
 
 std::vector<std::string> observation_keys_for_source(
     const xray::hexagon::model::BuildModelResult& result,
@@ -216,6 +220,7 @@ TEST_CASE("file api adapter selects lexicographically latest index among multipl
 
 // --- Error cases ---
 
+#ifdef XRAY_HAS_LIBCAP
 TEST_CASE("file api adapter returns file_api_not_accessible for unreadable reply directory") {
     const auto unreadable_dir =
         std::filesystem::temp_directory_path() / "cmake-xray-unreadable-reply";
@@ -238,6 +243,7 @@ TEST_CASE("file api adapter returns file_api_not_accessible for unreadable reply
     CHECK(result.compile_database.error() == CompileDatabaseError::file_api_not_accessible);
     CHECK(result.compile_database.error_description().find("cannot read") != std::string::npos);
 }
+#endif
 
 TEST_CASE("file api adapter returns file_api_not_accessible for nonexistent path") {
     const CmakeFileApiAdapter adapter;

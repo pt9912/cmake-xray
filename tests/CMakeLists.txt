@@ -19,21 +19,29 @@ target_link_libraries(
         doctest::doctest
         xray_hexagon
         xray_adapters
-        cap
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(xray_tests PRIVATE cap)
+    target_compile_definitions(xray_tests PRIVATE XRAY_HAS_LIBCAP)
+endif()
+
 xray_enable_coverage(xray_tests)
 
 add_test(NAME xray_tests COMMAND xray_tests)
 set_tests_properties(xray_tests PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
-add_test(
-    NAME hexagon_boundary_check
-    COMMAND bash ${PROJECT_SOURCE_DIR}/cmake/check_hexagon_boundary.sh ${PROJECT_SOURCE_DIR}/src/hexagon
-)
+find_program(BASH_PROGRAM bash)
+if(BASH_PROGRAM)
+    add_test(
+        NAME hexagon_boundary_check
+        COMMAND bash ${PROJECT_SOURCE_DIR}/cmake/check_hexagon_boundary.sh ${PROJECT_SOURCE_DIR}/src/hexagon
+    )
 
-add_test(
-    NAME e2e_binary
-    COMMAND bash ${PROJECT_SOURCE_DIR}/tests/e2e/run_e2e.sh
-            $<TARGET_FILE:cmake-xray>
-            ${PROJECT_SOURCE_DIR}/tests/e2e/testdata
-)
+    add_test(
+        NAME e2e_binary
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/e2e/run_e2e.sh
+                $<TARGET_FILE:cmake-xray>
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata
+    )
+endif()

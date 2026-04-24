@@ -10,8 +10,8 @@ permissions:
   packages: write
 
 jobs:
-  publish-release:
-    name: Publish Release Artifacts
+  verify:
+    name: Verify (Docker)
     runs-on: ubuntu-latest
 
     steps:
@@ -25,14 +25,10 @@ jobs:
           tag="${GITHUB_REF_NAME}"
           version="${tag#v}"
           image_repo="ghcr.io/${GITHUB_REPOSITORY,,}"
-          archive="cmake-xray_${version}_linux_x86_64.tar.gz"
-          checksum="${archive}.sha256"
 
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "image_repo=${image_repo}" >> "$GITHUB_OUTPUT"
-          echo "archive=${archive}" >> "$GITHUB_OUTPUT"
-          echo "checksum=${checksum}" >> "$GITHUB_OUTPUT"
 
       - name: Verify test image
         run: docker build --target test -t cmake-xray:test .
@@ -68,43 +64,6 @@ jobs:
             --changed-file include/common/config.h \
             --format markdown
 
-      - name: Package Linux CLI release artifact
-        run: |
-          set -eu
-          mkdir -p release-assets/package
-          container_id=$(docker create "cmake-xray:${{ steps.meta.outputs.tag }}")
-          trap 'docker rm -f "$container_id" >/dev/null 2>&1 || true' EXIT
-          docker cp "$container_id:/app/cmake-xray" release-assets/package/cmake-xray
-          docker rm "$container_id"
-          trap - EXIT
-
-          cp LICENSE README.md release-assets/package/
-          tar -C release-assets/package -czf "release-assets/${{ steps.meta.outputs.archive }}" \
-            cmake-xray LICENSE README.md
-          sha256sum "release-assets/${{ steps.meta.outputs.archive }}" \
-            > "release-assets/${{ steps.meta.outputs.checksum }}"
-          rm -rf release-assets/package
-
-      - name: Prepare release notes
-        run: |
-          set -eu
-          ver_esc=$(printf '%s' "${{ steps.meta.outputs.version }}" | sed 's/\./\\./g')
-          notes_path="release-assets/release-notes.md"
-          sed -n "/^## \\[$ver_esc\\]/,/^## \\[/{/^## \\[$ver_esc\\]/!{/^## \\[/!p}}" \
-            CHANGELOG.md > "$notes_path"
-
-          if [ ! -s "$notes_path" ]; then
-            {
-              echo "Release ${{ steps.meta.outputs.tag }}"
-              echo
-              echo "Automated release for ${{ steps.meta.outputs.tag }}."
-              echo
-              echo "Assets:"
-              echo "- ${{ steps.meta.outputs.archive }}"
-              echo "- OCI image: ${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.tag }}"
-            } > "$notes_path"
-          fi
-
       - name: Log in to GHCR
         run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
@@ -123,24 +82,155 @@ jobs:
             docker push "${image_repo}:latest"
           fi
 
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            artifact: linux_x86_64
+            archive_ext: tar.gz
+          - name: macos-arm64
+            os: macos-latest
+            artifact: macos_arm64
+            archive_ext: tar.gz
+          - name: macos-x86_64
+            os: macos-13
+            artifact: macos_x86_64
+            archive_ext: tar.gz
+          - name: windows-x86_64
+            os: windows-latest
+            artifact: windows_x86_64
+            archive_ext: zip
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure -C Release
+
+      - name: Derive archive name
+        id: meta
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          archive="cmake-xray_${version}_${{ matrix.artifact }}.${{ matrix.archive_ext }}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "archive=${archive}" >> "$GITHUB_OUTPUT"
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          set -eu
+          mkdir -p release-assets/package
+          cp build/cmake-xray LICENSE README.md release-assets/package/
+          tar -C release-assets/package -czf "release-assets/${{ steps.meta.outputs.archive }}" \
+            cmake-xray LICENSE README.md
+          sha256sum "release-assets/${{ steps.meta.outputs.archive }}" \
+            > "release-assets/${{ steps.meta.outputs.archive }}.sha256"
+          rm -rf release-assets/package
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path release-assets/package -Force | Out-Null
+          Copy-Item build/Release/cmake-xray.exe, LICENSE, README.md release-assets/package/
+          Compress-Archive -Path release-assets/package/* -DestinationPath "release-assets/${{ steps.meta.outputs.archive }}"
+          $hash = (Get-FileHash "release-assets/${{ steps.meta.outputs.archive }}" -Algorithm SHA256).Hash.ToLower()
+          "$hash  ${{ steps.meta.outputs.archive }}" | Out-File -Encoding ascii "release-assets/${{ steps.meta.outputs.archive }}.sha256"
+          Remove-Item -Recurse -Force release-assets/package
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.artifact }}
+          path: release-assets/*
+          retention-days: 1
+
+  release:
+    name: Publish Release
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Derive release metadata
+        id: meta
+        run: |
+          set -eu
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          image_repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "image_repo=${image_repo}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: release-*
+          merge-multiple: true
+
+      - name: List release assets
+        run: ls -la release-assets/
+
+      - name: Prepare release notes
+        run: |
+          set -eu
+          ver_esc=$(printf '%s' "${{ steps.meta.outputs.version }}" | sed 's/\./\\./g')
+          notes_path="release-assets/release-notes.md"
+          sed -n "/^## \\[$ver_esc\\]/,/^## \\[/{/^## \\[$ver_esc\\]/!{/^## \\[/!p}}" \
+            CHANGELOG.md > "$notes_path"
+
+          if [ ! -s "$notes_path" ]; then
+            {
+              echo "Release ${{ steps.meta.outputs.tag }}"
+              echo
+              echo "Automated release for ${{ steps.meta.outputs.tag }}."
+              echo
+              echo "Assets:"
+              echo "- OCI image: ${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.tag }}"
+            } > "$notes_path"
+          fi
+
       - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
           tag="${{ steps.meta.outputs.tag }}"
-          archive="release-assets/${{ steps.meta.outputs.archive }}"
-          checksum="release-assets/${{ steps.meta.outputs.checksum }}"
           notes="release-assets/release-notes.md"
+
+          # Collect all archives and checksums (exclude release-notes.md)
+          assets=()
+          for f in release-assets/cmake-xray_*; do
+            assets+=("$f")
+          done
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release edit "$tag" --notes-file "$notes"
-            gh release upload "$tag" "$archive" "$checksum" --clobber
+            gh release upload "$tag" "${assets[@]}" --clobber
           else
             gh release create "$tag" \
               --verify-tag \
               --title "$tag" \
               --notes-file "$notes" \
-              "$archive" \
-              "$checksum"
+              "${assets[@]}"
           fi

@@ -10,7 +10,12 @@
 #include <utility>
 
 #include <CLI/CLI.hpp>
+
+#ifdef _WIN32
+#include <process.h>
+#else
 #include <unistd.h>
+#endif
 
 #include "adapters/cli/exit_codes.h"
 #include "hexagon/model/compile_database_result.h"
@@ -196,7 +201,11 @@ std::filesystem::path temporary_output_path(const std::filesystem::path& output_
                                             std::size_t attempt) {
     const auto file_name = output_path.filename().generic_string();
     const auto temp_name = ".cmake-xray-" + (file_name.empty() ? std::string{"report"} : file_name) +
+#ifdef _WIN32
+                           "." + std::to_string(::_getpid()) + "." + std::to_string(attempt) +
+#else
                            "." + std::to_string(::getpid()) + "." + std::to_string(attempt) +
+#endif
                            ".tmp";
     return report_output_directory(output_path) / temp_name;
 }
