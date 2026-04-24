@@ -103,7 +103,7 @@ Ziel: nicht-MVP-Funktionen kontrolliert aufbauen.
 
 | Arbeitspaket                                                                                                                                                                                                                                             | Relevante Kennungen                               |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `CmakeFileApiAdapter` (`BuildModelPort`): zweite primaere Eingabequelle fuer Kernanalysen und initiale Target-Sicht; Einstieg mit Translation-Unit-Beobachtungen ohne `compile_commands.json`, TU-zu-Target-Zuordnung und targetbezogener Impact-Ausgabe | `F-05`, `F-18` bis `F-20`, `F-24`, `F-25`, `S-02` |
+| `CmakeFileApiAdapter` (`BuildModelPort`): zweite primaere Eingabequelle fuer Kernanalysen und initiale Target-Sicht; Einstieg mit Translation-Unit-Beobachtungen ohne `compile_commands.json`, TU-zu-Target-Zuordnung und targetbezogener Impact-Ausgabe | `F-05`, `F-19`, `F-24`, `S-02` |
 
 Einzelne Arbeitspakete koennen bei Bedarf eigene Abschlusskriterien erhalten.
 
@@ -127,6 +127,9 @@ Ziel: zusaetzliche Ausbaupunkte nach dem bereits geplanten M5-Umfang aufnehmen, 
 
 | Arbeitspaket                                                            | Relevante Kennungen            |
 | ----------------------------------------------------------------------- | ------------------------------ |
+| Direkte Target-Graph-Analysen und textuelle Darstellung direkter Target-Abhaengigkeiten | `F-18`                         |
+| Hervorhebung von Targets mit vielen ein- oder ausgehenden Abhaengigkeiten | `F-20`                         |
+| Priorisierung betroffener Targets ueber den Target-Graphen hinweg      | `F-25`                         |
 | Verfeinerte Include-Sicht jenseits des MVP                              | `F-16`, `F-17`                 |
 | Erweiterte Analysekonfiguration, Schwellenwerte und Vergleichsansichten | `F-10`, `F-11`, `F-37`, `F-38` |
 
@@ -180,4 +183,4 @@ Die Beschreibungen von Phase 0 bis Phase 6 bleiben bewusst am bisherigen Plansta
 | `S-05`, `S-09`, `S-10`, `S-11`                                  | Phase 3   | Markdown-Ausgabe sowie Nutzungs- und Integrationsbeispiele des MVP                                                               |
 | `S-06`, `S-07`, `S-08`, `F-43`, `F-44`, `NF-21`, `S-12`, `S-13` | Phase 4   | kuenftige HTML-, JSON- und DOT-Schnittstellen sowie offizielle Release-Bereitstellung innerhalb des laufenden Erweiterungsblocks |
 | `F-28`, `F-29`, `F-30`, `NF-20`, `NF-08`, `NF-09`, `F-39`, `F-40` | Phase 5   | HTML-Export, JSON-/DOT-Ausgaben, Plattformunterstuetzung sowie Detail- und Quiet-Modi                                          |
-| `F-10`, `F-11`, `F-16`, `F-17`, `F-37`, `F-38`                  | Phase 6   | weitere Ausbaupunkte nach dem bereits geplanten M5-Umfang                                                                        |
+| `F-18`, `F-20`, `F-25`, `F-10`, `F-11`, `F-16`, `F-17`, `F-37`, `F-38` | Phase 6   | weitere Ausbaupunkte nach dem bereits geplanten M5-Umfang                                                                        |
