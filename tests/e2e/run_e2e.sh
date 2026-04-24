@@ -18,6 +18,7 @@ assert_stdout_equals_file() {
         echo "PASS: $description"
     else
         echo "FAIL: $description — stdout differed from $expected_file" >&2
+        diff -u "$expected_file" "$actual_file" >&2 || true
         failures=$((failures + 1))
     fi
     rm -f "$actual_file"
@@ -29,6 +30,7 @@ assert_file_equals() {
         echo "PASS: $description"
     else
         echo "FAIL: $description — file differed from $expected_file" >&2
+        diff -u "$expected_file" "$actual_file" >&2 || true
         failures=$((failures + 1))
     fi
 }
