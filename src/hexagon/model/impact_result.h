@@ -20,6 +20,7 @@ enum class ImpactKind {
 struct ImpactedTranslationUnit {
     TranslationUnitReference reference;
     ImpactKind kind{ImpactKind::direct};
+    std::vector<TargetInfo> targets;
 };
 
 enum class TargetImpactClassification {

@@ -224,22 +224,12 @@ std::optional<std::string> write_report_bytes(const std::filesystem::path& path,
 
     if (!report.empty()) {
         const auto written = std::fwrite(report.data(), 1, report.size(), file);
-        // GCOVR_EXCL_START: deterministic stdio write faults would require fault injection.
-        if (written != report.size()) {
+        if (written != report.size() || std::fflush(file) != 0) {
             const auto error = system_error_message(errno);
             std::fclose(file);
             return error;
         }
-        // GCOVR_EXCL_STOP
     }
-
-    // GCOVR_EXCL_START: deterministic stdio flush faults would require fault injection.
-    if (std::fflush(file) != 0) {
-        const auto error = system_error_message(errno);
-        std::fclose(file);
-        return error;
-    }
-    // GCOVR_EXCL_STOP
 
     if (std::fclose(file) != 0) return system_error_message(errno);
     return std::nullopt;

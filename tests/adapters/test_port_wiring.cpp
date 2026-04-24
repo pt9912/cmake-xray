@@ -5,6 +5,7 @@
 
 #include "adapters/cli/cli_adapter.h"
 #include "adapters/cli/exit_codes.h"
+#include "adapters/input/cmake_file_api_adapter.h"
 #include "adapters/input/compile_commands_json_adapter.h"
 #include "adapters/input/source_parsing_include_adapter.h"
 #include "adapters/output/console_report_adapter.h"
@@ -29,10 +30,11 @@ TEST_CASE("full M2 analyze pipeline wires from CLI through hexagon to adapters")
     const xray::adapters::input::SourceParsingIncludeAdapter include_resolver_adapter;
     const xray::adapters::output::ConsoleReportAdapter console_report_adapter;
     const xray::adapters::output::MarkdownReportAdapter markdown_report_adapter;
-    const xray::hexagon::services::ProjectAnalyzer project_analyzer{compile_database_adapter,
-                                                                    include_resolver_adapter};
-    const xray::hexagon::services::ImpactAnalyzer impact_analyzer{compile_database_adapter,
-                                                                  include_resolver_adapter};
+    const xray::adapters::input::CmakeFileApiAdapter file_api_adapter;
+    const xray::hexagon::services::ProjectAnalyzer project_analyzer{
+        compile_database_adapter, include_resolver_adapter, file_api_adapter};
+    const xray::hexagon::services::ImpactAnalyzer impact_analyzer{
+        compile_database_adapter, include_resolver_adapter, file_api_adapter};
     const xray::hexagon::services::ReportGenerator console_report_generator{
         console_report_adapter};
     const xray::hexagon::services::ReportGenerator markdown_report_generator{
@@ -62,10 +64,11 @@ TEST_CASE("full M2 analyze pipeline is reproducible for permuted compile command
     const xray::adapters::input::SourceParsingIncludeAdapter include_resolver_adapter;
     const xray::adapters::output::ConsoleReportAdapter console_report_adapter;
     const xray::adapters::output::MarkdownReportAdapter markdown_report_adapter;
-    const xray::hexagon::services::ProjectAnalyzer project_analyzer{compile_database_adapter,
-                                                                    include_resolver_adapter};
-    const xray::hexagon::services::ImpactAnalyzer impact_analyzer{compile_database_adapter,
-                                                                  include_resolver_adapter};
+    const xray::adapters::input::CmakeFileApiAdapter file_api_adapter;
+    const xray::hexagon::services::ProjectAnalyzer project_analyzer{
+        compile_database_adapter, include_resolver_adapter, file_api_adapter};
+    const xray::hexagon::services::ImpactAnalyzer impact_analyzer{
+        compile_database_adapter, include_resolver_adapter, file_api_adapter};
     const xray::hexagon::services::ReportGenerator console_report_generator{
         console_report_adapter};
     const xray::hexagon::services::ReportGenerator markdown_report_generator{
@@ -109,10 +112,11 @@ TEST_CASE("full M2 impact pipeline wires from CLI through hexagon to adapters") 
     const xray::adapters::input::SourceParsingIncludeAdapter include_resolver_adapter;
     const xray::adapters::output::ConsoleReportAdapter console_report_adapter;
     const xray::adapters::output::MarkdownReportAdapter markdown_report_adapter;
-    const xray::hexagon::services::ProjectAnalyzer project_analyzer{compile_database_adapter,
-                                                                    include_resolver_adapter};
-    const xray::hexagon::services::ImpactAnalyzer impact_analyzer{compile_database_adapter,
-                                                                  include_resolver_adapter};
+    const xray::adapters::input::CmakeFileApiAdapter file_api_adapter;
+    const xray::hexagon::services::ProjectAnalyzer project_analyzer{
+        compile_database_adapter, include_resolver_adapter, file_api_adapter};
+    const xray::hexagon::services::ImpactAnalyzer impact_analyzer{
+        compile_database_adapter, include_resolver_adapter, file_api_adapter};
     const xray::hexagon::services::ReportGenerator console_report_generator{
         console_report_adapter};
     const xray::hexagon::services::ReportGenerator markdown_report_generator{
@@ -141,10 +145,11 @@ TEST_CASE("full M2 impact pipeline keeps duplicate translation-unit observations
     const xray::adapters::input::SourceParsingIncludeAdapter include_resolver_adapter;
     const xray::adapters::output::ConsoleReportAdapter console_report_adapter;
     const xray::adapters::output::MarkdownReportAdapter markdown_report_adapter;
-    const xray::hexagon::services::ProjectAnalyzer project_analyzer{compile_database_adapter,
-                                                                    include_resolver_adapter};
-    const xray::hexagon::services::ImpactAnalyzer impact_analyzer{compile_database_adapter,
-                                                                  include_resolver_adapter};
+    const xray::adapters::input::CmakeFileApiAdapter file_api_adapter;
+    const xray::hexagon::services::ProjectAnalyzer project_analyzer{
+        compile_database_adapter, include_resolver_adapter, file_api_adapter};
+    const xray::hexagon::services::ImpactAnalyzer impact_analyzer{
+        compile_database_adapter, include_resolver_adapter, file_api_adapter};
     const xray::hexagon::services::ReportGenerator console_report_generator{
         console_report_adapter};
     const xray::hexagon::services::ReportGenerator markdown_report_generator{
@@ -180,10 +185,11 @@ TEST_CASE("full M3 markdown analyze pipeline wires from CLI through hexagon to a
     const xray::adapters::input::SourceParsingIncludeAdapter include_resolver_adapter;
     const xray::adapters::output::ConsoleReportAdapter console_report_adapter;
     const xray::adapters::output::MarkdownReportAdapter markdown_report_adapter;
-    const xray::hexagon::services::ProjectAnalyzer project_analyzer{compile_database_adapter,
-                                                                    include_resolver_adapter};
-    const xray::hexagon::services::ImpactAnalyzer impact_analyzer{compile_database_adapter,
-                                                                  include_resolver_adapter};
+    const xray::adapters::input::CmakeFileApiAdapter file_api_adapter;
+    const xray::hexagon::services::ProjectAnalyzer project_analyzer{
+        compile_database_adapter, include_resolver_adapter, file_api_adapter};
+    const xray::hexagon::services::ImpactAnalyzer impact_analyzer{
+        compile_database_adapter, include_resolver_adapter, file_api_adapter};
     const xray::hexagon::services::ReportGenerator console_report_generator{
         console_report_adapter};
     const xray::hexagon::services::ReportGenerator markdown_report_generator{
@@ -212,10 +218,11 @@ TEST_CASE("full M3 markdown impact pipeline wires from CLI through hexagon to ad
     const xray::adapters::input::SourceParsingIncludeAdapter include_resolver_adapter;
     const xray::adapters::output::ConsoleReportAdapter console_report_adapter;
     const xray::adapters::output::MarkdownReportAdapter markdown_report_adapter;
-    const xray::hexagon::services::ProjectAnalyzer project_analyzer{compile_database_adapter,
-                                                                    include_resolver_adapter};
-    const xray::hexagon::services::ImpactAnalyzer impact_analyzer{compile_database_adapter,
-                                                                  include_resolver_adapter};
+    const xray::adapters::input::CmakeFileApiAdapter file_api_adapter;
+    const xray::hexagon::services::ProjectAnalyzer project_analyzer{
+        compile_database_adapter, include_resolver_adapter, file_api_adapter};
+    const xray::hexagon::services::ImpactAnalyzer impact_analyzer{
+        compile_database_adapter, include_resolver_adapter, file_api_adapter};
     const xray::hexagon::services::ReportGenerator console_report_generator{
         console_report_adapter};
     const xray::hexagon::services::ReportGenerator markdown_report_generator{

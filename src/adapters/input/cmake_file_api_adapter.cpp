@@ -165,8 +165,7 @@ struct SourceEntryContext {
     const TargetInfo& target_info;
 };
 
-BuildModelResult parse_and_load(const std::filesystem::path& reply_dir,
-                               const std::string& previous_suffix);
+BuildModelResult load_from_reply_directory(const std::filesystem::path& reply_dir);
 
 std::optional<BuildModelResult> load_latest_index_reply(const std::filesystem::path& reply_dir,
                                                         const std::string& previous_suffix,
@@ -415,11 +414,15 @@ void append_target_entries(const nlohmann::json& target, const ParsedCodemodel& 
     }
 }
 
+struct TargetReplyResult {
+    bool retry{false};
+};
+
 std::optional<BuildModelResult> append_target_reply(const std::filesystem::path& reply_dir,
                                                     const ParsedCodemodel& parsed_codemodel,
-                                                    const std::string& previous_suffix,
                                                     const nlohmann::json& target_ref,
-                                                    ParsedTargets& parsed_targets) {
+                                                    ParsedTargets& parsed_targets,
+                                                    TargetReplyResult& reply_result) {
     if (!target_ref.contains("jsonFile") || !target_ref["jsonFile"].is_string()) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
                                    "cmake file api target reference is missing jsonFile");
@@ -435,16 +438,10 @@ std::optional<BuildModelResult> append_target_reply(const std::filesystem::path&
     const auto target = parse_json_file(target_path, parse_ok);
 
     if (!parse_ok) {
-        // GCOVR_EXCL_START: requires a concurrent CMake rerun that publishes a newer
-        // reply index between the first failed target read and the retry scan.
-        if (!previous_suffix.empty()) {
-            return make_file_api_error(CompileDatabaseError::file_api_invalid,
-                                       "cmake file api target reply is not accessible after retry: " +
-                                           target_path.string());
-        }
-        // GCOVR_EXCL_STOP
-
-        return parse_and_load(reply_dir, parsed_codemodel.latest_suffix);
+        reply_result.retry = true;
+        return make_file_api_error(CompileDatabaseError::file_api_invalid,
+                                   "cmake file api target reply is not accessible: " +
+                                       target_path.string());
     }
 
     const auto target_name = target.value("name", "");
@@ -524,42 +521,53 @@ BuildModelResult build_success_result(const ParsedCodemodel& parsed_codemodel,
             std::move(diagnostics)};
 }
 
-BuildModelResult do_parse_and_load_impl(const std::filesystem::path& reply_dir,
-                                        const std::string& previous_suffix) {
+struct LoadAttemptResult {
+    BuildModelResult model;
+    bool retryable{false};
+    std::string retry_suffix;
+};
+
+LoadAttemptResult try_load_from_index(const std::filesystem::path& reply_dir,
+                                      const std::string& previous_suffix) {
     ParsedReplyIndex parsed_reply;
-    if (const auto error =
-            load_latest_index_reply(reply_dir, previous_suffix, parsed_reply);
+    if (const auto error = load_latest_index_reply(reply_dir, previous_suffix, parsed_reply);
         error.has_value()) {
-        return *error;
+        return {*error};
     }
 
     ParsedCodemodel parsed_codemodel;
     if (const auto error = load_codemodel_reply(reply_dir, parsed_reply, parsed_codemodel);
         error.has_value()) {
-        return *error;
+        return {*error};
     }
 
     ParsedTargets parsed_targets;
     for (const auto& target_ref : parsed_codemodel.target_refs) {
-        if (const auto error = append_target_reply(reply_dir, parsed_codemodel, previous_suffix,
-                                                   target_ref, parsed_targets);
+        TargetReplyResult reply_result;
+        if (const auto error = append_target_reply(reply_dir, parsed_codemodel,
+                                                   target_ref, parsed_targets, reply_result);
             error.has_value()) {
-            return *error;
+            if (reply_result.retry) {
+                return {*error, true, parsed_codemodel.latest_suffix};
+            }
+            return {*error};
         }
     }
 
     if (parsed_targets.entries.empty()) {
-        return make_file_api_error(CompileDatabaseError::file_api_invalid,
-                                   "cmake file api contains no compilable sources");
+        return {make_file_api_error(CompileDatabaseError::file_api_invalid,
+                                    "cmake file api contains no compilable sources")};
     }
 
-    return build_success_result(parsed_codemodel, std::move(parsed_targets));
+    return {build_success_result(parsed_codemodel, std::move(parsed_targets))};
 }
 
-BuildModelResult parse_and_load(const std::filesystem::path& reply_dir,
-                               const std::string& previous_suffix) {
+BuildModelResult load_from_reply_directory(const std::filesystem::path& reply_dir) {
     try {
-        return do_parse_and_load_impl(reply_dir, previous_suffix);
+        auto first = try_load_from_index(reply_dir, {});
+        if (first.model.is_success() || !first.retryable) return first.model;
+        auto retry = try_load_from_index(reply_dir, first.retry_suffix);
+        return retry.model;
     } catch (const nlohmann::json::exception& e) {
         return make_file_api_error(CompileDatabaseError::file_api_invalid,
                                   std::string("cmake file api reply data has unexpected structure: ") +
@@ -580,7 +588,7 @@ xray::hexagon::model::BuildModelResult CmakeFileApiAdapter::load_build_model(
             "cannot access cmake file api reply directory: " + reply_dir.string());
     }
 
-    return parse_and_load(reply_dir, {});
+    return load_from_reply_directory(reply_dir);
 }
 
 }  // namespace xray::adapters::input

@@ -22,9 +22,14 @@ using xray::hexagon::model::Diagnostic;
 using xray::hexagon::model::DiagnosticSeverity;
 using xray::hexagon::model::ImpactKind;
 using xray::hexagon::model::ImpactResult;
+using xray::hexagon::model::ImpactedTarget;
 using xray::hexagon::model::ImpactedTranslationUnit;
 using xray::hexagon::model::IncludeHotspot;
+using xray::hexagon::model::ObservationSource;
 using xray::hexagon::model::RankedTranslationUnit;
+using xray::hexagon::model::TargetImpactClassification;
+using xray::hexagon::model::TargetInfo;
+using xray::hexagon::model::TargetMetadataStatus;
 using xray::hexagon::model::TranslationUnitReference;
 
 TranslationUnitReference make_reference(std::string source_path, std::string directory,
@@ -201,6 +206,86 @@ TEST_CASE("markdown report adapter renders heuristic and uncertain impact classi
           "\n"
           "## Diagnostics\n"
           "- note: conditional or generated includes may be missing from this result\n");
+}
+
+TEST_CASE("markdown report adapter renders file api target metadata for analyze") {
+    const MarkdownReportAdapter adapter;
+    auto result = make_analysis_result();
+    const TargetInfo app{"app", "EXECUTABLE", "app::EXECUTABLE"};
+    const TargetInfo core{"core_lib", "STATIC_LIBRARY", "core::STATIC_LIBRARY"};
+    result.observation_source = ObservationSource::derived;
+    result.target_metadata = TargetMetadataStatus::partial;
+    result.translation_units[0].targets = {app};
+    result.translation_units[1].targets = {core};
+    result.target_assignments = {
+        {"src/app/main.cpp|build/debug", {app}},
+        {"src/lib/core.cpp|build/lib", {core}},
+    };
+
+    const auto report = adapter.write_analysis_report(result, 2);
+
+    CHECK(report.find("- Observation source: derived\n") != std::string::npos);
+    CHECK(report.find("- Target metadata: partial\n") != std::string::npos);
+    CHECK(report.find("- Translation units with target mapping: 2 of 2\n") !=
+          std::string::npos);
+    CHECK(report.find("1. src/app/main.cpp [directory: build/debug] [targets: app]\n") !=
+          std::string::npos);
+    CHECK(report.find("    - src/lib/core.cpp [directory: build/lib] [targets: core\\_lib]\n") !=
+          std::string::npos);
+}
+
+TEST_CASE("markdown report adapter renders target impact sections") {
+    const MarkdownReportAdapter adapter;
+    const TargetInfo app{"app", "EXECUTABLE", "app::EXECUTABLE"};
+    const TargetInfo core{"core_lib", "STATIC_LIBRARY", "core::STATIC_LIBRARY"};
+    auto result = make_impact_result();
+    result.observation_source = ObservationSource::exact;
+    result.target_metadata = TargetMetadataStatus::loaded;
+    result.affected_translation_units = {
+        ImpactedTranslationUnit{
+            make_reference("src/app/main.cpp", "build/app", "src/app/main.cpp|build/app"),
+            ImpactKind::direct,
+            {app},
+        },
+        ImpactedTranslationUnit{
+            make_reference("src/lib/core.cpp", "build/lib", "src/lib/core.cpp|build/lib"),
+            ImpactKind::heuristic,
+            {core},
+        },
+    };
+    result.affected_targets = {
+        ImpactedTarget{app, TargetImpactClassification::direct},
+        ImpactedTarget{core, TargetImpactClassification::heuristic},
+    };
+
+    const auto report = adapter.write_impact_report(result);
+
+    CHECK(report.find("- Observation source: exact\n") != std::string::npos);
+    CHECK(report.find("- Target metadata: loaded\n") != std::string::npos);
+    CHECK(report.find("- Affected targets: 2\n") != std::string::npos);
+    CHECK(report.find("## Directly Affected Translation Units\n"
+                      "- src/app/main.cpp [directory: build/app] [targets: app]\n") !=
+          std::string::npos);
+    CHECK(report.find("## Directly Affected Targets\n"
+                      "- app [type: EXECUTABLE]\n") != std::string::npos);
+    CHECK(report.find("## Heuristically Affected Targets\n"
+                      "- core\\_lib [type: STATIC\\_LIBRARY]\n") != std::string::npos);
+    CHECK(report.find("## Heuristically Affected Targets") <
+          report.find("## Diagnostics"));
+}
+
+TEST_CASE("markdown report adapter falls back for unnamed targets") {
+    const MarkdownReportAdapter adapter;
+    const TargetInfo keyed_target{"", "EXECUTABLE", "generated::EXECUTABLE"};
+    const TargetInfo typed_target{"", "UTILITY_TARGET", ""};
+    auto result = make_analysis_result();
+    result.target_metadata = TargetMetadataStatus::loaded;
+    result.translation_units[0].targets = {keyed_target, typed_target};
+
+    const auto report = adapter.write_analysis_report(result, 1);
+
+    CHECK(report.find("[targets: generated::EXECUTABLE, UTILITY\\_TARGET]") !=
+          std::string::npos);
 }
 
 TEST_CASE("markdown report adapter escapes markdown-sensitive paths and messages") {

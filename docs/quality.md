@@ -93,6 +93,15 @@ Der Standard fuer den aktuellen M3-/MVP-Stand ist:
 
 Das Gate ist per `XRAY_COVERAGE_THRESHOLD` konfigurierbar.
 
+### Coverage-Ausnahmen-Gate
+
+Coverage-Ausnahmen im Produktcode sind nicht Bestandteil des regulaeren Gates. Vor
+Coverage- oder Release-Pruefungen muss dieser Befehl den Wert `0` liefern:
+
+```bash
+rg "GCOVR""_EXCL_" | wc -l
+```
+
 ## Laufzeit-Image
 
 Das Runtime-Image ist fuer den aktuellen Stand gehaertet:
@@ -113,6 +122,7 @@ docker run --rm cmake-xray --help
 Fuer M3 und spaetere Releases sind mindestens diese Docker-Pfade massgeblich:
 
 - `docker build --target test -t cmake-xray:test .`
+- `rg "GCOVR""_EXCL_" | wc -l`
 - `docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .`
 - `docker build --target quality-check -t cmake-xray:quality-check .`
 - `docker build --target runtime -t cmake-xray .`

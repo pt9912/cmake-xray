@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "adapters/output/console_report_adapter.h"
 #include "hexagon/model/analysis_result.h"
@@ -19,9 +20,14 @@ using xray::hexagon::model::CompileDatabaseError;
 using xray::hexagon::model::CompileDatabaseResult;
 using xray::hexagon::model::ImpactKind;
 using xray::hexagon::model::ImpactResult;
+using xray::hexagon::model::ImpactedTarget;
 using xray::hexagon::model::ImpactedTranslationUnit;
 using xray::hexagon::model::IncludeHotspot;
+using xray::hexagon::model::ObservationSource;
 using xray::hexagon::model::RankedTranslationUnit;
+using xray::hexagon::model::TargetImpactClassification;
+using xray::hexagon::model::TargetInfo;
+using xray::hexagon::model::TargetMetadataStatus;
 using xray::hexagon::model::TranslationUnitReference;
 
 TranslationUnitReference make_reference(std::string source_path, std::string directory,
@@ -132,6 +138,89 @@ TEST_CASE("console report adapter renders report-wide diagnostics after visible 
     CHECK(report.find("top 1 of 1 translation units") != std::string::npos);
     CHECK(report.find("note: include-based results are heuristic; conditional or generated includes may be missing") !=
           std::string::npos);
+}
+
+TEST_CASE("console report adapter renders file api target metadata for analyze") {
+    const ConsoleReportAdapter adapter;
+    auto result = make_analysis_result();
+    const TargetInfo app{"app", "EXECUTABLE", "app::EXECUTABLE"};
+    const TargetInfo app_release{"app-release", "EXECUTABLE", "app-release::EXECUTABLE"};
+    const TargetInfo core{"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"};
+    result.observation_source = ObservationSource::derived;
+    result.target_metadata = TargetMetadataStatus::partial;
+    result.translation_units[0].targets = {app};
+    result.target_assignments = {
+        {"src/app/main.cpp|build/debug", {app}},
+        {"src/app/main.cpp|build/release", {app_release}},
+        {"src/lib/core.cpp|build/lib", {core}},
+    };
+
+    const auto report = adapter.write_analysis_report(result, 1);
+
+    CHECK(report.find("observation source: derived\n") != std::string::npos);
+    CHECK(report.find("target metadata: partial\n") != std::string::npos);
+    CHECK(report.find("translation units with target mapping: 1 of 1\n") !=
+          std::string::npos);
+    CHECK(report.find("src/app/main.cpp [directory: build/debug] [targets: app]\n") !=
+          std::string::npos);
+    CHECK(report.find("src/app/main.cpp [directory: build/release] [targets: app-release]\n") !=
+          std::string::npos);
+    CHECK(report.find("src/lib/core.cpp [directory: build/lib] [targets: core]\n") !=
+          std::string::npos);
+}
+
+TEST_CASE("console report adapter renders target impact sections") {
+    const ConsoleReportAdapter adapter;
+    const TargetInfo app{"app", "EXECUTABLE", "app::EXECUTABLE"};
+    const TargetInfo core{"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"};
+    ImpactResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.changed_file = "include/common/config.h";
+    result.heuristic = true;
+    result.observation_source = ObservationSource::exact;
+    result.target_metadata = TargetMetadataStatus::loaded;
+    result.affected_translation_units = {
+        ImpactedTranslationUnit{
+            make_reference("src/app/main.cpp", "build/app", "src/app/main.cpp|build/app"),
+            ImpactKind::direct,
+            {app},
+        },
+        ImpactedTranslationUnit{
+            make_reference("src/lib/core.cpp", "build/lib", "src/lib/core.cpp|build/lib"),
+            ImpactKind::heuristic,
+            {core},
+        },
+    };
+    result.affected_targets = {
+        ImpactedTarget{app, TargetImpactClassification::direct},
+        ImpactedTarget{core, TargetImpactClassification::heuristic},
+    };
+
+    const auto report = adapter.write_impact_report(result);
+
+    CHECK(report.find("observation source: exact\n") != std::string::npos);
+    CHECK(report.find("target metadata: loaded\n") != std::string::npos);
+    CHECK(report.find("affected targets: 2\n") != std::string::npos);
+    CHECK(report.find("src/app/main.cpp [directory: build/app] [targets: app] [direct]\n") !=
+          std::string::npos);
+    CHECK(report.find("directly affected targets\n- app [type: EXECUTABLE]\n") !=
+          std::string::npos);
+    CHECK(report.find("heuristically affected targets\n- core [type: STATIC_LIBRARY]\n") !=
+          std::string::npos);
+}
+
+TEST_CASE("console report adapter falls back for unnamed targets") {
+    const ConsoleReportAdapter adapter;
+    const TargetInfo keyed_target{"", "EXECUTABLE", "generated::EXECUTABLE"};
+    const TargetInfo typed_target{"", "UTILITY", ""};
+    auto result = make_analysis_result();
+    result.target_metadata = TargetMetadataStatus::loaded;
+    result.translation_units[0].targets = {keyed_target, typed_target};
+
+    const auto report = adapter.write_analysis_report(result, 1);
+
+    CHECK(report.find("[targets: generated::EXECUTABLE, UTILITY]") != std::string::npos);
 }
 
 TEST_CASE("console report adapter preserves inline diagnostics and handles empty hotspots") {

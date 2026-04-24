@@ -347,9 +347,7 @@ std::string make_display_path(const std::string& normalized_path,
 }
 
 std::vector<TranslationUnitObservation> build_translation_unit_observations(
-    const std::vector<CompileEntry>& entries, std::string_view compile_commands_path) {
-    const auto base_directory = compile_commands_base_directory(compile_commands_path);
-
+    const std::vector<CompileEntry>& entries, const std::filesystem::path& base_directory) {
     std::vector<TranslationUnitObservation> observations;
     observations.reserve(entries.size());
 
@@ -357,7 +355,12 @@ std::vector<TranslationUnitObservation> build_translation_unit_observations(
         observations.push_back(build_translation_unit_observation(entry, base_directory));
     }
 
-    return observations;
+    return observations; }
+
+std::vector<TranslationUnitObservation> build_translation_unit_observations(
+    const std::vector<CompileEntry>& entries, std::string_view compile_commands_path) {
+    return build_translation_unit_observations(entries,
+                                               compile_commands_base_directory(compile_commands_path));
 }
 
 std::vector<RankedTranslationUnit> build_ranked_translation_units(
@@ -380,6 +383,7 @@ std::vector<RankedTranslationUnit> build_ranked_translation_units(
             .include_path_count = observation.include_path_count,
             .define_count = observation.define_count,
             .diagnostics = std::move(diagnostics),
+            .targets = {},
         });
     }
 
@@ -394,9 +398,8 @@ std::vector<RankedTranslationUnit> build_ranked_translation_units(
 
 std::vector<model::IncludeHotspot> build_include_hotspots(
     const std::vector<TranslationUnitObservation>& observations,
-    const IncludeResolutionResult& include_resolution, std::string_view compile_commands_path) {
-    const auto base_directory = compile_commands_base_directory(compile_commands_path);
-
+    const IncludeResolutionResult& include_resolution,
+    const std::filesystem::path& base_directory) {
     std::unordered_map<std::string, TranslationUnitReference> references_by_key;
     references_by_key.reserve(observations.size());
     for (const auto& observation : observations) {
@@ -440,6 +443,13 @@ std::vector<model::IncludeHotspot> build_include_hotspots(
     });
 
     return hotspots;
+}
+
+std::vector<model::IncludeHotspot> build_include_hotspots(
+    const std::vector<TranslationUnitObservation>& observations,
+    const IncludeResolutionResult& include_resolution, std::string_view compile_commands_path) {
+    return build_include_hotspots(observations, include_resolution,
+                                 compile_commands_base_directory(compile_commands_path));
 }
 
 std::string resolve_changed_file_key(const std::filesystem::path& base_directory,

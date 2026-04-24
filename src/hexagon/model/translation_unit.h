@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "diagnostic.h"
+#include "target_info.h"
 
 namespace xray::hexagon::model {
 
@@ -37,6 +38,7 @@ struct RankedTranslationUnit {
     std::size_t include_path_count{0};
     std::size_t define_count{0};
     std::vector<Diagnostic> diagnostics;
+    std::vector<TargetInfo> targets;
 
     std::size_t score() const { return arg_count + include_path_count + define_count; }
 };

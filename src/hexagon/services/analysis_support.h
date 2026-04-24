@@ -22,6 +22,9 @@ std::string make_display_path(const std::string& normalized_path,
 std::vector<model::TranslationUnitObservation> build_translation_unit_observations(
     const std::vector<model::CompileEntry>& entries, std::string_view compile_commands_path);
 
+std::vector<model::TranslationUnitObservation> build_translation_unit_observations(
+    const std::vector<model::CompileEntry>& entries, const std::filesystem::path& base_directory);
+
 std::vector<model::RankedTranslationUnit> build_ranked_translation_units(
     const std::vector<model::TranslationUnitObservation>& observations,
     const model::IncludeResolutionResult& include_resolution);
@@ -30,6 +33,11 @@ std::vector<model::IncludeHotspot> build_include_hotspots(
     const std::vector<model::TranslationUnitObservation>& observations,
     const model::IncludeResolutionResult& include_resolution,
     std::string_view compile_commands_path);
+
+std::vector<model::IncludeHotspot> build_include_hotspots(
+    const std::vector<model::TranslationUnitObservation>& observations,
+    const model::IncludeResolutionResult& include_resolution,
+    const std::filesystem::path& base_directory);
 
 std::string resolve_changed_file_key(const std::filesystem::path& base_directory,
                                      const std::filesystem::path& changed_path);

@@ -1,15 +1,18 @@
 #include <doctest/doctest.h>
 
+#include <csignal>
 #include <fstream>
 #include <filesystem>
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include "adapters/cli/cli_adapter.h"
 #include "adapters/cli/exit_codes.h"
+#include "adapters/input/cmake_file_api_adapter.h"
 #include "adapters/input/compile_commands_json_adapter.h"
 #include "adapters/input/source_parsing_include_adapter.h"
 #include "adapters/output/console_report_adapter.h"
@@ -28,6 +31,7 @@ namespace {
 
 using xray::adapters::cli::CliAdapter;
 using xray::adapters::cli::ExitCode;
+using xray::adapters::input::CmakeFileApiAdapter;
 using xray::adapters::input::CompileCommandsJsonAdapter;
 using xray::adapters::input::SourceParsingIncludeAdapter;
 using xray::adapters::output::ConsoleReportAdapter;
@@ -43,11 +47,14 @@ using xray::hexagon::services::ReportGenerator;
 
 struct CliFixture {
     CompileCommandsJsonAdapter compile_database_adapter;
+    CmakeFileApiAdapter file_api_adapter;
     SourceParsingIncludeAdapter include_resolver_adapter;
     ConsoleReportAdapter console_report_adapter;
     MarkdownReportAdapter markdown_report_adapter;
-    ProjectAnalyzer project_analyzer{compile_database_adapter, include_resolver_adapter};
-    ImpactAnalyzer impact_analyzer{compile_database_adapter, include_resolver_adapter};
+    ProjectAnalyzer project_analyzer{compile_database_adapter, include_resolver_adapter,
+                                     file_api_adapter};
+    ImpactAnalyzer impact_analyzer{compile_database_adapter, include_resolver_adapter,
+                                   file_api_adapter};
     ReportGenerator console_report_generator{console_report_adapter};
     ReportGenerator markdown_report_generator{markdown_report_adapter};
     xray::adapters::cli::ReportPorts report_ports{console_report_generator,
@@ -409,6 +416,29 @@ TEST_CASE_FIXTURE(CliFixture, "invalid JSON returns exit 4 for impact") {
     CHECK(err.str().find("not valid JSON") != std::string::npos);
 }
 
+TEST_CASE_FIXTURE(CliFixture, "write fault during report generation returns exit 1") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    const TemporaryDirectory temp_dir;
+    const auto report_path = temp_dir.path() / "report.md";
+    const auto report_path_text = report_path.string();
+
+    struct rlimit old_limit{};
+    getrlimit(RLIMIT_FSIZE, &old_limit);
+    const struct rlimit zero_limit = {0, old_limit.rlim_max};
+    setrlimit(RLIMIT_FSIZE, &zero_limit);
+    std::signal(SIGXFSZ, SIG_IGN);
+
+    const auto exit_code =
+        run({"analyze", "--compile-commands", compile_commands.c_str(), "--format", "markdown",
+             "--output", report_path_text.c_str(), "--top", "2"});
+
+    setrlimit(RLIMIT_FSIZE, &old_limit);
+    std::signal(SIGXFSZ, SIG_DFL);
+
+    CHECK(exit_code == ExitCode::unexpected_error);
+    CHECK(err.str().find("error: cannot write report:") != std::string::npos);
+}
+
 TEST_CASE("invalid entries report is truncated after 20 diagnostics") {
     std::vector<EntryDiagnostic> diagnostics;
     diagnostics.reserve(20);
@@ -504,6 +534,106 @@ TEST_CASE("file api not accessible maps to exit code 3 with file api hint") {
     CHECK(err.str().find("cmake file api") != std::string::npos);
     CHECK(err.str().find("hint:") != std::string::npos);
     CHECK(err.str().find("--cmake-file-api") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "file api only analyze runs against real m4 fixture") {
+    const auto file_api_path = fixture_path("m4/file_api_only/build");
+
+    REQUIRE(run({"analyze", "--cmake-file-api", file_api_path.c_str()}) == ExitCode::success);
+    CHECK(out.str().find("observation source: derived") != std::string::npos);
+    CHECK(out.str().find("target metadata: loaded") != std::string::npos);
+    CHECK(out.str().find("translation unit ranking") != std::string::npos);
+    CHECK(out.str().find("main.cpp") != std::string::npos);
+    CHECK(out.str().find("core.cpp") != std::string::npos);
+    CHECK(out.str().find("[targets:") != std::string::npos);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "file api only analyze accepts reply directory directly") {
+    const auto reply_path = fixture_path("m4/file_api_only/build/.cmake/api/v1/reply");
+
+    REQUIRE(run({"analyze", "--cmake-file-api", reply_path.c_str()}) == ExitCode::success);
+    CHECK(out.str().find("translation unit ranking") != std::string::npos);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "file api only impact resolves changed file via source root") {
+    const auto file_api_path = fixture_path("m4/file_api_only/build");
+
+    REQUIRE(run({"impact", "--cmake-file-api", file_api_path.c_str(), "--changed-file",
+                 "src/main.cpp"}) == ExitCode::success);
+    CHECK(out.str().find("impact analysis") != std::string::npos);
+    CHECK(out.str().find("main.cpp") != std::string::npos);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "mixed path analyze enriches compile database with file api targets") {
+    const auto compile_commands = fixture_path("m4/partial_targets/compile_commands.json");
+    const auto file_api_path = fixture_path("m4/partial_targets/build");
+
+    REQUIRE(run({"analyze", "--compile-commands", compile_commands.c_str(), "--cmake-file-api",
+                 file_api_path.c_str()}) == ExitCode::success);
+    CHECK(out.str().find("observation source: exact") != std::string::npos);
+    CHECK(out.str().find("target metadata: partial") != std::string::npos);
+    CHECK(out.str().find("translation unit ranking") != std::string::npos);
+    CHECK(out.str().find("[targets: app]") != std::string::npos);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "mixed path impact enriches compile database with file api targets") {
+    const auto compile_commands = fixture_path("m4/partial_targets/compile_commands.json");
+    const auto file_api_path = fixture_path("m4/partial_targets/build");
+
+    REQUIRE(run({"impact", "--compile-commands", compile_commands.c_str(), "--cmake-file-api",
+                 file_api_path.c_str(), "--changed-file", "src/main.cpp"}) == ExitCode::success);
+    CHECK(out.str().find("impact analysis") != std::string::npos);
+    CHECK(out.str().find("observation source: exact") != std::string::npos);
+    CHECK(out.str().find("affected targets:") != std::string::npos);
+    CHECK(out.str().find("directly affected targets") != std::string::npos);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "multi target analyze shows shared source targets") {
+    const auto file_api_path = fixture_path("m4/multi_target/build");
+
+    REQUIRE(run({"analyze", "--cmake-file-api", file_api_path.c_str()}) == ExitCode::success);
+    CHECK(out.str().find("shared.cpp") != std::string::npos);
+    CHECK(out.str().find("[targets: app, core]") != std::string::npos);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "nonexistent file api path returns exit 3") {
+    CHECK(run({"analyze", "--cmake-file-api", "/nonexistent/reply"}) ==
+          ExitCode::input_not_accessible);
+    CHECK(err.str().find("cmake file api") != std::string::npos);
+    CHECK(err.str().find("hint:") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "invalid file api in mixed path returns exit 4") {
+    const auto compile_commands = fixture_path("m4/invalid_file_api/compile_commands.json");
+    const auto file_api_path = fixture_path("m4/invalid_file_api/build");
+
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--cmake-file-api",
+               file_api_path.c_str()}) == ExitCode::input_invalid);
+    CHECK(err.str().find("cmake file api") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "empty reply directory returns exit 4") {
+    const auto file_api_path = fixture_path("m4/empty_reply/build");
+
+    CHECK(run({"analyze", "--cmake-file-api", file_api_path.c_str()}) ==
+          ExitCode::input_invalid);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "m3 output remains unchanged without file api") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+
+    REQUIRE(run({"analyze", "--compile-commands", compile_commands.c_str(), "--top", "3"}) ==
+            ExitCode::success);
+    // M3 output must not contain target or observation source metadata
+    CHECK(out.str().find("observation source") == std::string::npos);
+    CHECK(out.str().find("target metadata") == std::string::npos);
+    CHECK(err.str().empty());
 }
 
 TEST_CASE("file api invalid maps to exit code 4 with file api hint") {

@@ -25,7 +25,7 @@ TEST_CASE("analysis support tokenizes escaped command variants and reports empty
                 "clang++ -I/project/include\\ path -c /project/src/spaced.cpp"),
             CompileEntry::from_command("/project/src/empty.cpp", "/project/build", ""),
         },
-        "/tmp/compile_commands.json");
+        std::string_view{"/tmp/compile_commands.json"});
 
     REQUIRE(observations.size() == 3);
     CHECK(observations[0].arg_count == 4);
@@ -50,7 +50,7 @@ TEST_CASE("analysis support reports missing split-flag values") {
             CompileEntry::from_arguments("/project/src/missing-define.cpp", "/project/build",
                                          {"clang++", "-D"}),
         },
-        "/tmp/compile_commands.json");
+        std::string_view{"/tmp/compile_commands.json"});
 
     REQUIRE(observations.size() == 2);
     REQUIRE(observations[0].diagnostics.size() == 1);
@@ -72,7 +72,7 @@ TEST_CASE("analysis support ranks translation units by include path tie-breaks")
                                          {"clang++", "-I/project/include/a", "-DONE=1", "-c",
                                           "/project/src/more-defines.cpp"}),
         },
-        "/tmp/compile_commands.json");
+        std::string_view{"/tmp/compile_commands.json"});
 
     const auto ranked =
         xray::hexagon::services::build_ranked_translation_units(observations, {});
@@ -90,7 +90,7 @@ TEST_CASE("analysis support sorts equally sized hotspots by header path") {
             CompileEntry::from_arguments("/project/src/lib.cpp", "/project/build/lib",
                                          {"clang++", "-c", "/project/src/lib.cpp"}),
         },
-        "/tmp/compile_commands.json");
+        std::string_view{"/tmp/compile_commands.json"});
 
     IncludeResolutionResult include_resolution;
     include_resolution.translation_units = {
@@ -107,7 +107,7 @@ TEST_CASE("analysis support sorts equally sized hotspots by header path") {
     };
 
     const auto hotspots = xray::hexagon::services::build_include_hotspots(
-        observations, include_resolution, "/tmp/compile_commands.json");
+        observations, include_resolution, std::string_view{"/tmp/compile_commands.json"});
 
     REQUIRE(hotspots.size() == 2);
     CHECK(hotspots[0].header_path == "/project/include/a.h");
@@ -124,7 +124,7 @@ TEST_CASE("analysis support sorts larger hotspots ahead of smaller ones") {
             CompileEntry::from_arguments("/project/src/tool.cpp", "/project/build/tool",
                                          {"clang++", "-c", "/project/src/tool.cpp"}),
         },
-        "/tmp/compile_commands.json");
+        std::string_view{"/tmp/compile_commands.json"});
 
     IncludeResolutionResult include_resolution;
     include_resolution.translation_units = {
@@ -146,7 +146,7 @@ TEST_CASE("analysis support sorts larger hotspots ahead of smaller ones") {
     };
 
     const auto hotspots = xray::hexagon::services::build_include_hotspots(
-        observations, include_resolution, "/tmp/compile_commands.json");
+        observations, include_resolution, std::string_view{"/tmp/compile_commands.json"});
 
     REQUIRE(hotspots.size() == 2);
     CHECK(hotspots[0].header_path == "/project/include/larger.h");

@@ -10,14 +10,16 @@ namespace xray::hexagon::services {
 
 class ProjectAnalyzer final : public ports::driving::AnalyzeProjectPort {
 public:
-    ProjectAnalyzer(const ports::driven::BuildModelPort& build_model_port,
-                    const ports::driven::IncludeResolverPort& include_resolver_port);
+    ProjectAnalyzer(const ports::driven::BuildModelPort& compile_db_port,
+                    const ports::driven::IncludeResolverPort& include_resolver_port,
+                    const ports::driven::BuildModelPort& file_api_port);
 
     model::AnalysisResult analyze_project(
         ports::driving::AnalyzeProjectRequest request) const override;
 
 private:
-    const ports::driven::BuildModelPort& build_model_port_;
+    const ports::driven::BuildModelPort& compile_db_port_;
+    const ports::driven::BuildModelPort& file_api_port_;
     const ports::driven::IncludeResolverPort& include_resolver_port_;
 };
 

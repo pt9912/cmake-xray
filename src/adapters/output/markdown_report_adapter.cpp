@@ -2,11 +2,15 @@
 
 #include <algorithm>
 #include <cctype>
+#include <map>
 #include <sstream>
 #include <string_view>
+#include <vector>
 
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
+#include "hexagon/model/observation_source.h"
+#include "hexagon/model/target_info.h"
 #include "hexagon/model/translation_unit.h"
 
 namespace xray::adapters::output {
@@ -18,6 +22,9 @@ using xray::hexagon::model::Diagnostic;
 using xray::hexagon::model::DiagnosticSeverity;
 using xray::hexagon::model::ImpactKind;
 using xray::hexagon::model::ImpactResult;
+using xray::hexagon::model::TargetImpactClassification;
+using xray::hexagon::model::TargetInfo;
+using xray::hexagon::model::TargetMetadataStatus;
 using xray::hexagon::model::TranslationUnitReference;
 
 struct AnalysisSectionCounts {
@@ -33,6 +40,24 @@ struct MarkdownEscapeContext {
 
 std::string diagnostic_prefix(DiagnosticSeverity severity) {
     return severity == DiagnosticSeverity::warning ? "warning" : "note";
+}
+
+std::string observation_source_text(xray::hexagon::model::ObservationSource source) {
+    return source == xray::hexagon::model::ObservationSource::derived ? "derived" : "exact";
+}
+
+std::string target_metadata_text(TargetMetadataStatus status) {
+    if (status == TargetMetadataStatus::loaded) {
+        return "loaded";
+    }
+    if (status == TargetMetadataStatus::partial) {
+        return "partial";
+    }
+    return "not_loaded";
+}
+
+bool target_metadata_loaded(TargetMetadataStatus status) {
+    return target_metadata_text(status) != "not_loaded";
 }
 
 std::size_t ordered_list_marker_dot_index(std::string_view text) {
@@ -72,10 +97,7 @@ bool should_escape_prefix(const MarkdownEscapeContext& context, std::size_t inde
     return context.text[index] == '#' || context.leading_unordered_list_marker;
 }
 
-std::string escape_markdown(std::string_view text) {
-    std::string escaped;
-    escaped.reserve(text.size() * 2);
-
+void append_escaped_markdown(std::ostringstream& out, std::string_view text) {
     const MarkdownEscapeContext context{
         text,
         ordered_list_marker_dot_index(text),
@@ -86,37 +108,73 @@ std::string escape_markdown(std::string_view text) {
         const auto ch = text[index];
 
         if (should_escape_prefix(context, index)) {
-            escaped.push_back('\\');
+            out << '\\';
         }
         if (is_markdown_escape_character(ch)) {
-            escaped.push_back('\\');
+            out << '\\';
         }
-        escaped.push_back(ch);
+        out << ch;
     }
-
-    return escaped; }  // GCOVR_EXCL_LINE
+}
 
 std::string ordered_list_indent(std::size_t index) {
     return std::string(std::to_string(index).size() + 3, ' ');
 }
 
 void append_reference(std::ostringstream& out, const TranslationUnitReference& reference) {
-    out << escape_markdown(reference.source_path) << " [directory: "
-        << escape_markdown(reference.directory) << ']';
+    append_escaped_markdown(out, reference.source_path);
+    out << " [directory: ";
+    append_escaped_markdown(out, reference.directory);
+    out << ']';
+}
+
+std::string target_label(const TargetInfo& target) {
+    if (!target.display_name.empty()) return target.display_name;
+    if (!target.unique_key.empty()) return target.unique_key;
+    return target.type;
+}
+
+void append_target_suffix(std::ostringstream& out, const std::vector<TargetInfo>& targets) {
+    if (targets.empty()) return;
+
+    out << " [targets: ";
+    for (std::size_t index = 0; index < targets.size(); ++index) {
+        if (index != 0) out << ", ";
+        append_escaped_markdown(out, target_label(targets[index]));
+    }
+    out << ']';
+}
+
+void append_reference(
+    std::ostringstream& out, const TranslationUnitReference& reference,
+    const std::map<std::string, const std::vector<TargetInfo>*>& targets_by_key) {
+    append_reference(out, reference);
+    const auto it = targets_by_key.find(reference.unique_key);
+    if (it != targets_by_key.end()) append_target_suffix(out, *it->second);
 }
 
 void append_diagnostic_list(std::ostringstream& out, const std::vector<Diagnostic>& diagnostics,
                             std::string_view indent) {
     for (const auto& diagnostic : diagnostics) {
-        out << indent << "- " << diagnostic_prefix(diagnostic.severity) << ": "
-            << escape_markdown(diagnostic.message) << '\n';
+        out << indent << "- " << diagnostic_prefix(diagnostic.severity) << ": ";
+        append_escaped_markdown(out, diagnostic.message);
+        out << '\n';
     }
+}
+
+std::size_t count_mapped_translation_units(
+    const std::vector<xray::hexagon::model::RankedTranslationUnit>& translation_units) {
+    return static_cast<std::size_t>(
+        std::count_if(translation_units.begin(), translation_units.end(),
+                      [](const auto& tu) { return !tu.targets.empty(); }));
 }
 
 void append_analysis_overview(std::ostringstream& out, const AnalysisResult& analysis_result,
                               std::size_t top_limit, const AnalysisSectionCounts& counts) {
     out << "- Report type: analyze\n";
-    out << "- Compile database: " << escape_markdown(analysis_result.compile_database_path) << '\n';
+    out << "- Compile database: ";
+    append_escaped_markdown(out, analysis_result.compile_database_path);
+    out << '\n';
     out << "- Translation units: " << analysis_result.translation_units.size() << '\n';
     out << "- Translation unit ranking entries: " << counts.ranking_count << " of "
         << analysis_result.translation_units.size() << '\n';
@@ -125,6 +183,15 @@ void append_analysis_overview(std::ostringstream& out, const AnalysisResult& ana
     out << "- Top limit: " << top_limit << '\n';
     out << "- Include analysis heuristic: "
         << (analysis_result.include_analysis_heuristic ? "yes" : "no") << '\n';
+    if (target_metadata_loaded(analysis_result.target_metadata)) {
+        out << "- Observation source: "
+            << observation_source_text(analysis_result.observation_source) << '\n';
+        out << "- Target metadata: " << target_metadata_text(analysis_result.target_metadata)
+            << '\n';
+        out << "- Translation units with target mapping: "
+            << count_mapped_translation_units(analysis_result.translation_units) << " of "
+            << analysis_result.translation_units.size() << '\n';
+    }
 }
 
 void append_ranking_section(std::ostringstream& out, const AnalysisResult& analysis_result,
@@ -137,6 +204,7 @@ void append_ranking_section(std::ostringstream& out, const AnalysisResult& analy
 
         out << translation_unit.rank << ". ";
         append_reference(out, translation_unit.reference);
+        append_target_suffix(out, translation_unit.targets);
         out << '\n';
         out << indent << "Metrics: arg_count=" << translation_unit.arg_count
             << ", include_path_count=" << translation_unit.include_path_count
@@ -151,6 +219,11 @@ void append_ranking_section(std::ostringstream& out, const AnalysisResult& analy
 
 void append_hotspot_section(std::ostringstream& out, const AnalysisResult& analysis_result,
                             std::size_t hotspot_count) {
+    std::map<std::string, const std::vector<TargetInfo>*> targets_by_key;
+    for (const auto& assignment : analysis_result.target_assignments) {
+        targets_by_key.emplace(assignment.observation_key, &assignment.targets);
+    }
+
     out << "## Include Hotspots\n";
 
     if (analysis_result.include_hotspots.empty()) {
@@ -163,14 +236,16 @@ void append_hotspot_section(std::ostringstream& out, const AnalysisResult& analy
         const auto indent = ordered_list_indent(item_index);
         const auto& hotspot = analysis_result.include_hotspots[index];
 
-        out << item_index << ". Header: " << escape_markdown(hotspot.header_path) << '\n';
+        out << item_index << ". Header: ";
+        append_escaped_markdown(out, hotspot.header_path);
+        out << '\n';
         out << indent << "Affected translation units: "
             << hotspot.affected_translation_units.size() << '\n';
         out << indent << "Translation units:\n";
 
         for (const auto& reference : hotspot.affected_translation_units) {
             out << indent << "- ";
-            append_reference(out, reference);
+            append_reference(out, reference, targets_by_key);
             out << '\n';
         }
 
@@ -201,39 +276,70 @@ std::string impact_classification(const ImpactResult& impact_result) {
 
 void append_impact_overview(std::ostringstream& out, const ImpactResult& impact_result) {
     out << "- Report type: impact\n";
-    out << "- Compile database: " << escape_markdown(impact_result.compile_database_path) << '\n';
-    out << "- Changed file: " << escape_markdown(impact_result.changed_file) << '\n';
+    out << "- Compile database: ";
+    append_escaped_markdown(out, impact_result.compile_database_path);
+    out << '\n';
+    out << "- Changed file: ";
+    append_escaped_markdown(out, impact_result.changed_file);
+    out << '\n';
     out << "- Affected translation units: " << impact_result.affected_translation_units.size()
         << '\n';
     out << "- Impact classification: " << impact_classification(impact_result) << '\n';
+    if (target_metadata_loaded(impact_result.target_metadata)) {
+        out << "- Observation source: "
+            << observation_source_text(impact_result.observation_source) << '\n';
+        out << "- Target metadata: " << target_metadata_text(impact_result.target_metadata)
+            << '\n';
+        out << "- Affected targets: " << impact_result.affected_targets.size() << '\n';
+    }
 }
 
-void append_impact_section(std::ostringstream& out, std::string_view title,
-                           const std::vector<TranslationUnitReference>& references,
-                           std::string_view empty_text) {
+void append_impacted_translation_unit_section(std::ostringstream& out, std::string_view title,
+                                              ImpactKind kind,
+                                              const ImpactResult& impact_result,
+                                              std::string_view empty_text) {
     out << title << '\n';
-    if (references.empty()) {
-        out << empty_text << '\n';
-        return;
-    }
-
-    for (const auto& reference : references) {
-        out << "- ";
-        append_reference(out, reference);
-        out << '\n';
-    }
-}
-
-std::vector<TranslationUnitReference> collect_impact_references(
-    const ImpactResult& impact_result, ImpactKind kind) {
-    std::vector<TranslationUnitReference> references;
+    bool any = false;
 
     for (const auto& impacted : impact_result.affected_translation_units) {
         if (impacted.kind != kind) continue;
-        references.push_back(impacted.reference);
+        out << "- ";
+        append_reference(out, impacted.reference);
+        append_target_suffix(out, impacted.targets);
+        out << '\n';
+        any = true;
     }
 
-    return references; }  // GCOVR_EXCL_LINE
+    if (!any) {
+        out << empty_text << '\n';
+    }
+}
+
+void append_target(std::ostringstream& out, const TargetInfo& target) {
+    out << "- ";
+    append_escaped_markdown(out, target_label(target));
+    if (!target.type.empty()) {
+        out << " [type: ";
+        append_escaped_markdown(out, target.type);
+        out << ']';
+    }
+    out << '\n';
+}
+
+void append_target_section(std::ostringstream& out, std::string_view title,
+                           TargetImpactClassification classification,
+                           const ImpactResult& impact_result, std::string_view empty_text) {
+    out << title << '\n';
+    bool any = false;
+
+    for (const auto& impacted_target : impact_result.affected_targets) {
+        if (impacted_target.classification != classification) continue;
+        append_target(out, impacted_target.target);
+        any = true;
+    }
+
+    if (!any) out << empty_text << '\n';
+}
 
 }  // namespace
 
@@ -259,10 +365,6 @@ std::string MarkdownReportAdapter::write_analysis_report(const AnalysisResult& a
 
 std::string MarkdownReportAdapter::write_impact_report(const ImpactResult& impact_result) const {
     std::ostringstream out;
-    const auto direct_references =
-        collect_impact_references(impact_result, ImpactKind::direct);
-    const auto heuristic_references =
-        collect_impact_references(impact_result, ImpactKind::heuristic);
 
     out << "# Impact Analysis Report\n\n";
     append_impact_overview(out, impact_result);
@@ -272,11 +374,23 @@ std::string MarkdownReportAdapter::write_impact_report(const ImpactResult& impac
     }
 
     out << '\n';
-    append_impact_section(out, "## Directly Affected Translation Units", direct_references,
-                          "No directly affected translation units.");
+    append_impacted_translation_unit_section(
+        out, "## Directly Affected Translation Units", ImpactKind::direct, impact_result,
+        "No directly affected translation units.");
     out << '\n';
-    append_impact_section(out, "## Heuristically Affected Translation Units",
-                          heuristic_references, "No heuristically affected translation units.");
+    append_impacted_translation_unit_section(
+        out, "## Heuristically Affected Translation Units", ImpactKind::heuristic,
+        impact_result, "No heuristically affected translation units.");
+    if (target_metadata_loaded(impact_result.target_metadata)) {
+        out << '\n';
+        append_target_section(out, "## Directly Affected Targets",
+                              TargetImpactClassification::direct, impact_result,
+                              "No directly affected targets.");
+        out << '\n';
+        append_target_section(out, "## Heuristically Affected Targets",
+                              TargetImpactClassification::heuristic, impact_result,
+                              "No heuristically affected targets.");
+    }
     out << '\n';
     append_report_diagnostics(out, impact_result.diagnostics);
 

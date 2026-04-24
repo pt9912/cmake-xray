@@ -169,7 +169,7 @@ TEST_CASE("file api adapter assigns shared source to multiple targets with corre
     const auto dummy_compile_commands = first_entry.directory() + "/compile_commands.json";
     const auto observations =
         xray::hexagon::services::build_translation_unit_observations(
-            result.compile_database.entries(), dummy_compile_commands);
+            result.compile_database.entries(), std::string_view{dummy_compile_commands});
     CHECK(observations.size() == 3);
 
     // Find the assignment for shared.cpp
@@ -445,7 +445,7 @@ TEST_CASE("file api adapter target_assignment keys match downstream observation 
 
     const auto observations =
         xray::hexagon::services::build_translation_unit_observations(
-            result.compile_database.entries(), dummy_compile_commands);
+            result.compile_database.entries(), std::string_view{dummy_compile_commands});
 
     for (const auto& assignment : result.target_assignments) {
         bool key_found = false;
