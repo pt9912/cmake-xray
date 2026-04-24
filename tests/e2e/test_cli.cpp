@@ -1,14 +1,19 @@
 #include <doctest/doctest.h>
 
-#include <csignal>
 #include <fstream>
 #include <filesystem>
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <csignal>
 #include <sys/resource.h>
 #include <unistd.h>
+#endif
 
 #include "adapters/cli/cli_adapter.h"
 #include "adapters/cli/exit_codes.h"
@@ -329,7 +334,11 @@ TEST_CASE_FIXTURE(CliFixture, "markdown output reports exhausted temporary repor
     const TemporaryDirectory temp_dir;
     const auto target_path = temp_dir.path() / "report.md";
     const auto target_name = target_path.filename().string();
+#ifdef _WIN32
+    const auto process_id = std::to_string(::_getpid());
+#else
     const auto process_id = std::to_string(::getpid());
+#endif
 
     for (std::size_t attempt = 0; attempt < 64; ++attempt) {
         std::ofstream reserved(temp_dir.path() /
@@ -416,6 +425,7 @@ TEST_CASE_FIXTURE(CliFixture, "invalid JSON returns exit 4 for impact") {
     CHECK(err.str().find("not valid JSON") != std::string::npos);
 }
 
+#ifndef _WIN32
 TEST_CASE_FIXTURE(CliFixture, "write fault during report generation returns exit 1") {
     const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
     const TemporaryDirectory temp_dir;
@@ -438,6 +448,7 @@ TEST_CASE_FIXTURE(CliFixture, "write fault during report generation returns exit
     CHECK(exit_code == ExitCode::unexpected_error);
     CHECK(err.str().find("error: cannot write report:") != std::string::npos);
 }
+#endif
 
 TEST_CASE("invalid entries report is truncated after 20 diagnostics") {
     std::vector<EntryDiagnostic> diagnostics;
