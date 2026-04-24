@@ -34,9 +34,33 @@ Referenzplattform ist Linux mit:
 
 Als reproduzierbare Referenzumgebung steht das Multi-Stage-[Dockerfile](./Dockerfile) zur Verfuegung.
 
-## Build und Installation
+## Installation und Ausfuehrung
 
-Lokaler Quellbuild:
+Fuer normale Nutzung wird die CLI als `cmake-xray` aufgerufen. Releases stellen
+dafuer ein versioniertes Linux-CLI-Artefakt und ein OCI-kompatibles
+Container-Image bereit, damit Nutzer nicht auf interne Build-Pfade angewiesen
+sind.
+
+Release-Artefakt entpacken:
+
+```bash
+tar -xzf cmake-xray_X.Y.Z_linux_x86_64.tar.gz
+mkdir -p "$HOME/.local/bin"
+install -m 0755 cmake-xray "$HOME/.local/bin/cmake-xray"
+export PATH="$HOME/.local/bin:$PATH"
+cmake-xray --help
+```
+
+Container-Image verwenden:
+
+```bash
+docker run --rm ghcr.io/pt9912/cmake-xray:vX.Y.Z --help
+```
+
+Dabei bezeichnet `X.Y.Z` die Release-Version ohne fuehrendes `v`; Container
+werden mit dem Git-Tag wie `vX.Y.Z` markiert.
+
+Lokaler Quellbuild fuer Entwicklung:
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -49,22 +73,26 @@ Runtime-Image bauen:
 docker build --target runtime -t cmake-xray .
 ```
 
-Danach steht das Binary lokal unter `./build/cmake-xray` bzw. im Container als Entrypoint zur Verfuegung.
+Danach steht das Binary im Container als Entrypoint zur Verfuegung:
+
+```bash
+docker run --rm cmake-xray --help
+```
 
 ## Nutzung
 
 ### Hilfe
 
 ```bash
-./build/cmake-xray --help
-./build/cmake-xray analyze --help
-./build/cmake-xray impact --help
+cmake-xray --help
+cmake-xray analyze --help
+cmake-xray impact --help
 ```
 
 ### Projektanalyse in der Konsole
 
 ```bash
-./build/cmake-xray analyze \
+cmake-xray analyze \
   --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json \
   --top 10
 ```
@@ -72,7 +100,7 @@ Danach steht das Binary lokal unter `./build/cmake-xray` bzw. im Container als E
 ### Projektanalyse als Markdown auf `stdout`
 
 ```bash
-./build/cmake-xray analyze \
+cmake-xray analyze \
   --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json \
   --format markdown \
   --top 10
@@ -81,7 +109,7 @@ Danach steht das Binary lokal unter `./build/cmake-xray` bzw. im Container als E
 ### Projektanalyse als Markdown-Datei
 
 ```bash
-./build/cmake-xray analyze \
+cmake-xray analyze \
   --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json \
   --format markdown \
   --output build/reports/analyze.md \
@@ -91,7 +119,7 @@ Danach steht das Binary lokal unter `./build/cmake-xray` bzw. im Container als E
 ### Impact-Analyse
 
 ```bash
-./build/cmake-xray impact \
+cmake-xray impact \
   --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json \
   --changed-file include/common/config.h
 ```
@@ -99,7 +127,7 @@ Danach steht das Binary lokal unter `./build/cmake-xray` bzw. im Container als E
 ### Impact-Analyse als Markdown
 
 ```bash
-./build/cmake-xray impact \
+cmake-xray impact \
   --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json \
   --changed-file include/common/config.h \
   --format markdown \
@@ -163,6 +191,7 @@ Die versionierten Referenzprojekte liegen unter [tests/reference](./tests/refere
 Weitere Dokumentation:
 
 - [docs/lastenheft.md](./docs/lastenheft.md)
+- [docs/guide.md](./docs/guide.md)
 - [docs/design.md](./docs/design.md)
 - [docs/architecture.md](./docs/architecture.md)
 - [docs/roadmap.md](./docs/roadmap.md)

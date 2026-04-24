@@ -1,0 +1,271 @@
+# Guide - cmake-xray
+
+## Zweck
+
+Dieser Guide beschreibt den praktischen Einstieg in `cmake-xray`: Build erzeugen,
+Eingabedaten bereitstellen, Projektanalyse ausfuehren, Impact abschaetzen und
+Reports lesen.
+
+Fuer Architektur, Design, Release- und Qualitaetsdetails bleiben die
+spezialisierten Dokumente massgeblich:
+
+- [docs/architecture.md](./architecture.md)
+- [docs/design.md](./design.md)
+- [docs/releasing.md](./releasing.md)
+- [docs/quality.md](./quality.md)
+- [docs/performance.md](./performance.md)
+
+## Voraussetzungen
+
+`cmake-xray` ist fuer CMake-basierte C++-Projekte gedacht. Fuer den lokalen
+Quellbuild werden benoetigt:
+
+- CMake >= 3.20
+- ein C++20-faehiger Compiler
+- Git fuer `FetchContent`
+
+Als reproduzierbare Umgebung kann alternativ das Dockerfile im Repository
+verwendet werden.
+
+## Ausfuehrungswege
+
+Fuer normale Nutzung wird die CLI als `cmake-xray` aufgerufen. Das kann ueber
+ein versioniertes Linux-Release-Artefakt oder ueber ein OCI-kompatibles
+Container-Image erfolgen. Beispiele in diesem Guide verwenden deshalb nicht den
+internen Entwicklerpfad `./build/cmake-xray`.
+
+### Release-Artefakt
+
+Ein Release stellt ein Archiv nach diesem Schema bereit:
+
+```text
+cmake-xray_X.Y.Z_linux_x86_64.tar.gz
+```
+
+Das Archiv enthaelt die ausfuehrbare Datei `cmake-xray` sowie
+Begleitdokumentation. Nach dem Entpacken kann die Datei in ein Verzeichnis im
+`PATH` gelegt werden:
+
+```bash
+tar -xzf cmake-xray_X.Y.Z_linux_x86_64.tar.gz
+mkdir -p "$HOME/.local/bin"
+install -m 0755 cmake-xray "$HOME/.local/bin/cmake-xray"
+export PATH="$HOME/.local/bin:$PATH"
+cmake-xray --help
+```
+
+Wenn `cmake-xray` im `PATH` liegt, sind alle weiteren Beispiele direkt
+uebertragbar.
+
+### Container
+
+Das Runtime-Image fuehrt `cmake-xray` als Entrypoint aus. Fuer lokale Daten wird
+das Projektverzeichnis oder ein Teil davon in den Container gemountet:
+
+```bash
+docker run --rm ghcr.io/pt9912/cmake-xray:vX.Y.Z --help
+```
+
+Dabei bezeichnet `X.Y.Z` die Release-Version ohne fuehrendes `v`; Container
+werden mit dem Git-Tag wie `vX.Y.Z` markiert.
+
+Mit lokal gebautem Runtime-Image:
+
+```bash
+docker build --target runtime -t cmake-xray .
+docker run --rm cmake-xray --help
+```
+
+### Lokaler Quellbuild fuer Entwicklung
+
+Der lokale Build ist vor allem fuer Entwicklung, Tests und Debugging gedacht:
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+Das dabei entstehende Binary im Build-Verzeichnis ist kein empfohlener
+Nutzeraufruf fuer Release-Dokumentation.
+
+## Schnellstart
+
+Eine erste Projektanalyse mit den mitgelieferten Testdaten, wenn `cmake-xray`
+im `PATH` liegt:
+
+```bash
+cmake-xray analyze \
+  --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json \
+  --top 10
+```
+
+Eine erste Impact-Analyse:
+
+```bash
+cmake-xray impact \
+  --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json \
+  --changed-file include/common/config.h
+```
+
+Dieselbe Projektanalyse ueber das Runtime-Image:
+
+```bash
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata/m3:/data:ro" \
+  ghcr.io/pt9912/cmake-xray:vX.Y.Z \
+  analyze --compile-commands /data/report_project/compile_commands.json --top 10
+```
+
+## Eingabedaten vorbereiten
+
+Der MVP-Stand liest `compile_commands.json`. In einem CMake-Projekt wird diese
+Datei typischerweise so erzeugt:
+
+```bash
+cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+```
+
+Danach liegt die Compilation Database normalerweise unter:
+
+```text
+build/compile_commands.json
+```
+
+Wichtig:
+
+- Die Datei muss ein gueltiges JSON-Array sein.
+- Jeder Eintrag muss die erwarteten Pflichtfelder enthalten.
+- Leere, nicht lesbare oder syntaktisch ungueltige Dateien werden mit
+  definierten Exit-Codes abgewiesen.
+
+## Projektanalyse
+
+Die Projektanalyse rankt auffaellige Translation Units und zeigt
+Include-Hotspots:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --top 20
+```
+
+Typische Einsatzfaelle:
+
+- grobe Orientierung in einem gewachsenen CMake-Projekt
+- Erkennen von Translation Units mit vielen Compilerargumenten
+- Erkennen von Headern, die viele Translation Units beeinflussen koennen
+- Erzeugen eines Markdown-Artefakts fuer Reviews oder CI
+
+Markdown-Ausgabe auf `stdout`:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --format markdown \
+  --top 20
+```
+
+Markdown-Ausgabe als Datei:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --format markdown \
+  --output build/reports/analyze.md \
+  --top 20
+```
+
+## Impact-Analyse
+
+Die Impact-Analyse schaetzt ab, welche Translation Units von einer geaenderten
+Datei betroffen sind:
+
+```bash
+cmake-xray impact \
+  --compile-commands build/compile_commands.json \
+  --changed-file include/common/config.h
+```
+
+Relative `--changed-file`-Pfade werden relativ zum Verzeichnis der uebergebenen
+`compile_commands.json` interpretiert.
+
+Markdown-Ausgabe als Datei:
+
+```bash
+cmake-xray impact \
+  --compile-commands build/compile_commands.json \
+  --changed-file include/common/config.h \
+  --format markdown \
+  --output build/reports/impact.md
+```
+
+## Reports lesen
+
+`analyze`-Reports enthalten:
+
+- Metadaten zur Eingabe und Ergebnisgroesse
+- Ranking auffaelliger Translation Units
+- Include-Hotspots
+- Diagnostics zu Datenluecken oder unsicheren Befunden
+
+`impact`-Reports enthalten:
+
+- die untersuchte Datei
+- direkt betroffene Translation Units
+- heuristisch betroffene Translation Units
+- Diagnostics zur Einordnung des Ergebnisses
+
+Kuratierte Beispielausgaben liegen unter [docs/examples](./examples):
+
+- [docs/examples/analyze-console.txt](./examples/analyze-console.txt)
+- [docs/examples/analyze-report.md](./examples/analyze-report.md)
+- [docs/examples/impact-console.txt](./examples/impact-console.txt)
+- [docs/examples/impact-report.md](./examples/impact-report.md)
+
+## Heuristiken einordnen
+
+Include-Hotspots und Header-Impact beruhen im MVP auf heuristischer
+Include-Aufloesung. Das bedeutet:
+
+- direkte Treffer auf bekannte Quelldateien sind belastbarer als
+  heuristische Include-Treffer
+- bedingte Includes koennen fehlen
+- generierte Header koennen fehlen, wenn sie nicht aus den vorhandenen
+  Eingabedaten ableitbar sind
+- relevante Unsicherheiten erscheinen als Diagnostics im Report
+
+Die Ergebnisse sind deshalb als Orientierung und Review-Hilfe gedacht, nicht als
+vollstaendiger Ersatz fuer Build-System- oder Compilerwissen.
+
+## Exit-Codes
+
+| Code | Bedeutung                           |
+| ---- | ----------------------------------- |
+| `0`  | Erfolg                              |
+| `1`  | Laufzeit- oder Report-Schreibfehler |
+| `2`  | CLI-Verwendungsfehler               |
+| `3`  | Eingabedatei nicht lesbar           |
+| `4`  | Eingabedaten ungueltig              |
+
+## Verifikation
+
+Lokale Tests:
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+Reproduzierbare Docker-Gates:
+
+```bash
+docker build --target test -t cmake-xray:test .
+docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
+docker build --target quality-check -t cmake-xray:quality-check .
+docker build --target runtime -t cmake-xray .
+docker run --rm cmake-xray --help
+```
+
+Details stehen in [docs/quality.md](./quality.md) und
+[docs/releasing.md](./releasing.md).
