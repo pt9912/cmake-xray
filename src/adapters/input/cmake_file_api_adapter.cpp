@@ -121,7 +121,9 @@ std::string find_codemodel_json_file(const nlohmann::json& index) {
 }
 
 std::string normalize_path(const std::filesystem::path& path) {
-    auto normalized = std::filesystem::absolute(path).lexically_normal().generic_string();
+    auto normalized = path.has_root_directory()
+                          ? path.lexically_normal().generic_string()
+                          : std::filesystem::absolute(path).lexically_normal().generic_string();
     if (normalized.size() > 1 && normalized.ends_with('/')) normalized.pop_back();
     return normalized;
 }

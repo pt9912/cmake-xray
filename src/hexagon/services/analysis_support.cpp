@@ -319,9 +319,10 @@ TranslationUnitObservation build_translation_unit_observation(
 }  // namespace
 
 std::filesystem::path compile_commands_base_directory(std::string_view compile_commands_path) {
-    const auto base = std::filesystem::absolute(std::filesystem::path{compile_commands_path})
-                          .lexically_normal()
-                          .parent_path();
+    const std::filesystem::path input{compile_commands_path};
+    const auto resolved = input.has_root_directory() ? input.lexically_normal()
+                                                     : std::filesystem::absolute(input).lexically_normal();
+    const auto base = resolved.parent_path();
     return base.empty() ? std::filesystem::current_path() : base;
 }
 
@@ -330,6 +331,7 @@ std::string display_compile_commands_path(std::string_view compile_commands_path
 }
 
 std::string normalize_path(const std::filesystem::path& path) {
+    if (path.has_root_directory()) return path.lexically_normal().generic_string();
     return std::filesystem::absolute(path).lexically_normal().generic_string();
 }
 

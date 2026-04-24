@@ -152,3 +152,12 @@ TEST_CASE("analysis support sorts larger hotspots ahead of smaller ones") {
     CHECK(hotspots[0].header_path == "/project/include/larger.h");
     CHECK(hotspots[1].header_path == "/project/include/smaller.h");
 }
+
+TEST_CASE("analysis support normalizes relative paths via absolute resolution") {
+    const auto result = xray::hexagon::services::normalize_path("relative/path.cpp");
+
+    CHECK_FALSE(result.empty());
+    // Relative path must be resolved to an absolute path containing the input suffix
+    CHECK(result.find("relative/path.cpp") != std::string::npos);
+    CHECK(std::filesystem::path{result}.is_absolute());
+}

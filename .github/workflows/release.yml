@@ -98,10 +98,6 @@ jobs:
             os: macos-latest
             artifact: macos_arm64
             archive_ext: tar.gz
-          - name: macos-x86_64
-            os: macos-13
-            artifact: macos_x86_64
-            archive_ext: tar.gz
           - name: windows-x86_64
             os: windows-latest
             artifact: windows_x86_64
