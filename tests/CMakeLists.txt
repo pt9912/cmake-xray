@@ -21,6 +21,10 @@ target_link_libraries(
         xray_adapters
 )
 
+if(MSVC)
+    target_compile_options(xray_tests PRIVATE /FI"ostream")
+endif()
+
 find_library(CAP_LIBRARY cap)
 if(CAP_LIBRARY)
     target_link_libraries(xray_tests PRIVATE cap)
