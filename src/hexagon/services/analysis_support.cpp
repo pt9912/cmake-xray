@@ -54,7 +54,7 @@ bool path_is_within(const std::filesystem::path& path, const std::filesystem::pa
 
 std::filesystem::path resolve_path(const std::filesystem::path& base, std::string_view candidate) {
     const std::filesystem::path candidate_path{candidate};
-    if (candidate_path.is_absolute()) return candidate_path.lexically_normal();
+    if (candidate_path.has_root_directory()) return candidate_path.lexically_normal();
     return (base / candidate_path).lexically_normal();
 }
 
@@ -338,8 +338,9 @@ std::string normalize_path(const std::filesystem::path& path) {
 std::string make_display_path(const std::string& normalized_path,
                               const std::filesystem::path& base_directory) {
     const auto absolute_path = std::filesystem::path{normalized_path}.lexically_normal();
-    const auto absolute_base =
-        std::filesystem::absolute(base_directory).lexically_normal();
+    const auto absolute_base = base_directory.has_root_directory()
+                                   ? base_directory.lexically_normal()
+                                   : std::filesystem::absolute(base_directory).lexically_normal();
 
     if (path_is_within(absolute_path, absolute_base)) {
         return absolute_path.lexically_relative(absolute_base).generic_string();
