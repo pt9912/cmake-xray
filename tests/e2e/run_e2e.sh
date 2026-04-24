@@ -3,11 +3,20 @@
 # Usage: run_e2e.sh <binary> <testdata_dir>
 set -euo pipefail
 
-# Prevent MSYS2/Git Bash from converting Unix-style paths in arguments
+# Prevent MSYS2/Git Bash from converting Unix-style paths in CLI arguments
 # (e.g. /project/src/main.cpp → C:/Program Files/Git/project/src/main.cpp).
-# Only suppress for the cmake-xray binary; shell builtins like mktemp still
-# need normal MSYS2 path translation.
-export MSYS2_ARG_CONV_EXCL="$1"
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL="*"
+
+# On MSYS2/Git Bash, convert a POSIX path to a native Windows path.
+# On other platforms, return the path unchanged.
+native_path() {
+    if command -v cygpath >/dev/null 2>&1; then
+        cygpath -m "$1"
+    else
+        printf '%s' "$1"
+    fi
+}
 
 BINARY="$1"
 TESTDATA="$2"
@@ -207,7 +216,7 @@ assert_stdout_equals_file "M4 mixed-path direct impact markdown matches golden" 
     "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file /project/src/main.cpp --format markdown
 
 # Markdown file output
-report_dir="$(mktemp -d)"
+report_dir="$(native_path "$(mktemp -d)")"
 report_file="$report_dir/analyze.md"
 assert_exit "markdown output file exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --format markdown --output "$report_file" --top 2
 if [ -f "$report_file" ]; then
@@ -253,7 +262,7 @@ else
     failures=$((failures + 1))
 fi
 
-permute_dir="$(mktemp -d)"
+permute_dir="$(native_path "$(mktemp -d)")"
 cp -R tests/e2e/testdata/m2/basic_project/. "$permute_dir/"
 baseline_markdown=$("$BINARY" analyze --compile-commands "$permute_dir/compile_commands.json" --format markdown --top 2 2>/dev/null) || true
 cp tests/e2e/testdata/m2/permuted_compile_commands/compile_commands.json "$permute_dir/compile_commands.json"
