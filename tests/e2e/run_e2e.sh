@@ -13,31 +13,45 @@ TESTDATA="$2"
 failures=0
 REPO_ROOT="$(cd "$TESTDATA/../../.." && pwd)"
 
+normalize_line_endings() {
+    tr -d '\r' < "$1"
+}
+
 assert_stdout_equals_file() {
     local description="$1" expected_file="$2"
     shift 2
-    local actual_file
+    local actual_file actual_clean expected_clean
     actual_file="$(mktemp)"
+    actual_clean="$(mktemp)"
+    expected_clean="$(mktemp)"
     "$@" >"$actual_file" 2>/dev/null || true
-    if cmp -s "$actual_file" "$expected_file"; then
+    normalize_line_endings "$actual_file" > "$actual_clean"
+    normalize_line_endings "$expected_file" > "$expected_clean"
+    if cmp -s "$actual_clean" "$expected_clean"; then
         echo "PASS: $description"
     else
         echo "FAIL: $description — stdout differed from $expected_file" >&2
-        diff -u "$expected_file" "$actual_file" >&2 || true
+        diff -u "$expected_clean" "$actual_clean" >&2 || true
         failures=$((failures + 1))
     fi
-    rm -f "$actual_file"
+    rm -f "$actual_file" "$actual_clean" "$expected_clean"
 }
 
 assert_file_equals() {
     local description="$1" actual_file="$2" expected_file="$3"
-    if cmp -s "$actual_file" "$expected_file"; then
+    local actual_clean expected_clean
+    actual_clean="$(mktemp)"
+    expected_clean="$(mktemp)"
+    normalize_line_endings "$actual_file" > "$actual_clean"
+    normalize_line_endings "$expected_file" > "$expected_clean"
+    if cmp -s "$actual_clean" "$expected_clean"; then
         echo "PASS: $description"
     else
         echo "FAIL: $description — file differed from $expected_file" >&2
-        diff -u "$expected_file" "$actual_file" >&2 || true
+        diff -u "$expected_clean" "$actual_clean" >&2 || true
         failures=$((failures + 1))
     fi
+    rm -f "$actual_clean" "$expected_clean"
 }
 
 assert_exit() {
