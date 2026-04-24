@@ -567,6 +567,16 @@ TEST_CASE_FIXTURE(CliFixture, "file api only impact resolves changed file via so
     CHECK(err.str().empty());
 }
 
+TEST_CASE_FIXTURE(CliFixture, "file api only impact accepts reply directory directly") {
+    const auto reply_path = fixture_path("m4/file_api_only/build/.cmake/api/v1/reply");
+
+    REQUIRE(run({"impact", "--cmake-file-api", reply_path.c_str(), "--changed-file",
+                 "src/main.cpp"}) == ExitCode::success);
+    CHECK(out.str().find("impact analysis") != std::string::npos);
+    CHECK(out.str().find("main.cpp") != std::string::npos);
+    CHECK(err.str().empty());
+}
+
 TEST_CASE_FIXTURE(CliFixture, "mixed path analyze enriches compile database with file api targets") {
     const auto compile_commands = fixture_path("m4/partial_targets/compile_commands.json");
     const auto file_api_path = fixture_path("m4/partial_targets/build");
@@ -590,6 +600,23 @@ TEST_CASE_FIXTURE(CliFixture, "mixed path impact enriches compile database with 
     CHECK(out.str().find("observation source: exact") != std::string::npos);
     CHECK(out.str().find("affected targets:") != std::string::npos);
     CHECK(out.str().find("directly affected targets") != std::string::npos);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "mixed path impact hits target with absolute changed file") {
+    const auto compile_commands = fixture_path("m4/partial_targets/compile_commands.json");
+    const auto file_api_path = fixture_path("m4/partial_targets/build");
+
+    REQUIRE(run({"impact", "--compile-commands", compile_commands.c_str(), "--cmake-file-api",
+                 file_api_path.c_str(), "--changed-file", "/project/src/main.cpp"}) ==
+            ExitCode::success);
+    CHECK(out.str().find("affected translation units: 1") != std::string::npos);
+    CHECK(out.str().find("observation source: exact") != std::string::npos);
+    CHECK(out.str().find("target metadata: partial") != std::string::npos);
+    CHECK(out.str().find("affected targets: 1") != std::string::npos);
+    CHECK(out.str().find("[targets: app]") != std::string::npos);
+    CHECK(out.str().find("[direct]") != std::string::npos);
+    CHECK(out.str().find("app [type: EXECUTABLE]") != std::string::npos);
     CHECK(err.str().empty());
 }
 

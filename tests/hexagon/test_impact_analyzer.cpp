@@ -618,6 +618,124 @@ TEST_CASE("impact analyzer propagates file api error in mixed path") {
     CHECK(result.compile_database.error() == CompileDatabaseError::file_api_not_accessible);
 }
 
+TEST_CASE("impact analyzer resolves relative changed file via source root in file-api-only path") {
+    class FileApiPort final : public xray::hexagon::ports::driven::BuildModelPort {
+    public:
+        xray::hexagon::model::BuildModelResult load_build_model(
+            std::string_view /*path*/) const override {
+            xray::hexagon::model::BuildModelResult result;
+            result.source = ObservationSource::derived;
+            result.target_metadata = TargetMetadataStatus::loaded;
+            result.source_root = "/project";
+            result.compile_database = CompileDatabaseResult{
+                CompileDatabaseError::none, {},
+                {
+                    CompileEntry::from_arguments(
+                        "/project/src/main.cpp", "/project/build/app",
+                        {"clang++", "-I/project/include", "-c", "/project/src/main.cpp"}),
+                    CompileEntry::from_arguments(
+                        "/project/src/core.cpp", "/project/build/lib",
+                        {"clang++", "-I/project/include", "-c", "/project/src/core.cpp"}),
+                },
+                {}};
+            result.target_assignments = {
+                {"/project/src/main.cpp|/project/build/app",
+                 {{"myapp", "EXECUTABLE", "myapp::EXECUTABLE"}}},
+                {"/project/src/core.cpp|/project/build/lib",
+                 {{"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"}}},
+            };
+            return result;
+        }
+    };
+
+    class DirectIncludeResolver final : public xray::hexagon::ports::driven::IncludeResolverPort {
+    public:
+        IncludeResolutionResult resolve_includes(
+            const std::vector<xray::hexagon::model::TranslationUnitObservation>&) const override {
+            return {};
+        }
+    };
+
+    const UnusedBuildModelPort compile_db_port;
+    const FileApiPort file_api_port;
+    const DirectIncludeResolver include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_db_port, include_resolver_port,
+                                                           file_api_port};
+
+    // Relative path "src/main.cpp" must resolve against source_root "/project"
+    const auto result =
+        analyzer.analyze_impact("", "src/main.cpp", "/tmp/build");
+
+    CHECK(result.observation_source == ObservationSource::derived);
+    CHECK(result.changed_file == "src/main.cpp");
+    CHECK_FALSE(result.heuristic);
+    REQUIRE(result.affected_translation_units.size() == 1);
+    CHECK(result.affected_translation_units[0].kind == ImpactKind::direct);
+    CHECK(result.affected_translation_units[0].reference.source_path == "src/main.cpp");
+    REQUIRE(result.affected_translation_units[0].targets.size() == 1);
+    CHECK(result.affected_translation_units[0].targets[0].display_name == "myapp");
+    REQUIRE(result.affected_targets.size() == 1);
+    CHECK(result.affected_targets[0].target.display_name == "myapp");
+    CHECK(result.affected_targets[0].classification == TargetImpactClassification::direct);
+}
+
+TEST_CASE("impact analyzer resolves relative changed file via compile database directory in mixed path") {
+    // Compile DB at /project/compile_commands.json → base directory is /project
+    // Entries use absolute paths /project/src/*.cpp
+    // File API provides target assignments
+    // Relative changed_path "src/main.cpp" must resolve to /project/src/main.cpp
+
+    class MixedFileApiPort final : public xray::hexagon::ports::driven::BuildModelPort {
+    public:
+        xray::hexagon::model::BuildModelResult load_build_model(
+            std::string_view /*path*/) const override {
+            xray::hexagon::model::BuildModelResult result;
+            result.source = ObservationSource::derived;
+            result.target_metadata = TargetMetadataStatus::loaded;
+            result.source_root = "/project";
+            result.compile_database = CompileDatabaseResult{
+                CompileDatabaseError::none, {},
+                {CompileEntry::from_arguments(
+                    "/project/src/main.cpp", "/project/build/debug",
+                    {"clang++", "-c", "/project/src/main.cpp"})},
+                {}};
+            result.target_assignments = {
+                {"/project/src/main.cpp|/project/build/debug",
+                 {{"myapp", "EXECUTABLE", "myapp::EXECUTABLE"}}},
+                {"/project/src/core.cpp|/project/build/core",
+                 {{"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"}}},
+            };
+            return result;
+        }
+    };
+
+    const StubBuildModelPort compile_db_port;
+    const MixedFileApiPort file_api_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_db_port, include_resolver_port,
+                                                           file_api_port};
+
+    // Relative path "src/main.cpp" must resolve against /tmp (parent of /tmp/compile_commands.json)
+    // StubBuildModelPort entries use absolute paths /project/src/main.cpp
+    // Since /tmp/src/main.cpp != /project/src/main.cpp, we need a path that resolves correctly.
+    // Use /project/compile_commands.json so base = /project, then "src/main.cpp" → /project/src/main.cpp
+    const auto result =
+        analyzer.analyze_impact("/project/compile_commands.json", "src/main.cpp", "/tmp/build");
+
+    CHECK(result.observation_source == ObservationSource::exact);
+    CHECK(result.target_metadata == TargetMetadataStatus::loaded);
+    CHECK(result.changed_file == "src/main.cpp");
+    CHECK_FALSE(result.heuristic);
+    // Direct match on both duplicate observations (debug and release) from StubBuildModelPort
+    REQUIRE(result.affected_translation_units.size() == 2);
+    CHECK(result.affected_translation_units[0].kind == ImpactKind::direct);
+    CHECK(result.affected_translation_units[1].kind == ImpactKind::direct);
+    // File API target is attached via filtered assignment
+    REQUIRE(result.affected_targets.size() == 1);
+    CHECK(result.affected_targets[0].target.display_name == "myapp");
+    CHECK(result.affected_targets[0].classification == TargetImpactClassification::direct);
+}
+
 TEST_CASE("impact analyzer sorts affected targets deterministically") {
     class MultiTargetBuildModelPort final : public xray::hexagon::ports::driven::BuildModelPort {
     public:

@@ -1,0 +1,19 @@
+observation source: derived
+target metadata: loaded
+translation units with target mapping: 3 of 3
+translation unit ranking
+based on metrics: arg_count + include_path_count + define_count
+top 3 of 3 translation units
+1. src/shared.cpp [directory: build] [targets: app, core]
+   arg_count=6 include_path_count=1 define_count=1
+   warning: cannot read source file for include analysis: src/shared.cpp
+2. src/main.cpp [directory: build] [targets: app]
+   arg_count=5 include_path_count=1 define_count=0
+   warning: cannot read source file for include analysis: src/main.cpp
+3. src/shared.cpp [directory: build] [targets: app, core]
+   arg_count=5 include_path_count=1 define_count=0
+   warning: cannot read source file for include analysis: src/shared.cpp
+
+include hotspots [heuristic]
+no include hotspots found
+note: include-based results are heuristic; conditional or generated includes may be missing

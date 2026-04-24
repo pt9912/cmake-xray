@@ -136,6 +136,54 @@ assert_exit "M3 top-limit analyze markdown exits 0" 0 "$BINARY" analyze --compil
 assert_stdout_equals_file "M3 top-limit analyze markdown matches golden" tests/e2e/testdata/m3/report_top_limit/analyze-markdown.md \
     "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_top_limit/compile_commands.json --format markdown --top 1
 
+# M4 golden outputs: file-api-only analyze
+assert_exit "M4 file-api-only analyze console exits 0" 0 "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/file_api_only/build
+assert_stdout_equals_file "M4 file-api-only analyze console matches golden" tests/e2e/testdata/m4/file_api_only/analyze-console.txt \
+    "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/file_api_only/build
+assert_exit "M4 file-api-only analyze markdown exits 0" 0 "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --format markdown
+assert_stdout_equals_file "M4 file-api-only analyze markdown matches golden" tests/e2e/testdata/m4/file_api_only/analyze-markdown.md \
+    "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --format markdown
+
+# M4 golden outputs: file-api-only impact
+assert_exit "M4 file-api-only impact console exits 0" 0 "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file include/common/config.h
+assert_stdout_equals_file "M4 file-api-only impact console matches golden" tests/e2e/testdata/m4/file_api_only/impact-console.txt \
+    "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file include/common/config.h
+assert_exit "M4 file-api-only impact markdown exits 0" 0 "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file include/common/config.h --format markdown
+assert_stdout_equals_file "M4 file-api-only impact markdown matches golden" tests/e2e/testdata/m4/file_api_only/impact-markdown.md \
+    "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file include/common/config.h --format markdown
+
+# M4 golden outputs: multi-target analyze
+assert_exit "M4 multi-target analyze console exits 0" 0 "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/multi_target/build
+assert_stdout_equals_file "M4 multi-target analyze console matches golden" tests/e2e/testdata/m4/multi_target/analyze-console.txt \
+    "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/multi_target/build
+assert_exit "M4 multi-target analyze markdown exits 0" 0 "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/multi_target/build --format markdown
+assert_stdout_equals_file "M4 multi-target analyze markdown matches golden" tests/e2e/testdata/m4/multi_target/analyze-markdown.md \
+    "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/multi_target/build --format markdown
+
+# M4 golden outputs: mixed-path analyze with partial targets
+assert_exit "M4 mixed-path analyze console exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build
+assert_stdout_equals_file "M4 mixed-path analyze console matches golden" tests/e2e/testdata/m4/partial_targets/analyze-console.txt \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build
+assert_exit "M4 mixed-path analyze markdown exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --format markdown
+assert_stdout_equals_file "M4 mixed-path analyze markdown matches golden" tests/e2e/testdata/m4/partial_targets/analyze-markdown.md \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --format markdown
+
+# M4 golden outputs: mixed-path impact with partial targets (relative path, no hit)
+assert_exit "M4 mixed-path impact console exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file src/main.cpp
+assert_stdout_equals_file "M4 mixed-path impact console matches golden" tests/e2e/testdata/m4/partial_targets/impact-console.txt \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file src/main.cpp
+assert_exit "M4 mixed-path impact markdown exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file src/main.cpp --format markdown
+assert_stdout_equals_file "M4 mixed-path impact markdown matches golden" tests/e2e/testdata/m4/partial_targets/impact-markdown.md \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file src/main.cpp --format markdown
+
+# M4 golden outputs: mixed-path impact with actual target hit (absolute path)
+assert_exit "M4 mixed-path direct impact console exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file /project/src/main.cpp
+assert_stdout_equals_file "M4 mixed-path direct impact console matches golden" tests/e2e/testdata/m4/partial_targets/impact-direct-console.txt \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file /project/src/main.cpp
+assert_exit "M4 mixed-path direct impact markdown exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file /project/src/main.cpp --format markdown
+assert_stdout_equals_file "M4 mixed-path direct impact markdown matches golden" tests/e2e/testdata/m4/partial_targets/impact-direct-markdown.md \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file /project/src/main.cpp --format markdown
+
 # Markdown file output
 report_dir="$(mktemp -d)"
 report_file="$report_dir/analyze.md"

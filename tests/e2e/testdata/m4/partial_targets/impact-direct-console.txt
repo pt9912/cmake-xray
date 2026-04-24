@@ -1,0 +1,13 @@
+impact analysis for /project/src/main.cpp
+affected translation units: 1
+observation source: exact
+target metadata: partial
+affected targets: 1
+  /project/src/main.cpp [directory: /project/build] [targets: app] [direct]
+
+directly affected targets
+- app [type: EXECUTABLE]
+
+heuristically affected targets
+no heuristically affected targets
+note: 1 of 2 targets have no compilable sources and are not included in the analysis

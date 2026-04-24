@@ -1,0 +1,14 @@
+observation source: exact
+target metadata: partial
+translation units with target mapping: 1 of 1
+translation unit ranking
+based on metrics: arg_count + include_path_count + define_count
+top 1 of 1 translation units
+1. /project/src/main.cpp [directory: /project/build] [targets: app]
+   arg_count=5 include_path_count=1 define_count=0
+   warning: cannot read source file for include analysis: /project/src/main.cpp
+
+include hotspots [heuristic]
+no include hotspots found
+note: 1 of 2 targets have no compilable sources and are not included in the analysis
+note: include-based results are heuristic; conditional or generated includes may be missing

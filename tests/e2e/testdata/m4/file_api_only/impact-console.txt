@@ -1,0 +1,15 @@
+impact analysis for include/common/config.h [heuristic]
+affected translation units: 0
+observation source: derived
+target metadata: loaded
+affected targets: 0
+
+directly affected targets
+no directly affected targets
+
+heuristically affected targets
+no heuristically affected targets
+warning: cannot read source file for include analysis: src/core.cpp
+warning: cannot read source file for include analysis: src/main.cpp
+note: conditional or generated includes may be missing from this result
+note: the file was not present in the loaded compile database or resolved include graph
