@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [1.1.0] - 2026-04-24
+
+### Added
+
 - CMake File API as second primary input source via `--cmake-file-api <path>` for `analyze` and `impact` (`F-05`, `S-02`)
 - `CmakeFileApiAdapter` for reading CMake File API v1 reply data with target extraction, compile group synthesis, and multi-target support
 - `BuildModelPort` as unified driven port replacing the former `CompileDatabasePort` and `TargetMetadataPort` separation

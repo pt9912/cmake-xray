@@ -2,7 +2,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt die Referenzumgebung, die versionierten Referenzprojekte und die gemessene M3-Baseline fuer `cmake-xray` im MVP-Stand `v1.0.0`.
+Dieses Dokument beschreibt die Referenzumgebung, die versionierten Referenzprojekte und die gemessene M3-Baseline fuer `cmake-xray`. Die Baseline wurde im MVP-Stand `v1.0.0` erhoben und gilt unveraendert fuer `v1.1.0`, da der bestehende Compile-Database-Pfad rueckwaertskompatibel geblieben ist. Der neue File-API-Pfad hat laut Plan-M4 keine eigene Performance-Baseline; diese wird im ersten Folge-Meilenstein eingefuehrt.
 
 ## Referenzdaten
 

@@ -5,9 +5,9 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M4 `cmake-xray` |
-| Version | `0.1` |
-| Stand | `2026-04-22` |
-| Status | Entwurf |
+| Version | `1.0` |
+| Stand | `2026-04-24` |
+| Status | Abgeschlossen |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M3](./plan-M3.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
 
 ### 0.1 Zweck
