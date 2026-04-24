@@ -21,7 +21,8 @@ target_link_libraries(
         xray_adapters
 )
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+find_library(CAP_LIBRARY cap)
+if(CAP_LIBRARY)
     target_link_libraries(xray_tests PRIVATE cap)
     target_compile_definitions(xray_tests PRIVATE XRAY_HAS_LIBCAP)
 endif()
