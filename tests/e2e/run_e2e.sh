@@ -4,9 +4,10 @@
 set -euo pipefail
 
 # Prevent MSYS2/Git Bash from converting Unix-style paths in arguments
-# (e.g. /project/src/main.cpp → C:/Program Files/Git/project/src/main.cpp)
-export MSYS_NO_PATHCONV=1
-export MSYS2_ARG_CONV_EXCL="*"
+# (e.g. /project/src/main.cpp → C:/Program Files/Git/project/src/main.cpp).
+# Only suppress for the cmake-xray binary; shell builtins like mktemp still
+# need normal MSYS2 path translation.
+export MSYS2_ARG_CONV_EXCL="$1"
 
 BINARY="$1"
 TESTDATA="$2"
