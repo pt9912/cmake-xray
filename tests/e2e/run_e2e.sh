@@ -3,6 +3,11 @@
 # Usage: run_e2e.sh <binary> <testdata_dir>
 set -euo pipefail
 
+# Prevent MSYS2/Git Bash from converting Unix-style paths in arguments
+# (e.g. /project/src/main.cpp → C:/Program Files/Git/project/src/main.cpp)
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL="*"
+
 BINARY="$1"
 TESTDATA="$2"
 failures=0

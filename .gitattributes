@@ -1,0 +1,3 @@
+# Enforce LF line endings for all text files so that golden-file
+# comparisons produce identical results on every platform.
+* text=auto eol=lf
