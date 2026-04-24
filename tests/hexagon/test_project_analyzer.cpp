@@ -161,7 +161,7 @@ TEST_CASE("project analyzer builds ranked translation units and hotspots") {
     const auto result = analyzer.analyze_project({"/tmp/compile_commands.json", ""});
 
     CHECK(result.application.name == std::string_view{"cmake-xray"});
-    CHECK(result.application.version == std::string_view{"v1.0.0"});
+    CHECK(result.application.version == std::string_view{"v1.1.0"});
     CHECK(result.compile_database.is_success());
     CHECK(result.compile_database_path == "/tmp/compile_commands.json");
     CHECK(result.observation_source == ObservationSource::exact);

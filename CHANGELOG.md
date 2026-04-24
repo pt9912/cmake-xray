@@ -9,7 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- CMake File API as second primary input source via `--cmake-file-api <path>` for `analyze` and `impact` (`F-05`, `S-02`)
+- `CmakeFileApiAdapter` for reading CMake File API v1 reply data with target extraction, compile group synthesis, and multi-target support
+- `BuildModelPort` as unified driven port replacing the former `CompileDatabasePort` and `TargetMetadataPort` separation
+- target-to-translation-unit assignment model with `TargetInfo`, `TargetAssignment`, and observation-key-based matching across adapters
+- `ObservationSource` (`exact`/`derived`) and `TargetMetadataStatus` (`not_loaded`/`loaded`/`partial`) metadata on analysis and impact results
+- target-aware `analyze` output: target suffixes `[targets: app, core]` on translation units and hotspots when file API data is loaded
+- target-aware `impact` output: `directly affected targets` and `heuristically affected targets` sections with evidence-based classification (`F-19`, `F-24`)
+- `analyze` and `impact` can run without `compile_commands.json` when file API data provides sufficient observations
+- mixed-path support: when both `compile_commands.json` and file API are provided, the compile database remains the authoritative `exact` source; the file API enriches matching observations with target context
+- diagnostics for partial target coverage, unmatched file API observations, and missing target metadata
+- exit code `3` for inaccessible explicit `--cmake-file-api` paths and `4` for invalid or structurally insufficient reply data
+- relative `--changed-file` paths in file-API-only mode resolve against the codemodel source root
+- 26 test fixtures under `tests/e2e/testdata/m4/` covering valid, partial, multi-target, permuted, and error scenarios
+- M4 golden output files for byte-exact E2E regression testing of file-api-only, multi-target, and mixed-path reports
+- unit tests for relative path resolution via source root (file-API-only) and compile database directory (mixed path) with target attachment
+- curated target-aware example outputs under `docs/examples/`
+
 ### Changed
+
+- `AnalysisResult` and `ImpactResult` now carry `observation_source`, `target_metadata`, `target_assignments`, and `affected_targets` fields
+- `RankedTranslationUnit` and `ImpactedTranslationUnit` now carry a `targets` vector for target-aware reporting
+- console and markdown reporters show `observation source: exact|derived` and `target metadata: loaded|partial` when file API data is involved
+- `impact` markdown report includes `## Directly Affected Targets` and `## Heuristically Affected Targets` sections before diagnostics
+- application and project version bumped to `1.1.0`
+- README updated with file API usage examples, target-aware impact documentation, and new example references
+- release verification checklist extended with file API smoke tests
 
 ### Fixed
 

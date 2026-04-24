@@ -19,7 +19,7 @@ Vor einem Release:
 - noch nicht veroeffentlichte Aenderungen bleiben unter `## [Unreleased]` in `CHANGELOG.md`; ein datierter Versionsabschnitt wird erst fuer den finalen Release-Commit angelegt
 - `CHANGELOG.md` auf den Zielstand bringen
 - betroffene Plan-, Status- und Nutzungsdokumente aktualisieren
-- kuratierte Beispielausgaben unter `docs/examples/` aus den kanonischen M3-Fixtures regenerieren, falls sich Report-Inhalt oder -Layout geaendert hat
+- kuratierte Beispielausgaben unter `docs/examples/` aus den kanonischen M3- und M4-Fixtures regenerieren, falls sich Report-Inhalt oder -Layout geaendert hat
 - bei Aenderungen am Analyse- oder Report-Pfad die Performance-Artefakte unter `build/reports/performance/` und `docs/performance.md` aktualisieren
 - sicherstellen, dass nur beabsichtigte Dateien fuer den Release-Commit vorgemerkt sind
 - falls Release-Artefakte mit veroefentlicht werden sollen, `./release-assets/` vorbereiten
@@ -41,6 +41,23 @@ docker run --rm \
 docker run --rm \
   -v "$PWD/tests/e2e/testdata/m3:/data:ro" \
   cmake-xray impact --compile-commands /data/report_impact_header/compile_commands.json --changed-file include/common/config.h --format markdown
+```
+
+Ab `v1.1.0` zusaetzlich die File-API-Pfade pruefen:
+
+```bash
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata/m4:/data:ro" \
+  cmake-xray analyze --cmake-file-api /data/file_api_only/build
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata/m4:/data:ro" \
+  cmake-xray analyze --cmake-file-api /data/multi_target/build --format markdown
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata/m4:/data:ro" \
+  cmake-xray impact --cmake-file-api /data/file_api_only/build --changed-file include/common/config.h
+docker run --rm \
+  -v "$PWD/tests/e2e/testdata/m4:/data:ro" \
+  cmake-xray analyze --compile-commands /data/partial_targets/compile_commands.json --cmake-file-api /data/partial_targets/build
 ```
 
 Optional koennen die Reports separat ausgegeben werden:
@@ -124,4 +141,5 @@ Falls kein Asset-Upload erforderlich ist, koennen die `./release-assets/*`-Argum
 - Der `coverage`-Stage dient dem Report; das eigentliche Build-Gate fuer Mindestabdeckung liegt in `coverage-check`.
 - Der `quality`-Stage dient dem Report; das eigentliche Build-Gate fuer statische Analyse und Metriken liegt in `quality-check`.
 - Fuer `v1.0.0` gehoeren Markdown-Smoke-Tests, Golden-Output-Konsistenz, `docs/examples/` und `docs/performance.md` zum Release-Check.
+- Ab `v1.1.0` gehoeren zusaetzlich die File-API-Smoke-Tests, die M4-Golden-Output-Konsistenz unter `tests/e2e/testdata/m4/` und die Target-Beispiele unter `docs/examples/` zum Release-Check.
 - Fuer regulare Releases soll das Container-Image zusaetzlich als `latest` veroeffentlicht werden; Vorabversionen mit Suffix wie `-rc1` bleiben auf ihren Versions-Tag beschraenkt.
