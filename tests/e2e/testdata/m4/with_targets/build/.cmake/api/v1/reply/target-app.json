@@ -1,0 +1,26 @@
+{
+  "name": "app",
+  "id": "app::@1234",
+  "type": "EXECUTABLE",
+  "paths": {"source": ".", "build": "app"},
+  "sources": [
+    {
+      "path": "src/app/main.cpp",
+      "compileGroupIndex": 0
+    }
+  ],
+  "compileGroups": [
+    {
+      "sourceIndexes": [0],
+      "language": "CXX",
+      "includes": [
+        {"path": "../../include", "isSystem": false},
+        {"path": "../../src", "isSystem": false}
+      ],
+      "defines": [
+        {"define": "APP=1"}
+      ],
+      "compileCommandFragments": []
+    }
+  ]
+}

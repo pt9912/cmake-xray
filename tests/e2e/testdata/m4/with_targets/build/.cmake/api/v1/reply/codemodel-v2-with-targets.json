@@ -1,0 +1,55 @@
+{
+  "kind": "codemodel",
+  "version": {
+    "major": 2,
+    "minor": 6
+  },
+  "paths": {
+    "source": "tests/e2e/testdata/m4/with_targets",
+    "build": "tests/e2e/testdata/m4/with_targets/build"
+  },
+  "configurations": [
+    {
+      "name": "",
+      "directories": [
+        {
+          "source": ".",
+          "build": ".",
+          "projectIndex": 0,
+          "childIndexes": [],
+          "targetIndexes": [0, 1, 2]
+        }
+      ],
+      "projects": [
+        {
+          "name": "with_targets",
+          "directoryIndexes": [0],
+          "targetIndexes": [0, 1, 2]
+        }
+      ],
+      "targets": [
+        {
+          "name": "app",
+          "id": "app::@1234",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-app.json"
+        },
+        {
+          "name": "core",
+          "id": "core::@5678",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-core.json"
+        },
+        {
+          "name": "tool",
+          "id": "tool::@9abc",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-tool.json"
+        }
+      ]
+    }
+  ]
+}

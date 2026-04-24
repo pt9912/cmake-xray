@@ -1,0 +1,34 @@
+[
+  {
+    "directory": "build/app",
+    "arguments": [
+      "clang++",
+      "-I../../include",
+      "-iquote../../src",
+      "-DAPP=1",
+      "-c",
+      "../../src/app/main.cpp",
+      "-o",
+      "main.o"
+    ],
+    "file": "../../src/app/main.cpp"
+  },
+  {
+    "directory": "build/lib",
+    "command": "clang++ -I../../include -c ../../src/lib/core.cpp -o core.o",
+    "file": "../../src/lib/core.cpp"
+  },
+  {
+    "directory": "build/tools",
+    "arguments": [
+      "clang++",
+      "-I../../include",
+      "-DTOOL=1",
+      "-c",
+      "../../src/tools/tool.cpp",
+      "-o",
+      "tool.o"
+    ],
+    "file": "../../src/tools/tool.cpp"
+  }
+]
