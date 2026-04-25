@@ -38,6 +38,7 @@ Wichtig:
 - `JsonReportAdapter` importiert `xray::hexagon::model::kReportFormatVersion` aus AP 1.1; eine zweite Formatversionskonstante im Adapter, Schema-Generator oder Testcode ist nicht zulaessig
 - `docs/report-json.schema.json` darf `format_version` mit `const: 1` absichern, aber dieser Schema-Wert muss in einem CTest-Gate gegen `xray::hexagon::model::kReportFormatVersion` geprueft werden; ein Schema-Wert, der von der C++-Konstante abweicht, laesst AP 1.2 fehlschlagen
 - CLI-Parser-/Verwendungsfehler, zum Beispiel fehlende Pflichtoptionen oder unbekannte Optionen, bleiben Textfehler auf `stderr` und erzeugen kein JSON-Fehlerobjekt
+- Nicht wiederherstellbare Eingabefehler vor Reporterzeugung, zum Beispiel nicht vorhandene Eingabedateien, ungueltige `compile_commands.json`-Dateien oder ungueltige CMake-File-API-Reply-Verzeichnisse, bleiben fuer `--format json` Textfehler auf `stderr`, liefern Exit-Code ungleich `0` und erzeugen kein JSON-Fehlerobjekt
 - Service-Ergebnisse mit Diagnostics oder Teildaten werden als regulaere JSON-Reports mit `diagnostics` ausgegeben; erfolgreiche Reporterzeugung bleibt Exit-Code `0`, sofern die bestehende CLI-Semantik fuer diese Serviceergebnisse nicht bereits Fehlercodes vorsieht
 - Schreib-, Render- und Output-Fehler bei `--format json` liefern Textfehler auf `stderr`, Exit-Code ungleich `0` und kein partielles JSON auf stdout; bei `--output` bleibt eine bestehende Zieldatei unveraendert
 - JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
@@ -48,7 +49,8 @@ Wichtig:
 - Pfade werden als Anzeige-Strings ausgegeben; kanonische Normalisierungsschluessel duerfen nur aufgenommen werden, wenn sie keinen instabilen Hostbezug in Goldens einfuehren
 - `docs/report-json.md` ist der verbindliche lesbare M5-Vertrag und dokumentiert fuer alle Felder Typ, Pflichtstatus, erlaubte Enum-Werte, Nullability, leere-Array-Regeln und Aenderungsregeln fuer kuenftige `format_version`-Erhoehungen; zusaetzlich entsteht ein maschinenlesbares Schema-Artefakt `docs/report-json.schema.json`, gegen das Golden-Outputs validiert werden
 - `docs/report-json.schema.json` verwendet JSON Schema Draft 2020-12 und enthaelt `$schema: "https://json-schema.org/draft/2020-12/schema"`
-- Schema-Validierung erfolgt ueber ein repository-lokales Python-Testskript mit der Python-Bibliothek `jsonschema`; die Dependency wird in `tests/requirements-json-schema.txt` mit Version-Pin dokumentiert, CI installiert diese Requirements vor `ctest`, und lokale CTest-Laeufe schlagen mit klarer Installationsanweisung fehl, wenn der Validator fehlt
+- Schema-Validierung erfolgt ueber ein repository-lokales Python-Testskript mit der Python-Bibliothek `jsonschema`; die Dependency wird in `tests/requirements-json-schema.txt` mit Version-Pin dokumentiert, CI installiert diese Requirements vor jedem `ctest`-Pfad, und lokale CTest-Laeufe schlagen mit klarer Installationsanweisung fehl, wenn der Validator fehlt
+- Die Validator-Bootstrap-Strategie deckt alle M5-Testwege ab: Docker-Test-Image, Docker-Coverage-Image, native Build-Matrix und Release-Matrix. Entweder installiert jeder dieser Wege `tests/requirements-json-schema.txt` vor `ctest`, oder CMake/CTest stellt eine gemeinsame Bootstrap-Schicht bereit, die in allen Wegen genutzt wird.
 - `docs/report-json.md` und `docs/report-json.schema.json` entstehen vor oder im selben Umsetzungsschritt wie `JsonReportAdapter`; der Adapter darf nicht ohne verbindlichen Item-Vertrag fuer Ranking-, Hotspot-, Diagnostic-, Translation-Unit- und Target-Objekte landen
 - Der Item-Vertrag legt Pflichtkeys, optionale Keys, Enum-Schreibweisen, numerische Typen und deterministische Sortier-Tie-Breaker fest; Adaptertests pruefen exakte Keys und mindestens einen Tie-Breaker pro sortierter Item-Liste
 - Tests pruefen nicht nur syntaktisch gueltiges JSON, sondern auch Pflichtfelder, Array-statt-Weglassen-Regeln, numerische Typen, bekannte Enum-Werte und `null` nur an dokumentierten Stellen
@@ -64,7 +66,9 @@ Vorgesehene Artefakte:
 - `src/main.cpp` fuer die Composition-Root-Verdrahtung des JSON-Adapters
 - `src/adapters/CMakeLists.txt`
 - `tests/CMakeLists.txt`
-- `.github/workflows/build.yml` fuer die Installation der JSON-Schema-Testrequirements vor `ctest`, sofern keine CMake-/CTest-seitige Bootstrap-Strategie umgesetzt wird
+- `Dockerfile` fuer Docker-Test-, Coverage- und Coverage-Check-Targets, die `ctest` ausfuehren
+- `.github/workflows/test.yml` fuer die Docker-Test- und Coverage-Pfade
+- `.github/workflows/build.yml` fuer die native Build-Matrix
 - `.github/workflows/release.yml`, falls Release-Smokes oder Release-CTest-Laeufe den JSON-Schema-Validator ausfuehren
 - `tests/adapters/test_json_report_adapter.cpp`
 - `tests/adapters/test_port_wiring.cpp`
@@ -82,7 +86,8 @@ Vorgesehene Artefakte:
 - CLI-/E2E-Tests, dass erfolgreiche `--format json`-Aufrufe ohne `--output` gueltiges JSON auf stdout und leeres stderr liefern
 - CLI-/E2E-Tests, dass erfolgreiche `--format json --output <path>`-Aufrufe gueltiges JSON in die Datei schreiben sowie stdout und stderr leer lassen
 - CLI-/E2E-Tests pruefen, dass `--format json` nicht mehr den AP-1.1-Fehler `recognized but not implemented` liefert
-- CLI-/E2E-Tests fuer Fehlerpfade: Parser-/Verwendungsfehler, insbesondere `impact --format json` ohne `--changed-file`, und Schreibfehler liefern Text auf stderr und kein JSON-Fehlerobjekt; Service-Diagnostics erscheinen im regulaeren JSON-Report unter `diagnostics`
+- CLI-/E2E-Tests fuer Fehlerpfade: Parser-/Verwendungsfehler, insbesondere `impact --format json` ohne `--changed-file`, Schreibfehler und nicht wiederherstellbare Eingabefehler liefern Text auf stderr und kein JSON-Fehlerobjekt; Service-Diagnostics erscheinen im regulaeren JSON-Report unter `diagnostics`
+- E2E-Fehlerfaelle fuer `--format json` decken mindestens nicht vorhandene Eingabepfade, ungueltiges Compile-Database-JSON und ungueltige CMake-File-API-Reply-Daten ab
 - JSON-`--output` nutzt den gemeinsamen M5-konformen Atomic-Writer aus AP 1.1; falls dieser Writer noch nicht vorhanden ist, ist AP 1.2 blockiert. Tests pruefen mindestens, dass ein simulierter Schreib-/Replace-Fehler eine bestehende JSON-Zieldatei unveraendert laesst
 
 **Ergebnis**: `cmake-xray` besitzt einen versionierten, automatisierbaren Reportvertrag fuer Analyse- und Impact-Ergebnisse.
