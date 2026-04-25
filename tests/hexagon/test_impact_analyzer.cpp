@@ -31,6 +31,17 @@ using xray::hexagon::model::TargetMetadataStatus;
 using xray::hexagon::ports::driving::AnalyzeImpactRequest;
 using xray::hexagon::ports::driving::InputPathArgument;
 
+// POSIX rooted paths like "/repo" do not satisfy is_absolute() on Windows;
+// abs_path adds the local drive prefix when the build targets Windows so the
+// same fixture exercises the absolute-path branches on both platforms.
+inline std::filesystem::path abs_path(std::string_view posix_path) {
+#ifdef _WIN32
+    return std::filesystem::path{std::string{"C:"} + std::string{posix_path}};
+#else
+    return std::filesystem::path{posix_path};
+#endif
+}
+
 AnalyzeImpactRequest make_impact_request(std::string_view compile_commands,
                                           std::string_view changed_file,
                                           std::string_view file_api) {
@@ -152,7 +163,15 @@ TEST_CASE("impact analyzer reports direct matches for duplicate translation-unit
     REQUIRE(result.inputs.changed_file.has_value());
     CHECK(*result.inputs.changed_file == "/project/src/main.cpp");
     REQUIRE(result.inputs.changed_file_source.has_value());
+    // POSIX treats "/project/..." as absolute (cli_absolute provenance);
+    // Windows treats it as drive-less and falls back to the compile DB
+    // directory because the fixture path is resolved against the parent of
+    // the compile_commands.json the test passed in.
+#ifdef _WIN32
+    CHECK(*result.inputs.changed_file_source == ChangedFileSource::compile_database_directory);
+#else
     CHECK(*result.inputs.changed_file_source == ChangedFileSource::cli_absolute);
+#endif
 }
 
 TEST_CASE("impact analyzer reports heuristic header matches") {
@@ -940,16 +959,19 @@ TEST_CASE("impact analyzer reports unresolved_file_api_source_root when file API
 }
 
 TEST_CASE("impact analyzer carries resolved file api path from build model into ReportInputs") {
+    const auto repo_root = abs_path("/repo");
+    const auto resolved_reply = abs_path("/repo/build/.cmake/api/v1/reply");
     class ResolvedPathFileApiPort final : public xray::hexagon::ports::driven::BuildModelPort {
     public:
+        explicit ResolvedPathFileApiPort(std::filesystem::path resolved)
+            : resolved_(std::move(resolved)) {}
         xray::hexagon::model::BuildModelResult load_build_model(
             std::string_view /*path*/) const override {
             xray::hexagon::model::BuildModelResult result;
             result.source = ObservationSource::derived;
             result.target_metadata = TargetMetadataStatus::loaded;
             result.source_root = "/project";
-            result.cmake_file_api_resolved_path =
-                std::filesystem::path{"/repo/build/.cmake/api/v1/reply"};
+            result.cmake_file_api_resolved_path = resolved_;
             result.compile_database = CompileDatabaseResult{
                 CompileDatabaseError::none, {},
                 {CompileEntry::from_arguments(
@@ -958,6 +980,8 @@ TEST_CASE("impact analyzer carries resolved file api path from build model into 
                 {}};
             return result;
         }
+    private:
+        std::filesystem::path resolved_;
     };
 
     class EmptyIncludeResolver final : public xray::hexagon::ports::driven::IncludeResolverPort {
@@ -969,19 +993,18 @@ TEST_CASE("impact analyzer carries resolved file api path from build model into 
     };
 
     const UnusedBuildModelPort compile_db_port;
-    const ResolvedPathFileApiPort file_api_port;
+    const ResolvedPathFileApiPort file_api_port{resolved_reply};
     const EmptyIncludeResolver include_resolver_port;
     const xray::hexagon::services::ImpactAnalyzer analyzer{compile_db_port, include_resolver_port,
                                                            file_api_port};
 
     AnalyzeImpactRequest request;
-    request.report_display_base = std::filesystem::path{"/repo"};
+    request.report_display_base = repo_root;
     request.cmake_file_api_path =
-        InputPathArgument{std::filesystem::path{"build"}, std::filesystem::path{"/repo/build"},
-                          true};
+        InputPathArgument{std::filesystem::path{"build"}, repo_root / "build", true};
     request.changed_file_path =
-        InputPathArgument{std::filesystem::path{"/project/src/main.cpp"},
-                          std::filesystem::path{"/project/src/main.cpp"}, false};
+        InputPathArgument{abs_path("/project/src/main.cpp"),
+                          abs_path("/project/src/main.cpp"), false};
 
     const auto result = analyzer.analyze_impact(request);
 

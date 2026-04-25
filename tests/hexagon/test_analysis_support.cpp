@@ -18,6 +18,17 @@ using xray::hexagon::model::CompileEntry;
 using xray::hexagon::model::IncludeResolutionResult;
 using xray::hexagon::model::ResolvedTranslationUnitIncludes;
 
+// POSIX has rooted absolute paths like "/repo"; Windows requires a drive name
+// (e.g. "C:/repo") for std::filesystem::path::is_absolute() to return true.
+// abs_path lets the same test fixture work on both platforms.
+inline std::filesystem::path abs_path(std::string_view posix_path) {
+#ifdef _WIN32
+    return std::filesystem::path{std::string{"C:"} + std::string{posix_path}};
+#else
+    return std::filesystem::path{posix_path};
+#endif
+}
+
 }  // namespace
 
 TEST_CASE("analysis support tokenizes escaped command variants and reports empty commands") {
@@ -241,9 +252,9 @@ TEST_CASE("to_report_display_path relativizes resolved adapter path under base w
     using xray::hexagon::services::ReportPathDisplayKind;
     using xray::hexagon::services::to_report_display_path;
     const auto display = to_report_display_path(
-        {std::filesystem::path{"/repo/build/.cmake/api/v1/reply"},
+        {abs_path("/repo/build/.cmake/api/v1/reply"),
          ReportPathDisplayKind::resolved_adapter_path, true},
-        std::filesystem::path{"/repo"});
+        abs_path("/repo"));
     REQUIRE(display.has_value());
     CHECK(*display == "build/.cmake/api/v1/reply");
 }
@@ -263,9 +274,9 @@ TEST_CASE("to_report_display_path returns dot when adapter path equals base") {
     using xray::hexagon::services::ReportPathDisplayKind;
     using xray::hexagon::services::to_report_display_path;
     const auto display = to_report_display_path(
-        {std::filesystem::path{"/repo"},
+        {abs_path("/repo"),
          ReportPathDisplayKind::resolved_adapter_path, true},
-        std::filesystem::path{"/repo"});
+        abs_path("/repo"));
     REQUIRE(display.has_value());
     CHECK(*display == ".");
 }
@@ -301,9 +312,9 @@ TEST_CASE("to_report_display_path with case_insensitive policy folds drive and s
     // Windows semantics: /Repo and /repo are the same path; display preserves
     // the original case of the resolved adapter path.
     const auto display = to_report_display_path(
-        {std::filesystem::path{"/Repo/Build/.cmake/api/v1/reply"},
+        {abs_path("/Repo/Build/.cmake/api/v1/reply"),
          ReportPathDisplayKind::resolved_adapter_path, true},
-        std::filesystem::path{"/repo"}, ReportPathCasePolicy::case_insensitive);
+        abs_path("/repo"), ReportPathCasePolicy::case_insensitive);
     REQUIRE(display.has_value());
     CHECK(*display == "Build/.cmake/api/v1/reply");
 }
@@ -313,9 +324,9 @@ TEST_CASE("to_report_display_path with case_insensitive policy treats equal-with
     using xray::hexagon::services::ReportPathDisplayKind;
     using xray::hexagon::services::to_report_display_path;
     const auto display = to_report_display_path(
-        {std::filesystem::path{"/REPO"},
+        {abs_path("/REPO"),
          ReportPathDisplayKind::resolved_adapter_path, true},
-        std::filesystem::path{"/repo"}, ReportPathCasePolicy::case_insensitive);
+        abs_path("/repo"), ReportPathCasePolicy::case_insensitive);
     REQUIRE(display.has_value());
     CHECK(*display == ".");
 }
