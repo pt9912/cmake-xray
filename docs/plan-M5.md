@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.14` |
+| Version | `0.15` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -86,7 +86,7 @@ Wichtig:
 - die atomare Dateiausgabe verwendet eine temporaere Datei im Zielverzeichnis und eine plattformsichere Replace-Operation, die auf Linux, macOS und Windows getestet wird
 - fuer `analyze` folgen alle Reportformate derselben `--top`-Begrenzung fuer Ranking-, Hotspot- und vergleichbare Listenabschnitte; `impact` erhaelt in M5 keine `--top`-Option und keine implizite Begrenzung seiner strukturierten Ergebnislisten
 - DOT ist die visualisierungsorientierte Ausnahme: Auch `impact --format dot` wird ueber Graph-Budgets begrenzt, ohne das zugrunde liegende `ImpactResult` oder JSON-/HTML-/Markdown-Impact-Listen zu kuerzen
-- DOT bleibt fuer `analyze` und `impact` ein begrenztes Artefakt: Kontextknoten fuer betroffene Translation Units werden ueber ein separates, kleines `context_limit` und ein globales `node_limit`-/`edge_limit`-Budget begrenzt; bei Kuerzung werden `context_total_count`, `context_returned_count`, `context_truncated`, `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kenntlich gemacht
+- DOT bleibt fuer `analyze` und `impact` ein begrenztes Artefakt: Analyze-Hotspot-Kontext wird ueber ein separates, kleines `context_limit` begrenzt, beide DOT-Reporttypen werden ueber ein globales `node_limit`-/`edge_limit`-Budget begrenzt; bei Kuerzung werden fuer Analyze-Kontext `context_total_count`, `context_returned_count`, `context_truncated` und fuer beide Reporttypen `graph_node_limit`, `graph_edge_limit`, `graph_truncated` kenntlich gemacht
 - alle neuen Formate muessen deterministisch sein, damit Golden-Outputs sinnvoll diffbar bleiben
 - Datums-, Laufzeit- oder Hostinformationen duerfen nicht automatisch in Reports erscheinen
 
@@ -98,9 +98,12 @@ Vorgesehene Artefakte:
 - Erweiterung von `src/hexagon/model/analysis_result.*` und `src/hexagon/model/impact_result.*` um ein strukturiertes `ReportInputs`-Modell, mindestens mit `compile_database_path`, `cmake_file_api_path` und bei `impact` `changed_file`
 - `ReportInputs` ist ab M5 die alleinige Quelle fuer Report-Eingabepfade; bestehende skalare Pfadfelder wie `AnalysisResult::compile_database_path` werden entfernt oder als deprecated Mirror ohne eigene Semantik markiert und duerfen nicht fuer JSON-`inputs` serialisiert werden
 - `ReportInputs`-Felder sind im JSON-Vertrag immer vorhanden; gesetzte Pfade sind Strings, nicht gesetzte Eingaben sind `null`, und leere Strings duerfen nicht als Ersatz fuer fehlende Eingaben verwendet werden
-- `ReportInputs` serialisiert stabile Display-Pfade aus der fachlichen Eingabeaufloesung: CLI-relative Pfade werden relativ zum Arbeitsverzeichnis normalisiert, absolute Pfade bleiben absolute Anzeige-Strings, und `cmake_file_api_path` bezeichnet den tatsaechlich verwendeten Build- oder Reply-Directory-Pfad nach CLI-Aufloesung; normalisierte interne Schluessel werden nicht in `inputs` serialisiert
+- `ReportInputs` serialisiert stabile Display-Pfade aus der fachlichen Eingabeaufloesung: CLI-relative Pfade werden relativ zum Arbeitsverzeichnis normalisiert, absolute Pfade bleiben absolute Anzeige-Strings, und `cmake_file_api_path` bezeichnet den tatsaechlich verwendeten Build- oder Reply-Directory-Pfad nach Adapter-Aufloesung; normalisierte interne Schluessel werden nicht in `inputs` serialisiert
+- der `CmakeFileApiAdapter` gibt den aufgeloesten Build-/Reply-Directory-Pfad ueber Metadaten in `BuildModelResult` an Hexagon-Services zurueck; `ProjectAnalyzer` und `ImpactAnalyzer` duerfen diesen Wert nur aus `BuildModelResult` oder vorgelagerter Input-Resolution uebernehmen, nicht aus CLI- oder Adapterzustand nachreichen
+- `changed_file` nutzt fuer Display- und Provenienzregeln dieselbe fachliche Basis wie die Impact-Analyse: relativ zur `compile_commands.json`-Directory oder zur CMake-File-API-Source-Root, nicht pauschal relativ zum Prozess-Arbeitsverzeichnis
 - `ReportInputs` dokumentiert die Provenienz ueber strukturierte Zusatzfelder wie `compile_database_source`, `cmake_file_api_source` und `changed_file_source` mit Enum-Werten wie `cli`, `derived`, `not_provided`, damit File-API-only- und Mixed-Input-Laeufe eindeutig auswertbar bleiben
 - Anpassung der Producer-Pfade in `ProjectAnalyzer`, `ImpactAnalyzer` und den zugehoerigen Driving-Request-/Port-Vertraegen, damit `ReportInputs` beim Erzeugen von `AnalysisResult` und `ImpactResult` vollstaendig gesetzt wird und nicht nachtraeglich in der CLI an Adapter uebergeben werden muss
+- Erweiterung von `src/hexagon/model/build_model_result.*` um Input-Metadaten fuer den aufgeloesten CMake-File-API-Build-/Reply-Pfad und die zugrunde liegende Source-Root, damit Adapter-Aufloesung fachlich transportiert werden kann
 - `ReportWriterPort`/`GenerateReportPort` bleiben aus Adaptersicht ergebnisobjektzentriert; Signaturaenderungen sind nur zulaessig, wenn sie `ReportInputs` weiterhin als Teil des fachlichen Ergebnisvertrags transportieren und nicht als separaten CLI-Kontext in Adapter leaken
 - Verbosity bleibt eine CLI-Emission-Policy in `src/adapters/cli/` und `src/main.cpp`; `ReportWriterPort`/`GenerateReportPort` erhalten keinen `OutputVerbosity`-Parameter, und fachliche Reportadapter rendern keine Verbose-/Quiet-Sondervarianten
 - Console-Verbosity ist ein CLI-owned Sonderfall: Fuer `--format console` darf die CLI nach dem Erzeugen von `AnalysisResult`/`ImpactResult` eine eigene kurze, normale oder verbose Console-Emission waehlen, ohne den artefaktorientierten Report-Pfad oder dessen Ports mit `OutputVerbosity` zu erweitern
@@ -119,7 +122,7 @@ Ein JSON-Bericht fuer `analyze` soll mindestens enthalten:
 - `format`: fester Formatbezeichner, zum Beispiel `cmake-xray.analysis`
 - `format_version`: Schema-/Formatversion, initial `1`
 - `report_type`: `analyze`
-- `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell, mindestens `compile_database_path` und `cmake_file_api_path`
+- `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell, mindestens `compile_database_path`, `compile_database_source`, `cmake_file_api_path` und `cmake_file_api_source`
 - `summary`: Translation-Unit-Anzahl, Ranking-Anzahl, Hotspot-Anzahl, Top-Limit, Beobachtungsherkunft und Target-Metadatenstatus
 - `translation_unit_ranking`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items` inklusive Metriken, Diagnostics und Target-Zuordnungen
 - `include_hotspots`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items`
@@ -130,7 +133,7 @@ Ein JSON-Bericht fuer `impact` soll mindestens enthalten:
 - `format`: fester Formatbezeichner, zum Beispiel `cmake-xray.impact`
 - `format_version`: Schema-/Formatversion, initial `1`
 - `report_type`: `impact`
-- `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell, mindestens `compile_database_path`, `cmake_file_api_path` und `changed_file`
+- `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell, mindestens `compile_database_path`, `compile_database_source`, `cmake_file_api_path`, `cmake_file_api_source`, `changed_file` und `changed_file_source`
 - `summary`: Anzahl betroffener Translation Units, Klassifikation, Beobachtungsherkunft, Target-Metadatenstatus und Anzahl betroffener Targets
 - `directly_affected_translation_units`
 - `heuristically_affected_translation_units`
@@ -149,7 +152,8 @@ Wichtig:
 - `context_limit` ist fuer M5 Teil des DOT-Formatvertrags, kleiner als oder gleich dem wirksamen `--top`-Limit bei `analyze` und nicht pro Hotspot zu einem unbeschraenkten Gesamtgraphen addierbar, weil zusaetzlich ein globales `node_limit`-/`edge_limit`-Budget gilt
 - M5 legt die DOT-Grenzen deterministisch fest: Fuer `analyze` gilt `context_limit = min(top_limit, 5)`, `node_limit = max(25, 4 * top_limit + 10)`, `edge_limit = max(40, 6 * top_limit + 20)`. Ohne explizites `--top` wird der wirksame Standard-Top-Wert der CLI verwendet. Fuer `impact` gilt mangels Top-Limit fest `node_limit = 100` und `edge_limit = 200`.
 - Kuerzung erfolgt deterministisch in stabiler Sortierreihenfolge: bei `analyze` zuerst primaere Top-Ranking-Knoten, dann Top-Hotspot-Knoten, dann Target-Knoten, dann Hotspot-Kontext-Translation-Units sortiert nach Anzeige-Pfad; bei `impact` zuerst geaenderte Datei, dann direkt betroffene Translation Units, heuristisch betroffene Translation Units und Targets, jeweils nach Anzeige-Pfad bzw. Target-Name sortiert. Kanten werden nur ausgegeben, wenn beide Endknoten im Budget enthalten sind, und innerhalb gleicher Prioritaet lexikografisch sortiert
-- bei gekuerztem Hotspot-Kontext oder global gekuerztem Graph enthaelt DOT verpflichtend Graph-Attribute mit exakt diesen Namen und Typen: `context_total_count` integer, `context_returned_count` integer, `context_truncated` boolean, `graph_node_limit` integer, `graph_edge_limit` integer und `graph_truncated` boolean; Kommentare duerfen nur zusaetzlich erscheinen und sind nicht Teil des Vertrags
+- bei gekuerztem Analyze-Hotspot-Kontext enthaelt DOT verpflichtend die Graph-Attribute `context_total_count` integer, `context_returned_count` integer und `context_truncated` boolean; diese `context_*`-Attribute gelten nicht fuer `impact`
+- bei global gekuerztem Graph enthaelt DOT fuer `analyze` und `impact` verpflichtend die Graph-Attribute `graph_node_limit` integer, `graph_edge_limit` integer und `graph_truncated` boolean; Kommentare duerfen nur zusaetzlich erscheinen und sind nicht Teil des Vertrags
 - JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
 - Felder mit leerer Menge werden als leere Arrays ausgegeben, nicht weggelassen, sofern sie Teil des Formatvertrags sind
 - optionale fachliche Informationen koennen `null` sein, wenn das Schema dies explizit dokumentiert
@@ -391,11 +395,12 @@ Tests und Abnahme muessen mindestens abdecken:
 - CLI-Golden-Tests, dass `--quiet --format json|dot|html|markdown` ohne `--output` denselben stdout-Report wie der Normalmodus ausgibt und keine Erfolgsmeldungen in stdout mischt
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
 - Golden- und CLI-Tests, dass `--top` bei `analyze` fuer Markdown, HTML, JSON und DOT konsistent wirkt und kein Artefaktformat implizit vollstaendige Listen ausgibt
-- DOT-Golden-Tests, dass `analyze --top N` fuer ausgegebene Top-Hotspots hoechstens `context_limit` betroffene Translation Units als Kontextknoten enthaelt, das globale `node_limit`-/`edge_limit`-Budget einhaelt und gekuerzten Kontext bzw. gekuerzte Graphen mit den verpflichtenden Graph-Attributen `context_total_count`, `context_returned_count`, `context_truncated`, `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kennzeichnet
+- DOT-Golden-Tests, dass `analyze --top N` fuer ausgegebene Top-Hotspots hoechstens `context_limit` betroffene Translation Units als Kontextknoten enthaelt, das globale `node_limit`-/`edge_limit`-Budget einhaelt und gekuerzten Kontext mit den verpflichtenden `context_*`-Graph-Attributen sowie gekuerzte Graphen mit den verpflichtenden `graph_*`-Graph-Attributen kennzeichnet
 - DOT-Golden-Tests, dass `impact --format dot` das feste Impact-`node_limit`-/`edge_limit`-Budget einhaelt und Kuerzungen mit den verpflichtenden Graph-Attributen `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kennzeichnet
 - CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und Impact-Reports keine implizite Begrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren
 - JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
 - JSON-Schema-/Golden-Tests fuer `ReportInputs`-Pfad-Provenienz: CLI-relative Pfade, absolute Pfade, Build-Dir-vs.-Reply-Dir bei `--cmake-file-api` und relative `--changed-file` muessen stabile Display-Pfade und passende `*_source`-Enums liefern
+- Adapter-/Service-Tests, dass der vom `CmakeFileApiAdapter` aufgeloeste Build-/Reply-Pfad ueber `BuildModelResult` in `ReportInputs.cmake_file_api_path` landet und nicht aus CLI-Zustand nachgereicht wird
 - JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path` und `inputs.cmake_file_api_path` bei `analyze` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
 - JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path`, `inputs.cmake_file_api_path` und `inputs.changed_file` bei `impact` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
 - Tests, dass `--verbose` JSON-, Markdown-, HTML- und DOT-Artefakte nicht gegenueber dem Normalmodus veraendert und Zusatzdiagnostik nur Console/`stderr` betrifft
@@ -439,6 +444,7 @@ Abhaengigkeiten:
 | JSON-`inputs` verlangt Daten, die nicht im Ergebnisobjekt stehen | Adapter muessten CLI-Zustand kennen oder der Vertrag bleibt unerfuellt | strukturiertes `ReportInputs`-Modell als Bestandteil von `AnalysisResult` und `ImpactResult` einfuehren |
 | JSON-`inputs` nutzt uneinheitliche Repraesentation fuer fehlende Pfade | Automatisierung muss `null`, leere Strings und fehlende Felder unterschiedlich abfangen | Felder immer ausgeben, gesetzte Pfade als String und fehlende Eingaben ausschliesslich als `null` serialisieren |
 | JSON-`inputs` nutzt instabile Pfad-Provenienz | Golden-Outputs und Folgewerkzeuge unterscheiden CLI-Strings, Reply-Dirs und Normalisierungsschluessel falsch | stabile Display-Pfade und `*_source`-Enums im JSON-Vertrag festlegen |
+| Aufgeloester File-API-Pfad bleibt im Adapter verborgen | `ReportInputs.cmake_file_api_path` kann nur durch CLI-/Adapter-Leakage oder falsch gesetzte Werte entstehen | `BuildModelResult` um Input-Metadaten erweitern oder vorgelagerte Input-Resolution einfuehren |
 | Alte skalare Eingabepfadfelder bleiben neben `ReportInputs` aktiv | File-API-only-Laeufe koennen falsche Pfade in `inputs.compile_database_path` ausgeben | `ReportInputs` als alleinige Quelle fuer Report-Eingaben festlegen; alte Felder entfernen oder nur deprecated spiegeln |
 | Producer setzen `ReportInputs` nicht vollstaendig | JSON/HTML/DOT zeigen bekannte File-API- oder Mixed-Input-Kontexte als `null` | `ProjectAnalyzer`, `ImpactAnalyzer` und Driving-Requests/-Ports als Producer explizit anpassen und testen |
 | Analyze-Listen sind durch `--top` gekuerzt, ohne dies zu kennzeichnen | Automatisierung verwechselt kurze Ausgaben mit vollstaendigen Projektdaten | `limit`, `total_count`, `returned_count` und `truncated` fuer Analyze-Ranking- und Hotspot-Listen verpflichtend machen |
