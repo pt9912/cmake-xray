@@ -59,8 +59,6 @@ Falls der M5-konforme Atomic-Writer aus AP 1.1 noch nicht vorhanden oder nicht t
 
 Voraussichtlich zu aendern:
 
-- `src/adapters/output/json_report_adapter.h`
-- `src/adapters/output/json_report_adapter.cpp`
 - `src/adapters/cli/cli_adapter.{h,cpp}`
 - `src/main.cpp`
 - `src/adapters/CMakeLists.txt`
@@ -78,11 +76,14 @@ Voraussichtlich zu aendern:
 
 Neue Dateien:
 
+- `src/adapters/output/json_report_adapter.h`
+- `src/adapters/output/json_report_adapter.cpp`
 - `docs/report-json.md`
 - `docs/report-json.schema.json`
 - `tests/validate_json_schema.py` oder ein gleichwertiges repository-lokales Validierungsskript
 - `tests/requirements-json-schema.txt`
-- JSON-Golden-Outputs unter `tests/e2e/testdata/m5/`
+- JSON-Report-Goldens unter `tests/e2e/testdata/m5/json-reports/`
+- Golden-Manifest `tests/e2e/testdata/m5/json-reports/manifest.txt` oder eine gleichwertige explizite Liste aller JSON-Report-Goldens
 
 ## JSON-Dokumentvertrag
 
@@ -232,7 +233,7 @@ Render-, Schreib- und Output-Fehler:
 
 - Schreib-, Render- und Output-Fehler liefern Textfehler auf `stderr`.
 - Exit-Code ist ungleich `0`.
-- Es wird kein partielles JSON auf stdout geschrieben.
+- Render-Fehler vor Emission schreiben kein partielles JSON auf stdout. Bei echten stdout-Transportfehlern koennen bereits geschriebene Bytes nicht zurueckgenommen werden; die CLI erkennt solche Fehler best-effort nach dem Schreiben und meldet sie als Textfehler auf `stderr`.
 - Bei `--output` bleibt eine bestehende Zieldatei unveraendert.
 - Render-Fehler umfassen JSON-Dump-/Serialisierungsfehler, UTF-8-/Escaping-Fehler und explizite Fehler aus der CLI-internen Render-Abstraktion.
 - Render-Fehler werden vor dem Atomic-Writer in Text-`stderr` und nonzero Exit uebersetzt.
@@ -278,7 +279,7 @@ Bootstrap-Pfade:
 Schema- und Vertrags-Tests:
 
 - CTest-integrierter Schema-Validierungstest validiert alle JSON-Goldens gegen `docs/report-json.schema.json`.
-- Der Schema-Test schlaegt fehl, wenn ein JSON-Golden nicht erfasst ist.
+- Der Schema-Test validiert ausschliesslich JSON-Report-Goldens aus `tests/e2e/testdata/m5/json-reports/` und gleicht sie gegen das Manifest ab. Er schlaegt fehl, wenn ein Report-Golden im Verzeichnis nicht im Manifest steht oder ein Manifesteintrag fehlt.
 - CTest-integrierter Versionskonsistenztest prueft den `format_version`-Schema-`const`-Wert gegen `xray::hexagon::model::kReportFormatVersion`.
 - Tests pruefen Pflichtfelder, Array-statt-Weglassen-Regeln, numerische Typen, bekannte Enum-Werte und `null` nur an dokumentierten Stellen.
 
