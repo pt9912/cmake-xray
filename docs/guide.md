@@ -90,8 +90,12 @@ Nutzeraufruf fuer Release-Dokumentation.
 
 ## Schnellstart
 
-Eine erste Projektanalyse mit den mitgelieferten Testdaten, wenn `cmake-xray`
-im `PATH` liegt:
+Die folgenden Schnellstart-Beispiele setzen ein lokal geklontes
+`cmake-xray`-Repository sowie ein installiertes `cmake-xray` im `PATH` voraus.
+Wer von einem Release-Artefakt aus arbeitet, ersetzt die Pfade unter
+`tests/e2e/testdata/` durch eigene Eingabedaten.
+
+Eine erste Projektanalyse:
 
 ```bash
 cmake-xray analyze \
@@ -118,8 +122,13 @@ docker run --rm \
 
 ## Eingabedaten vorbereiten
 
-Der MVP-Stand liest `compile_commands.json`. In einem CMake-Projekt wird diese
-Datei typischerweise so erzeugt:
+`cmake-xray` liest `compile_commands.json` und optional Daten der
+CMake File API. Beide Eingaben koennen einzeln oder kombiniert verwendet
+werden.
+
+### Compilation Database
+
+In einem CMake-Projekt wird die Datei typischerweise so erzeugt:
 
 ```bash
 cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
@@ -137,6 +146,22 @@ Wichtig:
 - Jeder Eintrag muss die erwarteten Pflichtfelder enthalten.
 - Leere, nicht lesbare oder syntaktisch ungueltige Dateien werden mit
   definierten Exit-Codes abgewiesen.
+
+### CMake File API
+
+Fuer die Target-Sicht legt CMake auf Anfrage strukturierte Reply-Daten ab.
+Die Anfrage wird vor dem ersten `cmake -B build` als leere Query-Datei
+hinterlegt:
+
+```bash
+mkdir -p build/.cmake/api/v1/query
+touch build/.cmake/api/v1/query/codemodel-v2
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+```
+
+Die Reply-Daten landen unter `build/.cmake/api/v1/reply/`. Als Wert fuer
+`--cmake-file-api` wird entweder das Build-Verzeichnis oder direkt das
+Reply-Verzeichnis akzeptiert.
 
 ## Projektanalyse
 
@@ -217,17 +242,136 @@ cmake-xray impact \
 
 Kuratierte Beispielausgaben liegen unter [docs/examples](./examples):
 
+Ohne Target-Sicht (nur `compile_commands.json`):
+
 - [docs/examples/analyze-console.txt](./examples/analyze-console.txt)
 - [docs/examples/analyze-report.md](./examples/analyze-report.md)
 - [docs/examples/impact-console.txt](./examples/impact-console.txt)
 - [docs/examples/impact-report.md](./examples/impact-report.md)
 
+Mit Target-Sicht (File API):
+
+- [docs/examples/analyze-console-targets.txt](./examples/analyze-console-targets.txt)
+- [docs/examples/analyze-report-targets.md](./examples/analyze-report-targets.md)
+- [docs/examples/impact-console-targets.txt](./examples/impact-console-targets.txt)
+- [docs/examples/impact-report-targets.md](./examples/impact-report-targets.md)
+
+## Heuristiken einordnen
+
+Include-Hotspots und Header-Impact beruhen im aktuellen Stand auf
+heuristischer Include-Aufloesung. Das bedeutet:
+
+- direkte Treffer auf bekannte Quelldateien sind belastbarer als
+  heuristische Include-Treffer
+- bedingte Includes koennen fehlen
+- generierte Header koennen fehlen, wenn sie nicht aus den vorhandenen
+  Eingabedaten ableitbar sind
+- relevante Unsicherheiten erscheinen als Diagnostics im Report
+
+Die Ergebnisse sind deshalb als Orientierung und Review-Hilfe gedacht, nicht als
+vollstaendiger Ersatz fuer Build-System- oder Compilerwissen.
+
+## Exit-Codes
+
+| Code | Bedeutung                           |
+| ---- | ----------------------------------- |
+| `0`  | Erfolg                              |
+| `1`  | Laufzeit- oder Report-Schreibfehler |
+| `2`  | CLI-Verwendungsfehler               |
+| `3`  | Eingabedatei nicht lesbar           |
+| `4`  | Eingabedaten ungueltig              |
+
+## Quality Gate in einem Anwender-Projekt
+
+`cmake-xray` hat im aktuellen Stand keine konfigurierbaren Analyseschwellen.
+Die einzigen harten Fehlersignale sind die Exit-Codes `1`, `3` und `4` aus dem
+vorigen Abschnitt. Ein Quality Gate in einem Anwender-Projekt wird deshalb aus
+drei Bausteinen aufgebaut:
+
+1. Eingabedaten reproduzierbar erzeugen
+2. `cmake-xray` aus Build oder CI heraus aufrufen
+3. den Markdown-Report als Artefakt sichern
+
+Schwellen auf Reportinhalte sind nicht Bestandteil von `cmake-xray` und werden
+bei Bedarf ausserhalb des Tools gepflegt.
+
+### Eingabedaten im Anwender-Projekt erzeugen
+
+In der `CMakeLists.txt` des zu analysierenden Projekts wird die
+Compilation Database aktiviert:
+
+```cmake
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "" FORCE)
+```
+
+Fuer die Target-Sicht ueber die CMake File API wird vor dem ersten
+`cmake -B build` zusaetzlich eine Query-Datei abgelegt:
+
+```bash
+mkdir -p build/.cmake/api/v1/query
+touch build/.cmake/api/v1/query/codemodel-v2
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+### Analyse als CMake-Target
+
+Optional kann der Aufruf als `add_custom_target` in das Anwender-Projekt
+eingebunden werden. `find_program` wird ohne `REQUIRED` aufgerufen, damit das
+Configure des Anwender-Projekts nicht fehlschlaegt, falls `cmake-xray` lokal
+nicht installiert ist:
+
+```cmake
+find_program(CMAKE_XRAY cmake-xray)
+
+if(CMAKE_XRAY)
+  add_custom_target(xray
+    COMMAND ${CMAKE_XRAY} analyze
+            --compile-commands ${CMAKE_BINARY_DIR}/compile_commands.json
+            --cmake-file-api ${CMAKE_BINARY_DIR}
+            --format markdown
+            --output ${CMAKE_BINARY_DIR}/reports/xray-analyze.md
+            --top 20
+    VERBATIM)
+endif()
+```
+
+Aufruf: `cmake --build build --target xray`.
+
+### CI-Integration
+
+Skizze fuer GitHub Actions, wenn `cmake-xray` im `PATH` des Runners liegt:
+
+```yaml
+- run: cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+- run: cmake --build build
+- run: |
+    cmake-xray analyze \
+      --compile-commands build/compile_commands.json \
+      --cmake-file-api build \
+      --format markdown --output build/xray.md --top 20
+- uses: actions/upload-artifact@v4
+  with: { name: cmake-xray, path: build/xray.md }
+```
+
+Der CI-Schritt schlaegt automatisch fehl, wenn `cmake-xray` einen Exit-Code
+ungleich `0` zurueckgibt.
+
+### Container-Variante
+
+Ohne lokale Installation kann das Runtime-Image verwendet werden:
+
+```bash
+docker run --rm -v "$PWD/build:/data:ro" \
+  ghcr.io/pt9912/cmake-xray:vX.Y.Z \
+  analyze --compile-commands /data/compile_commands.json --cmake-file-api /data
+```
+
 ## Weitere Anwendungsfaelle
 
 Neben dem Quality-Gate-Pfad gibt es weitere Einsatzszenarien, die mit dem
 aktuellen Funktionsumfang abgedeckt sind. Sie nutzen dieselben Eingabedaten
-(`compile_commands.json` und optional CMake File API) und unterliegen
-denselben Heuristik-Hinweisen wie die regulaere Analyse.
+und unterliegen denselben Heuristik-Hinweisen wie die regulaere Analyse.
 
 ### PR-Review-Hilfe
 
@@ -239,7 +383,7 @@ arbeiten:
 ```bash
 cmake-xray impact \
   --compile-commands build/compile_commands.json \
-  --cmake-file-api  build \
+  --cmake-file-api build \
   --changed-file include/common/config.h \
   --format markdown
 ```
@@ -309,112 +453,6 @@ cmake-xray analyze \
   --compile-commands build/compile_commands.json \
   --format markdown --output build/reports/xray-after.md
 diff -u build/reports/xray-before.md build/reports/xray-after.md
-```
-
-## Heuristiken einordnen
-
-Include-Hotspots und Header-Impact beruhen im MVP auf heuristischer
-Include-Aufloesung. Das bedeutet:
-
-- direkte Treffer auf bekannte Quelldateien sind belastbarer als
-  heuristische Include-Treffer
-- bedingte Includes koennen fehlen
-- generierte Header koennen fehlen, wenn sie nicht aus den vorhandenen
-  Eingabedaten ableitbar sind
-- relevante Unsicherheiten erscheinen als Diagnostics im Report
-
-Die Ergebnisse sind deshalb als Orientierung und Review-Hilfe gedacht, nicht als
-vollstaendiger Ersatz fuer Build-System- oder Compilerwissen.
-
-## Exit-Codes
-
-| Code | Bedeutung                           |
-| ---- | ----------------------------------- |
-| `0`  | Erfolg                              |
-| `1`  | Laufzeit- oder Report-Schreibfehler |
-| `2`  | CLI-Verwendungsfehler               |
-| `3`  | Eingabedatei nicht lesbar           |
-| `4`  | Eingabedaten ungueltig              |
-
-## Quality Gate in einem Anwender-Projekt
-
-`cmake-xray` hat im aktuellen Stand keine konfigurierbaren Analyseschwellen.
-Die einzigen harten Fehlersignale sind die Exit-Codes `1`, `3` und `4` aus dem
-vorigen Abschnitt. Ein Quality Gate in einem Anwender-Projekt wird deshalb aus
-drei Bausteinen aufgebaut:
-
-1. Eingabedaten reproduzierbar erzeugen
-2. `cmake-xray` aus Build oder CI heraus aufrufen
-3. den Markdown-Report als Artefakt sichern
-
-Schwellen auf Reportinhalte sind nicht Bestandteil von `cmake-xray` und werden
-bei Bedarf ausserhalb des Tools gepflegt.
-
-### Eingabedaten im Anwender-Projekt erzeugen
-
-In der `CMakeLists.txt` des zu analysierenden Projekts wird die
-Compilation Database aktiviert:
-
-```cmake
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "" FORCE)
-```
-
-Fuer die Target-Sicht ueber die CMake File API wird vor dem ersten
-`cmake -B build` zusaetzlich eine Query-Datei abgelegt:
-
-```bash
-mkdir -p build/.cmake/api/v1/query
-touch build/.cmake/api/v1/query/codemodel-v2
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-```
-
-### Analyse als CMake-Target
-
-Optional kann der Aufruf als `add_custom_target` in das Anwender-Projekt
-eingebunden werden:
-
-```cmake
-find_program(CMAKE_XRAY cmake-xray REQUIRED)
-
-add_custom_target(xray
-  COMMAND ${CMAKE_XRAY} analyze
-          --compile-commands ${CMAKE_BINARY_DIR}/compile_commands.json
-          --cmake-file-api  ${CMAKE_BINARY_DIR}
-          --format markdown
-          --output ${CMAKE_BINARY_DIR}/reports/xray-analyze.md
-          --top 20
-  VERBATIM)
-```
-
-Aufruf: `cmake --build build --target xray`.
-
-### CI-Integration
-
-Skizze fuer GitHub Actions, wenn `cmake-xray` im `PATH` des Runners liegt:
-
-```yaml
-- run: cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-- run: cmake --build build
-- run: cmake-xray analyze
-        --compile-commands build/compile_commands.json
-        --cmake-file-api  build
-        --format markdown --output build/xray.md --top 20
-- uses: actions/upload-artifact@v4
-  with: { name: cmake-xray, path: build/xray.md }
-```
-
-Der CI-Schritt schlaegt automatisch fehl, wenn `cmake-xray` einen Exit-Code
-ungleich `0` zurueckgibt.
-
-### Container-Variante
-
-Ohne lokale Installation kann das Runtime-Image verwendet werden:
-
-```bash
-docker run --rm -v "$PWD/build:/data:ro" \
-  ghcr.io/pt9912/cmake-xray:vX.Y.Z \
-  analyze --compile-commands /data/compile_commands.json --cmake-file-api /data
 ```
 
 ## Verifikation
