@@ -172,7 +172,8 @@ Bestehenden Request erweitern:
 
 ```cpp
 struct InputPathArgument {
-    std::filesystem::path path;
+    std::filesystem::path original_argument;
+    std::filesystem::path path_for_io;
     bool was_relative{false};
 };
 
@@ -183,7 +184,14 @@ struct AnalyzeProjectRequest {
 };
 ```
 
-`report_display_base` und `was_relative` werden von der CLI gesetzt. In Tests werden sie explizit injiziert. Services duerfen fuer Report-Pfade nicht `std::filesystem::current_path()` lesen und duerfen die urspruengliche Relativitaet eines Arguments nicht aus einem spaeter aufgeloesten Pfad ableiten.
+`report_display_base`, `original_argument`, `path_for_io` und `was_relative` werden von der CLI gesetzt. In Tests werden sie explizit injiziert. Services duerfen fuer Report-Pfade nicht `std::filesystem::current_path()` lesen und duerfen die urspruengliche Anzeigeform oder Relativitaet eines Arguments nicht aus einem spaeter aufgeloesten Pfad ableiten.
+
+Regeln:
+
+- `original_argument` enthaelt den rohen lexikalischen CLI-Wert nach CLI11-Parsing, aber vor fachlicher Aufloesung gegen `report_display_base`.
+- `path_for_io` enthaelt den Pfad, den Services fuer Laden, Existenzpruefung und fachliche Aufloesung verwenden.
+- Bei relativen CLI-Werten wird `path_for_io` gegen `report_display_base` gebildet; `original_argument` bleibt relativ.
+- Bei absoluten CLI-Werten sind `original_argument` und `path_for_io` beide absolut lexikalisch normalisiert.
 
 ### `AnalyzeImpactRequest`
 
@@ -251,7 +259,7 @@ enum class ReportPathDisplayKind {
 };
 
 struct ReportPathDisplayInput {
-    std::optional<std::filesystem::path> path;
+    std::optional<std::filesystem::path> display_path;
     ReportPathDisplayKind kind{ReportPathDisplayKind::input_argument};
     bool was_relative{false};
 };
@@ -264,6 +272,7 @@ std::optional<std::string> to_report_display_path(
 Regeln fuer normale Eingabepfade:
 
 - `compile_database_path` und `cmake_file_api_path` werden als `input_argument` behandelt.
+- Fuer `input_argument` wird `display_path` aus `InputPathArgument::original_argument` befuellt, nicht aus `path_for_io`.
 - `was_relative` wird beim Request-Aufbau aus dem urspruenglichen CLI-Argument bestimmt und nicht spaeter aus einem aufgeloesten Pfad rekonstruiert.
 - `report_display_base` dient nur als explizite Basis fuer relative normale Eingabepfade und Adapterpfade, damit Services nicht vom Prozess-CWD abhaengen.
 - Relative normale Eingabepfade werden fuer Laden und Validierung gegen `report_display_base` interpretiert, aber als Anzeige-Strings nur aus dem urspruenglichen CLI-Relativpfad lexikalisch normalisiert. Sie werden nicht auf einen basisrelativen kanonischen Pfad umgeschrieben.
@@ -297,12 +306,13 @@ Gemeinsame Grenzen:
 Display- und Aufloesungsregeln:
 
 - Die Provenienzentscheidung nutzt ausschliesslich `AnalyzeImpactRequest::changed_file_path.was_relative`, nicht `changed_file_path.path.is_absolute()`.
-- Die CLI soll `InputPathArgument::path` als rohen lexikalischen CLI-Pfad transportieren. Falls eine spaetere Vorbereitung den Pfad bereits absolut oder normalisiert ablegt, muss `was_relative` trotzdem die urspruengliche CLI-Relativitaet bewahren und die Provenienz steuern.
+- Die CLI transportiert den rohen lexikalischen CLI-Pfad in `InputPathArgument::original_argument` und den fachlichen Ladepfad in `InputPathArgument::path_for_io`.
+- Die Provenienzlogik darf `path_for_io.is_absolute()` nicht verwenden. `was_relative` steuert, ob ein urspruenglich relatives `--changed-file` als relativer ReportInput behandelt wird.
 - Ist `changed_file_path.was_relative == false`, wird `changed_file` als lexikalisch normalisierter absoluter String ausgegeben und `changed_file_source=cli_absolute` gesetzt.
 - Ist `changed_file_path.was_relative == true` und `compile_commands_path` gesetzt, wird der Pfad fuer Analyse und Anzeige gegen die Compile-Database-Directory interpretiert. `changed_file` bleibt der lexikalisch normalisierte relative Pfad zu dieser Directory, nicht relativ zu `report_display_base`.
 - Ist `changed_file_path.was_relative == true`, keine Compile Database gesetzt und eine File-API-Source-Root vorhanden, wird der Pfad fuer Analyse und Anzeige gegen diese Source-Root interpretiert. `changed_file` bleibt der lexikalisch normalisierte relative Pfad zu dieser Source-Root.
 - Ist `changed_file_path.was_relative == true`, keine Compile Database gesetzt und wegen File-API-Ladefehler keine Source-Root bekannt, wird `changed_file` als normalisierter roher CLI-Relativpfad ausgegeben und `changed_file_source=unresolved_file_api_source_root` gesetzt.
-- Wenn `was_relative == true`, aber `path` bereits absolut vorliegt, wird der Anzeige-String relativ zur jeweiligen Provenienz-Basis berechnet; dadurch bleibt ein urspruenglich relatives `--changed-file` auch nach vorgelagerter Normalisierung ein relativer ReportInput.
+- Wenn `was_relative == true`, aber `path_for_io` bereits absolut vorliegt, wird der Anzeige-String aus `original_argument` beziehungsweise relativ zur jeweiligen Provenienz-Basis berechnet; dadurch bleibt ein urspruenglich relatives `--changed-file` auch nach vorgelagerter Normalisierung ein relativer ReportInput.
 
 Quellen:
 
@@ -340,9 +350,10 @@ Validierungsreihenfolge:
 1. Syntax und Optionsform werden geparst. Unbekannte Optionen, fehlende Optionswerte und unbekannte `--format`-Werte liefern Exit-Code `2`.
 2. Danach wird die Formatverfuegbarkeit geprueft. Ist das Format bekannt, aber in diesem Build nicht implementiert, liefert die CLI sofort den `not implemented in this build`-Fehler.
 3. Fuer nicht implementierte Formate werden keine fachlichen Eingaben validiert, keine Adapter oder Ports ausgewaehlt, keine Analyse gestartet und keine Zieldatei erzeugt.
-4. Erst fuer lauffaehige Formate folgen Eingabevalidierung, `--output`-Kombinationsvalidierung und Analyse.
-5. Deshalb gewinnt bei `--format json|html|dot` der `not implemented`-Fehler gegen gleichzeitig fehlende Eingaben oder ein angegebenes `--output`.
-6. Bei lauffaehigem `--format console` gewinnt dagegen die normale `--output`-Kombinationsvalidierung und `--format console --output out.txt` bleibt ein Verwendungsfehler.
+4. Erst fuer lauffaehige Formate folgt die Format-/Options-Kombinationsvalidierung, insbesondere `console --output`.
+5. Danach folgen fachliche Eingabevalidierung und Analyse.
+6. Deshalb gewinnt bei `--format json|html|dot` der `not implemented`-Fehler gegen gleichzeitig fehlende Eingaben oder ein angegebenes `--output`.
+7. Bei lauffaehigem `--format console` gewinnt die `--output`-Kombinationsvalidierung gegen fehlende fachliche Eingaben: `analyze --format console --output out.txt` ohne Eingabequelle liefert `--output`-nicht-erlaubt und keinen Missing-Input-Fehler.
 
 CLI-Parser-Anpassung:
 
@@ -371,6 +382,7 @@ Der bestehende Report-Port liefert fuer erfolgreiche Renderings weiter Reportinh
 Umsetzung:
 
 - Es wird ein kleines `RenderResult`-/`Expected<std::string, RenderError>`-Value-Object fuer den CLI-Schreibpfad eingefuehrt.
+- Der CLI-Schreibpfad haengt fuer Tests an einer kleinen internen Renderer-Abstraktion, zum Beispiel `CliReportRenderer`, deren `render()` ein `RenderResult` liefert.
 - Reportadapter, die weiterhin `std::string` liefern, werden im CLI-Schreibpfad ueber einen Adapter-Wrapper in `RenderResult` gehoben.
 - Exceptions aus Reportadaptern sind kein primaerer Fehlervertrag; der CLI-Schreibpfad darf sie als Sicherheitsnetz abfangen und in `RenderError` mappen, aber neue Tests und neue Formatpfade pruefen den `RenderResult`-Pfad.
 
@@ -504,7 +516,7 @@ Unit-/Service-Tests:
 - Impact mit absolutem `changed_file`:
   - `changed_file_source=cli_absolute`
   - `changed_file` ist der normalisierte absolute Pfad, zum Beispiel `/project/src/lib.cpp`
-- Impact mit urspruenglich relativem `changed_file`, dessen `InputPathArgument::path` bereits absolut vorbereitet wurde:
+- Impact mit urspruenglich relativem `changed_file`, dessen `InputPathArgument::path_for_io` bereits absolut vorbereitet wurde:
   - `changed_file_path.was_relative=true`
   - `changed_file_source` bleibt `compile_database_directory` oder `file_api_source_root`
   - `changed_file` bleibt ein relativer Anzeige-String zur jeweiligen Provenienz-Basis
@@ -514,6 +526,8 @@ Unit-/Service-Tests:
 - Relative normale Eingabepfade bleiben in `compile_database_path` und `cmake_file_api_path` als normalisierte relative Anzeige-Strings erhalten.
 - Absolute normale Eingabepfade bleiben in `compile_database_path` und `cmake_file_api_path` als absolute Anzeige-Strings erhalten.
 - `cmake_file_api_resolved_path` folgt der Adapterpfad-Regel und wird nicht aus dem originalen CLI-String rekonstruiert.
+- Normale Eingabe-Displaypfade werden aus `InputPathArgument::original_argument` erzeugt; IO nutzt `path_for_io`.
+- Ein Test deckt `original_argument=./build/../out/compile_commands.json` und davon abweichendes `path_for_io` ab, damit die Anzeige nicht aus dem IO-Pfad rekonstruiert wird.
 - File-API-Fehlerergebnis nach bereits bekannter Build-/Reply-Pfadaufloesung behaelt `cmake_file_api_resolved_path` in `ReportInputs`.
 - File-API-Fehlerergebnis ohne stabile Build-/Reply-Pfadaufloesung setzt `ReportInputs.cmake_file_api_resolved_path=nullopt`.
 - Leerer `BuildModelResult::source_root` wird als unbekannte Source-Root behandelt und fuehrt bei File-API-only-Impact mit relativem `changed_file` zu `changed_file_source=unresolved_file_api_source_root`.
@@ -541,6 +555,7 @@ CLI-Tests:
 - `--output` mit `markdown` wird akzeptiert.
 - `--output` mit `html|json|dot` erzeugt bis zur jeweiligen Adapter-Implementierung denselben `not implemented`-Fehler und keine Zieldatei.
 - `--format console --output out.txt` ergibt Exit-Code `2`.
+- `analyze --format console --output out.txt` ohne Eingabequelle ergibt den `--output`-nicht-erlaubt-Fehler, nicht Missing-Input.
 - erfolgreicher `--output`-Aufruf laesst stdout leer.
 - Fehler und Warnungen gehen nach `stderr`.
 - Reportports und Formatadapter erhalten keinen `OutputVerbosity`-Parameter.
@@ -549,6 +564,7 @@ CLI-Schreibpfad-Tests:
 
 - simulierter Render-Fehler erzeugt keine ersetzte Zieldatei, liefert Exit-Code ungleich `0` und schreibt eine Fehlermeldung nach `stderr`.
 - Render-Fehler werden im CLI-Schreibpfad vor dem Atomic Writer abgefangen; der Atomic Writer bekommt nur fertige Bytes.
+- Der Test injiziert einen `CliReportRenderer`-Test-Doppelgaenger, der `RenderResult` mit Fehler liefert; Exception-only-Tests reichen fuer AP 1.1 nicht aus.
 
 Atomic-Writer-Tests:
 
