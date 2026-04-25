@@ -18,7 +18,7 @@ Umsetzen:
 - Dokumentierter JSON-Vertrag in `docs/report-json.md`.
 - Maschinenlesbares JSON Schema in `docs/report-json.schema.json`.
 - Schema-Validierung fuer Goldens und echte CLI-E2E-Ausgaben.
-- E2E-Goldens fuer zentrale Provenienz-, Limit-, Fehler- und Stream-Vertraege.
+- E2E-Goldens fuer zentrale Provenienz- und Limit-Vertraege sowie E2E-Tests fuer Fehler- und Stream-Vertraege.
 - CI-/Docker-Bootstrap fuer den JSON-Schema-Validator in allen `ctest`-Pfaden.
 
 Nicht veraendern:
