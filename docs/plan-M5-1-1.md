@@ -47,6 +47,7 @@ Voraussichtlich zu aendern:
 - `src/adapters/CMakeLists.txt`
 - `src/main.cpp`
 - `tests/CMakeLists.txt`
+- `tests/adapters/test_cmake_file_api_adapter.cpp`
 - `tests/hexagon/test_analysis_support.cpp`
 - `tests/hexagon/test_project_analyzer.cpp`
 - `tests/hexagon/test_impact_analyzer.cpp`
@@ -134,6 +135,17 @@ Regeln:
 - Bei Mixed-Input-Laeufen bleiben die alten Legacy-Felder so befuellt, dass bestehende Console-/Markdown-Goldens unveraendert bleiben.
 - Legacy-Felder duerfen in AP 1.1 aus bestehender Rueckwaertskompatibilitaetslogik befuellt werden; sie sind keine Quelle fuer neue HTML-/JSON-/DOT-Adapter.
 - Eine spaetere Migration von Console/Markdown auf `ReportInputs` ist ein eigenes Arbeitspaket und muss eigene Golden-Aenderungen explizit begruenden.
+
+### `ReportInputs` bei Fehlerergebnissen
+
+`ProjectAnalyzer` und `ImpactAnalyzer` erzeugen `ReportInputs` aus dem Request, bevor Compile Database oder File API geladen werden.
+
+Regeln:
+
+- Wenn ein Service ein `AnalysisResult` oder `ImpactResult` mit Diagnostics oder unvollstaendigen Daten zurueckgibt, muss `inputs` trotzdem aus dem Request befuellt sein.
+- Fehler beim Laden von Compile Database oder File API duerfen die bekannte Eingabeprovenienz nicht auf `nullopt` zuruecksetzen.
+- Ausgenommen sind reine CLI-Parser-/Verwendungsfehler, bei denen kein Service aufgerufen und kein Ergebnisobjekt erzeugt wird.
+- AP 1.1 definiert keinen stabilen `ReportInputs`-Vertrag fuer ungefangene Exceptions, die kein Ergebnisobjekt erzeugen.
 
 Die Includes in `analysis_result.h` und `impact_result.h` werden entsprechend angepasst.
 
@@ -312,6 +324,13 @@ Validierungsreihenfolge:
 5. Deshalb gewinnt bei `--format json|html|dot` der `not implemented`-Fehler gegen gleichzeitig fehlende Eingaben oder ein angegebenes `--output`.
 6. Bei lauffaehigem `--format console` gewinnt dagegen die normale `--output`-Kombinationsvalidierung und `--format console --output out.txt` bleibt ein Verwendungsfehler.
 
+CLI-Parser-Anpassung:
+
+- `--changed-file` darf nicht mehr als Parser-`required()` modelliert sein, wenn diese Required-Pruefung vor der Formatverfuegbarkeit greift.
+- Die Pflicht fuer `impact --changed-file` wird als fachliche Eingabevalidierung nach der Formatverfuegbarkeitspruefung umgesetzt.
+- Dadurch liefert `impact --format json --cmake-file-api <path>` ohne `--changed-file` in AP 1.1 den stabilen `not implemented in this build`-Fehler und keinen Parser-Required-Fehler.
+- Fuer lauffaehige Formate bleibt `impact` ohne `--changed-file` ein Verwendungsfehler mit Exit-Code `2`.
+
 `--output`-Validierung:
 
 - In AP 1.1 erfolgreich erlaubt nur fuer `markdown`.
@@ -449,6 +468,13 @@ Unit-/Service-Tests:
 - `cmake_file_api_resolved_path` folgt der Adapterpfad-Regel und wird nicht aus dem originalen CLI-String rekonstruiert.
 - `AnalyzeImpactRequest` transportiert `compile_commands_path`, `changed_file_path`, `cmake_file_api_path`, `report_display_base` und die jeweilige `was_relative`-Information.
 - Es gibt keinen virtuellen positionalen `AnalyzeImpactPort` mehr im CLI- oder Composition-Root-Pfad.
+- Fehlerergebnisse aus `ProjectAnalyzer` und `ImpactAnalyzer`, zum Beispiel fehlgeschlagene Compile-Database- oder File-API-Ladevorgaenge, enthalten trotzdem die aus dem Request bekannten `ReportInputs`.
+
+Adapter-Tests:
+
+- `tests/adapters/test_cmake_file_api_adapter.cpp` prueft, dass `CmakeFileApiAdapter` bei Build-Dir-Eingabe den rohen aufgeloesten Build-/Reply-Pfad in `BuildModelResult::cmake_file_api_resolved_path` setzt.
+- `tests/adapters/test_cmake_file_api_adapter.cpp` prueft denselben Vertrag bei direkter Reply-Dir-Eingabe.
+- Adapter-Tests pruefen nur den rohen lexikalischen Adapterpfad; Display-Konvertierung relativ zu `report_display_base` bleibt Service-Testumfang.
 
 CLI-Tests:
 
@@ -456,6 +482,7 @@ CLI-Tests:
 - `--format html|json|dot` wird als bekannter, aber in diesem Build noch nicht implementierter Wert erkannt, liefert Exit-Code `2`, schreibt keine Zieldatei und startet keine Analyse.
 - Tests pruefen die stabile Fehlermeldung ohne Arbeitspaketnummer: `recognized but not implemented in this build`.
 - `--format json|html|dot` mit fehlenden fachlichen Eingaben liefert trotzdem den `not implemented`-Fehler, weil Formatverfuegbarkeit vor Eingabevalidierung geprueft wird.
+- `impact --format json --cmake-file-api <path>` ohne `--changed-file` liefert den `not implemented`-Fehler und keinen Parser-Required-Fehler.
 - `--format json|html|dot --output out` liefert ebenfalls den `not implemented`-Fehler und erzeugt keine Datei.
 - ungueltiges `--format` ergibt Exit-Code `2`.
 - `--output` mit `markdown` wird akzeptiert.
@@ -492,10 +519,13 @@ AP 1.1 ist abgeschlossen, wenn:
 - `console --output` abgelehnt wird;
 - `--output` fuer `markdown` stdout leer laesst;
 - `html`, `json` und `dot` als bekannte, aber noch nicht implementierte Formate deterministisch vor Analyse und Dateierzeugung abgelehnt werden;
+- `impact --format json|html|dot` ohne `--changed-file` nicht an Parser-Required-Validierung scheitert, sondern vor fachlicher Eingabevalidierung den `not implemented in this build`-Fehler liefert;
 - atomarer Write bestehende Zielartefakte bei Fehlern nicht veraendert;
 - `AnalyzeImpactPort` im Produktionspfad nur noch den `AnalyzeImpactRequest`-Vertrag anbietet;
 - kein Produktionspfad mehr eine `analysis_support`-Helper-API nutzt, die ihre Fallback-Basis aus dem Prozess-CWD ableitet;
 - `ReportInputs` fuer Analyze und Impact vollstaendig in Service-Tests abgedeckt ist;
+- `ReportInputs` auch fuer Service-Fehlerergebnisse aus dem Request befuellt wird, sofern ein Ergebnisobjekt zurueckgegeben wird;
+- `CmakeFileApiAdapter` den rohen aufgeloesten Build-/Reply-Pfad in `BuildModelResult::cmake_file_api_resolved_path` setzt und Adaptertests Build-Dir- sowie Reply-Dir-Eingaben abdecken;
 - Compile-Database-only-, File-API- und Mixed-Input-Console-/Markdown-Goldens byte-stabil bleiben;
 - `ReportInputs` in AP 1.1 nicht neu in Console oder Markdown sichtbar wird;
 - bestehende Console-/Markdown-Adapter nur ueber die Legacy-Presentation-Felder byte-stabil gehalten werden, waehrend neue M5-Artefaktadapter `ReportInputs` verwenden muessen;
