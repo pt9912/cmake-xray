@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.2` |
+| Version | `0.3` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -70,6 +70,7 @@ Fuer M5 benoetigt der Report-Pfad mindestens:
 - eine erweiterte Formatwahl in CLI und Composition Root fuer `console`, `markdown`, `html`, `json` und `dot`
 - eine erweiterte `--output`-Validierung fuer `markdown`, `html`, `json` und `dot` bei `analyze` und `impact`; `console` bleibt standardmaessig stdout-orientiert
 - ein gemeinsamer Schreibpfad fuer Reportdateien, der Zielartefakte atomar ueber temporaere Datei und Rename ersetzt und Fehler sauber an die CLI meldet
+- eine explizite Modell- oder Request-Erweiterung fuer stabile Report-Eingabequellen, damit Adapter weiterhin nur `AnalysisResult`- bzw. `ImpactResult`-Daten rendern und keine CLI-/Composition-Root-Details nachladen
 - klare Adaptergrenzen: Jeder Report-Adapter rendert ausschliesslich vorhandene `AnalysisResult`- bzw. `ImpactResult`-Modelle
 - gemeinsame Hilfsfunktionen fuer stabile Sortierung, Text-Escaping, Pfadanzeige und Diagnostics, soweit dadurch Dopplung zwischen Adaptern reduziert wird
 - eine dokumentierte Formatversion fuer maschinenlesbare JSON-Ausgaben
@@ -89,6 +90,7 @@ Vorgesehene Artefakte:
 - Anpassung der CLI-Formatvalidierung in `src/adapters/cli/`
 - Anpassung der CLI-Output-Validierung und der atomaren Dateiausgabe fuer Reportartefakte
 - Anpassung der Composition-Root-Verdrahtung in `src/main.cpp`
+- Erweiterung der fachlichen Ergebnis- oder Request-Modelle um stabile Report-Eingabequellen, mindestens Compile-Database-Pfad, optionaler CMake-File-API-Pfad und bei `impact` die geaenderte Datei
 - neue Adapter unter `src/adapters/output/`
 - Erweiterung von `src/adapters/CMakeLists.txt`
 - Dokumentation der JSON-Formatversion in `docs/`
@@ -125,6 +127,7 @@ Ein JSON-Bericht fuer `impact` soll mindestens enthalten:
 
 Wichtig:
 
+- `inputs` darf nur Felder enthalten, die stabil im fachlichen Ergebnis- oder Request-Modell verfuegbar sind; falls M5 CMake-File-API-Pfade im JSON ausgeben soll, ist vorher eine Modell- oder Request-Erweiterung umzusetzen
 - JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
 - Felder mit leerer Menge werden als leere Arrays ausgegeben, nicht weggelassen, sofern sie Teil des Formatvertrags sind
 - optionale fachliche Informationen koennen `null` sein, wenn das Schema dies explizit dokumentiert
@@ -270,6 +273,7 @@ Der Release-Pfad muss mindestens:
 - ein Linux-CLI-Artefakt als `.tar.gz` erzeugen
 - im Archiv mindestens die ausfuehrbare Datei, Lizenz-/Hinweisdateien und kurze Nutzungsdokumentation enthalten
 - eine SHA-256-Pruefsumme erzeugen
+- vorhandene macOS- und Windows-Artefakt-Jobs im Release-Workflow bewusst einordnen: Entweder werden sie fuer M5-Releases deaktiviert, oder sie werden nur als experimentelle Preview-Artefakte veroeffentlicht, klar benannt und in Release Notes sowie Dokumentation als nicht vollstaendig freigegeben markiert
 - ein OCI-kompatibles Runtime-Image bauen
 - das Image mit dem Versions-Tag veroeffentlichen
 - fuer regulaere Releases ohne Prerelease-Suffix zusaetzlich `latest` pflegen und Vorabversionen davon ausnehmen
@@ -278,6 +282,7 @@ Der Release-Pfad muss mindestens:
 Wichtig:
 
 - Release-Artefakte duerfen nicht von lokalen Build-Pfaden abhaengen
+- offiziell freigegebene M5-Artefakte sind Linux-CLI-Archiv und OCI-Image; macOS-/Windows-Archive zaehlen nur dann zum Releaseumfang, wenn der Plan vor Abschluss explizit auf vollstaendige Plattformfreigabe erweitert wird
 - der Runtime-Container muss `cmake-xray --help` ohne weitere Toolchain ausfuehren koennen
 - die Dokumentation muss lokale Nutzung und CI-Nutzung des Containers zeigen
 - fehlgeschlagene Release-Schritte muessen klar sichtbar sein und keine Teilveroeffentlichung als Erfolg melden
@@ -332,6 +337,7 @@ Die neuen Formate und Release-Pfade sind nur dann nutzbar, wenn Beispiele, Golde
 
 M5 aktualisiert mindestens:
 
+- Versionsquellen fuer `v1.2.0`: Root-`CMakeLists.txt`, `src/hexagon/model/application_info.h` und alle daraus abgeleiteten `--version`-/Paketmetadaten
 - `docs/examples/` mit repraesentativen HTML-, JSON- und DOT-Ausgaben
 - `README.md` mit Formatwahl, quiet/verbose und Release-/Container-Nutzung
 - `docs/guide.md` mit praktischen Aufrufen fuer alle M5-Formate
@@ -348,6 +354,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
 - Smoke-Test fuer Docker-Runtime-Image
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
+- Versionscheck, dass `cmake-xray --version`, `src/hexagon/model/application_info.h`, Root-`CMakeLists.txt` und Release-Tag konsistent `1.2.0` melden
 - Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
 - Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt und den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
@@ -380,13 +387,16 @@ Abhaengigkeiten:
 | Risiko | Auswirkung | Gegenmassnahme |
 |---|---|---|
 | JSON wird ohne klaren Vertrag eingefuehrt | Folgewerkzeuge brechen bei jeder Report-Aenderung | `format_version` dokumentieren und Golden-Tests fuer zentrale Felder pflegen |
+| JSON-`inputs` verlangt Daten, die nicht im Ergebnis- oder Request-Modell stehen | Adapter muessten CLI-Zustand kennen oder der Vertrag bleibt unerfuellt | Eingabequellen vor Adapterbau explizit im Modell/Request verfuegbar machen oder den JSON-Vertrag auf vorhandene Felder begrenzen |
 | `--output` bleibt nur teilweise fuer neue Formate nutzbar | Nutzer koennen neue Artefaktformate nicht verlaesslich in CI speichern | `--output` fuer `markdown`, `html`, `json` und `dot` explizit freischalten und atomare Schreibtests aufnehmen |
 | DOT suggeriert Target-Graph-Semantik, die M5 noch nicht besitzt | Nutzer interpretieren Graphen falsch | keine Target-zu-Target-Kanten erzeugen und Legende/Labels klar formulieren |
 | DOT-Escaping ist syntaktisch fehlerhaft | Graphviz-Berichte brechen erst bei Nutzern | Sonderzeichen-Goldens mit Graphviz oder Parser validieren |
 | HTML-Goldens werden durch kosmetische Details instabil | Tests werden teuer und rauschanfaellig | keine Zeitstempel, keine Zufalls-IDs, deterministische Struktur |
 | `--verbose` schreibt Zusatztext in maschinenlesbare Ausgaben | JSON-/DOT-Nutzung in CI bricht | stdout fuer maschinenlesbare Reports sauber halten; Zusatzdiagnostik nach `stderr` oder strukturiert ausgeben |
 | Release-Trigger akzeptiert ungueltige Tags | fehlerhafte Releases oder falsche `latest`-Tags entstehen | Semver-/Prerelease-Tags fail-fast validieren und `latest` nur fuer regulaere Releases setzen |
+| macOS-/Windows-Artefakte werden trotz begrenzter Freigabe veroeffentlicht | Nutzer interpretieren Preview-Builds als offiziell unterstuetzte Releases | Release-Workflow entweder auf Linux/OCI begrenzen oder Plattformarchive deutlich als experimentell dokumentieren |
 | Release-Workflow funktioniert nur fuer lokale Pfade | Artefakte sind nicht real nutzbar | entpacktes Linux-Archiv und Container-Image separat smoke-testen |
+| Versionsquellen bleiben auf `1.1.0` | ein `v1.2.0`-Release meldet intern die alte Version | Root-`CMakeLists.txt`, `application_info.h`, `--version` und Release-Tag gemeinsam pruefen |
 | Windows-Pfade brechen Golden-Tests | Portabilitaetsziel bleibt theoretisch | Pfadanzeige und Normalisierung explizit testen; Goldens plattformrobust gestalten |
 
 ## 4. Rueckverfolgbarkeit
