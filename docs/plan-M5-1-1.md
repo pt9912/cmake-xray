@@ -232,8 +232,11 @@ Regeln:
 - Der `CmakeFileApiAdapter` setzt diese Werte, kennt aber keine Report-Display-Basis.
 - Adapter liefern rohe lexikalische Pfade, keine host-spezifisch normalisierten Display-Strings.
 - `source_root` bleibt die Quelle fuer bestehende Analyse- und Impact-Basislogik; AP 1.1 fuehrt kein zusaetzliches `cmake_file_api_source_root` mit abweichender Semantik ein.
+- Ein leerer `source_root`-String gilt als "Source-Root unbekannt"; ein nicht leerer String gilt als bekannte File-API-Source-Root. Services kapseln diese Regel in einem kleinen Helper, damit `unresolved_file_api_source_root` nicht ueber verstreute Leerstring-Pruefungen entsteht.
 - `ReportInputs.cmake_file_api_path` kommt ausschliesslich aus `AnalyzeProjectRequest::cmake_file_api_path` oder `AnalyzeImpactRequest::cmake_file_api_path`, inklusive `was_relative` und `report_display_base`.
 - `ReportInputs.cmake_file_api_resolved_path` kommt ausschliesslich aus `BuildModelResult::cmake_file_api_resolved_path` und wird in den Services ueber die Display-Pfadregeln konvertiert.
+- Wenn File-API-Laden nach erfolgreicher Build-/Reply-Pfadaufloesung fehlschlaegt, bleibt `BuildModelResult::cmake_file_api_resolved_path` gesetzt und wird in Fehlerergebnissen nach `ReportInputs.cmake_file_api_resolved_path` uebernommen.
+- Wenn File-API-Laden vor einer stabilen Build-/Reply-Pfadaufloesung fehlschlaegt, bleibt `BuildModelResult::cmake_file_api_resolved_path == std::nullopt`; Services duerfen in diesem Fall keinen Ersatzpfad erfinden.
 - Der Adapter transportiert den originalen CLI-Eingabepfad nicht zurueck; er koennte `was_relative` und `report_display_base` nicht verlaesslich rekonstruieren.
 - Keine CLI- oder Adapterzustandswerte werden spaeter an Reportadapter nachgereicht.
 
@@ -289,7 +292,7 @@ Gemeinsame Grenzen:
 
 ## `changed_file`-Provenienz
 
-`ImpactAnalyzer` setzt `changed_file` und `changed_file_source` ueber eine eigene Regel. `report_display_base` wird fuer `changed_file` nicht verwendet, weil relative `--changed-file`-Werte fachlich gegen die Impact-Provenienz-Basis aufgeloest werden.
+`ImpactAnalyzer` setzt `changed_file` und `changed_file_source` ueber eine eigene Regel. `report_display_base` wird nicht direkt als Display-Basis fuer `changed_file` verwendet, weil relative `--changed-file`-Werte fachlich gegen die Impact-Provenienz-Basis aufgeloest werden. Indirekt kann `report_display_base` relevant sein, wenn die Compile-Database-Directory fuer einen pfadlosen `compile_commands_path` zuerst ueber die explizite Request-Basis bestimmt werden muss.
 
 Display- und Aufloesungsregeln:
 
@@ -397,7 +400,9 @@ Atomic-Writer-Vertrag:
 - AP 1.1 garantiert keine Crash-Dauerhaftigkeit nach Stromausfall oder Kernel-Abbruch.
 - Flush bedeutet hier Stream-/Handle-Flush zur Fehlererkennung vor dem Replace, nicht zwingend `fsync`, Directory-`fsync`, `_commit` oder `FlushFileBuffers`.
 - POSIX nutzt `rename` oder `renameat` fuer den finalen Replace.
-- Windows nutzt `ReplaceFileW` oder `MoveFileExW` mit `MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH`.
+- Windows unterscheidet Zielzustaende:
+  - fuer vorhandene Zielpfade nutzt der Wrapper `ReplaceFileW` oder `MoveFileExW` mit `MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH`;
+  - fuer neue Zielpfade nutzt der Wrapper `MoveFileExW` mit `MOVEFILE_WRITE_THROUGH` ohne Replace-Erwartung oder eine gleichwertige exklusive Move-Primitive.
 - Zielpfad darf vor dem Replace nicht geloescht werden.
 - Zurueckbleibende Temp-Dateien nach Prozessabbruch sind erlaubt, aber unter dem Zielnamen darf nie ein teilgeschriebener Report sichtbar werden.
 
@@ -507,6 +512,9 @@ Unit-/Service-Tests:
 - Relative normale Eingabepfade bleiben in `compile_database_path` und `cmake_file_api_path` als normalisierte relative Anzeige-Strings erhalten.
 - Absolute normale Eingabepfade bleiben in `compile_database_path` und `cmake_file_api_path` als absolute Anzeige-Strings erhalten.
 - `cmake_file_api_resolved_path` folgt der Adapterpfad-Regel und wird nicht aus dem originalen CLI-String rekonstruiert.
+- File-API-Fehlerergebnis nach bereits bekannter Build-/Reply-Pfadaufloesung behaelt `cmake_file_api_resolved_path` in `ReportInputs`.
+- File-API-Fehlerergebnis ohne stabile Build-/Reply-Pfadaufloesung setzt `ReportInputs.cmake_file_api_resolved_path=nullopt`.
+- Leerer `BuildModelResult::source_root` wird als unbekannte Source-Root behandelt und fuehrt bei File-API-only-Impact mit relativem `changed_file` zu `changed_file_source=unresolved_file_api_source_root`.
 - `AnalyzeImpactRequest` transportiert `compile_commands_path`, `changed_file_path`, `cmake_file_api_path`, `report_display_base` und die jeweilige `was_relative`-Information.
 - Es gibt keinen virtuellen positionalen `AnalyzeImpactPort` mehr im CLI- oder Composition-Root-Pfad.
 - Fehlerergebnisse aus `ProjectAnalyzer` und `ImpactAnalyzer`, zum Beispiel fehlgeschlagene Compile-Database- oder File-API-Ladevorgaenge, enthalten trotzdem die aus dem Request bekannten `ReportInputs`.
@@ -515,6 +523,8 @@ Adapter-Tests:
 
 - `tests/adapters/test_cmake_file_api_adapter.cpp` prueft, dass `CmakeFileApiAdapter` bei Build-Dir-Eingabe den rohen aufgeloesten Build-/Reply-Pfad in `BuildModelResult::cmake_file_api_resolved_path` setzt.
 - `tests/adapters/test_cmake_file_api_adapter.cpp` prueft denselben Vertrag bei direkter Reply-Dir-Eingabe.
+- Adaptertests pruefen einen Fehlerfall nach erfolgreicher Build-/Reply-Pfadaufloesung, bei dem `cmake_file_api_resolved_path` gesetzt bleibt.
+- Adaptertests pruefen einen Fehlerfall vor stabiler Build-/Reply-Pfadaufloesung, bei dem `cmake_file_api_resolved_path` `std::nullopt` bleibt.
 - Adapter-Tests pruefen nur den rohen lexikalischen Adapterpfad; Display-Konvertierung relativ zu `report_display_base` bleibt Service-Testumfang.
 
 CLI-Tests:
@@ -533,13 +543,18 @@ CLI-Tests:
 - Fehler und Warnungen gehen nach `stderr`.
 - Reportports und Formatadapter erhalten keinen `OutputVerbosity`-Parameter.
 
+CLI-Schreibpfad-Tests:
+
+- simulierter Render-Fehler erzeugt keine ersetzte Zieldatei, liefert Exit-Code ungleich `0` und schreibt eine Fehlermeldung nach `stderr`.
+- Render-Fehler werden im CLI-Schreibpfad vor dem Atomic Writer abgefangen; der Atomic Writer bekommt nur fertige Bytes.
+
 Atomic-Writer-Tests:
 
 - neue Datei wird vollstaendig geschrieben.
 - vorhandene Datei wird bei Erfolg ersetzt.
-- vorhandene Datei bleibt bei simuliertem Render-/Write-/Flush-/Replace-Fehler unveraendert.
-- simulierter Render-Fehler erzeugt keine ersetzte Zieldatei, liefert Exit-Code ungleich `0` und schreibt eine Fehlermeldung nach `stderr`.
+- vorhandene Datei bleibt bei simuliertem Write-/Flush-/Replace-Fehler unveraendert.
 - Temp-Datei wird exklusiv erstellt; eine vorhandene Temp-Datei wird nicht ueberschrieben.
+- neue Zielpfade und vorhandene Zielpfade werden auf Windows ueber die jeweils passende Move-/Replace-Primitive getestet.
 - Tests pruefen leserseitige atomare Replace-Semantik, aber keine Crash-Dauerhaftigkeit nach Stromausfall.
 - Windows-Pfad nutzt die Windows-Replace-Implementierung oder einen abstrahierten Test-Doppelgaenger mit derselben Semantik.
 
