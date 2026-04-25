@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.3` |
+| Version | `0.4` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -31,7 +31,7 @@ M5 gilt als erreicht, wenn:
 - macOS- und Windows-Builds mindestens in CI oder dokumentierten Smoke-Checks bewertet sind; bekannte Einschraenkungen werden explizit dokumentiert
 - automatisierte Adapter-, CLI-, Golden-Output- und Release-Smoke-Tests die neuen Formate, Modi und Bereitstellungspfade absichern
 
-Relevante Kennungen: `F-28`, `F-29`, `F-30`, `F-39`, `F-40`, `F-43`, `F-44`, `NF-08`, `NF-09`, `NF-20`, `NF-21`, `S-12`, `S-13`
+Relevante Kennungen: `F-28`, `F-29`, `F-30`, `F-39`, `F-40`, `F-43`, `F-44`, `NF-08`, `NF-09`, `NF-20`, `NF-21`, `S-06`, `S-07`, `S-08`, `S-12`, `S-13`
 
 ### 0.3 Abgrenzung
 Bestandteil von M5 sind:
@@ -70,7 +70,7 @@ Fuer M5 benoetigt der Report-Pfad mindestens:
 - eine erweiterte Formatwahl in CLI und Composition Root fuer `console`, `markdown`, `html`, `json` und `dot`
 - eine erweiterte `--output`-Validierung fuer `markdown`, `html`, `json` und `dot` bei `analyze` und `impact`; `console` bleibt standardmaessig stdout-orientiert
 - ein gemeinsamer Schreibpfad fuer Reportdateien, der Zielartefakte atomar ueber temporaere Datei und Rename ersetzt und Fehler sauber an die CLI meldet
-- eine explizite Modell- oder Request-Erweiterung fuer stabile Report-Eingabequellen, damit Adapter weiterhin nur `AnalysisResult`- bzw. `ImpactResult`-Daten rendern und keine CLI-/Composition-Root-Details nachladen
+- eine verpflichtende strukturierte Modell- oder Request-Erweiterung fuer stabile Report-Eingabequellen, damit Adapter weiterhin nur `AnalysisResult`- bzw. `ImpactResult`-Daten rendern und keine CLI-/Composition-Root-Details nachladen
 - klare Adaptergrenzen: Jeder Report-Adapter rendert ausschliesslich vorhandene `AnalysisResult`- bzw. `ImpactResult`-Modelle
 - gemeinsame Hilfsfunktionen fuer stabile Sortierung, Text-Escaping, Pfadanzeige und Diagnostics, soweit dadurch Dopplung zwischen Adaptern reduziert wird
 - eine dokumentierte Formatversion fuer maschinenlesbare JSON-Ausgaben
@@ -90,7 +90,7 @@ Vorgesehene Artefakte:
 - Anpassung der CLI-Formatvalidierung in `src/adapters/cli/`
 - Anpassung der CLI-Output-Validierung und der atomaren Dateiausgabe fuer Reportartefakte
 - Anpassung der Composition-Root-Verdrahtung in `src/main.cpp`
-- Erweiterung der fachlichen Ergebnis- oder Request-Modelle um stabile Report-Eingabequellen, mindestens Compile-Database-Pfad, optionaler CMake-File-API-Pfad und bei `impact` die geaenderte Datei
+- Erweiterung der fachlichen Ergebnis- oder Request-Modelle um ein strukturiertes `ReportInputs`-Modell, mindestens mit `compile_database_path`, `cmake_file_api_path` und bei `impact` `changed_file`; nicht verwendete optionale Eingaben werden explizit als `null` oder leeres Feld nach dokumentierter Schema-Regel abgebildet
 - neue Adapter unter `src/adapters/output/`
 - Erweiterung von `src/adapters/CMakeLists.txt`
 - Dokumentation der JSON-Formatversion in `docs/`
@@ -106,10 +106,10 @@ Ein JSON-Bericht fuer `analyze` soll mindestens enthalten:
 - `format`: fester Formatbezeichner, zum Beispiel `cmake-xray.analysis`
 - `format_version`: Schema-/Formatversion, initial `1`
 - `report_type`: `analyze`
-- `inputs`: verwendete Eingabequellen und Anzeige-/Normalisierungspfade
+- `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell, mindestens `compile_database_path` und `cmake_file_api_path`
 - `summary`: Translation-Unit-Anzahl, Ranking-Anzahl, Hotspot-Anzahl, Top-Limit, Beobachtungsherkunft und Target-Metadatenstatus
-- `translation_unit_ranking`: deterministisch sortierte Ranking-Eintraege inklusive Metriken, Diagnostics und Target-Zuordnungen
-- `include_hotspots`: deterministisch sortierte Include-Hotspot-Eintraege
+- `translation_unit_ranking`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items` inklusive Metriken, Diagnostics und Target-Zuordnungen
+- `include_hotspots`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items`
 - `diagnostics`: reportweite Diagnostics
 
 Ein JSON-Bericht fuer `impact` soll mindestens enthalten:
@@ -117,7 +117,7 @@ Ein JSON-Bericht fuer `impact` soll mindestens enthalten:
 - `format`: fester Formatbezeichner, zum Beispiel `cmake-xray.impact`
 - `format_version`: Schema-/Formatversion, initial `1`
 - `report_type`: `impact`
-- `inputs`: verwendete Eingabequellen und geaenderte Datei
+- `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell, mindestens `compile_database_path`, `cmake_file_api_path` und `changed_file`
 - `summary`: Anzahl betroffener Translation Units, Klassifikation, Beobachtungsherkunft, Target-Metadatenstatus und Anzahl betroffener Targets
 - `directly_affected_translation_units`
 - `heuristically_affected_translation_units`
@@ -127,7 +127,8 @@ Ein JSON-Bericht fuer `impact` soll mindestens enthalten:
 
 Wichtig:
 
-- `inputs` darf nur Felder enthalten, die stabil im fachlichen Ergebnis- oder Request-Modell verfuegbar sind; falls M5 CMake-File-API-Pfade im JSON ausgeben soll, ist vorher eine Modell- oder Request-Erweiterung umzusetzen
+- `inputs` darf nur Felder enthalten, die stabil im fachlichen Ergebnis- oder Request-Modell verfuegbar sind; `cmake_file_api_path` ist als Feld fuer M5 verpflichtend, damit File-API- und Mixed-Input-Laeufe vollstaendig dokumentiert werden koennen
+- JSON folgt der CLI-`--top`-Begrenzung fuer Ranking- und Hotspot-Listen, muss aber ueber `limit`, `total_count`, `returned_count` und `truncated` eindeutig anzeigen, ob die Ausgabe gekuerzt wurde; eine unlimitierte JSON-Ausgabe waere nur nach expliziter Schema-Entscheidung zulaessig
 - JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
 - Felder mit leerer Menge werden als leere Arrays ausgegeben, nicht weggelassen, sofern sie Teil des Formatvertrags sind
 - optionale fachliche Informationen koennen `null` sein, wenn das Schema dies explizit dokumentiert
@@ -270,6 +271,7 @@ Der Release-Pfad muss mindestens:
 - bei Tag-Push mit erlaubtem Semver-Tag einen Release-Workflow starten: regulaere Releases verwenden `vMAJOR.MINOR.PATCH`, Vorabversionen verwenden `vMAJOR.MINOR.PATCH-PRERELEASE`
 - Tags vor dem Build fail-fast validieren und unbekannte Muster wie `vfoo`, unvollstaendige Versionen oder Build-Metadaten ohne dokumentierte Freigabe abbrechen
 - Test-, Coverage-, Quality- und Runtime-Pfade vor dem Veroeffentlichen ausfuehren
+- Publishing-Schritte in einen finalen Release-Job nach allen Gates verschieben; Verify-/Build-Jobs duerfen Container und Archive bauen und testen, aber keine Images oder Release-Artefakte in externe Registries bzw. Releases pushen
 - ein Linux-CLI-Artefakt als `.tar.gz` erzeugen
 - im Archiv mindestens die ausfuehrbare Datei, Lizenz-/Hinweisdateien und kurze Nutzungsdokumentation enthalten
 - eine SHA-256-Pruefsumme erzeugen
@@ -286,6 +288,7 @@ Wichtig:
 - der Runtime-Container muss `cmake-xray --help` ohne weitere Toolchain ausfuehren koennen
 - die Dokumentation muss lokale Nutzung und CI-Nutzung des Containers zeigen
 - fehlgeschlagene Release-Schritte muessen klar sichtbar sein und keine Teilveroeffentlichung als Erfolg melden
+- insbesondere darf kein GHCR-Image veroeffentlicht werden, bevor Build-Artefakte, Smoke-Tests und GitHub-Release-Erstellung erfolgreich abgeschlossen sind; falls technisch nicht erreichbar, muss ein expliziter Recovery-Pfad mit Loesch-/Retagging-Schritten dokumentiert werden
 - die Release-Dokumentation muss die erlaubten Tag-Muster, Prerelease-Behandlung und `latest`-Regel explizit nennen
 
 Vorgesehene Artefakte:
@@ -352,6 +355,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - CLI-Tests fuer atomare Dateiausgabe: erfolgreiche Writes erzeugen vollstaendige Reports, Fehlerfaelle hinterlassen kein halb geschriebenes Zielartefakt
 - CLI-Tests fuer `--verbose`, `--quiet` und gegenseitigen Ausschluss
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
+- JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten Listen
 - Smoke-Test fuer Docker-Runtime-Image
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
 - Versionscheck, dass `cmake-xray --version`, `src/hexagon/model/application_info.h`, Root-`CMakeLists.txt` und Release-Tag konsistent `1.2.0` melden
@@ -387,7 +391,8 @@ Abhaengigkeiten:
 | Risiko | Auswirkung | Gegenmassnahme |
 |---|---|---|
 | JSON wird ohne klaren Vertrag eingefuehrt | Folgewerkzeuge brechen bei jeder Report-Aenderung | `format_version` dokumentieren und Golden-Tests fuer zentrale Felder pflegen |
-| JSON-`inputs` verlangt Daten, die nicht im Ergebnis- oder Request-Modell stehen | Adapter muessten CLI-Zustand kennen oder der Vertrag bleibt unerfuellt | Eingabequellen vor Adapterbau explizit im Modell/Request verfuegbar machen oder den JSON-Vertrag auf vorhandene Felder begrenzen |
+| JSON-`inputs` verlangt Daten, die nicht im Ergebnis- oder Request-Modell stehen | Adapter muessten CLI-Zustand kennen oder der Vertrag bleibt unerfuellt | strukturiertes `ReportInputs`-Modell mit `compile_database_path`, `cmake_file_api_path` und `changed_file` als M5-Pflicht einfuehren |
+| JSON-Listen sind durch `--top` gekuerzt, ohne dies zu kennzeichnen | Automatisierung verwechselt kurze Ausgaben mit vollstaendigen Projektdaten | `limit`, `total_count`, `returned_count` und `truncated` fuer Ranking- und Hotspot-Listen verpflichtend machen |
 | `--output` bleibt nur teilweise fuer neue Formate nutzbar | Nutzer koennen neue Artefaktformate nicht verlaesslich in CI speichern | `--output` fuer `markdown`, `html`, `json` und `dot` explizit freischalten und atomare Schreibtests aufnehmen |
 | DOT suggeriert Target-Graph-Semantik, die M5 noch nicht besitzt | Nutzer interpretieren Graphen falsch | keine Target-zu-Target-Kanten erzeugen und Legende/Labels klar formulieren |
 | DOT-Escaping ist syntaktisch fehlerhaft | Graphviz-Berichte brechen erst bei Nutzern | Sonderzeichen-Goldens mit Graphviz oder Parser validieren |
@@ -395,6 +400,7 @@ Abhaengigkeiten:
 | `--verbose` schreibt Zusatztext in maschinenlesbare Ausgaben | JSON-/DOT-Nutzung in CI bricht | stdout fuer maschinenlesbare Reports sauber halten; Zusatzdiagnostik nach `stderr` oder strukturiert ausgeben |
 | Release-Trigger akzeptiert ungueltige Tags | fehlerhafte Releases oder falsche `latest`-Tags entstehen | Semver-/Prerelease-Tags fail-fast validieren und `latest` nur fuer regulaere Releases setzen |
 | macOS-/Windows-Artefakte werden trotz begrenzter Freigabe veroeffentlicht | Nutzer interpretieren Preview-Builds als offiziell unterstuetzte Releases | Release-Workflow entweder auf Linux/OCI begrenzen oder Plattformarchive deutlich als experimentell dokumentieren |
+| GHCR-Image wird vor Abschluss aller Release-Gates gepusht | Teilveroeffentlichung ohne passenden GitHub Release bleibt zurueck | Publish in finalen Job nach Build, Smoke-Tests und Release-Erstellung verschieben oder Recovery-Pfad dokumentieren |
 | Release-Workflow funktioniert nur fuer lokale Pfade | Artefakte sind nicht real nutzbar | entpacktes Linux-Archiv und Container-Image separat smoke-testen |
 | Versionsquellen bleiben auf `1.1.0` | ein `v1.2.0`-Release meldet intern die alte Version | Root-`CMakeLists.txt`, `application_info.h`, `--version` und Release-Tag gemeinsam pruefen |
 | Windows-Pfade brechen Golden-Tests | Portabilitaetsziel bleibt theoretisch | Pfadanzeige und Normalisierung explizit testen; Goldens plattformrobust gestalten |
@@ -414,5 +420,8 @@ Abhaengigkeiten:
 | `NF-09` | dokumentierte Compiler-/CMake-Kompatibilitaet und Smoke-Checks |
 | `NF-20` | dokumentierte JSON-Formatversion |
 | `NF-21` | Release- und Container-Dokumentation ohne interne Build-Pfade |
+| `S-06` | HTML-Datei als Ausgabeschnittstelle |
+| `S-07` | JSON als versionierte Ausgabeschnittstelle |
+| `S-08` | DOT/Graphviz als Ausgabeschnittstelle |
 | `S-12` | Linux-Release-Archiv |
 | `S-13` | Container-Image fuer lokale Nutzung und CI |
