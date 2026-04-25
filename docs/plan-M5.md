@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.6` |
+| Version | `0.7` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -96,6 +96,7 @@ Vorgesehene Artefakte:
 - Erweiterung von `src/hexagon/model/analysis_result.*` und `src/hexagon/model/impact_result.*` um ein strukturiertes `ReportInputs`-Modell, mindestens mit `compile_database_path`, `cmake_file_api_path` und bei `impact` `changed_file`; nicht verwendete optionale Eingaben werden explizit als `null` oder leeres Feld nach dokumentierter Schema-Regel abgebildet
 - Anpassung der Producer-Pfade in `ProjectAnalyzer`, `ImpactAnalyzer` und den zugehoerigen Driving-Request-/Port-Vertraegen, damit `ReportInputs` beim Erzeugen von `AnalysisResult` und `ImpactResult` vollstaendig gesetzt wird und nicht nachtraeglich in der CLI an Adapter uebergeben werden muss
 - `ReportWriterPort`/`GenerateReportPort` bleiben aus Adaptersicht ergebnisobjektzentriert; Signaturaenderungen sind nur zulaessig, wenn sie `ReportInputs` weiterhin als Teil des fachlichen Ergebnisvertrags transportieren und nicht als separaten CLI-Kontext in Adapter leaken
+- Verbosity bleibt eine CLI-Emission-Policy in `src/adapters/cli/` und `src/main.cpp`; `ReportWriterPort`/`GenerateReportPort` erhalten keinen `OutputVerbosity`-Parameter, und fachliche Reportadapter rendern keine Verbose-/Quiet-Sondervarianten
 - neue Adapter unter `src/adapters/output/`
 - Erweiterung von `src/adapters/CMakeLists.txt`
 - Dokumentation der JSON-Formatversion in `docs/`
@@ -135,7 +136,8 @@ Wichtig:
 - `inputs` darf nur Felder enthalten, die stabil im fachlichen Ergebnis- oder Request-Modell verfuegbar sind; `cmake_file_api_path` ist als Feld fuer M5 verpflichtend, damit File-API- und Mixed-Input-Laeufe vollstaendig dokumentiert werden koennen
 - JSON folgt bei `analyze` der CLI-`--top`-Begrenzung fuer Ranking- und Hotspot-Listen, muss aber ueber `limit`, `total_count`, `returned_count` und `truncated` eindeutig anzeigen, ob die Ausgabe gekuerzt wurde; eine unlimitierte JSON-Ausgabe waere nur nach expliziter Schema-Entscheidung zulaessig
 - `impact`-JSON enthaelt in M5 keine `limit`-/`truncated`-Felder, solange der CLI- und Port-Vertrag keine Impact-Begrenzung kennt; alle betroffenen Translation Units und Targets aus dem `ImpactResult` werden ausgegeben
-- Markdown, HTML und DOT folgen bei `analyze` ebenfalls der CLI-`--top`-Begrenzung; HTML und Markdown kennzeichnen begrenzte Abschnitte menschenlesbar, DOT enthaelt nur die in der begrenzten Ergebnissicht dargestellten Knoten und Kanten
+- Markdown, HTML und DOT folgen bei `analyze` ebenfalls der CLI-`--top`-Begrenzung; HTML und Markdown kennzeichnen begrenzte Abschnitte menschenlesbar
+- DOT enthaelt bei `analyze --top N` die Top-N-Ranking- und Top-N-Hotspot-Knoten sowie deren Kontextkanten; fuer einen Top-Hotspot werden alle in `IncludeHotspot` gespeicherten betroffenen Translation Units als Kontextknoten ausgegeben, auch wenn diese Translation Units nicht selbst im Top-N-Ranking liegen
 - JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
 - Felder mit leerer Menge werden als leere Arrays ausgegeben, nicht weggelassen, sofern sie Teil des Formatvertrags sind
 - optionale fachliche Informationen koennen `null` sein, wenn das Schema dies explizit dokumentiert
@@ -256,15 +258,17 @@ Entscheidungen fuer M5:
 
 - `--verbose` und `--quiet` sind gegenseitig exklusiv
 - beide Optionen gelten fuer `analyze` und `impact`
+- Verbosity ist kein fachlicher Report-Parameter, sondern steuert nur CLI-Emissionen wie Console-Zusammenfassung, Erfolgsmeldungen, `stderr`-Diagnostik und Fehlerkontext
+- `ReportWriterPort`, `GenerateReportPort` und die Formatadapter bleiben frei von einem `OutputVerbosity`-Parameter; Artefaktinhalte werden ausschliesslich durch Ergebnisdaten, Format und `analyze`-Top-Limit bestimmt
 - Standardverhalten ohne beide Optionen bleibt rueckwaertskompatibel
 - quiet beeinflusst nicht Exit-Codes
-- verbose darf Goldens nur fuer explizite Verbose-Testfaelle aendern
+- verbose darf nur Console-/`stderr`-Goldens fuer explizite Verbose-Testfaelle aendern, nicht Markdown-, HTML-, DOT- oder JSON-Artefakt-Goldens
 
 Vorgesehene Artefakte:
 
 - Anpassung von `src/adapters/cli/cli_adapter.*`
 - Anpassung von `src/main.cpp`
-- gegebenenfalls kleines CLI-Modell fuer `OutputVerbosity`
+- kleines CLI-Modell fuer `OutputVerbosity` in der CLI-Schicht, ohne Aenderung der fachlichen Report-Port-Signaturen
 - Tests in `tests/e2e/test_cli.cpp`
 - Golden-Outputs fuer quiet/verbose unter `tests/e2e/testdata/m5/`
 
@@ -288,7 +292,8 @@ Der Release-Pfad muss mindestens:
 - das Image mit dem Versions-Tag veroeffentlichen
 - fuer regulaere Releases ohne Prerelease-Suffix zusaetzlich `latest` pflegen und Vorabversionen davon ausnehmen
 - GitHub-Release-Notes aus dem Changelog verwenden
-- einen dokumentierten Recovery-/Rollback-Pfad fuer den Fall bereitstellen, dass die GitHub-Release-Erstellung erfolgreich war, der nachgelagerte OCI-Image-Publish aber fehlschlaegt
+- den GitHub Release zunaechst als Draft oder staging-internen Release vorbereiten und erst nach erfolgreichem OCI-Image-Publish oeffentlich veroeffentlichen; der oeffentliche GitHub Release ist der letzte Publish-Schritt
+- einen dokumentierten Recovery-/Rollback-Pfad fuer den Fall bereitstellen, dass Draft-Erstellung, Image-Publish oder finale Release-Publikation fehlschlagen
 
 Wichtig:
 
@@ -297,13 +302,13 @@ Wichtig:
 - der Runtime-Container muss `cmake-xray --help` ohne weitere Toolchain ausfuehren koennen
 - die Dokumentation muss lokale Nutzung und CI-Nutzung des Containers zeigen
 - fehlgeschlagene Release-Schritte muessen klar sichtbar sein und keine Teilveroeffentlichung als Erfolg melden
-- insbesondere darf kein GHCR-Image veroeffentlicht werden, bevor Build-Artefakte, Smoke-Tests und GitHub-Release-Erstellung erfolgreich abgeschlossen sind; falls technisch nicht erreichbar, muss ein expliziter Recovery-Pfad mit Loesch-/Retagging-Schritten dokumentiert werden
-- wenn die GitHub-Release-Erstellung erfolgreich war, der Image-Publish aber fehlschlaegt, muss der Workflow entweder den Release automatisch als Draft/failed markieren bzw. loeschen oder eine dokumentierte manuelle Recovery mit Nachpublish, Retagging und Release-Notes-Korrektur erzwingen
+- insbesondere darf kein GHCR-Image veroeffentlicht werden, bevor Build-Artefakte und Smoke-Tests erfolgreich abgeschlossen sind; danach wird das Image gepusht, und erst danach wird der GitHub Release aus dem Draft-Status oeffentlich gemacht
+- wenn Draft-Erstellung, Image-Publish oder finale Release-Publikation fehlschlagen, muss der Workflow entweder automatisch aufraeumen oder eine dokumentierte manuelle Recovery mit Draft-Loeschung, GHCR-Tag-Loeschung, Nachpublish, Retagging und Release-Notes-Korrektur erzwingen
 - die Release-Dokumentation muss die erlaubten Tag-Muster, Prerelease-Behandlung und `latest`-Regel explizit nennen
 
 Vorgesehene Artefakte:
 
-- Pruefung und ggf. Anpassung von `.github/workflows/release.yml`
+- Umstrukturierung von `.github/workflows/release.yml`: kein GHCR-Push im Verify-Job, bewusste macOS-/Windows-Artefaktbehandlung, Draft-Release vor Image-Publish und oeffentliche Release-Publikation als letzter Schritt
 - Pruefung und ggf. Anpassung von `Dockerfile`
 - Aktualisierung von `docs/releasing.md`
 - Aktualisierung von `README.md`
@@ -366,6 +371,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - CLI-Tests fuer `--verbose`, `--quiet` und gegenseitigen Ausschluss
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
 - Golden- und CLI-Tests, dass `--top` bei `analyze` fuer Markdown, HTML, JSON und DOT konsistent wirkt und kein Artefaktformat implizit vollstaendige Listen ausgibt
+- DOT-Golden-Tests, dass `analyze --top N` alle Translation Units eines ausgegebenen Top-Hotspots als Kontextknoten enthaelt, auch wenn diese nicht im Top-N-Ranking liegen
 - CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und Impact-Reports keine implizite Begrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren
 - JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
 - Tests, dass `--verbose` Markdown-, HTML- und DOT-Artefakte nicht gegenueber dem Normalmodus veraendert und Zusatzdiagnostik nur Console/`stderr` bzw. strukturierte vorhandene Diagnostics betrifft
@@ -373,7 +379,8 @@ Tests und Abnahme muessen mindestens abdecken:
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
 - Versionscheck, dass `cmake-xray --version`, `src/hexagon/model/application_info.h`, Root-`CMakeLists.txt` und Release-Tag konsistent `1.2.0` melden
 - Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
-- Release-Test oder dokumentierter Dry-Run fuer den Recovery-Pfad, wenn die GitHub-Release-Erstellung erfolgreich war, der OCI-Image-Publish danach aber fehlschlaegt
+- Release-Test oder dokumentierter Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt
+- Release-Test oder dokumentierter Dry-Run fuer Recovery-Pfade bei fehlgeschlagener Draft-Erstellung, fehlgeschlagenem OCI-Image-Publish und fehlgeschlagener finaler Release-Publikation
 - Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt und den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
 
@@ -419,8 +426,8 @@ Abhaengigkeiten:
 | `--verbose` schreibt Zusatztext in maschinenlesbare Ausgaben | JSON-/DOT-Nutzung in CI bricht | stdout fuer maschinenlesbare Reports sauber halten; Zusatzdiagnostik nach `stderr` oder strukturiert ausgeben |
 | Release-Trigger akzeptiert ungueltige Tags | fehlerhafte Releases oder falsche `latest`-Tags entstehen | Semver-/Prerelease-Tags fail-fast validieren und `latest` nur fuer regulaere Releases setzen |
 | macOS-/Windows-Artefakte werden trotz begrenzter Freigabe veroeffentlicht | Nutzer interpretieren Preview-Builds als offiziell unterstuetzte Releases | Release-Workflow entweder auf Linux/OCI begrenzen oder Plattformarchive deutlich als experimentell dokumentieren |
-| GHCR-Image wird vor Abschluss aller Release-Gates gepusht | Teilveroeffentlichung ohne passenden GitHub Release bleibt zurueck | Publish in finalen Job nach Build, Smoke-Tests und Release-Erstellung verschieben oder Recovery-Pfad dokumentieren |
-| GitHub Release wird erstellt, aber OCI-Publish schlaegt danach fehl | Release zeigt ein fehlendes Container-Artefakt oder falsche Installationshinweise | Recovery-/Rollback-Pfad fuer Draft/Loeschen, Nachpublish, Retagging und Release-Notes-Korrektur dokumentieren und trocken testen |
+| GHCR-Image wird vor Abschluss aller Release-Gates gepusht | Teilveroeffentlichung ohne passenden GitHub Release bleibt zurueck | GHCR-Push erst nach Build- und Smoke-Gates ausfuehren, aber vor finaler oeffentlicher Release-Publikation |
+| Oeffentlicher GitHub Release entsteht vor erfolgreichem OCI-Publish | Release zeigt ein fehlendes Container-Artefakt oder falsche Installationshinweise | GitHub Release zuerst als Draft vorbereiten, OCI-Image veroeffentlichen und erst danach den Release oeffentlich machen |
 | Release-Workflow funktioniert nur fuer lokale Pfade | Artefakte sind nicht real nutzbar | entpacktes Linux-Archiv und Container-Image separat smoke-testen |
 | Versionsquellen bleiben auf `1.1.0` | ein `v1.2.0`-Release meldet intern die alte Version | Root-`CMakeLists.txt`, `application_info.h`, `--version` und Release-Tag gemeinsam pruefen |
 | Windows-Pfade brechen Golden-Tests | Portabilitaetsziel bleibt theoretisch | Pfadanzeige und Normalisierung explizit testen; Goldens plattformrobust gestalten |
