@@ -1,97 +1,354 @@
 # Plan M5 - AP 1.2 JsonReportAdapter fuer stabile maschinenlesbare Ausgaben umsetzen
 
-Der JSON-Export ist fuer Automatisierung, CI-Auswertung und Folgewerkzeuge gedacht. Deshalb muss das Format stabiler und expliziter sein als die menschenlesbaren Textberichte.
+## Ziel
 
-Ein JSON-Bericht fuer `analyze` soll mindestens enthalten:
+AP 1.2 implementiert den JSON-Report als ersten neuen maschinenlesbaren M5-Reportadapter.
 
-- `format`: fester Formatbezeichner `cmake-xray.analysis`
-- `format_version`: Schema-/Formatversion aus `xray::hexagon::model::kReportFormatVersion`, initial `1`
-- `report_type`: `analyze`
-- `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell mit den Pflichtfeldern `compile_database_path`, `compile_database_source`, `cmake_file_api_path`, `cmake_file_api_resolved_path` und `cmake_file_api_source`
-- `summary`: Translation-Unit-Anzahl, Ranking-Anzahl, Hotspot-Anzahl, Top-Limit, `include_analysis_heuristic`, Beobachtungsherkunft und Target-Metadatenstatus
-- `translation_unit_ranking`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items` inklusive Metriken, Diagnostics und Target-Zuordnungen
-- `include_hotspots`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items`
-- `diagnostics`: reportweite Diagnostics
+Der JSON-Export ist fuer Automatisierung, CI-Auswertung und Folgewerkzeuge gedacht. Deshalb muss das Format stabiler und expliziter sein als die menschenlesbaren Textberichte: versioniert, dokumentiert, schema-validiert, golden-getestet und ohne unstrukturierte Zusatztexte auf stdout.
 
-Ein JSON-Bericht fuer `impact` soll mindestens enthalten:
+Nach AP 1.2 kann `cmake-xray analyze --format json` und `cmake-xray impact --format json` produktiv genutzt werden. Die Ausgabe folgt dem in `docs/report-json.md` dokumentierten Vertrag und verwendet die Formatversion aus AP 1.1.
 
-- `format`: fester Formatbezeichner `cmake-xray.impact`
-- `format_version`: Schema-/Formatversion aus `xray::hexagon::model::kReportFormatVersion`, initial `1`
-- `report_type`: `impact`
-- `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell mit den Pflichtfeldern `compile_database_path`, `compile_database_source`, `cmake_file_api_path`, `cmake_file_api_resolved_path`, `cmake_file_api_source`, `changed_file` und `changed_file_source`
-- `summary`: Anzahl betroffener Translation Units, Klassifikation, Beobachtungsherkunft, Target-Metadatenstatus und Anzahl betroffener Targets
-- `directly_affected_translation_units`
-- `heuristically_affected_translation_units`
-- `directly_affected_targets`
-- `heuristically_affected_targets`
-- `diagnostics`
+## Scope
 
-Wichtig:
+Umsetzen:
 
-- `format` ist der maschinenlesbare Dokumenttypbezeichner des JSON-Reports und nicht der CLI-Wert `--format json`; `report_type` bleibt der kurze Workflow-Wert fuer `analyze` oder `impact`
-- `inputs` darf nur Felder enthalten, die stabil im fachlichen Ergebnis- oder Request-Modell verfuegbar sind; `cmake_file_api_path` ist als Feld fuer M5 verpflichtend, damit File-API- und Mixed-Input-Laeufe vollstaendig dokumentiert werden koennen
-- Alle im jeweiligen `inputs`-Vertrag genannten Felder werden immer ausgegeben. Fehlende optionale Eingaben erscheinen als JSON-`null`, nie als leerer String und nie als weggelassenes Feld. Bei `impact` ist `changed_file` wegen der CLI-Pflicht ein String; `changed_file_source` ist einer der dokumentierten Enum-Werte.
-- JSON folgt bei `analyze` der CLI-`--top`-Begrenzung fuer Ranking- und Hotspot-Listen, muss aber ueber `limit`, `total_count`, `returned_count` und `truncated` eindeutig anzeigen, ob die Ausgabe gekuerzt wurde; eine unlimitierte JSON-Ausgabe waere nur nach expliziter Schema-Entscheidung zulaessig
-- `impact`-JSON enthaelt in M5 keine `limit`-/`truncated`-Felder, solange der CLI- und Port-Vertrag keine Impact-Begrenzung kennt; alle betroffenen Translation Units und Targets aus dem `ImpactResult` werden ausgegeben
-- AP 1.2 implementiert nur JSON. Markdown-/HTML- und DOT-Regeln werden hier nur als Kompatibilitaetsrahmen verstanden; die konkrete HTML-Ausgestaltung folgt in AP 1.4, DOT-Budgetierung und Graph-Metadaten folgen in AP 1.3
-- JSON darf keine DOT-/HTML-/Markdown-spezifischen Metadaten wie `graph_*`, `context_*` oder menschenlesbare Kuerzungshinweise einfuehren
-- `JsonReportAdapter` importiert `xray::hexagon::model::kReportFormatVersion` aus AP 1.1; eine zweite Formatversionskonstante im Adapter, Schema-Generator oder Testcode ist nicht zulaessig
-- `docs/report-json.schema.json` darf `format_version` mit `const: 1` absichern, aber dieser Schema-Wert muss in einem CTest-Gate gegen `xray::hexagon::model::kReportFormatVersion` geprueft werden; ein Schema-Wert, der von der C++-Konstante abweicht, laesst AP 1.2 fehlschlagen
-- CLI-Parser-/Verwendungsfehler, zum Beispiel fehlende Pflichtoptionen oder unbekannte Optionen, bleiben Textfehler auf `stderr` und erzeugen kein JSON-Fehlerobjekt
-- Nicht wiederherstellbare Eingabefehler vor Reporterzeugung, zum Beispiel nicht vorhandene Eingabedateien, ungueltige `compile_commands.json`-Dateien oder ungueltige CMake-File-API-Reply-Verzeichnisse, bleiben fuer `--format json` Textfehler auf `stderr`, liefern Exit-Code ungleich `0` und erzeugen kein JSON-Fehlerobjekt
-- Service-Ergebnisse mit Diagnostics oder Teildaten werden als regulaere JSON-Reports mit `diagnostics` ausgegeben; erfolgreiche Reporterzeugung bleibt Exit-Code `0`, sofern die bestehende CLI-Semantik fuer diese Serviceergebnisse nicht bereits Fehlercodes vorsieht
-- Schreib-, Render- und Output-Fehler bei `--format json` liefern Textfehler auf `stderr`, Exit-Code ungleich `0` und kein partielles JSON auf stdout; bei `--output` bleibt eine bestehende Zieldatei unveraendert
-- Render-Fehler umfassen JSON-Dump-/Serialisierungsfehler, UTF-8-/Escaping-Fehler und explizite Fehler aus der CLI-internen Render-Abstraktion; diese Fehler werden vor dem Atomic-Writer in Text-`stderr` und nonzero Exit uebersetzt. Tests nutzen einen werfenden oder fehlerliefernden Renderer-Stub, damit kein Adapter-spezifischer Sonderfall die Fehlergrenze umgeht.
-- JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
-- Felder mit leerer Menge werden als leere Arrays ausgegeben, nicht weggelassen, sofern sie Teil des Formatvertrags sind
-- optionale fachliche Informationen koennen `null` sein, wenn das Schema dies explizit dokumentiert
-- numerische Metriken bleiben numerisch und werden nicht als lokalisierte Strings gerendert
-- die Reihenfolge von Objektfeldern soll im Adapter stabil bleiben, auch wenn JSON semantisch keine Feldreihenfolge garantiert
-- Pfade werden als Anzeige-Strings ausgegeben; kanonische Normalisierungsschluessel duerfen nur aufgenommen werden, wenn sie keinen instabilen Hostbezug in Goldens einfuehren
-- `docs/report-json.md` ist der verbindliche lesbare M5-Vertrag und dokumentiert fuer alle Felder Typ, Pflichtstatus, erlaubte Enum-Werte, Nullability, leere-Array-Regeln und Aenderungsregeln fuer kuenftige `format_version`-Erhoehungen; zusaetzlich entsteht ein maschinenlesbares Schema-Artefakt `docs/report-json.schema.json`, gegen das Golden-Outputs validiert werden
-- `docs/report-json.schema.json` verwendet JSON Schema Draft 2020-12 und enthaelt `$schema: "https://json-schema.org/draft/2020-12/schema"`
-- Schema-Validierung erfolgt ueber ein repository-lokales Python-Testskript mit der Python-Bibliothek `jsonschema`; die Dependency wird in `tests/requirements-json-schema.txt` mit Version-Pin dokumentiert, CI installiert diese Requirements vor jedem `ctest`-Pfad, und lokale CTest-Laeufe schlagen mit klarer Installationsanweisung fehl, wenn der Validator fehlt
-- Die Validator-Bootstrap-Strategie deckt alle M5-Testwege ab: Docker-Test-Image, Docker-Coverage-Image, native Build-Matrix und Release-Matrix. Entweder installiert jeder dieser Wege `tests/requirements-json-schema.txt` vor `ctest`, oder CMake/CTest stellt eine gemeinsame Bootstrap-Schicht bereit, die in allen Wegen genutzt wird.
-- `docs/report-json.md` und `docs/report-json.schema.json` entstehen vor oder im selben Umsetzungsschritt wie `JsonReportAdapter`; der Adapter darf nicht ohne verbindlichen Item-Vertrag fuer Ranking-, Hotspot-, Diagnostic-, Translation-Unit- und Target-Objekte landen
-- Der Item-Vertrag legt Pflichtkeys, optionale Keys, Enum-Schreibweisen, numerische Typen und deterministische Sortier-Tie-Breaker fest; Adaptertests pruefen exakte Keys und mindestens einen Tie-Breaker pro sortierter Item-Liste
-- Tests pruefen nicht nur syntaktisch gueltiges JSON, sondern auch Pflichtfelder, Array-statt-Weglassen-Regeln, numerische Typen, bekannte Enum-Werte und `null` nur an dokumentierten Stellen
-- `include_analysis_heuristic` ist im Analyze-JSON ein boolesches Pflichtfeld unter `summary`; Schema, Adaptertests und Goldens pruefen `true` und `false`, damit Consumer die Heuristik nicht aus Textdiagnostics ableiten muessen
-- E2E-Tests erzeugen die JSON-Ausgaben mit der echten CLI, vergleichen diese byte-stabil oder strukturell deterministisch gegen die Golden-Dateien und validieren genau die erzeugten Ausgaben gegen `docs/report-json.schema.json`; reine Schema-Validierung statischer Goldens reicht fuer AP 1.2 nicht aus
-- Die AP-1.1-Sperre fuer `--format json` wird in AP 1.2 entfernt oder auf andere noch nicht implementierte Formate begrenzt; `--format json` darf den Fehler `recognized but not implemented` nicht mehr liefern
-- AP 1.2 setzt den gemeinsamen Atomic-Writer aus AP 1.1 als vorhandene Voraussetzung voraus. Das Arbeitspaket muss vor der JSON-Freischaltung einen Test- oder CMake-Check besitzen, der den M5-konformen Writer referenziert; ohne diesen Check bleibt `--format json --output` nicht freigegeben.
+- `JsonReportAdapter` fuer Analyze- und Impact-Ergebnisse.
+- Freischaltung von `--format json` fuer `analyze` und `impact`.
+- Freischaltung von `--output <path>` fuer `--format json` ueber den gemeinsamen M5-Atomic-Writer.
+- Dokumentierter JSON-Vertrag in `docs/report-json.md`.
+- Maschinenlesbares JSON Schema in `docs/report-json.schema.json`.
+- Schema-Validierung fuer Goldens und echte CLI-E2E-Ausgaben.
+- E2E-Goldens fuer zentrale Provenienz-, Limit-, Fehler- und Stream-Vertraege.
+- CI-/Docker-Bootstrap fuer den JSON-Schema-Validator in allen `ctest`-Pfaden.
 
-Vorgesehene Artefakte:
+Nicht veraendern:
+
+- Bestehende Console- und Markdown-Ausgaben.
+- Report-Ports so, dass Adapter CLI-Kontext erhalten.
+- Verbosity-Verhalten aus AP 1.5.
+
+## Nicht umsetzen
+
+Nicht Bestandteil von AP 1.2:
+
+- HTML-Renderer und HTML-spezifische Formatdetails.
+- DOT-Renderer, DOT-Budgetierung und Graph-Metadaten.
+- Markdown-/Console-Migration auf `ReportInputs`.
+- Release-Artefakte jenseits der noetigen CI-/CTest-Bootstrap-Anpassungen.
+- JSON-Fehlerobjekte fuer Parser-, Eingabe-, Render- oder Schreibfehler.
+
+Diese Punkte folgen in anderen M5-Arbeitspaketen oder bleiben bewusst ausserhalb des JSON-Vertrags.
+
+## Voraussetzungen aus AP 1.1
+
+AP 1.2 baut auf folgenden AP-1.1-Vertraegen auf:
+
+- `AnalysisResult` und `ImpactResult` enthalten `ReportInputs`.
+- `ReportInputs` ist die kanonische Eingabeprovenienz fuer neue M5-Artefaktadapter.
+- `AnalyzeProjectRequest` und `AnalyzeImpactRequest` transportieren Eingabepfade und `report_display_base`.
+- `BuildModelResult` transportiert File-API-Aufloesungsmetadaten fuer `cmake_file_api_resolved_path`.
+- `xray::hexagon::model::kReportFormatVersion` existiert in `src/hexagon/model/report_format_version.h` und hat initial den Integerwert `1`.
+- Der gemeinsame atomare Schreibpfad fuer Reportdateien existiert und ist testbar.
+- `html`, `json` und `dot` sind bekannte Formatwerte; AP 1.1 lehnt sie als noch nicht implementiert ab.
+
+AP 1.2 entfernt die AP-1.1-Sperre fuer `--format json` oder begrenzt sie auf andere noch nicht implementierte Formate. `--format json` darf nach AP 1.2 den Fehler `recognized but not implemented` nicht mehr liefern.
+
+Falls der M5-konforme Atomic-Writer aus AP 1.1 noch nicht vorhanden oder nicht testbar ist, bleibt `--format json --output <path>` in AP 1.2 blockiert.
+
+## Dateien
+
+Voraussichtlich zu aendern:
 
 - `src/adapters/output/json_report_adapter.h`
 - `src/adapters/output/json_report_adapter.cpp`
-- `src/adapters/cli/cli_adapter.{h,cpp}` fuer die Freischaltung von `--format json` und `--output` mit JSON
-- `src/main.cpp` fuer die Composition-Root-Verdrahtung des JSON-Adapters
+- `src/adapters/cli/cli_adapter.{h,cpp}`
+- `src/main.cpp`
 - `src/adapters/CMakeLists.txt`
 - `tests/CMakeLists.txt`
-- `Dockerfile` fuer Docker-Test-, Coverage- und Coverage-Check-Targets, die `ctest` ausfuehren
-- `.github/workflows/test.yml` fuer die Docker-Test- und Coverage-Pfade
-- `.github/workflows/build.yml` fuer die native Build-Matrix
-- `.github/workflows/release.yml`, falls Release-Smokes oder Release-CTest-Laeufe den JSON-Schema-Validator ausfuehren
 - `tests/adapters/test_json_report_adapter.cpp`
 - `tests/adapters/test_port_wiring.cpp`
 - `tests/e2e/test_cli.cpp`
+- `Dockerfile`
+- `.github/workflows/test.yml`
+- `.github/workflows/build.yml`
+- `.github/workflows/release.yml`, falls Release-Smokes oder Release-CTest-Laeufe den JSON-Schema-Validator ausfuehren
+
+Neue Dateien:
+
+- `docs/report-json.md`
+- `docs/report-json.schema.json`
 - `tests/validate_json_schema.py` oder ein gleichwertiges repository-lokales Validierungsskript
-- `tests/requirements-json-schema.txt` mit gepinnter `jsonschema`-Dependency fuer CI und lokale Reproduktion
+- `tests/requirements-json-schema.txt`
 - JSON-Golden-Outputs unter `tests/e2e/testdata/m5/`
-- Dokumentation `docs/report-json.md` als verbindlicher lesbarer Formatvertrag und `docs/report-json.schema.json` als maschinenlesbares Validierungsartefakt; `docs/guide.md` verweist darauf nur nutzungsorientiert
-- CTest-integrierter Schema-Validierungstest, der alle JSON-Goldens gegen `docs/report-json.schema.json` validiert und fehlschlaegt, wenn ein JSON-Golden nicht erfasst ist
-- CTest-integrierter Versionskonsistenztest, der den `format_version`-Schema-`const`-Wert gegen `xray::hexagon::model::kReportFormatVersion` prueft
-- CLI-/E2E-Tests fuer `analyze --format json`, `impact --format json`, `--format json --output <path>` und die Abwesenheit unstrukturierter Zusatztexte auf stdout
-- CLI-/E2E-Tests muessen die erzeugten JSON-Reports gegen die Golden-Dateien vergleichen; dieselben erzeugten Reports werden anschliessend gegen das Schema validiert, damit Adapterausgabe, Golden und Schema nicht auseinanderlaufen
-- JSON-Goldens fuer Compile-Database-only-, File-API-only- und Mixed-Input-Laeufe bei `analyze`, inklusive `compile_database_path`, `cmake_file_api_path`, `cmake_file_api_resolved_path`, `compile_database_source` und `cmake_file_api_source`
-- Analyze-Goldens decken fuer `translation_unit_ranking` und `include_hotspots` jeweils mindestens einen ungekuerzten Fall mit `truncated=false` und einen gekuerzten `--top`-Fall mit `truncated=true`, korrektem `limit`, `total_count` und `returned_count` ab
-- JSON-Goldens fuer `impact` mit Compile-Database-only-, File-API-only- und Mixed-Input-Provenienz; relative `changed_file`-Faelle pruefen `compile_database_directory` bei Mixed-Input und `file_api_source_root` bei File-API-only, absolute `changed_file` prueft `cli_absolute`
-- CLI-/E2E-Tests, dass erfolgreiche `--format json`-Aufrufe ohne `--output` gueltiges JSON auf stdout und leeres stderr liefern
-- CLI-/E2E-Tests, dass erfolgreiche `--format json --output <path>`-Aufrufe gueltiges JSON in die Datei schreiben sowie stdout und stderr leer lassen
-- CLI-/E2E-Tests pruefen, dass `--format json` nicht mehr den AP-1.1-Fehler `recognized but not implemented` liefert
-- CLI-/E2E-Tests fuer Fehlerpfade: Parser-/Verwendungsfehler, insbesondere `impact --format json` ohne `--changed-file`, Schreibfehler und nicht wiederherstellbare Eingabefehler liefern Text auf stderr und kein JSON-Fehlerobjekt; Service-Diagnostics erscheinen im regulaeren JSON-Report unter `diagnostics`
-- E2E-Fehlerfaelle fuer `--format json` decken mindestens nicht vorhandene Eingabepfade, ungueltiges Compile-Database-JSON und ungueltige CMake-File-API-Reply-Daten ab
-- CLI-/Schreibpfad-Tests decken einen simulierten JSON-Render-Fehler vor dem Atomic-Writer ab und pruefen nonzero Exit, Text auf stderr, leeres stdout und unveraenderte bestehende Zieldatei bei `--output`
-- JSON-`--output` nutzt den gemeinsamen M5-konformen Atomic-Writer aus AP 1.1; falls dieser Writer noch nicht vorhanden ist, ist AP 1.2 blockiert. Tests pruefen mindestens, dass ein simulierter Schreib-/Replace-Fehler eine bestehende JSON-Zieldatei unveraendert laesst
+
+## JSON-Dokumentvertrag
+
+### Gemeinsame Regeln
+
+Der JSON-Vertrag ist in `docs/report-json.md` verbindlich dokumentiert. Dieses Dokument beschreibt fuer alle Felder:
+
+- Typ.
+- Pflichtstatus.
+- erlaubte Enum-Werte.
+- Nullability.
+- Regeln fuer leere Arrays.
+- Sortier- und Tie-Breaker-Regeln.
+- Aenderungsregeln fuer kuenftige `format_version`-Erhoehungen.
+
+Allgemeine JSON-Regeln:
+
+- JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein.
+- `format` ist der maschinenlesbare Dokumenttypbezeichner des JSON-Reports und nicht der CLI-Wert `--format json`.
+- `report_type` bleibt der kurze Workflow-Wert `analyze` oder `impact`.
+- Alle im jeweiligen `inputs`-Vertrag definierten Felder werden immer ausgegeben.
+- Fehlende optionale Eingaben erscheinen als JSON-`null`, nie als leerer String und nie als weggelassenes Feld.
+- Felder mit leerer Menge werden als leere Arrays ausgegeben, sofern sie Teil des Formatvertrags sind.
+- Optionale fachliche Informationen koennen `null` sein, wenn das Schema dies explizit dokumentiert.
+- Numerische Metriken bleiben numerisch und werden nicht als lokalisierte Strings gerendert.
+- Die Reihenfolge von Objektfeldern bleibt im Adapter stabil, auch wenn JSON semantisch keine Feldreihenfolge garantiert.
+- Pfade werden als Anzeige-Strings ausgegeben; kanonische Normalisierungsschluessel duerfen nur aufgenommen werden, wenn sie keinen instabilen Hostbezug in Goldens einfuehren.
+- JSON darf keine DOT-/HTML-/Markdown-spezifischen Metadaten wie `graph_*`, `context_*` oder menschenlesbare Kuerzungshinweise einfuehren.
+
+### Analyze-JSON
+
+Ein JSON-Bericht fuer `analyze` enthaelt mindestens:
+
+- `format`: fester Formatbezeichner `cmake-xray.analysis`.
+- `format_version`: Formatversion aus `xray::hexagon::model::kReportFormatVersion`, initial `1`.
+- `report_type`: `analyze`.
+- `inputs`: `compile_database_path`, `compile_database_source`, `cmake_file_api_path`, `cmake_file_api_resolved_path` und `cmake_file_api_source`.
+- `summary`: Translation-Unit-Anzahl, Ranking-Anzahl, Hotspot-Anzahl, Top-Limit, `include_analysis_heuristic`, Beobachtungsherkunft und Target-Metadatenstatus.
+- `translation_unit_ranking`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items` inklusive Metriken, Diagnostics und Target-Zuordnungen.
+- `include_hotspots`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items`.
+- `diagnostics`: reportweite Diagnostics.
+
+Analyze-spezifische Regeln:
+
+- JSON folgt bei `analyze` der CLI-`--top`-Begrenzung fuer Ranking- und Hotspot-Listen.
+- `limit`, `total_count`, `returned_count` und `truncated` zeigen eindeutig, ob die Ausgabe gekuerzt wurde.
+- Eine unlimitierte JSON-Ausgabe waere nur nach expliziter Schema-Entscheidung zulaessig.
+- `include_analysis_heuristic` ist ein boolesches Pflichtfeld unter `summary`.
+- Schema, Adaptertests und Goldens pruefen `include_analysis_heuristic=true` und `include_analysis_heuristic=false`.
+
+### Impact-JSON
+
+Ein JSON-Bericht fuer `impact` enthaelt mindestens:
+
+- `format`: fester Formatbezeichner `cmake-xray.impact`.
+- `format_version`: Formatversion aus `xray::hexagon::model::kReportFormatVersion`, initial `1`.
+- `report_type`: `impact`.
+- `inputs`: `compile_database_path`, `compile_database_source`, `cmake_file_api_path`, `cmake_file_api_resolved_path`, `cmake_file_api_source`, `changed_file` und `changed_file_source`.
+- `summary`: Anzahl betroffener Translation Units, Klassifikation, Beobachtungsherkunft, Target-Metadatenstatus und Anzahl betroffener Targets.
+- `directly_affected_translation_units`.
+- `heuristically_affected_translation_units`.
+- `directly_affected_targets`.
+- `heuristically_affected_targets`.
+- `diagnostics`.
+
+Impact-spezifische Regeln:
+
+- Bei `impact` ist `changed_file` wegen der CLI-Pflicht ein String.
+- `changed_file_source` ist einer der in `docs/report-json.md` dokumentierten Enum-Werte.
+- `impact`-JSON enthaelt in M5 keine `limit`-/`truncated`-Felder, solange der CLI- und Port-Vertrag keine Impact-Begrenzung kennt.
+- Alle betroffenen Translation Units und Targets aus dem `ImpactResult` werden ausgegeben.
+
+## Schema- und Formatversionierung
+
+AP 1.2 verwendet die in AP 1.1 eingefuehrte Konstante:
+
+- `JsonReportAdapter` importiert `xray::hexagon::model::kReportFormatVersion`.
+- Adapter, Dokumentation, Schema-Tests und Goldens duerfen keine zweite Formatversionskonstante definieren.
+- `docs/report-json.schema.json` verwendet JSON Schema Draft 2020-12 und enthaelt `$schema: "https://json-schema.org/draft/2020-12/schema"`.
+- `docs/report-json.schema.json` darf `format_version` mit `const: 1` absichern.
+- Der `format_version`-`const`-Wert im Schema wird in einem CTest-Gate gegen `xray::hexagon::model::kReportFormatVersion` geprueft.
+- Ein Schema-Wert, der von der C++-Konstante abweicht, laesst AP 1.2 fehlschlagen.
+
+`docs/report-json.md` und `docs/report-json.schema.json` entstehen vor oder im selben Umsetzungsschritt wie `JsonReportAdapter`. Der Adapter darf nicht ohne verbindlichen Item-Vertrag fuer Ranking-, Hotspot-, Diagnostic-, Translation-Unit- und Target-Objekte landen.
+
+## Adapter- und Port-Grenzen
+
+`JsonReportAdapter` rendert ausschliesslich aus `AnalysisResult` und `ImpactResult`.
+
+Regeln:
+
+- Der Adapter bekommt keinen CLI-Kontext.
+- Der Adapter verwendet `ReportInputs` als Eingabeprovenienz und nicht die Legacy-Presentation-Felder fuer Console/Markdown.
+- Der Adapter importiert `kReportFormatVersion` aus dem Modell.
+- Der Adapter fuehrt keine HTML-, DOT- oder Markdown-spezifischen Metadaten ein.
+- Der Item-Vertrag legt Pflichtkeys, optionale Keys, Enum-Schreibweisen, numerische Typen und deterministische Sortier-Tie-Breaker fest.
+- Adaptertests pruefen exakte Keys und mindestens einen Tie-Breaker pro sortierter Item-Liste.
+- Report-Ports bleiben ergebnisobjektzentriert.
+
+## CLI-/Output-Vertrag
+
+CLI-Regeln:
+
+- `--format json` ist fuer `analyze` und `impact` lauffaehig.
+- `--format json --output <path>` schreibt in eine Datei und nutzt den gemeinsamen M5-konformen Atomic-Writer aus AP 1.1.
+- Erfolgreiche `--format json`-Aufrufe ohne `--output` schreiben ausschliesslich gueltiges JSON auf stdout.
+- Erfolgreiche `--format json`-Aufrufe ohne `--output` lassen stderr leer.
+- Erfolgreiche `--format json --output <path>`-Aufrufe schreiben ausschliesslich in die Zieldatei.
+- Erfolgreiche `--format json --output <path>`-Aufrufe lassen stdout und stderr leer.
+- Reportinhalt wird bei `--output` nicht zusaetzlich auf stdout dupliziert.
+- `--format json` liefert nach AP 1.2 nicht mehr den AP-1.1-Fehler `recognized but not implemented`.
+
+`--top`-Regeln:
+
+- Bei `analyze` beeinflusst `--top` die JSON-Listen `translation_unit_ranking.items` und `include_hotspots.items`.
+- Die Begrenzung wird ueber `limit`, `total_count`, `returned_count` und `truncated` maschinenlesbar dokumentiert.
+- Bei `impact` fuehrt AP 1.2 keine neue `--top`-Semantik ein.
+
+## Fehlervertrag
+
+Parser- und Usage-Fehler:
+
+- CLI-Parser-/Verwendungsfehler bleiben Textfehler auf `stderr`.
+- Beispiele sind fehlende Pflichtoptionen, unbekannte Optionen und `impact --format json` ohne `--changed-file`.
+- Diese Fehler erzeugen kein JSON-Fehlerobjekt.
+- Exit-Code ist ungleich `0`.
+
+Nicht wiederherstellbare Eingabefehler:
+
+- Fehler vor Reporterzeugung bleiben fuer `--format json` Textfehler auf `stderr`.
+- Beispiele sind nicht vorhandene Eingabedateien, ungueltige `compile_commands.json`-Dateien und ungueltige CMake-File-API-Reply-Verzeichnisse.
+- Diese Fehler erzeugen kein JSON-Fehlerobjekt.
+- Exit-Code ist ungleich `0`.
+
+Service-Ergebnisse mit Diagnostics:
+
+- Service-Ergebnisse mit Diagnostics oder Teildaten werden als regulaere JSON-Reports mit `diagnostics` ausgegeben.
+- Erfolgreiche Reporterzeugung bleibt Exit-Code `0`, sofern die bestehende CLI-Semantik fuer diese Serviceergebnisse nicht bereits Fehlercodes vorsieht.
+
+Render-, Schreib- und Output-Fehler:
+
+- Schreib-, Render- und Output-Fehler liefern Textfehler auf `stderr`.
+- Exit-Code ist ungleich `0`.
+- Es wird kein partielles JSON auf stdout geschrieben.
+- Bei `--output` bleibt eine bestehende Zieldatei unveraendert.
+- Render-Fehler umfassen JSON-Dump-/Serialisierungsfehler, UTF-8-/Escaping-Fehler und explizite Fehler aus der CLI-internen Render-Abstraktion.
+- Render-Fehler werden vor dem Atomic-Writer in Text-`stderr` und nonzero Exit uebersetzt.
+- Tests nutzen einen werfenden oder fehlerliefernden Renderer-Stub, damit kein Adapter-spezifischer Sonderfall die Fehlergrenze umgeht.
+
+## Schema-Validierung und CI-Bootstrap
+
+Schema-Validierung:
+
+- Schema-Validierung erfolgt ueber ein repository-lokales Python-Testskript mit der Python-Bibliothek `jsonschema`.
+- Die Dependency wird in `tests/requirements-json-schema.txt` mit Version-Pin dokumentiert.
+- Lokale CTest-Laeufe schlagen mit klarer Installationsanweisung fehl, wenn der Validator fehlt.
+- Der CTest-Schema-Test ueberspringt nicht still, wenn der Validator fehlt.
+
+Bootstrap-Pfade:
+
+- Alle M5-Testwege installieren `tests/requirements-json-schema.txt` vor jedem `ctest`-Pfad oder nutzen eine gemeinsame CMake-/CTest-Bootstrap-Schicht.
+- Abgedeckt werden Docker-Test-Image, Docker-Coverage-Image, native Build-Matrix und Release-Matrix.
+- `Dockerfile` wird angepasst, wenn Docker-Test-, Coverage- oder Coverage-Check-Targets `ctest` ausfuehren.
+- `.github/workflows/test.yml` wird angepasst fuer Docker-Test- und Coverage-Pfade.
+- `.github/workflows/build.yml` wird angepasst fuer die native Build-Matrix.
+- `.github/workflows/release.yml` wird angepasst, falls Release-Smokes oder Release-CTest-Laeufe den JSON-Schema-Validator ausfuehren.
+
+## Implementierungsreihenfolge
+
+1. JSON-Vertrag in `docs/report-json.md` und `docs/report-json.schema.json` festlegen.
+2. Schema-Validator-Skript und gepinnte Requirements anlegen.
+3. CTest-Gates fuer Schema-Validierung und Formatversionskonsistenz einhaengen.
+4. CI-/Docker-Bootstrap fuer alle `ctest`-Pfade einrichten.
+5. `JsonReportAdapter` fuer `AnalysisResult` und `ImpactResult` implementieren.
+6. Adaptertests fuer Pflichtfelder, Typen, Enums, Nullability, Sortierung und Tie-Breaker ergaenzen.
+7. JSON in Composition Root und Port-Wiring verdrahten.
+8. AP-1.1-Sperre fuer `--format json` entfernen.
+9. `--format json --output` an den gemeinsamen Atomic-Writer anbinden.
+10. E2E-Goldens fuer Analyze und Impact erzeugen.
+11. E2E-Tests mit Golden-Vergleich, Schema-Validierung, Stream-Vertrag und Fehlerfaellen ergaenzen.
+12. Abschliessend pruefen, dass Console-/Markdown-Goldens unveraendert bleiben.
+
+## Tests
+
+Schema- und Vertrags-Tests:
+
+- CTest-integrierter Schema-Validierungstest validiert alle JSON-Goldens gegen `docs/report-json.schema.json`.
+- Der Schema-Test schlaegt fehl, wenn ein JSON-Golden nicht erfasst ist.
+- CTest-integrierter Versionskonsistenztest prueft den `format_version`-Schema-`const`-Wert gegen `xray::hexagon::model::kReportFormatVersion`.
+- Tests pruefen Pflichtfelder, Array-statt-Weglassen-Regeln, numerische Typen, bekannte Enum-Werte und `null` nur an dokumentierten Stellen.
+
+Adaptertests:
+
+- `tests/adapters/test_json_report_adapter.cpp` prueft Analyze- und Impact-Serialisierung.
+- Adaptertests pruefen exakte Item-Keys.
+- Adaptertests pruefen mindestens einen Tie-Breaker pro sortierter Item-Liste.
+- Adaptertests pruefen `include_analysis_heuristic=true` und `include_analysis_heuristic=false`.
+
+Port- und Wiring-Tests:
+
+- `tests/adapters/test_port_wiring.cpp` prueft, dass `json` an den `JsonReportAdapter` verdrahtet ist.
+- Tests pruefen, dass keine zweite Formatversionskonstante im Adapter oder Wiring verwendet wird.
+
+E2E-Golden-Tests:
+
+- E2E-Tests erzeugen JSON-Ausgaben mit der echten CLI.
+- Die erzeugten JSON-Reports werden byte-stabil oder strukturell deterministisch gegen Golden-Dateien verglichen.
+- Dieselben erzeugten Reports werden gegen `docs/report-json.schema.json` validiert.
+- Reine Schema-Validierung statischer Goldens reicht nicht aus.
+- JSON-Goldens decken Compile-Database-only-, File-API-only- und Mixed-Input-Laeufe bei `analyze` ab.
+- Analyze-Goldens pruefen `compile_database_path`, `cmake_file_api_path`, `cmake_file_api_resolved_path`, `compile_database_source` und `cmake_file_api_source`.
+- Analyze-Goldens decken fuer `translation_unit_ranking` und `include_hotspots` jeweils mindestens einen ungekuerzten Fall mit `truncated=false` und einen gekuerzten `--top`-Fall mit `truncated=true`, korrektem `limit`, `total_count` und `returned_count` ab.
+- JSON-Goldens decken `impact` mit Compile-Database-only-, File-API-only- und Mixed-Input-Provenienz ab.
+- Relative `changed_file`-Faelle pruefen `compile_database_directory` bei Mixed-Input und `file_api_source_root` bei File-API-only.
+- Absolute `changed_file`-Faelle pruefen `cli_absolute`.
+
+CLI- und Stream-Tests:
+
+- `analyze --format json` liefert gueltiges JSON auf stdout und leeres stderr.
+- `impact --format json` liefert gueltiges JSON auf stdout und leeres stderr.
+- `--format json --output <path>` schreibt gueltiges JSON in die Datei.
+- Erfolgreiche `--format json --output <path>`-Aufrufe lassen stdout und stderr leer.
+- Tests pruefen, dass `--format json` nicht mehr den AP-1.1-Fehler `recognized but not implemented` liefert.
+
+Fehlerpfad-Tests:
+
+- `impact --format json` ohne `--changed-file` liefert Text auf stderr, nonzero Exit und kein JSON-Fehlerobjekt.
+- Nicht vorhandene Eingabepfade liefern Text auf stderr, nonzero Exit und kein JSON-Fehlerobjekt.
+- Ungueltiges Compile-Database-JSON liefert Text auf stderr, nonzero Exit und kein JSON-Fehlerobjekt.
+- Ungueltige CMake-File-API-Reply-Daten liefern Text auf stderr, nonzero Exit und kein JSON-Fehlerobjekt.
+- Schreibfehler liefern Text auf stderr, nonzero Exit und kein JSON-Fehlerobjekt.
+- Service-Diagnostics erscheinen im regulaeren JSON-Report unter `diagnostics`.
+- CLI-/Schreibpfad-Tests decken einen simulierten JSON-Render-Fehler vor dem Atomic-Writer ab.
+- Der simulierte Render-Fehler prueft nonzero Exit, Text auf stderr, leeres stdout und unveraenderte bestehende Zieldatei bei `--output`.
+
+Atomic-Writer-Tests:
+
+- JSON-`--output` nutzt den gemeinsamen M5-konformen Atomic-Writer aus AP 1.1.
+- Tests pruefen mindestens, dass ein simulierter Schreib-/Replace-Fehler eine bestehende JSON-Zieldatei unveraendert laesst.
+
+Rueckwaertskompatibilitaets-Tests:
+
+- Bestehende Console-/Markdown-Goldens bleiben unveraendert.
+- JSON-Freischaltung fuehrt keine Verbosity-Parameter in Reportports oder Artefaktadapter ein.
+
+## Abnahmekriterien
+
+AP 1.2 ist abnahmefaehig, wenn:
+
+- `cmake-xray analyze --format json` und `cmake-xray impact --format json` lauffaehig sind.
+- `--format json --output <path>` ueber den gemeinsamen Atomic-Writer schreibt.
+- Erfolgreiche JSON-Stdout-Ausgaben keine unstrukturierten Zusatztexte enthalten.
+- Erfolgreiche JSON-Dateiausgaben stdout und stderr leer lassen.
+- `docs/report-json.md` und `docs/report-json.schema.json` vorhanden, konsistent und in Tests eingebunden sind.
+- Der Schema-`format_version`-Wert gegen `kReportFormatVersion` geprueft wird.
+- Echte CLI-Ausgaben gegen Goldens verglichen und anschliessend gegen das Schema validiert werden.
+- Analyze-Goldens Limit-/Truncation-Faelle fuer Ranking und Hotspots abdecken.
+- Impact-Goldens die relevanten `changed_file_source`-Faelle abdecken.
+- Parser-, Eingabe-, Render- und Schreibfehler als Textfehler ohne JSON-Fehlerobjekt getestet sind.
+- Docker-, Coverage-, native Build- und Release-CTest-Pfade den JSON-Schema-Validator installieren oder eine gemeinsame Bootstrap-Schicht nutzen.
+- Console- und Markdown-Verhalten unveraendert bleibt.
+
+## Offene Folgearbeiten
+
+Folgearbeiten ausserhalb von AP 1.2:
+
+- AP 1.3 implementiert DOT-Rendering, DOT-Budgetierung und Graph-Metadaten.
+- AP 1.4 implementiert HTML-Rendering und HTML-spezifische Ausgabe-/Escaping-Regeln.
+- AP 1.5 definiert Quiet-/Verbose-Verhalten.
+- Eine spaetere JSON-Formatversion kann neue Felder oder JSON-Fehlerobjekte einfuehren, muss dann aber `format_version` erhoehen und `docs/report-json.md` sowie `docs/report-json.schema.json` entsprechend migrieren.
 
 **Ergebnis**: `cmake-xray` besitzt einen versionierten, automatisierbaren Reportvertrag fuer Analyse- und Impact-Ergebnisse.
