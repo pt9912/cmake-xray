@@ -120,6 +120,7 @@ Vertrag:
 - `format_version` startet mit dem Integerwert `1`.
 - Die Konstante lebt in `src/hexagon/model/report_format_version.h`.
 - JSON-Adapter, JSON-Schema, Dokumentation und Golden-Tests muessen spaeter dieselbe Konstante beziehungsweise denselben Wert verwenden.
+- Die Konstante heisst `xray::hexagon::model::kReportFormatVersion` und wird als `inline constexpr int kReportFormatVersion = 1;` deklariert. AP 1.2 importiert genau dieses Symbol; ein parallel definierter zweiter Wert oder eine zweite Konstante mit abweichendem Namen ist verboten.
 - AP 1.1 implementiert noch keinen JSON-Renderer, aber verhindert, dass AP 1.2 die Versionierungsentscheidung neu treffen muss.
 
 ### Ergebnisobjekte
@@ -216,6 +217,19 @@ public:
 
 Alle Produktionsaufrufer in CLI, Composition Root, Tests und Port-Wiring werden auf den Request umgestellt. Der alte positionale virtuelle Portvertrag wird nicht als Produktionspfad behalten, weil er `report_display_base` und `was_relative` nicht korrekt transportieren kann. Falls ein temporaerer nicht-virtueller Testhelper fuer alte Testdaten noetig ist, muss er intern einen vollstaendigen `AnalyzeImpactRequest` mit expliziter Display-Basis bauen und darf nicht von CLI oder Port-Wiring genutzt werden.
 
+### CLI-Aufbau von `report_display_base` und `InputPathArgument`
+
+`report_display_base` ist im Produktionspfad ausschliesslich ein CLI-Snapshot des Prozess-CWD. Services und Adapter bekommen den Wert nur ueber den Request und lesen Prozess-CWD nicht selbst.
+
+Regeln:
+
+- Die CLI erfasst `std::filesystem::current_path()` einmalig am Eintritt von `CliAdapter::run()` und uebergibt diesen Snapshot als `report_display_base` in jedes gebaute `AnalyzeProjectRequest` und `AnalyzeImpactRequest`.
+- Aenderungen des Prozess-CWD waehrend desselben `run()`-Aufrufs duerfen `report_display_base` nicht veraendern; der Snapshot ist pro CLI-Aufruf konstant.
+- Tests bauen `report_display_base` direkt aus Fixture-Pfaden; Service- und Adaptertests duerfen `std::filesystem::current_path()` nicht aufrufen, um eine Request-Basis abzuleiten.
+- Die CLI exponiert `report_display_base` nicht ueber eine eigene Option; AP 1.1 fuehrt keinen `--working-dir`-Parameter ein.
+- `InputPathArgument::path_for_io` wird fuer relative `compile_commands_path` und `cmake_file_api_path` als `(report_display_base / original_argument).lexically_normal()` gebildet; absolute CLI-Werte werden lexikalisch normalisiert direkt uebernommen.
+- Fuer `changed_file_path` wird `path_for_io` bei relativem CLI-Wert nicht gegen `report_display_base` aufgeloest; der Wert bleibt der lexikalisch normalisierte Relativpfad, weil die fachliche Impact-Basis erst im Service feststeht.
+
 ### `analysis_support`-Pfadbasis
 
 Bestehende Hilfsfunktionen in `src/hexagon/services/analysis_support.{h,cpp}` duerfen fuer Report- und Impact-Pfadbasen nicht mehr implizit `std::filesystem::current_path()` lesen.
@@ -227,6 +241,9 @@ Regeln:
 - Alte Helper-Ueberladungen, die ihre Fallback-Basis selbst aus Prozesszustand ableiten, werden entfernt oder auf Testcode beschraenkt.
 - Kein Produktionspfad darf nach AP 1.1 eine pfadbasierte Service-Helper-API verwenden, die bei fehlendem Parent implizit `std::filesystem::current_path()` liest.
 - Service-Tests muessen einen veraenderten Prozess-CWD abdecken, damit ReportInputs und Impact-Aufloesung stabil bleiben.
+- Die bestehende `compile_commands_base_directory(std::string_view)`-Ueberladung in `analysis_support.h` wird in AP 1.1 durch `compile_commands_base_directory(std::string_view path, const std::filesystem::path& fallback_base)` ersetzt; die alte CWD-implizite Signatur wird aus dem Header entfernt und nicht als Bequemlichkeitsueberladung beibehalten.
+- Die String-View-Ueberladungen `build_translation_unit_observations(const std::vector<CompileEntry>&, std::string_view)` und `build_include_hotspots(..., std::string_view)`, die intern `compile_commands_base_directory` mit Prozess-CWD-Fallback aufrufen, werden aus dem Produktionspfad entfernt; alle Produktionsaufrufer nutzen die `base_directory`-Ueberladungen mit Request-getriebener Basis.
+- `display_compile_commands_path(std::string_view)` wird auf eine Variante mit expliziter Basis migriert, sofern die bestehende Implementierung Prozess-CWD liest; eine reine String-Normalisierung ohne CWD-Lesepfad darf parameterlos bleiben.
 
 ## File-API-Aufloesungsmetadaten
 
@@ -243,6 +260,7 @@ Regeln:
 - Adapter liefern rohe lexikalische Pfade, keine host-spezifisch normalisierten Display-Strings.
 - `source_root` bleibt die Quelle fuer bestehende Analyse- und Impact-Basislogik; AP 1.1 fuehrt kein zusaetzliches `cmake_file_api_source_root` mit abweichender Semantik ein.
 - Ein leerer `source_root`-String gilt als "Source-Root unbekannt"; ein nicht leerer String gilt als bekannte File-API-Source-Root. Services kapseln diese Regel in einem kleinen Helper, damit `unresolved_file_api_source_root` nicht ueber verstreute Leerstring-Pruefungen entsteht.
+- Der Helper lebt als freie Funktion `source_root_from_build_model(const BuildModelResult&) -> std::optional<std::filesystem::path>` in `src/hexagon/services/analysis_support.h`/`.cpp`. Produktionscode prueft `BuildModelResult::source_root` nicht direkt auf Leerstring, sondern liest die Source-Root ausschliesslich ueber diesen Helper.
 - `ReportInputs.cmake_file_api_path` kommt ausschliesslich aus `AnalyzeProjectRequest::cmake_file_api_path` oder `AnalyzeImpactRequest::cmake_file_api_path`, inklusive `was_relative` und `report_display_base`.
 - `ReportInputs.cmake_file_api_resolved_path` kommt ausschliesslich aus `BuildModelResult::cmake_file_api_resolved_path` und wird in den Services ueber die Display-Pfadregeln konvertiert.
 - Wenn File-API-Laden nach erfolgreicher Build-/Reply-Pfadaufloesung fehlschlaegt, bleibt `BuildModelResult::cmake_file_api_resolved_path` gesetzt und wird in Fehlerergebnissen nach `ReportInputs.cmake_file_api_resolved_path` uebernommen.
@@ -252,7 +270,7 @@ Regeln:
 
 ## Display-Pfadregeln
 
-Eine gemeinsame Hilfsfunktion in der Hexagon-Service-Schicht oder einem kleinen lokalen Helper. Die Funktion bekommt neben dem Pfad auch die Display-Art, damit ein bereits aufgeloester Pfad nicht versehentlich wie ein originaler CLI-String behandelt wird:
+Eine gemeinsame Hilfsfunktion `to_report_display_path` lebt in `src/hexagon/services/analysis_support.h`/`.cpp` neben den bestehenden `display_*`-Helfern. AP 1.1 fuehrt keine separate `report_path_display.{h,cpp}`-Datei ein. Die Funktion bekommt neben dem Pfad auch die Display-Art, damit ein bereits aufgeloester Pfad nicht versehentlich wie ein originaler CLI-String behandelt wird:
 
 ```cpp
 enum class ReportPathDisplayKind {
@@ -315,7 +333,7 @@ Gemeinsame Grenzen:
 
 Display- und Aufloesungsregeln:
 
-- Die Provenienzentscheidung nutzt ausschliesslich `AnalyzeImpactRequest::changed_file_path.was_relative`, nicht `changed_file_path.path.is_absolute()`.
+- Die Provenienzentscheidung nutzt ausschliesslich `AnalyzeImpactRequest::changed_file_path.was_relative`, nicht `changed_file_path.path_for_io.is_absolute()`.
 - Die CLI transportiert den rohen lexikalischen CLI-Pfad in `InputPathArgument::original_argument` und einen vorbereiteten Pfad in `InputPathArgument::path_for_io`; bei relativem `changed_file` ist `path_for_io` nicht die fachliche Impact-Basis.
 - Die Provenienzlogik darf `path_for_io.is_absolute()` nicht verwenden und darf `path_for_io` bei relativen `changed_file`-Werten nicht als gegen `report_display_base` aufgeloesten Impact-Pfad behandeln. `was_relative` steuert, ob ein urspruenglich relatives `--changed-file` als relativer ReportInput behandelt wird.
 - Ist `changed_file_path.was_relative == false`, wird `changed_file` als lexikalisch normalisierter absoluter String ausgegeben und `changed_file_source=cli_absolute` gesetzt.
@@ -368,6 +386,7 @@ Validierungsreihenfolge:
 CLI-Parser-Anpassung:
 
 - `--changed-file` darf nicht mehr als Parser-`required()` modelliert sein, wenn diese Required-Pruefung vor der Formatverfuegbarkeit greift.
+- Auch eine subcommand-level Required-Pruefung in CLI11 (z.B. `subcommand->require_option()`, `->required()` am Option-Objekt oder ein positional-required-Aufruf) fuer `--changed-file` ist verboten, sofern sie vor der Formatverfuegbarkeit feuert. Die Pflicht wird ausschliesslich post-format-gate als fachliche Eingabevalidierung implementiert.
 - Die Pflicht fuer `impact --changed-file` wird als fachliche Eingabevalidierung nach der Formatverfuegbarkeitspruefung umgesetzt.
 - Dadurch liefert `impact --format json --cmake-file-api <path>` ohne `--changed-file` in AP 1.1 den stabilen `not implemented in this build`-Fehler und keinen Parser-Required-Fehler.
 - Fuer lauffaehige Formate bleibt `impact` ohne `--changed-file` ein Verwendungsfehler mit Exit-Code `2`.
@@ -392,6 +411,7 @@ Der bestehende Report-Port liefert fuer erfolgreiche Renderings weiter Reportinh
 Umsetzung:
 
 - Es wird ein kleines eigenes `RenderResult`-Struct fuer den CLI-Schreibpfad eingefuehrt, zum Beispiel mit `std::optional<std::string> content` und `std::optional<RenderError> error`.
+- `RenderError` traegt in AP 1.1 ausschliesslich ein `std::string message`-Feld. Exit-Code-Mapping bleibt CLI-Verantwortung; AP 1.1 fuehrt keine RenderError-Kategorien, format-spezifischen Subtypen oder strukturierten Diagnostics ein.
 - AP 1.1 fuehrt weder `std::expected` noch eine neue Expected-Dependency ein; der Code bleibt C++20-kompatibel.
 - Der CLI-Schreibpfad haengt fuer Tests an einer kleinen internen Renderer-Abstraktion, zum Beispiel `CliReportRenderer`, deren `render()` ein `RenderResult` liefert.
 - Reportadapter, die weiterhin `std::string` liefern, werden im CLI-Schreibpfad ueber einen Adapter-Wrapper in `RenderResult` gehoben.
@@ -430,6 +450,46 @@ Atomic-Writer-Vertrag:
 - Die plattformspezifischen Operationen liegen hinter einer kleinen Atomic-File-Operation-Abstraktion, zum Beispiel `AtomicFilePlatformOps`, damit Neu-/Replace-/Fehlerpfade deterministisch auch ohne Windows-CI getestet werden koennen.
 - Zielpfad darf vor dem Replace nicht geloescht werden.
 - Zurueckbleibende Temp-Dateien nach Prozessabbruch sind erlaubt, aber unter dem Zielnamen darf nie ein teilgeschriebener Report sichtbar werden.
+
+Atomic-File-Plattformabstraktion:
+
+`AtomicFilePlatformOps` kapselt die plattformspezifischen FS-Namensraumoperationen; das Schreiben der Bytes laeuft ueber `std::ofstream` direkt im Writer. Die Abstraktion lebt in `src/adapters/cli/atomic_report_writer.h` neben dem Writer; AP 1.1 fuehrt keine separate Datei dafuer ein.
+
+```cpp
+namespace xray::adapters::cli {
+
+struct AtomicFileError {
+    std::string message;
+};
+
+class AtomicFilePlatformOps {
+public:
+    virtual ~AtomicFilePlatformOps() = default;
+
+    virtual std::optional<AtomicFileError> create_temp_exclusive(
+        const std::filesystem::path& temp_path) = 0;
+
+    virtual std::optional<AtomicFileError> replace_existing(
+        const std::filesystem::path& temp_path,
+        const std::filesystem::path& target_path) = 0;
+
+    virtual std::optional<AtomicFileError> move_new(
+        const std::filesystem::path& temp_path,
+        const std::filesystem::path& target_path) = 0;
+
+    virtual void remove_temp_quiet(
+        const std::filesystem::path& temp_path) noexcept = 0;
+};
+
+}  // namespace xray::adapters::cli
+```
+
+Regeln:
+
+- Der Writer entscheidet anhand einer `exists`-Pruefung des Zielpfads vor dem Replace, ob `replace_existing` oder `move_new` aufgerufen wird.
+- Die Plattformimplementierung ruft auf POSIX `rename` oder `renameat`, auf Windows `ReplaceFileW` beziehungsweise `MoveFileExW` mit den im Atomic-Writer-Vertrag genannten Flags.
+- Tests injizieren einen Test-Doppelgaenger fuer `AtomicFilePlatformOps` und decken Erfolgs- und Fehlerpfade fuer `create_temp_exclusive`, `replace_existing`, `move_new` und Cleanup deterministisch ohne Plattform-IO ab.
+- Der Writer macht ausschliesslich diese vier Aufrufe an die Abstraktion; weitere FS-Namensraumoperationen bleiben dem Writer-Body verboten.
 
 ## Verbosity-Grenze
 
