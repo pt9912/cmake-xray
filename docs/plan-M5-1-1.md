@@ -190,8 +190,10 @@ Regeln:
 
 - `original_argument` enthaelt den rohen lexikalischen CLI-Wert nach CLI11-Parsing, aber vor fachlicher Aufloesung gegen `report_display_base`.
 - `path_for_io` enthaelt den Pfad, den Services fuer Laden, Existenzpruefung und fachliche Aufloesung verwenden.
-- Bei relativen CLI-Werten wird `path_for_io` gegen `report_display_base` gebildet; `original_argument` bleibt relativ.
+- Fuer normale Eingabepfade wie `compile_commands_path` und `cmake_file_api_path` wird `path_for_io` bei relativen CLI-Werten gegen `report_display_base` gebildet; `original_argument` bleibt relativ.
+- Fuer `changed_file_path` wird ein relativer CLI-Wert nicht vorab gegen `report_display_base` zu einem fachlichen IO-Pfad gemacht. `ImpactAnalyzer` loest ihn spaeter gegen die Compile-Database-Directory oder die File-API-Source-Root auf.
 - Bei absoluten CLI-Werten sind `original_argument` und `path_for_io` beide absolut lexikalisch normalisiert.
+- Produktionscode darf `changed_file_path.path_for_io` nicht als bereits fachlich aufgeloesten Impact-Pfad interpretieren, solange `changed_file_path.was_relative == true`.
 
 ### `AnalyzeImpactRequest`
 
@@ -290,8 +292,12 @@ Regeln fuer aufgeloeste Adapterpfade:
 
 - `cmake_file_api_resolved_path` wird als `resolved_adapter_path` behandelt.
 - Der Adapter liefert den rohen lexikalischen Build- oder Reply-Pfad, den er tatsaechlich verwendet hat.
-- Ist dieser Adapterpfad relativ, wird er gegen `report_display_base` interpretiert und als normalisierter relativer Anzeige-String ausgegeben.
-- Ist dieser Adapterpfad absolut, bleibt er absolut; Goldens mit solchen Pfaden verwenden fixture-stabile Werte wie `/project/...`.
+- Der Service kombiniert diesen rohen Adapterpfad mit dem zugehoerigen `InputPathArgument` der File-API-Eingabe.
+- War die urspruengliche File-API-Eingabe relativ, wird ein absoluter roher Adapterpfad fuer die Anzeige lexikalisch relativ zu `report_display_base` dargestellt, sofern der Pfad unter dieser Basis liegt. Beispiel: `--cmake-file-api build` mit `report_display_base=/repo` und Adapterpfad `/repo/build/.cmake/api/v1/reply` wird als `build/.cmake/api/v1/reply` angezeigt.
+- War die urspruengliche File-API-Eingabe relativ und liegt der Adapterpfad nicht unter `report_display_base`, bleibt er absolut und muss in Goldens ueber fixture-stabile Pfade wie `/project/...` kontrolliert werden.
+- War die urspruengliche File-API-Eingabe absolut, bleibt ein absoluter Adapterpfad absolut.
+- Ist der rohe Adapterpfad relativ, wird er als lexikalisch normalisierter relativer Anzeige-String ausgegeben; Services duerfen ihn fuer IO gegen `report_display_base` interpretieren, aber nicht fuer die Anzeige basisrelativ kanonisieren.
+- `cmake_file_api_resolved_path` wird damit nicht aus dem urspruenglichen CLI-String rekonstruiert, sondern aus Adapterpfad, `report_display_base` und `was_relative` der File-API-Eingabe abgeleitet.
 
 Gemeinsame Grenzen:
 
@@ -306,8 +312,8 @@ Gemeinsame Grenzen:
 Display- und Aufloesungsregeln:
 
 - Die Provenienzentscheidung nutzt ausschliesslich `AnalyzeImpactRequest::changed_file_path.was_relative`, nicht `changed_file_path.path.is_absolute()`.
-- Die CLI transportiert den rohen lexikalischen CLI-Pfad in `InputPathArgument::original_argument` und den fachlichen Ladepfad in `InputPathArgument::path_for_io`.
-- Die Provenienzlogik darf `path_for_io.is_absolute()` nicht verwenden. `was_relative` steuert, ob ein urspruenglich relatives `--changed-file` als relativer ReportInput behandelt wird.
+- Die CLI transportiert den rohen lexikalischen CLI-Pfad in `InputPathArgument::original_argument` und einen vorbereiteten Pfad in `InputPathArgument::path_for_io`; bei relativem `changed_file` ist `path_for_io` nicht die fachliche Impact-Basis.
+- Die Provenienzlogik darf `path_for_io.is_absolute()` nicht verwenden und darf `path_for_io` bei relativen `changed_file`-Werten nicht als gegen `report_display_base` aufgeloesten Impact-Pfad behandeln. `was_relative` steuert, ob ein urspruenglich relatives `--changed-file` als relativer ReportInput behandelt wird.
 - Ist `changed_file_path.was_relative == false`, wird `changed_file` als lexikalisch normalisierter absoluter String ausgegeben und `changed_file_source=cli_absolute` gesetzt.
 - Ist `changed_file_path.was_relative == true` und `compile_commands_path` gesetzt, wird der Pfad fuer Analyse und Anzeige gegen die Compile-Database-Directory interpretiert. `changed_file` bleibt der lexikalisch normalisierte relative Pfad zu dieser Directory, nicht relativ zu `report_display_base`.
 - Ist `changed_file_path.was_relative == true`, keine Compile Database gesetzt und eine File-API-Source-Root vorhanden, wird der Pfad fuer Analyse und Anzeige gegen diese Source-Root interpretiert. `changed_file` bleibt der lexikalisch normalisierte relative Pfad zu dieser Source-Root.
@@ -526,8 +532,11 @@ Unit-/Service-Tests:
 - Relative normale Eingabepfade bleiben in `compile_database_path` und `cmake_file_api_path` als normalisierte relative Anzeige-Strings erhalten.
 - Absolute normale Eingabepfade bleiben in `compile_database_path` und `cmake_file_api_path` als absolute Anzeige-Strings erhalten.
 - `cmake_file_api_resolved_path` folgt der Adapterpfad-Regel und wird nicht aus dem originalen CLI-String rekonstruiert.
+- Bei relativer File-API-Eingabe und absolutem Adapterpfad unter `report_display_base` wird `cmake_file_api_resolved_path` als relativer Anzeige-String ausgegeben, zum Beispiel `build/.cmake/api/v1/reply`.
+- Ein Test deckt `--cmake-file-api build` mit `report_display_base=/repo` und rohem Adapterpfad `/repo/build/.cmake/api/v1/reply` ab, damit keine hostabhaengige Absolutform in `ReportInputs.cmake_file_api_resolved_path` landet.
 - Normale Eingabe-Displaypfade werden aus `InputPathArgument::original_argument` erzeugt; IO nutzt `path_for_io`.
 - Ein Test deckt `original_argument=./build/../out/compile_commands.json` und davon abweichendes `path_for_io` ab, damit die Anzeige nicht aus dem IO-Pfad rekonstruiert wird.
+- Ein Test stellt sicher, dass `changed_file_path.path_for_io` bei relativem `changed_file` nicht gegen `report_display_base`, sondern gegen die Impact-Provenienz-Basis ausgewertet wird.
 - File-API-Fehlerergebnis nach bereits bekannter Build-/Reply-Pfadaufloesung behaelt `cmake_file_api_resolved_path` in `ReportInputs`.
 - File-API-Fehlerergebnis ohne stabile Build-/Reply-Pfadaufloesung setzt `ReportInputs.cmake_file_api_resolved_path=nullopt`.
 - Leerer `BuildModelResult::source_root` wird als unbekannte Source-Root behandelt und fuehrt bei File-API-only-Impact mit relativem `changed_file` zu `changed_file_source=unresolved_file_api_source_root`.
