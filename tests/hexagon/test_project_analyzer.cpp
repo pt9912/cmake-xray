@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -10,24 +11,45 @@
 #include "hexagon/model/compile_entry.h"
 #include "hexagon/model/impact_result.h"
 #include "hexagon/model/observation_source.h"
+#include "hexagon/model/report_inputs.h"
 #include "hexagon/model/target_info.h"
 #include "hexagon/ports/driven/build_model_port.h"
 #include "hexagon/ports/driven/include_resolver_port.h"
 #include "hexagon/ports/driven/report_writer_port.h"
+#include "hexagon/ports/driving/analyze_project_port.h"
 #include "hexagon/services/project_analyzer.h"
 #include "hexagon/services/report_generator.h"
 
 namespace {
 
+using xray::hexagon::model::ChangedFileSource;
 using xray::hexagon::model::CompileDatabaseError;
 using xray::hexagon::model::CompileDatabaseResult;
 using xray::hexagon::model::CompileEntry;
 using xray::hexagon::model::IncludeResolutionResult;
 using xray::hexagon::model::ObservationSource;
+using xray::hexagon::model::ReportInputSource;
 using xray::hexagon::model::ResolvedTranslationUnitIncludes;
 using xray::hexagon::model::TargetAssignment;
 using xray::hexagon::model::TargetInfo;
 using xray::hexagon::model::TargetMetadataStatus;
+using xray::hexagon::ports::driving::AnalyzeProjectRequest;
+using xray::hexagon::ports::driving::InputPathArgument;
+
+AnalyzeProjectRequest make_project_request(std::string_view compile_commands,
+                                            std::string_view file_api) {
+    AnalyzeProjectRequest request;
+    request.report_display_base = std::filesystem::path{"/"};
+    if (!compile_commands.empty()) {
+        std::filesystem::path p{compile_commands};
+        request.compile_commands_path = InputPathArgument{p, p, !p.is_absolute()};
+    }
+    if (!file_api.empty()) {
+        std::filesystem::path p{file_api};
+        request.cmake_file_api_path = InputPathArgument{p, p, !p.is_absolute()};
+    }
+    return request;
+}
 
 std::vector<CompileEntry> stub_entries() {
     return {
@@ -158,12 +180,21 @@ TEST_CASE("project analyzer builds ranked translation units and hotspots") {
     const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port, include_resolver_port,
                                                             unused_port};
 
-    const auto result = analyzer.analyze_project({"/tmp/compile_commands.json", ""});
+    const auto result = analyzer.analyze_project(
+        make_project_request("/tmp/compile_commands.json", ""));
 
     CHECK(result.application.name == std::string_view{"cmake-xray"});
     CHECK(result.application.version == std::string_view{"v1.1.0"});
     CHECK(result.compile_database.is_success());
     CHECK(result.compile_database_path == "/tmp/compile_commands.json");
+    REQUIRE(result.inputs.compile_database_path.has_value());
+    CHECK(*result.inputs.compile_database_path == "/tmp/compile_commands.json");
+    CHECK(result.inputs.compile_database_source == ReportInputSource::cli);
+    CHECK_FALSE(result.inputs.cmake_file_api_path.has_value());
+    CHECK_FALSE(result.inputs.cmake_file_api_resolved_path.has_value());
+    CHECK(result.inputs.cmake_file_api_source == ReportInputSource::not_provided);
+    CHECK_FALSE(result.inputs.changed_file.has_value());
+    CHECK_FALSE(result.inputs.changed_file_source.has_value());
     CHECK(result.observation_source == ObservationSource::exact);
     CHECK(result.target_metadata == TargetMetadataStatus::not_loaded);
     REQUIRE(result.translation_units.size() == 3);
@@ -214,11 +245,15 @@ TEST_CASE("project analyzer propagates compile database errors") {
     const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port, include_resolver_port,
                                                             unused_port};
 
-    const auto result = analyzer.analyze_project({"/path/to/compile_commands.json", ""});
+    const auto result = analyzer.analyze_project(
+        make_project_request("/path/to/compile_commands.json", ""));
 
     CHECK_FALSE(result.compile_database.is_success());
     CHECK(result.compile_database.error() == CompileDatabaseError::empty_database);
     CHECK(result.translation_units.empty());
+    REQUIRE(result.inputs.compile_database_path.has_value());
+    CHECK(*result.inputs.compile_database_path == "/path/to/compile_commands.json");
+    CHECK(result.inputs.compile_database_source == ReportInputSource::cli);
 }
 
 TEST_CASE("project analyzer ranking is stable for permuted compile database entries") {
@@ -232,9 +267,9 @@ TEST_CASE("project analyzer ranking is stable for permuted compile database entr
         permuted_build_model_port, include_resolver_port, unused_port};
 
     const auto baseline_result =
-        baseline_analyzer.analyze_project({"/tmp/compile_commands.json", ""});
+        baseline_analyzer.analyze_project(make_project_request("/tmp/compile_commands.json", ""));
     const auto permuted_result =
-        permuted_analyzer.analyze_project({"/tmp/compile_commands.json", ""});
+        permuted_analyzer.analyze_project(make_project_request("/tmp/compile_commands.json", ""));
 
     REQUIRE(baseline_result.translation_units.size() == 3);
     REQUIRE(permuted_result.translation_units.size() == 3);
@@ -257,7 +292,8 @@ TEST_CASE("project analyzer tokenizes quoted command arguments with spaces") {
     const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port, include_resolver_port,
                                                             unused_port};
 
-    const auto result = analyzer.analyze_project({"/tmp/compile_commands.json", ""});
+    const auto result = analyzer.analyze_project(
+        make_project_request("/tmp/compile_commands.json", ""));
 
     REQUIRE(result.translation_units.size() == 1);
     CHECK(result.translation_units[0].arg_count == 7);
@@ -275,7 +311,8 @@ TEST_CASE("project analyzer keeps best effort metrics for unmatched command quot
     const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port, include_resolver_port,
                                                             unused_port};
 
-    const auto result = analyzer.analyze_project({"/tmp/compile_commands.json", ""});
+    const auto result = analyzer.analyze_project(
+        make_project_request("/tmp/compile_commands.json", ""));
 
     REQUIRE(result.translation_units.size() == 1);
     CHECK(result.translation_units[0].arg_count == 3);
@@ -333,7 +370,7 @@ TEST_CASE("project analyzer uses file api as derived source with targets on TUs"
     const xray::hexagon::services::ProjectAnalyzer analyzer{compile_db_port, include_resolver_port,
                                                             file_api_port};
 
-    const auto result = analyzer.analyze_project({"", "/tmp/build"});
+    const auto result = analyzer.analyze_project(make_project_request("", "/tmp/build"));
 
     CHECK(result.compile_database.is_success());
     CHECK(result.observation_source == ObservationSource::derived);
@@ -343,6 +380,11 @@ TEST_CASE("project analyzer uses file api as derived source with targets on TUs"
     CHECK(result.translation_units[0].targets[0].display_name == "myapp");
     REQUIRE(result.target_assignments.size() == 1);
     CHECK(result.diagnostics.size() >= 1);
+    CHECK_FALSE(result.inputs.compile_database_path.has_value());
+    CHECK(result.inputs.compile_database_source == ReportInputSource::not_provided);
+    REQUIRE(result.inputs.cmake_file_api_path.has_value());
+    CHECK(*result.inputs.cmake_file_api_path == "/tmp/build");
+    CHECK(result.inputs.cmake_file_api_source == ReportInputSource::cli);
 }
 
 TEST_CASE("project analyzer filters file api assignments and attaches targets in mixed path") {
@@ -376,7 +418,8 @@ TEST_CASE("project analyzer filters file api assignments and attaches targets in
     const xray::hexagon::services::ProjectAnalyzer analyzer{compile_db_port, include_resolver_port,
                                                             file_api_port};
 
-    const auto result = analyzer.analyze_project({"/tmp/compile_commands.json", "/tmp/build"});
+    const auto result = analyzer.analyze_project(
+        make_project_request("/tmp/compile_commands.json", "/tmp/build"));
 
     CHECK(result.compile_database.is_success());
     CHECK(result.observation_source == ObservationSource::exact);
@@ -433,7 +476,8 @@ TEST_CASE("project analyzer propagates file api error in mixed path") {
     const xray::hexagon::services::ProjectAnalyzer analyzer{compile_db_port, include_resolver_port,
                                                             file_api_port};
 
-    const auto result = analyzer.analyze_project({"/tmp/compile_commands.json", "/tmp/build"});
+    const auto result = analyzer.analyze_project(
+        make_project_request("/tmp/compile_commands.json", "/tmp/build"));
 
     CHECK_FALSE(result.compile_database.is_success());
     CHECK(result.compile_database.error() == CompileDatabaseError::file_api_invalid);
@@ -468,7 +512,8 @@ TEST_CASE("project analyzer reports mismatch diagnostic when no file api assignm
     const xray::hexagon::services::ProjectAnalyzer analyzer{compile_db_port, include_resolver_port,
                                                             file_api_port};
 
-    const auto result = analyzer.analyze_project({"/tmp/compile_commands.json", "/tmp/build"});
+    const auto result = analyzer.analyze_project(
+        make_project_request("/tmp/compile_commands.json", "/tmp/build"));
 
     CHECK(result.compile_database.is_success());
     CHECK(result.observation_source == ObservationSource::exact);
@@ -483,4 +528,129 @@ TEST_CASE("project analyzer reports mismatch diagnostic when no file api assignm
         }
     }
     CHECK(found_mismatch);
+}
+
+TEST_CASE("project analyzer carries resolved file api path from build model into ReportInputs") {
+    class ResolvedPathFileApiPort final : public xray::hexagon::ports::driven::BuildModelPort {
+    public:
+        xray::hexagon::model::BuildModelResult load_build_model(
+            std::string_view /*path*/) const override {
+            xray::hexagon::model::BuildModelResult result;
+            result.source = ObservationSource::derived;
+            result.target_metadata = TargetMetadataStatus::loaded;
+            result.source_root = "/project";
+            result.cmake_file_api_resolved_path =
+                std::filesystem::path{"/repo/build/.cmake/api/v1/reply"};
+            result.compile_database = CompileDatabaseResult{
+                CompileDatabaseError::none, {},
+                {CompileEntry::from_arguments(
+                    "/project/src/main.cpp", "/project/build/app",
+                    {"clang++", "-c", "/project/src/main.cpp"})},
+                {}};
+            return result;
+        }
+    };
+
+    const UnusedBuildModelPort compile_db_port;
+    const ResolvedPathFileApiPort file_api_port;
+    const EmptyIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{compile_db_port, include_resolver_port,
+                                                            file_api_port};
+
+    AnalyzeProjectRequest request;
+    request.report_display_base = std::filesystem::path{"/repo"};
+    request.cmake_file_api_path =
+        InputPathArgument{std::filesystem::path{"build"}, std::filesystem::path{"/repo/build"},
+                          true};
+
+    const auto result = analyzer.analyze_project(request);
+
+    CHECK(result.compile_database.is_success());
+    REQUIRE(result.inputs.cmake_file_api_path.has_value());
+    CHECK(*result.inputs.cmake_file_api_path == "build");
+    REQUIRE(result.inputs.cmake_file_api_resolved_path.has_value());
+    CHECK(*result.inputs.cmake_file_api_resolved_path == "build/.cmake/api/v1/reply");
+}
+
+TEST_CASE("project analyzer preserves ReportInputs on compile database load failure") {
+    class ErrorBuildModelPort final : public xray::hexagon::ports::driven::BuildModelPort {
+    public:
+        xray::hexagon::model::BuildModelResult load_build_model(
+            std::string_view /*path*/) const override {
+            xray::hexagon::model::BuildModelResult result;
+            result.compile_database =
+                CompileDatabaseResult{CompileDatabaseError::file_not_accessible,
+                                      "cannot read", {}, {}};
+            return result;
+        }
+    };
+
+    const ErrorBuildModelPort compile_db_port;
+    const UnusedBuildModelPort file_api_port;
+    const EmptyIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{compile_db_port, include_resolver_port,
+                                                            file_api_port};
+
+    const auto result = analyzer.analyze_project(
+        make_project_request("/tmp/compile_commands.json", ""));
+
+    CHECK_FALSE(result.compile_database.is_success());
+    REQUIRE(result.inputs.compile_database_path.has_value());
+    CHECK(*result.inputs.compile_database_path == "/tmp/compile_commands.json");
+    CHECK(result.inputs.compile_database_source == ReportInputSource::cli);
+    CHECK_FALSE(result.inputs.cmake_file_api_path.has_value());
+}
+
+TEST_CASE("project analyzer preserves resolved file api path on post-resolution failure") {
+    class PostResolutionErrorPort final : public xray::hexagon::ports::driven::BuildModelPort {
+    public:
+        xray::hexagon::model::BuildModelResult load_build_model(
+            std::string_view /*path*/) const override {
+            xray::hexagon::model::BuildModelResult result;
+            result.cmake_file_api_resolved_path =
+                std::filesystem::path{"/tmp/build/.cmake/api/v1/reply"};
+            result.compile_database =
+                CompileDatabaseResult{CompileDatabaseError::file_api_invalid,
+                                      "cmake file api index is not valid JSON", {}, {}};
+            return result;
+        }
+    };
+
+    const StubBuildModelPort compile_db_port;
+    const PostResolutionErrorPort file_api_port;
+    const EmptyIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{compile_db_port, include_resolver_port,
+                                                            file_api_port};
+
+    const auto result = analyzer.analyze_project(
+        make_project_request("/tmp/compile_commands.json", "/tmp/build"));
+
+    CHECK_FALSE(result.compile_database.is_success());
+    REQUIRE(result.inputs.cmake_file_api_path.has_value());
+    CHECK(*result.inputs.cmake_file_api_path == "/tmp/build");
+    REQUIRE(result.inputs.cmake_file_api_resolved_path.has_value());
+    CHECK(*result.inputs.cmake_file_api_resolved_path == "/tmp/build/.cmake/api/v1/reply");
+}
+
+TEST_CASE("project analyzer is stable when the process working directory changes") {
+    const StubBuildModelPort build_model_port;
+    const UnusedBuildModelPort unused_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port, include_resolver_port,
+                                                            unused_port};
+
+    const auto baseline = analyzer.analyze_project(
+        make_project_request("/tmp/compile_commands.json", ""));
+
+    const auto previous_cwd = std::filesystem::current_path();
+    std::filesystem::current_path(std::filesystem::temp_directory_path());
+    const auto after_cwd_change = analyzer.analyze_project(
+        make_project_request("/tmp/compile_commands.json", ""));
+    std::filesystem::current_path(previous_cwd);
+
+    REQUIRE(baseline.translation_units.size() == after_cwd_change.translation_units.size());
+    for (std::size_t i = 0; i < baseline.translation_units.size(); ++i) {
+        CHECK(baseline.translation_units[i].reference.unique_key ==
+              after_cwd_change.translation_units[i].reference.unique_key);
+    }
 }

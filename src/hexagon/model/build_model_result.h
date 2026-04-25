@@ -1,5 +1,7 @@
 #pragma once
 
+#include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -17,6 +19,7 @@ struct BuildModelResult {
     std::vector<TargetAssignment> target_assignments;
     std::string source_root;
     std::vector<Diagnostic> diagnostics;
+    std::optional<std::filesystem::path> cmake_file_api_resolved_path;
 
     bool is_success() const { return compile_database.is_success(); }
 };

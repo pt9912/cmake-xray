@@ -7,6 +7,7 @@
 #include "compile_database_result.h"
 #include "diagnostic.h"
 #include "observation_source.h"
+#include "report_inputs.h"
 #include "target_info.h"
 #include "translation_unit.h"
 
@@ -39,6 +40,7 @@ struct ImpactResult {
     std::string compile_database_path;
     std::string changed_file;
     std::string changed_file_key;
+    ReportInputs inputs;
     bool heuristic{false};
     std::vector<ImpactedTranslationUnit> affected_translation_units;
     std::vector<Diagnostic> diagnostics;

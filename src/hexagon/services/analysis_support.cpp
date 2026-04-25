@@ -318,16 +318,57 @@ TranslationUnitObservation build_translation_unit_observation(
 
 }  // namespace
 
-std::filesystem::path compile_commands_base_directory(std::string_view compile_commands_path) {
-    const std::filesystem::path input{compile_commands_path};
-    const auto resolved = input.has_root_directory() ? input.lexically_normal()
-                                                     : std::filesystem::absolute(input).lexically_normal();
-    const auto base = resolved.parent_path();
-    return base.empty() ? std::filesystem::current_path() : base;
+namespace {
+
+bool report_path_under_base(const std::filesystem::path& path,
+                            const std::filesystem::path& base) {
+    if (path.root_name() != base.root_name()) return false;
+    const auto relative = path.lexically_relative(base);
+    if (relative.empty()) return false;
+    const auto text = relative.generic_string();
+    return text != ".." && !text.starts_with("../");
 }
 
-std::string display_compile_commands_path(std::string_view compile_commands_path) {
-    return std::filesystem::path{compile_commands_path}.lexically_normal().generic_string();
+std::string display_resolved_adapter_path(const std::filesystem::path& display_path,
+                                          const std::filesystem::path& report_display_base) {
+    if (display_path == report_display_base) return ".";
+    if (!report_path_under_base(display_path, report_display_base)) {
+        return display_path.generic_string();
+    }
+    return display_path.lexically_relative(report_display_base).generic_string();
+}
+
+}  // namespace
+
+std::filesystem::path compile_commands_base_directory(
+    std::string_view compile_commands_path, const std::filesystem::path& fallback_base) {
+    const std::filesystem::path input{compile_commands_path};
+    const std::filesystem::path resolved =
+        input.has_root_directory()
+            ? input.lexically_normal()
+            : (fallback_base / input).lexically_normal();
+    const auto base = resolved.parent_path();
+    return base.empty() ? fallback_base.lexically_normal() : base;
+}
+
+std::optional<std::filesystem::path> source_root_from_build_model(
+    const model::BuildModelResult& build_model) {
+    if (build_model.source_root.empty()) return std::nullopt;
+    return std::filesystem::path{build_model.source_root};
+}
+
+std::optional<std::string> to_report_display_path(
+    ReportPathDisplayInput input, const std::filesystem::path& report_display_base) {
+    if (!input.display_path.has_value()) return std::nullopt;
+    const auto display = input.display_path->lexically_normal();
+
+    if (input.kind == ReportPathDisplayKind::input_argument) {
+        return display.generic_string();
+    }
+    if (!input.was_relative || !display.is_absolute()) {
+        return display.generic_string();
+    }
+    return display_resolved_adapter_path(display, report_display_base.lexically_normal());
 }
 
 std::string normalize_path(const std::filesystem::path& path) {
@@ -359,12 +400,6 @@ std::vector<TranslationUnitObservation> build_translation_unit_observations(
     }
 
     return observations; }
-
-std::vector<TranslationUnitObservation> build_translation_unit_observations(
-    const std::vector<CompileEntry>& entries, std::string_view compile_commands_path) {
-    return build_translation_unit_observations(entries,
-                                               compile_commands_base_directory(compile_commands_path));
-}
 
 std::vector<RankedTranslationUnit> build_ranked_translation_units(
     const std::vector<TranslationUnitObservation>& observations,
@@ -446,13 +481,6 @@ std::vector<model::IncludeHotspot> build_include_hotspots(
     });
 
     return hotspots;
-}
-
-std::vector<model::IncludeHotspot> build_include_hotspots(
-    const std::vector<TranslationUnitObservation>& observations,
-    const IncludeResolutionResult& include_resolution, std::string_view compile_commands_path) {
-    return build_include_hotspots(observations, include_resolution,
-                                 compile_commands_base_directory(compile_commands_path));
 }
 
 std::string resolve_changed_file_key(const std::filesystem::path& base_directory,

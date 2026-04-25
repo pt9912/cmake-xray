@@ -308,6 +308,47 @@ int handle_impact_result(const xray::hexagon::model::ImpactResult& result,
     return emit_report(report_port.generate_impact_report(result), options, streams);
 }
 
+xray::hexagon::ports::driving::InputPathArgument make_input_path_argument(
+    const std::string& cli_value, const std::filesystem::path& report_display_base) {
+    const std::filesystem::path raw{cli_value};
+    const bool was_relative = !raw.is_absolute();
+    const auto path_for_io = was_relative
+                                 ? (report_display_base / raw).lexically_normal()
+                                 : raw.lexically_normal();
+    return {raw, path_for_io, was_relative};
+}
+
+xray::hexagon::ports::driving::InputPathArgument make_changed_file_argument(
+    const std::string& cli_value) {
+    const std::filesystem::path raw{cli_value};
+    const bool was_relative = !raw.is_absolute();
+    const auto path_for_io = raw.lexically_normal();
+    return {raw, path_for_io, was_relative};
+}
+
+std::optional<xray::hexagon::ports::driving::InputPathArgument> optional_input_path(
+    const std::string& cli_value, const std::filesystem::path& report_display_base) {
+    if (cli_value.empty()) return std::nullopt;
+    return make_input_path_argument(cli_value, report_display_base);
+}
+
+xray::hexagon::ports::driving::AnalyzeProjectRequest build_project_request(
+    const CliOptions& options, const std::filesystem::path& report_display_base) {
+    // Aggregate return avoids a gcov NRVO artifact on the closing brace.
+    return {optional_input_path(options.compile_commands_path, report_display_base),
+            optional_input_path(options.cmake_file_api_path, report_display_base),
+            report_display_base};
+}
+
+xray::hexagon::ports::driving::AnalyzeImpactRequest build_impact_request(
+    const CliOptions& options, const std::filesystem::path& report_display_base) {
+    // Aggregate return avoids a gcov NRVO artifact on the closing brace.
+    return {optional_input_path(options.compile_commands_path, report_display_base),
+            make_changed_file_argument(options.changed_file_path),
+            optional_input_path(options.cmake_file_api_path, report_display_base),
+            report_display_base};
+}
+
 }  // namespace
 
 CliAdapter::CliAdapter(
@@ -355,15 +396,15 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
     const auto report_format = parse_report_format(options.report_format);
     const auto& report_port = select_report_port(report_format, report_ports_);
 
+    const auto report_display_base = std::filesystem::current_path();
     if (impact_cmd->parsed()) {
         const auto result = analyze_impact_port_.analyze_impact(
-            options.compile_commands_path, options.changed_file_path,
-            options.cmake_file_api_path);
+            build_impact_request(options, report_display_base));
         return handle_impact_result(result, report_port, options, streams);
     }
 
     const auto result = analyze_project_port_.analyze_project(
-        {options.compile_commands_path, options.cmake_file_api_path});
+        build_project_request(options, report_display_base));
     return handle_analysis_result(result, report_port, options, streams);
 }
 

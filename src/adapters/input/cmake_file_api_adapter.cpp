@@ -590,7 +590,9 @@ xray::hexagon::model::BuildModelResult CmakeFileApiAdapter::load_build_model(
             "cannot access cmake file api reply directory: " + reply_dir.string());
     }
 
-    return load_from_reply_directory(reply_dir);
+    auto result = load_from_reply_directory(reply_dir);
+    result.cmake_file_api_resolved_path = reply_dir;
+    return result;
 }
 
 }  // namespace xray::adapters::input

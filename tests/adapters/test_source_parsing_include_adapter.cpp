@@ -39,10 +39,8 @@ void write_file(const std::filesystem::path& path, std::string_view contents) {
 
 std::vector<xray::hexagon::model::TranslationUnitObservation> build_single_observation(
     const std::filesystem::path& fixture_root, CompileEntry entry) {
-    const auto compile_commands_path = fixture_root / "compile_commands.json";
-    const auto path_string = compile_commands_path.string();
     return xray::hexagon::services::build_translation_unit_observations(
-        {std::move(entry)}, std::string_view{path_string});
+        {std::move(entry)}, fixture_root);
 }
 
 }  // namespace

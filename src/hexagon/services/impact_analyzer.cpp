@@ -3,12 +3,16 @@
 #include <algorithm>
 #include <cstddef>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #include "model/application_info.h"
 #include "model/diagnostic.h"
+#include "model/report_inputs.h"
 #include "services/analysis_support.h"
 #include "services/diagnostic_support.h"
 
@@ -16,6 +20,9 @@ namespace xray::hexagon::services {
 
 namespace {
 
+using ports::driving::AnalyzeImpactRequest;
+using ports::driving::InputPathArgument;
+using xray::hexagon::model::ChangedFileSource;
 using xray::hexagon::model::Diagnostic;
 using xray::hexagon::model::DiagnosticSeverity;
 using xray::hexagon::model::ImpactedTarget;
@@ -30,21 +37,87 @@ struct LoadedInputs {
     bool success{false};
 };
 
-LoadedInputs load_compile_commands_input(const ports::driven::BuildModelPort& port,
-                                         std::string_view path,
-                                         ImpactResult& result) {
-    const auto model = port.load_build_model(path);
-    result.compile_database_path = display_compile_commands_path(path);
-    result.compile_database = model.compile_database;
-    result.observation_source = model::ObservationSource::exact;
-    return {compile_commands_base_directory(path), model.is_success()};
+struct FileApiLoadOutcome {
+    LoadedInputs loaded;
+    std::optional<std::filesystem::path> source_root;
+};
+
+struct ChangedFileResolution {
+    ChangedFileSource source{ChangedFileSource::cli_absolute};
+    std::optional<std::filesystem::path> base;
+};
+
+std::string path_for_io_string(const std::optional<InputPathArgument>& opt) {
+    return opt.has_value() ? opt->path_for_io.generic_string() : std::string{};
 }
 
-LoadedInputs load_file_api_input(const ports::driven::BuildModelPort& port,
-                                 std::string_view path,
-                                 ImpactResult& result) {
+model::ReportInputSource source_from(const std::optional<InputPathArgument>& opt) {
+    return opt.has_value() ? model::ReportInputSource::cli
+                           : model::ReportInputSource::not_provided;
+}
+
+std::optional<std::string> input_arg_display(const std::optional<InputPathArgument>& opt,
+                                             const std::filesystem::path& base) {
+    if (!opt.has_value()) return std::nullopt;
+    return to_report_display_path(
+        {opt->original_argument, ReportPathDisplayKind::input_argument, opt->was_relative},
+        base);
+}
+
+std::optional<std::string> resolved_file_api_display(
+    const std::optional<std::filesystem::path>& adapter_path,
+    const std::optional<InputPathArgument>& input_arg,
+    const std::filesystem::path& base) {
+    if (!adapter_path.has_value()) return std::nullopt;
+    const bool was_relative = input_arg.has_value() && input_arg->was_relative;
+    return to_report_display_path(
+        {adapter_path, ReportPathDisplayKind::resolved_adapter_path, was_relative}, base);
+}
+
+void populate_initial_inputs(const AnalyzeImpactRequest& request, model::ReportInputs& inputs) {
+    inputs.compile_database_path =
+        input_arg_display(request.compile_commands_path, request.report_display_base);
+    inputs.compile_database_source = source_from(request.compile_commands_path);
+    inputs.cmake_file_api_path =
+        input_arg_display(request.cmake_file_api_path, request.report_display_base);
+    inputs.cmake_file_api_source = source_from(request.cmake_file_api_path);
+}
+
+void set_legacy_compile_database_path(ImpactResult& result) {
+    if (result.inputs.compile_database_path.has_value()) {
+        result.compile_database_path = *result.inputs.compile_database_path;
+    } else if (result.inputs.cmake_file_api_path.has_value()) {
+        result.compile_database_path = *result.inputs.cmake_file_api_path;
+    }
+}
+
+void update_inputs_from_file_api_load(const model::BuildModelResult& model,
+                                      const AnalyzeImpactRequest& request,
+                                      model::ReportInputs& inputs) {
+    auto resolved = resolved_file_api_display(model.cmake_file_api_resolved_path,
+                                              request.cmake_file_api_path,
+                                              request.report_display_base);
+    if (resolved.has_value()) {
+        inputs.cmake_file_api_resolved_path = std::move(resolved);
+    }
+}
+
+LoadedInputs load_compile_commands_input(const ports::driven::BuildModelPort& port,
+                                         std::string_view path,
+                                         const std::filesystem::path& fallback_base,
+                                         ImpactResult& result) {
     const auto model = port.load_build_model(path);
-    result.compile_database_path = display_compile_commands_path(path);
+    result.compile_database = model.compile_database;
+    result.observation_source = model::ObservationSource::exact;
+    return {compile_commands_base_directory(path, fallback_base), model.is_success()};
+}
+
+FileApiLoadOutcome load_file_api_input(const ports::driven::BuildModelPort& port,
+                                       std::string_view path,
+                                       const AnalyzeImpactRequest& request,
+                                       ImpactResult& result) {
+    const auto model = port.load_build_model(path);
+    update_inputs_from_file_api_load(model, request, result.inputs);
     result.compile_database = model.compile_database;
     result.observation_source = model::ObservationSource::derived;
     result.target_metadata = model.target_metadata;
@@ -52,20 +125,86 @@ LoadedInputs load_file_api_input(const ports::driven::BuildModelPort& port,
     if (model.is_success()) {
         append_unique_diagnostics(result.diagnostics, model.diagnostics);
     }
-    return {std::filesystem::path{model.source_root}, model.is_success()};
+    return {{std::filesystem::path{model.source_root}, model.is_success()},
+            source_root_from_build_model(model)};
 }
 
 bool try_load_file_api(const ports::driven::BuildModelPort& port,
                        std::string_view path,
+                       const AnalyzeImpactRequest& request,
                        model::BuildModelResult& file_api_model,
                        ImpactResult& result) {
     file_api_model = port.load_build_model(path);
+    update_inputs_from_file_api_load(file_api_model, request, result.inputs);
     if (!file_api_model.is_success()) {
         result.compile_database = file_api_model.compile_database;
         return false;
     }
     append_unique_diagnostics(result.diagnostics, file_api_model.diagnostics);
     return true;
+}
+
+ChangedFileResolution resolve_changed_file_provenance(
+    const InputPathArgument& changed_file_arg,
+    bool has_compile_commands,
+    const std::filesystem::path& compile_db_base,
+    const std::optional<std::filesystem::path>& source_root) {
+    if (!changed_file_arg.was_relative) {
+        return {ChangedFileSource::cli_absolute, std::nullopt};
+    }
+    if (has_compile_commands) {
+        return {ChangedFileSource::compile_database_directory, compile_db_base};
+    }
+    if (source_root.has_value()) {
+        return {ChangedFileSource::file_api_source_root, source_root};
+    }
+    return {ChangedFileSource::unresolved_file_api_source_root, std::nullopt};
+}
+
+void apply_changed_file_absolute(const InputPathArgument& arg, ImpactResult& result) {
+    const auto display = arg.path_for_io.lexically_normal().generic_string();
+    result.inputs.changed_file = display;
+    result.changed_file = display;
+    result.changed_file_key = display;
+}
+
+void apply_changed_file_unresolved(const InputPathArgument& arg, ImpactResult& result) {
+    const auto display = arg.original_argument.lexically_normal().generic_string();
+    result.inputs.changed_file = display;
+    result.changed_file = display;
+    result.changed_file_key = display;
+}
+
+void apply_changed_file_with_base(const InputPathArgument& arg,
+                                  const std::filesystem::path& base, ImpactResult& result) {
+    result.changed_file_key = resolve_changed_file_key(base, arg.path_for_io);
+    result.changed_file = display_changed_file(base, result.changed_file_key);
+    result.inputs.changed_file = result.changed_file;
+}
+
+void apply_changed_file(const InputPathArgument& arg, const ChangedFileResolution& resolution,
+                        ImpactResult& result) {
+    result.inputs.changed_file_source = resolution.source;
+    if (resolution.source == ChangedFileSource::cli_absolute) {
+        apply_changed_file_absolute(arg, result);
+        return;
+    }
+    if (resolution.source == ChangedFileSource::unresolved_file_api_source_root) {
+        apply_changed_file_unresolved(arg, result);
+        return;
+    }
+    apply_changed_file_with_base(arg, *resolution.base, result);
+}
+
+void finalize_changed_file(const AnalyzeImpactRequest& request, bool has_compile_commands,
+                           const std::filesystem::path& compile_db_base,
+                           const std::optional<std::filesystem::path>& source_root,
+                           ImpactResult& result) {
+    apply_changed_file(request.changed_file_path,
+                       resolve_changed_file_provenance(request.changed_file_path,
+                                                       has_compile_commands, compile_db_base,
+                                                       source_root),
+                       result);
 }
 
 bool impacted_translation_unit_less(const ImpactedTranslationUnit& lhs,
@@ -263,40 +402,83 @@ ImpactAnalyzer::ImpactAnalyzer(
       file_api_port_(file_api_port),
       include_resolver_port_(include_resolver_port) {}
 
-ImpactResult ImpactAnalyzer::analyze_impact(
-    std::string_view compile_commands_path,
-    const std::filesystem::path& changed_path,
-    std::string_view cmake_file_api_path) const {
+namespace {
+
+struct ImpactLoadContext {
+    const ports::driven::BuildModelPort& compile_db_port;
+    const ports::driven::BuildModelPort& file_api_port;
+    const AnalyzeImpactRequest& request;
+    std::string compile_path;
+    std::string file_api_path;
+};
+
+struct ImpactLoadState {
+    LoadedInputs loaded;
+    std::optional<std::filesystem::path> source_root;
+    model::BuildModelResult file_api_model;
+};
+
+bool load_inputs_with_compile_db(const ImpactLoadContext& ctx, ImpactLoadState& state,
+                                  ImpactResult& result) {
+    state.loaded = load_compile_commands_input(ctx.compile_db_port, ctx.compile_path,
+                                               ctx.request.report_display_base, result);
+    if (!state.loaded.success) {
+        finalize_changed_file(ctx.request, true, state.loaded.base_directory, std::nullopt, result);
+        return false;
+    }
+    if (!ctx.file_api_path.empty() &&
+        !try_load_file_api(ctx.file_api_port, ctx.file_api_path, ctx.request,
+                           state.file_api_model, result)) {
+        finalize_changed_file(ctx.request, true, state.loaded.base_directory, std::nullopt, result);
+        return false;
+    }
+    return true;
+}
+
+bool load_inputs_file_api_only(const ImpactLoadContext& ctx, ImpactLoadState& state,
+                                ImpactResult& result) {
+    auto outcome = load_file_api_input(ctx.file_api_port, ctx.file_api_path, ctx.request, result);
+    state.loaded = outcome.loaded;
+    state.source_root = outcome.source_root;
+    if (!state.loaded.success) {
+        finalize_changed_file(ctx.request, false, state.loaded.base_directory,
+                              state.source_root, result);
+        return false;
+    }
+    return true;
+}
+
+bool load_inputs(const ImpactLoadContext& ctx, ImpactLoadState& state, ImpactResult& result) {
+    if (!ctx.compile_path.empty()) {
+        return load_inputs_with_compile_db(ctx, state, result);
+    }
+    return load_inputs_file_api_only(ctx, state, result);
+}
+
+}  // namespace
+
+ImpactResult ImpactAnalyzer::analyze_impact(AnalyzeImpactRequest request) const {
     ImpactResult result;
     result.application = model::application_info();
+    populate_initial_inputs(request, result.inputs);
+    set_legacy_compile_database_path(result);
 
-    const bool has_compile_commands = !compile_commands_path.empty();
-    const bool has_file_api = !cmake_file_api_path.empty();
-    LoadedInputs loaded;
-    model::BuildModelResult file_api_model;
-    if (has_compile_commands) {
-        loaded = load_compile_commands_input(compile_db_port_, compile_commands_path, result);
-        if (!loaded.success) return result;
-        if (has_file_api &&
-            !try_load_file_api(file_api_port_, cmake_file_api_path, file_api_model, result)) {
-            return result;
-        }
-    } else {
-        loaded = load_file_api_input(file_api_port_, cmake_file_api_path, result);
-        if (!loaded.success) return result;
-    }
+    const ImpactLoadContext ctx{compile_db_port_, file_api_port_, request,
+                                 path_for_io_string(request.compile_commands_path),
+                                 path_for_io_string(request.cmake_file_api_path)};
+    ImpactLoadState state;
+    if (!load_inputs(ctx, state, result)) return result;
 
-    const auto observations =
-        build_translation_unit_observations(result.compile_database.entries(), loaded.base_directory);
+    const auto observations = build_translation_unit_observations(
+        result.compile_database.entries(), state.loaded.base_directory);
     const auto include_resolution = include_resolver_port_.resolve_includes(observations);
     const auto observations_by_key = index_observations(observations);
 
-    if (has_compile_commands && has_file_api) {
-        filter_assignments_to_observations(observations_by_key, file_api_model, result);
+    if (!ctx.compile_path.empty() && !ctx.file_api_path.empty()) {
+        filter_assignments_to_observations(observations_by_key, state.file_api_model, result);
     }
-
-    result.changed_file_key = resolve_changed_file_key(loaded.base_directory, changed_path);
-    result.changed_file = display_changed_file(loaded.base_directory, result.changed_file_key);
+    finalize_changed_file(request, !ctx.compile_path.empty(), state.loaded.base_directory,
+                          state.source_root, result);
     collect_and_classify_impacts(observations, include_resolution, observations_by_key,
                                 result.changed_file_key, result);
     normalize_report_diagnostics(result.diagnostics);

@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <filesystem>
 #include <string_view>
 #include <vector>
 
@@ -7,22 +8,48 @@
 #include "hexagon/model/compile_entry.h"
 #include "hexagon/model/include_resolution.h"
 #include "hexagon/model/observation_source.h"
+#include "hexagon/model/report_inputs.h"
 #include "hexagon/model/target_info.h"
 #include "hexagon/ports/driven/build_model_port.h"
 #include "hexagon/ports/driven/include_resolver_port.h"
+#include "hexagon/ports/driving/analyze_impact_port.h"
 #include "hexagon/services/impact_analyzer.h"
 
 namespace {
 
+using xray::hexagon::model::ChangedFileSource;
 using xray::hexagon::model::CompileDatabaseError;
 using xray::hexagon::model::CompileDatabaseResult;
 using xray::hexagon::model::CompileEntry;
 using xray::hexagon::model::ImpactKind;
 using xray::hexagon::model::IncludeResolutionResult;
 using xray::hexagon::model::ObservationSource;
+using xray::hexagon::model::ReportInputSource;
 using xray::hexagon::model::ResolvedTranslationUnitIncludes;
 using xray::hexagon::model::TargetImpactClassification;
 using xray::hexagon::model::TargetMetadataStatus;
+using xray::hexagon::ports::driving::AnalyzeImpactRequest;
+using xray::hexagon::ports::driving::InputPathArgument;
+
+AnalyzeImpactRequest make_impact_request(std::string_view compile_commands,
+                                          std::string_view changed_file,
+                                          std::string_view file_api) {
+    AnalyzeImpactRequest request;
+    request.report_display_base = std::filesystem::path{"/"};
+    {
+        std::filesystem::path p{changed_file};
+        request.changed_file_path = InputPathArgument{p, p, !p.is_absolute()};
+    }
+    if (!compile_commands.empty()) {
+        std::filesystem::path p{compile_commands};
+        request.compile_commands_path = InputPathArgument{p, p, !p.is_absolute()};
+    }
+    if (!file_api.empty()) {
+        std::filesystem::path p{file_api};
+        request.cmake_file_api_path = InputPathArgument{p, p, !p.is_absolute()};
+    }
+    return request;
+}
 
 class StubBuildModelPort final : public xray::hexagon::ports::driven::BuildModelPort {
 public:
@@ -105,7 +132,7 @@ TEST_CASE("impact analyzer reports direct matches for duplicate translation-unit
                                                            unused_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/src/main.cpp", "");
+        analyzer.analyze_impact(make_impact_request("/tmp/compile_commands.json", "/project/src/main.cpp", ""));
 
     CHECK(result.compile_database.is_success());
     CHECK(result.compile_database_path == "/tmp/compile_commands.json");
@@ -118,6 +145,14 @@ TEST_CASE("impact analyzer reports direct matches for duplicate translation-unit
     CHECK(result.affected_translation_units[1].reference.directory == "/project/build/release");
     CHECK(result.diagnostics.empty());
     CHECK(result.affected_targets.empty());
+    REQUIRE(result.inputs.compile_database_path.has_value());
+    CHECK(*result.inputs.compile_database_path == "/tmp/compile_commands.json");
+    CHECK(result.inputs.compile_database_source == ReportInputSource::cli);
+    CHECK_FALSE(result.inputs.cmake_file_api_path.has_value());
+    REQUIRE(result.inputs.changed_file.has_value());
+    CHECK(*result.inputs.changed_file == "/project/src/main.cpp");
+    REQUIRE(result.inputs.changed_file_source.has_value());
+    CHECK(*result.inputs.changed_file_source == ChangedFileSource::cli_absolute);
 }
 
 TEST_CASE("impact analyzer reports heuristic header matches") {
@@ -128,7 +163,7 @@ TEST_CASE("impact analyzer reports heuristic header matches") {
                                                            unused_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/config.h", "");
+        analyzer.analyze_impact(make_impact_request("/tmp/compile_commands.json", "/project/include/common/config.h", ""));
 
     CHECK(result.heuristic);
     REQUIRE(result.affected_translation_units.size() == 3);
@@ -147,7 +182,7 @@ TEST_CASE("impact analyzer reports heuristic matches for transitively included h
                                                            unused_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/shared.h", "");
+        analyzer.analyze_impact(make_impact_request("/tmp/compile_commands.json", "/project/include/common/shared.h", ""));
 
     CHECK(result.heuristic);
     REQUIRE(result.affected_translation_units.size() == 3);
@@ -166,7 +201,7 @@ TEST_CASE("impact analyzer reports missing matches as heuristic empty result") {
                                                            unused_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/generated/version.h", "");
+        analyzer.analyze_impact(make_impact_request("/tmp/compile_commands.json", "/project/include/generated/version.h", ""));
 
     CHECK(result.heuristic);
     CHECK(result.affected_translation_units.empty());
@@ -217,7 +252,7 @@ TEST_CASE("impact analyzer only keeps diagnostics for impacted translation units
                                                            unused_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/partial.h", "");
+        analyzer.analyze_impact(make_impact_request("/tmp/compile_commands.json", "/project/include/common/partial.h", ""));
 
     CHECK(result.heuristic);
     REQUIRE(result.affected_translation_units.size() == 1);
@@ -269,7 +304,7 @@ TEST_CASE("impact analyzer sorts report-wide diagnostics deterministically") {
                                                            unused_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/include/common/config.h", "");
+        analyzer.analyze_impact(make_impact_request("/tmp/compile_commands.json", "/project/include/common/config.h", ""));
 
     REQUIRE(result.diagnostics.size() == 4);
     CHECK(result.diagnostics[0].message == "alpha warning");
@@ -342,7 +377,7 @@ TEST_CASE("impact analyzer computes affected targets from file api data") {
 
     SUBCASE("direct impact attaches targets to impacted TU") {
         const auto result =
-            analyzer.analyze_impact("", "/project/src/main.cpp", "/tmp/build");
+            analyzer.analyze_impact(make_impact_request("", "/project/src/main.cpp", "/tmp/build"));
 
         CHECK(result.observation_source == ObservationSource::derived);
         CHECK(result.target_metadata == TargetMetadataStatus::loaded);
@@ -357,7 +392,7 @@ TEST_CASE("impact analyzer computes affected targets from file api data") {
 
     SUBCASE("heuristic impact attaches targets to all impacted TUs") {
         const auto result =
-            analyzer.analyze_impact("", "/project/include/common/config.h", "/tmp/build");
+            analyzer.analyze_impact(make_impact_request("", "/project/include/common/config.h", "/tmp/build"));
 
         CHECK(result.heuristic);
         REQUIRE(result.affected_translation_units.size() == 2);
@@ -437,7 +472,7 @@ TEST_CASE("impact analyzer promotes heuristic target to direct when later observ
     // z_main.cpp is the changed file: direct impact on z_main.cpp, heuristic on a_helper.cpp.
     // Both map to myapp. a_helper (heuristic) sorts first. Direct must win.
     const auto result =
-        analyzer.analyze_impact("", "/project/src/z_main.cpp", "/tmp/build");
+        analyzer.analyze_impact(make_impact_request("", "/project/src/z_main.cpp", "/tmp/build"));
 
     REQUIRE(result.affected_targets.size() == 1);
     CHECK(result.affected_targets[0].target.display_name == "myapp");
@@ -474,7 +509,7 @@ TEST_CASE("impact analyzer enriches compile database with file api targets in mi
                                                            file_api_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/src/main.cpp", "/tmp/build");
+        analyzer.analyze_impact(make_impact_request("/tmp/compile_commands.json", "/project/src/main.cpp", "/tmp/build"));
 
     CHECK(result.compile_database.is_success());
     CHECK(result.observation_source == ObservationSource::exact);
@@ -518,7 +553,7 @@ TEST_CASE("impact analyzer filters file api assignments and reports unmatched ob
                                                            file_api_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/src/main.cpp", "/tmp/build");
+        analyzer.analyze_impact(make_impact_request("/tmp/compile_commands.json", "/project/src/main.cpp", "/tmp/build"));
 
     CHECK(result.compile_database.is_success());
     // Only the matching assignment survives
@@ -575,7 +610,7 @@ TEST_CASE("impact analyzer reports mismatch diagnostic when no file api assignme
                                                            file_api_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/src/main.cpp", "/tmp/build");
+        analyzer.analyze_impact(make_impact_request("/tmp/compile_commands.json", "/project/src/main.cpp", "/tmp/build"));
 
     CHECK(result.compile_database.is_success());
     CHECK(result.observation_source == ObservationSource::exact);
@@ -612,7 +647,7 @@ TEST_CASE("impact analyzer propagates file api error in mixed path") {
                                                            file_api_port};
 
     const auto result =
-        analyzer.analyze_impact("/tmp/compile_commands.json", "/project/src/main.cpp", "/nonexistent");
+        analyzer.analyze_impact(make_impact_request("/tmp/compile_commands.json", "/project/src/main.cpp", "/nonexistent"));
 
     CHECK_FALSE(result.compile_database.is_success());
     CHECK(result.compile_database.error() == CompileDatabaseError::file_api_not_accessible);
@@ -664,7 +699,7 @@ TEST_CASE("impact analyzer resolves relative changed file via source root in fil
 
     // Relative path "src/main.cpp" must resolve against source_root "/project"
     const auto result =
-        analyzer.analyze_impact("", "src/main.cpp", "/tmp/build");
+        analyzer.analyze_impact(make_impact_request("", "src/main.cpp", "/tmp/build"));
 
     CHECK(result.observation_source == ObservationSource::derived);
     CHECK(result.changed_file == "src/main.cpp");
@@ -720,7 +755,7 @@ TEST_CASE("impact analyzer resolves relative changed file via compile database d
     // Since /tmp/src/main.cpp != /project/src/main.cpp, we need a path that resolves correctly.
     // Use /project/compile_commands.json so base = /project, then "src/main.cpp" → /project/src/main.cpp
     const auto result =
-        analyzer.analyze_impact("/project/compile_commands.json", "src/main.cpp", "/tmp/build");
+        analyzer.analyze_impact(make_impact_request("/project/compile_commands.json", "src/main.cpp", "/tmp/build"));
 
     CHECK(result.observation_source == ObservationSource::exact);
     CHECK(result.target_metadata == TargetMetadataStatus::loaded);
@@ -776,7 +811,7 @@ TEST_CASE("impact analyzer sorts affected targets deterministically") {
                                                            file_api_port};
 
     const auto result =
-        analyzer.analyze_impact("", "/project/src/shared.cpp", "/tmp/build");
+        analyzer.analyze_impact(make_impact_request("", "/project/src/shared.cpp", "/tmp/build"));
 
     REQUIRE(result.affected_targets.size() == 3);
     // Sorted by (classification, display_name, type)
@@ -785,4 +820,199 @@ TEST_CASE("impact analyzer sorts affected targets deterministically") {
     CHECK(result.affected_targets[1].target.display_name == "alpha");
     CHECK(result.affected_targets[1].target.type == "STATIC_LIBRARY");
     CHECK(result.affected_targets[2].target.display_name == "zebra");
+}
+
+TEST_CASE("impact analyzer reports compile_database_directory provenance for relative changed file with compile DB") {
+    class MixedFileApiPort final : public xray::hexagon::ports::driven::BuildModelPort {
+    public:
+        xray::hexagon::model::BuildModelResult load_build_model(
+            std::string_view /*path*/) const override {
+            xray::hexagon::model::BuildModelResult result;
+            result.source = ObservationSource::derived;
+            result.target_metadata = TargetMetadataStatus::loaded;
+            result.source_root = "/project";
+            result.compile_database = CompileDatabaseResult{
+                CompileDatabaseError::none, {},
+                {CompileEntry::from_arguments(
+                    "/project/src/main.cpp", "/project/build/debug",
+                    {"clang++", "-c", "/project/src/main.cpp"})},
+                {}};
+            return result;
+        }
+    };
+
+    const StubBuildModelPort compile_db_port;
+    const MixedFileApiPort file_api_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_db_port, include_resolver_port,
+                                                           file_api_port};
+
+    const auto result = analyzer.analyze_impact(
+        make_impact_request("/project/compile_commands.json", "src/main.cpp", "/tmp/build"));
+
+    REQUIRE(result.inputs.changed_file_source.has_value());
+    CHECK(*result.inputs.changed_file_source == ChangedFileSource::compile_database_directory);
+    REQUIRE(result.inputs.changed_file.has_value());
+    CHECK(*result.inputs.changed_file == "src/main.cpp");
+}
+
+TEST_CASE("impact analyzer reports file_api_source_root provenance for relative changed file with file API only") {
+    class FileApiPort final : public xray::hexagon::ports::driven::BuildModelPort {
+    public:
+        xray::hexagon::model::BuildModelResult load_build_model(
+            std::string_view /*path*/) const override {
+            xray::hexagon::model::BuildModelResult result;
+            result.source = ObservationSource::derived;
+            result.target_metadata = TargetMetadataStatus::loaded;
+            result.source_root = "/project";
+            result.compile_database = CompileDatabaseResult{
+                CompileDatabaseError::none, {},
+                {CompileEntry::from_arguments(
+                    "/project/src/main.cpp", "/project/build/app",
+                    {"clang++", "-c", "/project/src/main.cpp"})},
+                {}};
+            return result;
+        }
+    };
+
+    class EmptyIncludeResolver final : public xray::hexagon::ports::driven::IncludeResolverPort {
+    public:
+        IncludeResolutionResult resolve_includes(
+            const std::vector<xray::hexagon::model::TranslationUnitObservation>&) const override {
+            return {};
+        }
+    };
+
+    const UnusedBuildModelPort compile_db_port;
+    const FileApiPort file_api_port;
+    const EmptyIncludeResolver include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_db_port, include_resolver_port,
+                                                           file_api_port};
+
+    const auto result = analyzer.analyze_impact(
+        make_impact_request("", "src/main.cpp", "/tmp/build"));
+
+    REQUIRE(result.inputs.changed_file_source.has_value());
+    CHECK(*result.inputs.changed_file_source == ChangedFileSource::file_api_source_root);
+    REQUIRE(result.inputs.changed_file.has_value());
+    CHECK(*result.inputs.changed_file == "src/main.cpp");
+}
+
+TEST_CASE("impact analyzer reports unresolved_file_api_source_root when file API load fails before source root is known") {
+    class FailingFileApiPort final : public xray::hexagon::ports::driven::BuildModelPort {
+    public:
+        xray::hexagon::model::BuildModelResult load_build_model(
+            std::string_view /*path*/) const override {
+            xray::hexagon::model::BuildModelResult result;
+            result.compile_database = CompileDatabaseResult{
+                CompileDatabaseError::file_api_invalid,
+                "cmake file api index is not valid JSON", {}, {}};
+            return result;
+        }
+    };
+
+    class EmptyIncludeResolver final : public xray::hexagon::ports::driven::IncludeResolverPort {
+    public:
+        IncludeResolutionResult resolve_includes(
+            const std::vector<xray::hexagon::model::TranslationUnitObservation>&) const override {
+            return {};
+        }
+    };
+
+    const UnusedBuildModelPort compile_db_port;
+    const FailingFileApiPort file_api_port;
+    const EmptyIncludeResolver include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_db_port, include_resolver_port,
+                                                           file_api_port};
+
+    const auto result = analyzer.analyze_impact(
+        make_impact_request("", "src/main.cpp", "/tmp/build"));
+
+    CHECK_FALSE(result.compile_database.is_success());
+    REQUIRE(result.inputs.changed_file_source.has_value());
+    CHECK(*result.inputs.changed_file_source ==
+          ChangedFileSource::unresolved_file_api_source_root);
+    REQUIRE(result.inputs.changed_file.has_value());
+    CHECK(*result.inputs.changed_file == "src/main.cpp");
+    REQUIRE(result.inputs.cmake_file_api_path.has_value());
+    CHECK(*result.inputs.cmake_file_api_path == "/tmp/build");
+    CHECK_FALSE(result.inputs.compile_database_path.has_value());
+}
+
+TEST_CASE("impact analyzer carries resolved file api path from build model into ReportInputs") {
+    class ResolvedPathFileApiPort final : public xray::hexagon::ports::driven::BuildModelPort {
+    public:
+        xray::hexagon::model::BuildModelResult load_build_model(
+            std::string_view /*path*/) const override {
+            xray::hexagon::model::BuildModelResult result;
+            result.source = ObservationSource::derived;
+            result.target_metadata = TargetMetadataStatus::loaded;
+            result.source_root = "/project";
+            result.cmake_file_api_resolved_path =
+                std::filesystem::path{"/repo/build/.cmake/api/v1/reply"};
+            result.compile_database = CompileDatabaseResult{
+                CompileDatabaseError::none, {},
+                {CompileEntry::from_arguments(
+                    "/project/src/main.cpp", "/project/build/app",
+                    {"clang++", "-c", "/project/src/main.cpp"})},
+                {}};
+            return result;
+        }
+    };
+
+    class EmptyIncludeResolver final : public xray::hexagon::ports::driven::IncludeResolverPort {
+    public:
+        IncludeResolutionResult resolve_includes(
+            const std::vector<xray::hexagon::model::TranslationUnitObservation>&) const override {
+            return {};
+        }
+    };
+
+    const UnusedBuildModelPort compile_db_port;
+    const ResolvedPathFileApiPort file_api_port;
+    const EmptyIncludeResolver include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_db_port, include_resolver_port,
+                                                           file_api_port};
+
+    AnalyzeImpactRequest request;
+    request.report_display_base = std::filesystem::path{"/repo"};
+    request.cmake_file_api_path =
+        InputPathArgument{std::filesystem::path{"build"}, std::filesystem::path{"/repo/build"},
+                          true};
+    request.changed_file_path =
+        InputPathArgument{std::filesystem::path{"/project/src/main.cpp"},
+                          std::filesystem::path{"/project/src/main.cpp"}, false};
+
+    const auto result = analyzer.analyze_impact(request);
+
+    REQUIRE(result.inputs.cmake_file_api_resolved_path.has_value());
+    CHECK(*result.inputs.cmake_file_api_resolved_path == "build/.cmake/api/v1/reply");
+}
+
+TEST_CASE("impact analyzer preserves ReportInputs on compile database load failure") {
+    class ErrorCompileDbPort final : public xray::hexagon::ports::driven::BuildModelPort {
+    public:
+        xray::hexagon::model::BuildModelResult load_build_model(
+            std::string_view /*path*/) const override {
+            xray::hexagon::model::BuildModelResult result;
+            result.compile_database = CompileDatabaseResult{
+                CompileDatabaseError::file_not_accessible, "cannot read", {}, {}};
+            return result;
+        }
+    };
+
+    const ErrorCompileDbPort compile_db_port;
+    const UnusedBuildModelPort file_api_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_db_port, include_resolver_port,
+                                                           file_api_port};
+
+    const auto result = analyzer.analyze_impact(
+        make_impact_request("/tmp/compile_commands.json", "src/main.cpp", ""));
+
+    CHECK_FALSE(result.compile_database.is_success());
+    REQUIRE(result.inputs.compile_database_path.has_value());
+    CHECK(*result.inputs.compile_database_path == "/tmp/compile_commands.json");
+    REQUIRE(result.inputs.changed_file_source.has_value());
+    CHECK(*result.inputs.changed_file_source == ChangedFileSource::compile_database_directory);
 }

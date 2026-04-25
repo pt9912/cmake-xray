@@ -136,9 +136,7 @@ private:
 class StubAnalyzeImpactPort final : public xray::hexagon::ports::driving::AnalyzeImpactPort {
 public:
     ImpactResult analyze_impact(
-        std::string_view /*compile_commands_path*/,
-        const std::filesystem::path& /*changed_path*/,
-        std::string_view /*cmake_file_api_path*/) const override {
+        xray::hexagon::ports::driving::AnalyzeImpactRequest /*request*/) const override {
         return {};
     }
 };

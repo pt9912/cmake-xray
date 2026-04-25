@@ -54,8 +54,10 @@ std::vector<std::string> observation_keys_for_source(
     const xray::hexagon::model::BuildModelResult& result,
     std::string_view compile_commands_path,
     std::string_view source_fragment) {
+    const auto base = xray::hexagon::services::compile_commands_base_directory(
+        compile_commands_path, std::filesystem::current_path());
     const auto observations = xray::hexagon::services::build_translation_unit_observations(
-        result.compile_database.entries(), compile_commands_path);
+        result.compile_database.entries(), base);
 
     std::vector<std::string> keys;
     for (const auto& observation : observations) {
@@ -81,6 +83,38 @@ TEST_CASE("file api adapter loads valid reply from build directory") {
     CHECK(result.target_metadata == TargetMetadataStatus::loaded);
     CHECK(result.source_root == "/project");
     REQUIRE(result.compile_database.entries().size() == 2);
+    REQUIRE(result.cmake_file_api_resolved_path.has_value());
+    CHECK(result.cmake_file_api_resolved_path->generic_string().find(
+              ".cmake/api/v1/reply") != std::string::npos);
+}
+
+TEST_CASE("file api adapter exposes resolved reply path when loading from reply directory") {
+    const CmakeFileApiAdapter adapter;
+    const auto result =
+        adapter.load_build_model(testdata + "file_api_only/build/.cmake/api/v1/reply");
+
+    REQUIRE(result.compile_database.is_success());
+    REQUIRE(result.cmake_file_api_resolved_path.has_value());
+    CHECK(result.cmake_file_api_resolved_path->generic_string().ends_with(
+        ".cmake/api/v1/reply"));
+}
+
+TEST_CASE("file api adapter keeps resolved reply path on post-resolution failure") {
+    const CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(testdata + "invalid_file_api/build");
+
+    CHECK_FALSE(result.compile_database.is_success());
+    REQUIRE(result.cmake_file_api_resolved_path.has_value());
+    CHECK(result.cmake_file_api_resolved_path->generic_string().ends_with(
+        ".cmake/api/v1/reply"));
+}
+
+TEST_CASE("file api adapter leaves resolved reply path empty when reply dir is unreachable") {
+    const CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model("/nonexistent/build");
+
+    CHECK_FALSE(result.compile_database.is_success());
+    CHECK_FALSE(result.cmake_file_api_resolved_path.has_value());
 }
 
 TEST_CASE("file api adapter produces identical results from build dir and reply dir") {
@@ -170,10 +204,9 @@ TEST_CASE("file api adapter assigns shared source to multiple targets with corre
 
     // All three entries produce valid observations downstream
     const auto& first_entry = result.compile_database.entries()[0];
-    const auto dummy_compile_commands = first_entry.directory() + "/compile_commands.json";
-    const auto observations =
-        xray::hexagon::services::build_translation_unit_observations(
-            result.compile_database.entries(), std::string_view{dummy_compile_commands});
+    const auto observations = xray::hexagon::services::build_translation_unit_observations(
+        result.compile_database.entries(),
+        std::filesystem::path{first_entry.directory()});
     CHECK(observations.size() == 3);
 
     // Find the assignment for shared.cpp
