@@ -162,6 +162,7 @@ AP 1.2 verwendet die in AP 1.1 eingefuehrte Konstante:
 - `JsonReportAdapter` importiert `xray::hexagon::model::kReportFormatVersion`.
 - Adapter, Dokumentation, Schema-Tests und Goldens duerfen keine zweite Formatversionskonstante definieren.
 - `docs/report-json.schema.json` verwendet JSON Schema Draft 2020-12 und enthaelt `$schema: "https://json-schema.org/draft/2020-12/schema"`.
+- Das Schema ist fuer Vertragsobjekte geschlossen: Top-Level, `inputs`, `summary`, Ranking-/Hotspot-Container, Items, Diagnostics, Translation-Unit-Objekte, Target-Objekte und verschachtelte Unterobjekte setzen `additionalProperties: false` oder ein aequivalentes geschlossenes Schema. Unbekannte Felder werden in M5 hart abgelehnt.
 - `docs/report-json.schema.json` darf `format_version` mit `const: 1` absichern.
 - Der `format_version`-`const`-Wert im Schema wird in einem CTest-Gate gegen `xray::hexagon::model::kReportFormatVersion` geprueft.
 - Ein Schema-Wert, der von der C++-Konstante abweicht, laesst AP 1.2 fehlschlagen.
@@ -189,7 +190,7 @@ Regeln:
 CLI-Regeln:
 
 - `--format json` ist fuer `analyze` und `impact` lauffaehig.
-- `--format json --output <path>` schreibt in eine Datei und nutzt den gemeinsamen M5-konformen Atomic-Writer aus AP 1.1.
+- `--format json --output <path>` schreibt in eine Datei und nutzt den gemeinsamen M5-konformen Atomic-Writer aus AP 1.1; AP 1.2 ist blockiert, bis dieser Writer vorhanden und testbar ist. Eine teilweise Abnahme ohne JSON-Dateiausgabe gibt es nicht.
 - Erfolgreiche `--format json`-Aufrufe ohne `--output` schreiben ausschliesslich gueltiges JSON auf stdout.
 - Erfolgreiche `--format json`-Aufrufe ohne `--output` lassen stderr leer.
 - Erfolgreiche `--format json --output <path>`-Aufrufe schreiben ausschliesslich in die Zieldatei.
@@ -242,6 +243,7 @@ Schema-Validierung:
 - Die Dependency wird in `tests/requirements-json-schema.txt` mit Version-Pin dokumentiert.
 - Lokale CTest-Laeufe schlagen mit klarer Installationsanweisung fehl, wenn der Validator fehlt.
 - Der CTest-Schema-Test ueberspringt nicht still, wenn der Validator fehlt.
+- CTest selbst installiert keine Python-Packages und greift nicht auf das Netzwerk zu. Installation erfolgt ausschliesslich im Bootstrap-Schritt; der Test prueft nur die vorhandene Umgebung und gibt bei fehlendem Validator eine konkrete Installationsanweisung aus.
 
 Bootstrap-Pfade:
 
@@ -288,6 +290,7 @@ Port- und Wiring-Tests:
 
 - `tests/adapters/test_port_wiring.cpp` prueft, dass `json` an den `JsonReportAdapter` verdrahtet ist.
 - Tests pruefen, dass keine zweite Formatversionskonstante im Adapter oder Wiring verwendet wird.
+- Port-/Wiring-Tests pruefen ausdruecklich, dass `--format json` nicht in den bestehenden Console-Fallback faellt und keinen Console-Adapter nutzt.
 
 E2E-Golden-Tests:
 
@@ -311,6 +314,7 @@ CLI- und Stream-Tests:
 - `--format json --output <path>` schreibt gueltiges JSON in die Datei.
 - Erfolgreiche `--format json --output <path>`-Aufrufe lassen stdout und stderr leer.
 - Tests pruefen, dass `--format json` nicht mehr den AP-1.1-Fehler `recognized but not implemented` liefert.
+- Tests pruefen, dass `--format json` tatsaechlich JSON mit `format=cmake-xray.analysis` beziehungsweise `format=cmake-xray.impact` rendert und nicht den Console-Reportpfad trifft.
 
 Fehlerpfad-Tests:
 
@@ -342,6 +346,7 @@ AP 1.2 ist abnahmefaehig, wenn:
 - Erfolgreiche JSON-Stdout-Ausgaben keine unstrukturierten Zusatztexte enthalten.
 - Erfolgreiche JSON-Dateiausgaben stdout und stderr leer lassen.
 - `docs/report-json.md` und `docs/report-json.schema.json` vorhanden, konsistent und in Tests eingebunden sind.
+- Das Schema lehnt unbekannte Felder in allen Vertragsobjekten ab.
 - Der Schema-`format_version`-Wert gegen `kReportFormatVersion` geprueft wird.
 - Echte CLI-Ausgaben gegen Goldens verglichen und anschliessend gegen das Schema validiert werden.
 - Analyze-Goldens Limit-/Truncation-Faelle fuer Ranking und Hotspots abdecken.
@@ -349,6 +354,7 @@ AP 1.2 ist abnahmefaehig, wenn:
 - File-API-Goldens Build-Dir- und Reply-Dir-Eingaben fuer `cmake_file_api_resolved_path` abdecken.
 - Parser-, Eingabe-, Render- und Schreibfehler als Textfehler ohne JSON-Fehlerobjekt getestet sind.
 - Docker-, Coverage-, native Build- und Release-CTest-Pfade den JSON-Schema-Validator installieren oder eine gemeinsame Bootstrap-Schicht nutzen.
+- CTest bleibt offline und reproduzierbar; fehlende Validator-Dependencies fuehren zu einer klaren Fehlermeldung statt zu Netzwerkzugriffen oder stillen Skips.
 - `docs/guide.md` die produktive JSON-Nutzung beschreibt und `docs/quality.md` die neuen JSON-Schema-, Golden- und E2E-Gates auffuehrt.
 - Console- und Markdown-Verhalten unveraendert bleibt.
 
