@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.8` |
+| Version | `0.9` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -85,6 +85,7 @@ Wichtig:
 - `--output` ersetzt vorhandene Zielartefakte bei erfolgreichem Schreiben; bei Render-, Schreib- oder Rename-Fehlern bleibt eine bereits vorhandene Zieldatei unveraendert erhalten
 - die atomare Dateiausgabe verwendet eine temporaere Datei im Zielverzeichnis und eine plattformsichere Replace-Operation, die auf Linux, macOS und Windows getestet wird
 - fuer `analyze` folgen alle Reportformate derselben `--top`-Begrenzung fuer Ranking-, Hotspot- und vergleichbare Listenabschnitte; `impact` erhaelt in M5 keine `--top`-Option und keine implizite Ergebnisbegrenzung
+- DOT bleibt auch mit Hotspot-Kontext ein begrenztes Artefakt: Kontextknoten fuer betroffene Translation Units werden pro Hotspot ueber ein dokumentiertes `context_limit` begrenzt und bei Kuerzung mit `context_total_count`, `context_returned_count` und `context_truncated` kenntlich gemacht
 - alle neuen Formate muessen deterministisch sein, damit Golden-Outputs sinnvoll diffbar bleiben
 - Datums-, Laufzeit- oder Hostinformationen duerfen nicht automatisch in Reports erscheinen
 
@@ -137,7 +138,8 @@ Wichtig:
 - JSON folgt bei `analyze` der CLI-`--top`-Begrenzung fuer Ranking- und Hotspot-Listen, muss aber ueber `limit`, `total_count`, `returned_count` und `truncated` eindeutig anzeigen, ob die Ausgabe gekuerzt wurde; eine unlimitierte JSON-Ausgabe waere nur nach expliziter Schema-Entscheidung zulaessig
 - `impact`-JSON enthaelt in M5 keine `limit`-/`truncated`-Felder, solange der CLI- und Port-Vertrag keine Impact-Begrenzung kennt; alle betroffenen Translation Units und Targets aus dem `ImpactResult` werden ausgegeben
 - Markdown, HTML und DOT folgen bei `analyze` ebenfalls der CLI-`--top`-Begrenzung; HTML und Markdown kennzeichnen begrenzte Abschnitte menschenlesbar
-- DOT enthaelt bei `analyze --top N` die Top-N-Ranking- und Top-N-Hotspot-Knoten sowie deren Kontextkanten; fuer einen Top-Hotspot werden alle in `IncludeHotspot` gespeicherten betroffenen Translation Units als Kontextknoten ausgegeben, auch wenn diese Translation Units nicht selbst im Top-N-Ranking liegen
+- DOT enthaelt bei `analyze --top N` die Top-N-Ranking- und Top-N-Hotspot-Knoten sowie begrenzte Kontextkanten; fuer einen Top-Hotspot werden hoechstens `context_limit` der in `IncludeHotspot` gespeicherten betroffenen Translation Units als Kontextknoten ausgegeben, auch wenn diese Translation Units nicht selbst im Top-N-Ranking liegen
+- `context_limit` ist fuer M5 Teil des DOT-Formatvertrags, wird stabil dokumentiert und standardmaessig aus dem wirksamen `--top`-Limit abgeleitet; bei gekuerztem Hotspot-Kontext enthaelt DOT einen maschinenlesbaren Kommentar oder Graph-Attributsatz mit `context_total_count`, `context_returned_count` und `context_truncated`
 - JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
 - Felder mit leerer Menge werden als leere Arrays ausgegeben, nicht weggelassen, sofern sie Teil des Formatvertrags sind
 - optionale fachliche Informationen koennen `null` sein, wenn das Schema dies explizit dokumentiert
@@ -342,7 +344,8 @@ Fuer CMake-/Compiler-Kompatibilitaet:
 
 Vorgesehene Artefakte:
 
-- CI-Matrix oder dokumentierte Smoke-Check-Skripte fuer macOS und Windows
+- verpflichtende CI-Matrix fuer die plattformsichere atomare Replace-Semantik auf Linux, macOS und Windows
+- CI-Matrix oder dokumentierte Smoke-Check-Skripte fuer weitere macOS-/Windows-Build- und CLI-Smokes ausserhalb der atomaren Dateiausgabe
 - Aktualisierung von `docs/quality.md`
 - Aktualisierung von `docs/releasing.md`
 - falls noetig kleine Portabilitaetsfixes an Pfad- und Testlogik
@@ -371,7 +374,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - CLI-Tests fuer `--verbose`, `--quiet` und gegenseitigen Ausschluss
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
 - Golden- und CLI-Tests, dass `--top` bei `analyze` fuer Markdown, HTML, JSON und DOT konsistent wirkt und kein Artefaktformat implizit vollstaendige Listen ausgibt
-- DOT-Golden-Tests, dass `analyze --top N` alle Translation Units eines ausgegebenen Top-Hotspots als Kontextknoten enthaelt, auch wenn diese nicht im Top-N-Ranking liegen
+- DOT-Golden-Tests, dass `analyze --top N` fuer ausgegebene Top-Hotspots hoechstens `context_limit` betroffene Translation Units als Kontextknoten enthaelt und gekuerzten Kontext mit `context_total_count`, `context_returned_count` und `context_truncated` kennzeichnet
 - CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und Impact-Reports keine implizite Begrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren
 - JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
 - Tests, dass `--verbose` JSON-, Markdown-, HTML- und DOT-Artefakte nicht gegenueber dem Normalmodus veraendert und Zusatzdiagnostik nur Console/`stderr` betrifft
@@ -419,6 +422,8 @@ Abhaengigkeiten:
 | `--output` bleibt nur teilweise fuer neue Formate nutzbar | Nutzer koennen neue Artefaktformate nicht verlaesslich in CI speichern | `--output` fuer `markdown`, `html`, `json` und `dot` explizit freischalten und atomare Schreibtests aufnehmen |
 | Atomarer Write ueberschreibt vorhandene Dateien nicht portabel | Fehler koennen Zielartefakte zerstoeren oder Windows-Releases brechen | Replace-Semantik fuer existierende Dateien auf Linux, macOS und Windows testen; bei Fehler bleibt die alte Datei unveraendert |
 | Analyze-Artefaktformate interpretieren `--top` unterschiedlich | Goldens, CLI-Ausgabe und Automatisierung liefern widerspruechliche Ergebnismengen | einheitliche Top-Limit-Regel fuer Markdown, HTML, JSON und DOT bei `analyze` festlegen und testen |
+| DOT-Hotspot-Kontext umgeht faktisch das `--top`-Limit | ein einzelner verbreiteter Header erzeugt sehr grosse Graphen trotz kleinem Top-Limit | DOT-Kontext pro Hotspot mit `context_limit` begrenzen und Kuerzung maschinenlesbar kennzeichnen |
+| macOS-/Windows-Replace-Semantik wird nur dokumentiert, aber nicht getestet | atomare Dateiausgabe kann auf anderen Plattformen anders fehlschlagen | atomare Replace-Tests als CI-Gate fuer Linux, macOS und Windows aufnehmen |
 | `--verbose` veraendert HTML-/Markdown-/DOT-Artefakte | Golden-Outputs und CI-Artefakte werden durch Diagnosemodus instabil | Verbose-only-Inhalte fuer diese Artefakte ausschliessen und Zusatzdiagnostik auf Console/`stderr` beschraenken |
 | DOT suggeriert Target-Graph-Semantik, die M5 noch nicht besitzt | Nutzer interpretieren Graphen falsch | keine Target-zu-Target-Kanten erzeugen und Legende/Labels klar formulieren |
 | DOT-Escaping ist syntaktisch fehlerhaft | Graphviz-Berichte brechen erst bei Nutzern | Sonderzeichen-Goldens mit Graphviz oder Parser validieren |
