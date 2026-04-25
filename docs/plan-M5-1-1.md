@@ -46,6 +46,8 @@ Voraussichtlich zu aendern:
 - `src/adapters/cli/cli_adapter.{h,cpp}`
 - `src/adapters/CMakeLists.txt`
 - `src/main.cpp`
+- `tests/CMakeLists.txt`
+- `tests/hexagon/test_analysis_support.cpp`
 - `tests/hexagon/test_project_analyzer.cpp`
 - `tests/hexagon/test_impact_analyzer.cpp`
 - `tests/e2e/test_cli.cpp`
@@ -185,6 +187,8 @@ Regeln:
 
 - `compile_commands_base_directory()` oder ein gleichwertiger Ersatz bekommt die benoetigte Fallback-Basis explizit aus dem Request-Kontext.
 - Wenn `compile_commands_path` keinen Parent hat, wird `report_display_base` beziehungsweise die fachliche Request-Basis verwendet, nicht der aktuelle Prozess-CWD.
+- Alte Helper-Ueberladungen, die ihre Fallback-Basis selbst aus Prozesszustand ableiten, werden entfernt oder auf Testcode beschraenkt.
+- Kein Produktionspfad darf nach AP 1.1 eine pfadbasierte Service-Helper-API verwenden, die bei fehlendem Parent implizit `std::filesystem::current_path()` liest.
 - Service-Tests muessen einen veraenderten Prozess-CWD abdecken, damit ReportInputs und Impact-Aufloesung stabil bleiben.
 
 ## File-API-Aufloesungsmetadaten
@@ -262,15 +266,18 @@ Gemeinsame Grenzen:
 
 Display- und Aufloesungsregeln:
 
-- Ist `changed_file_path` absolut, wird `changed_file` als lexikalisch normalisierter absoluter String ausgegeben und `changed_file_source=cli_absolute` gesetzt.
-- Ist `changed_file_path` relativ und `compile_commands_path` gesetzt, wird der Pfad fuer Analyse und Anzeige gegen die Compile-Database-Directory interpretiert. `changed_file` bleibt der lexikalisch normalisierte relative Pfad zu dieser Directory, nicht relativ zu `report_display_base`.
-- Ist `changed_file_path` relativ, keine Compile Database gesetzt und eine File-API-Source-Root vorhanden, wird der Pfad fuer Analyse und Anzeige gegen diese Source-Root interpretiert. `changed_file` bleibt der lexikalisch normalisierte relative Pfad zu dieser Source-Root.
+- Die Provenienzentscheidung nutzt ausschliesslich `AnalyzeImpactRequest::changed_file_path.was_relative`, nicht `changed_file_path.path.is_absolute()`.
+- Die CLI soll `InputPathArgument::path` als rohen lexikalischen CLI-Pfad transportieren. Falls eine spaetere Vorbereitung den Pfad bereits absolut oder normalisiert ablegt, muss `was_relative` trotzdem die urspruengliche CLI-Relativitaet bewahren und die Provenienz steuern.
+- Ist `changed_file_path.was_relative == false`, wird `changed_file` als lexikalisch normalisierter absoluter String ausgegeben und `changed_file_source=cli_absolute` gesetzt.
+- Ist `changed_file_path.was_relative == true` und `compile_commands_path` gesetzt, wird der Pfad fuer Analyse und Anzeige gegen die Compile-Database-Directory interpretiert. `changed_file` bleibt der lexikalisch normalisierte relative Pfad zu dieser Directory, nicht relativ zu `report_display_base`.
+- Ist `changed_file_path.was_relative == true`, keine Compile Database gesetzt und eine File-API-Source-Root vorhanden, wird der Pfad fuer Analyse und Anzeige gegen diese Source-Root interpretiert. `changed_file` bleibt der lexikalisch normalisierte relative Pfad zu dieser Source-Root.
+- Wenn `was_relative == true`, aber `path` bereits absolut vorliegt, wird der Anzeige-String relativ zur jeweiligen Provenienz-Basis berechnet; dadurch bleibt ein urspruenglich relatives `--changed-file` auch nach vorgelagerter Normalisierung ein relativer ReportInput.
 
 Quellen:
 
-- `changed_file_source = cli_absolute`, wenn `changed_file_path` absolut ist.
-- `changed_file_source = compile_database_directory`, wenn `changed_file_path` relativ ist und `compile_commands_path` gesetzt ist.
-- `changed_file_source = file_api_source_root`, wenn `changed_file_path` relativ ist, keine Compile Database gesetzt ist und File-API-Metadaten eine Source-Root liefern.
+- `changed_file_source = cli_absolute`, wenn `changed_file_path.was_relative == false`.
+- `changed_file_source = compile_database_directory`, wenn `changed_file_path.was_relative == true` und `compile_commands_path` gesetzt ist.
+- `changed_file_source = file_api_source_root`, wenn `changed_file_path.was_relative == true`, keine Compile Database gesetzt ist und File-API-Metadaten eine Source-Root liefern.
 
 Mixed-Input-Prioritaet:
 
@@ -295,6 +302,15 @@ Formatwerte:
 - Unbekannte Werte bleiben CLI-Verwendungsfehler mit Exit-Code `2`.
 - Bekannte, aber im aktuellen Build noch nicht lauffaehige Werte `html`, `json` und `dot` liefern ebenfalls Exit-Code `2`, aber mit eigener Fehlermeldung `--format <value> is recognized but not implemented in this build`.
 - Help-Text nennt alle fuenf Werte.
+
+Validierungsreihenfolge:
+
+1. Syntax und Optionsform werden geparst. Unbekannte Optionen, fehlende Optionswerte und unbekannte `--format`-Werte liefern Exit-Code `2`.
+2. Danach wird die Formatverfuegbarkeit geprueft. Ist das Format bekannt, aber in diesem Build nicht implementiert, liefert die CLI sofort den `not implemented in this build`-Fehler.
+3. Fuer nicht implementierte Formate werden keine fachlichen Eingaben validiert, keine Adapter oder Ports ausgewaehlt, keine Analyse gestartet und keine Zieldatei erzeugt.
+4. Erst fuer lauffaehige Formate folgen Eingabevalidierung, `--output`-Kombinationsvalidierung und Analyse.
+5. Deshalb gewinnt bei `--format json|html|dot` der `not implemented`-Fehler gegen gleichzeitig fehlende Eingaben oder ein angegebenes `--output`.
+6. Bei lauffaehigem `--format console` gewinnt dagegen die normale `--output`-Kombinationsvalidierung und `--format console --output out.txt` bleibt ein Verwendungsfehler.
 
 `--output`-Validierung:
 
@@ -421,8 +437,13 @@ Unit-/Service-Tests:
 - Impact mit absolutem `changed_file`:
   - `changed_file_source=cli_absolute`
   - `changed_file` ist der normalisierte absolute Pfad, zum Beispiel `/project/src/lib.cpp`
+- Impact mit urspruenglich relativem `changed_file`, dessen `InputPathArgument::path` bereits absolut vorbereitet wurde:
+  - `changed_file_path.was_relative=true`
+  - `changed_file_source` bleibt `compile_database_directory` oder `file_api_source_root`
+  - `changed_file` bleibt ein relativer Anzeige-String zur jeweiligen Provenienz-Basis
 - Services verwenden `report_display_base`; ein veraendertes Prozess-CWD darf Ergebnisse nicht aendern.
 - `analysis_support`-Pfadhelper nutzen bei pfadlosen Compile-Database-Namen die explizite Request-Basis und nicht `std::filesystem::current_path()`.
+- Kein Produktionscode ruft eine `analysis_support`-Helper-Ueberladung auf, die ihre Fallback-Basis implizit aus Prozesszustand ableitet.
 - Relative normale Eingabepfade bleiben in `compile_database_path` und `cmake_file_api_path` als normalisierte relative Anzeige-Strings erhalten.
 - Absolute normale Eingabepfade bleiben in `compile_database_path` und `cmake_file_api_path` als absolute Anzeige-Strings erhalten.
 - `cmake_file_api_resolved_path` folgt der Adapterpfad-Regel und wird nicht aus dem originalen CLI-String rekonstruiert.
@@ -434,6 +455,8 @@ CLI-Tests:
 - `--format console|markdown` bleibt lauffaehig.
 - `--format html|json|dot` wird als bekannter, aber in diesem Build noch nicht implementierter Wert erkannt, liefert Exit-Code `2`, schreibt keine Zieldatei und startet keine Analyse.
 - Tests pruefen die stabile Fehlermeldung ohne Arbeitspaketnummer: `recognized but not implemented in this build`.
+- `--format json|html|dot` mit fehlenden fachlichen Eingaben liefert trotzdem den `not implemented`-Fehler, weil Formatverfuegbarkeit vor Eingabevalidierung geprueft wird.
+- `--format json|html|dot --output out` liefert ebenfalls den `not implemented`-Fehler und erzeugt keine Datei.
 - ungueltiges `--format` ergibt Exit-Code `2`.
 - `--output` mit `markdown` wird akzeptiert.
 - `--output` mit `html|json|dot` erzeugt bis zur jeweiligen Adapter-Implementierung denselben `not implemented`-Fehler und keine Zieldatei.
@@ -471,6 +494,7 @@ AP 1.1 ist abgeschlossen, wenn:
 - `html`, `json` und `dot` als bekannte, aber noch nicht implementierte Formate deterministisch vor Analyse und Dateierzeugung abgelehnt werden;
 - atomarer Write bestehende Zielartefakte bei Fehlern nicht veraendert;
 - `AnalyzeImpactPort` im Produktionspfad nur noch den `AnalyzeImpactRequest`-Vertrag anbietet;
+- kein Produktionspfad mehr eine `analysis_support`-Helper-API nutzt, die ihre Fallback-Basis aus dem Prozess-CWD ableitet;
 - `ReportInputs` fuer Analyze und Impact vollstaendig in Service-Tests abgedeckt ist;
 - Compile-Database-only-, File-API- und Mixed-Input-Console-/Markdown-Goldens byte-stabil bleiben;
 - `ReportInputs` in AP 1.1 nicht neu in Console oder Markdown sichtbar wird;
