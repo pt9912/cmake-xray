@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.12` |
+| Version | `0.13` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -84,7 +84,8 @@ Wichtig:
 - stdout bleibt der Standard, wenn kein `--output` angegeben ist; mit `--output` wird der vollstaendige Reportinhalt in die Datei geschrieben und nicht zusaetzlich fachlich nach stdout dupliziert
 - `--output` ersetzt vorhandene Zielartefakte bei erfolgreichem Schreiben; bei Render-, Schreib- oder Rename-Fehlern bleibt eine bereits vorhandene Zieldatei unveraendert erhalten
 - die atomare Dateiausgabe verwendet eine temporaere Datei im Zielverzeichnis und eine plattformsichere Replace-Operation, die auf Linux, macOS und Windows getestet wird
-- fuer `analyze` folgen alle Reportformate derselben `--top`-Begrenzung fuer Ranking-, Hotspot- und vergleichbare Listenabschnitte; `impact` erhaelt in M5 keine `--top`-Option und keine implizite Ergebnisbegrenzung
+- fuer `analyze` folgen alle Reportformate derselben `--top`-Begrenzung fuer Ranking-, Hotspot- und vergleichbare Listenabschnitte; `impact` erhaelt in M5 keine `--top`-Option und keine implizite Begrenzung seiner strukturierten Ergebnislisten
+- DOT ist die visualisierungsorientierte Ausnahme: Auch `impact --format dot` wird ueber Graph-Budgets begrenzt, ohne das zugrunde liegende `ImpactResult` oder JSON-/HTML-/Markdown-Impact-Listen zu kuerzen
 - DOT bleibt fuer `analyze` und `impact` ein begrenztes Artefakt: Kontextknoten fuer betroffene Translation Units werden ueber ein separates, kleines `context_limit` und ein globales `node_limit`-/`edge_limit`-Budget begrenzt; bei Kuerzung werden `context_total_count`, `context_returned_count`, `context_truncated`, `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kenntlich gemacht
 - alle neuen Formate muessen deterministisch sein, damit Golden-Outputs sinnvoll diffbar bleiben
 - Datums-, Laufzeit- oder Hostinformationen duerfen nicht automatisch in Reports erscheinen
@@ -381,6 +382,7 @@ Tests und Abnahme muessen mindestens abdecken:
 
 - Adapter-Unit-Tests fuer HTML, JSON und DOT
 - CLI-Tests fuer Formatwahl, ungueltige Formatwerte und `--format html|json|dot --output <path>` fuer `analyze` und `impact`
+- CLI-Negativtest, dass `--format console --output <path>` abgelehnt wird, weil `--output` auf artefaktorientierte Formate begrenzt bleibt
 - CLI-Tests fuer atomare Dateiausgabe: erfolgreiche Writes erzeugen vollstaendige Reports, vorhandene Zieldateien werden bei Erfolg ersetzt, und Fehlerfaelle lassen vorhandene Zieldateien auf Linux, macOS und Windows unveraendert
 - CLI-Tests fuer `--verbose`, `--quiet` und gegenseitigen Ausschluss
 - CLI-Golden-Tests, dass `--quiet --format json|dot|html|markdown` ohne `--output` denselben stdout-Report wie der Normalmodus ausgibt und keine Erfolgsmeldungen in stdout mischt
@@ -390,7 +392,8 @@ Tests und Abnahme muessen mindestens abdecken:
 - DOT-Golden-Tests, dass `impact --format dot` das feste Impact-`node_limit`-/`edge_limit`-Budget einhaelt und Kuerzungen mit `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kennzeichnet
 - CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und Impact-Reports keine implizite Begrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren
 - JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
-- JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path`, `inputs.cmake_file_api_path` und `inputs.changed_file` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
+- JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path` und `inputs.cmake_file_api_path` bei `analyze` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
+- JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path`, `inputs.cmake_file_api_path` und `inputs.changed_file` bei `impact` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
 - Tests, dass `--verbose` JSON-, Markdown-, HTML- und DOT-Artefakte nicht gegenueber dem Normalmodus veraendert und Zusatzdiagnostik nur Console/`stderr` betrifft
 - Smoke-Test fuer Docker-Runtime-Image
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
