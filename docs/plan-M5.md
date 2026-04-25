@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.1` |
+| Version | `0.2` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -19,8 +19,9 @@ M5 erweitert primaer die Nutzbarkeit und Auslieferbarkeit des bereits vorhandene
 M5 gilt als erreicht, wenn:
 
 - `cmake-xray analyze` und `cmake-xray impact` neben `console` und `markdown` auch `html`, `json` und `dot` als Ausgabeformate akzeptieren
+- `--output <path>` fuer `markdown`, `html`, `json` und `dot` bei `analyze` und `impact` freigeschaltet ist und Reportdateien atomar schreibt, sodass bei Fehlern keine halb geschriebenen Zielartefakte als Erfolg zurueckbleiben
 - der HTML-Export eigenstaendige, deterministische Berichte fuer Projektanalyse und Impact-Analyse erzeugt, ohne externe Laufzeitressourcen zu benoetigen
-- der JSON-Export fuer Projektanalyse und Impact-Analyse ein dokumentiertes Schema mit Formatversion ausgibt und fuer Automatisierung stabil nutzbar ist
+- der JSON-Export fuer Projektanalyse und Impact-Analyse ein dokumentiertes Schema mit Formatversion, Pflichtfeldern, Typen, Enums, Nullability-Regeln und Array-Regeln ausgibt und fuer Automatisierung stabil nutzbar ist
 - der DOT-Export fuer die in M5 vorhandene Datenlage sinnvolle Graphviz-Diagramme erzeugt, ohne noch nicht implementierte Target-Graph-Semantik vorwegzunehmen
 - `--verbose` diagnoseorientierte Zusatzinformationen ausgibt, ohne maschinenlesbare Standardausgaben unbrauchbar zu machen
 - `--quiet` fuer erfolgreiche Aufrufe reduzierte Ausgabe liefert und Fehler weiterhin verstaendlich auf `stderr` meldet
@@ -39,6 +40,7 @@ Bestandteil von M5 sind:
 - `JsonReportAdapter` fuer Projektanalyse und Impact-Analyse mit dokumentierter Formatversion
 - `DotReportAdapter` fuer graphische Sicht auf die vorhandenen Analyseergebnisse
 - CLI-Formatwahl fuer `html`, `json` und `dot`
+- CLI-Dateiausgabe ueber `--output` fuer alle artefaktorientierten Formate `markdown`, `html`, `json` und `dot`
 - CLI-Modi `--verbose` und `--quiet`
 - tag-basierter Release-Workflow fuer Linux-CLI-Artefakt und OCI-Image
 - Installations- und Nutzungsdokumentation fuer Release-Artefakte und Container
@@ -66,6 +68,8 @@ Die M3-/M4-Reportstrecke ist textorientiert. Fuer M5 muessen weitere Formate ang
 Fuer M5 benoetigt der Report-Pfad mindestens:
 
 - eine erweiterte Formatwahl in CLI und Composition Root fuer `console`, `markdown`, `html`, `json` und `dot`
+- eine erweiterte `--output`-Validierung fuer `markdown`, `html`, `json` und `dot` bei `analyze` und `impact`; `console` bleibt standardmaessig stdout-orientiert
+- ein gemeinsamer Schreibpfad fuer Reportdateien, der Zielartefakte atomar ueber temporaere Datei und Rename ersetzt und Fehler sauber an die CLI meldet
 - klare Adaptergrenzen: Jeder Report-Adapter rendert ausschliesslich vorhandene `AnalysisResult`- bzw. `ImpactResult`-Modelle
 - gemeinsame Hilfsfunktionen fuer stabile Sortierung, Text-Escaping, Pfadanzeige und Diagnostics, soweit dadurch Dopplung zwischen Adaptern reduziert wird
 - eine dokumentierte Formatversion fuer maschinenlesbare JSON-Ausgaben
@@ -76,12 +80,14 @@ Wichtig:
 - `console` und `markdown` duerfen sich fuer bestehende M3-/M4-Eingaben ohne neue Optionen nicht aendern
 - Formatadapter duerfen keine neuen Impact- oder Ranking-Entscheidungen treffen
 - JSON ist der einzige maschinenlesbare Vertragsausdruck in M5; HTML und DOT bleiben menschen- bzw. visualisierungsorientiert
+- stdout bleibt der Standard, wenn kein `--output` angegeben ist; mit `--output` wird der vollstaendige Reportinhalt in die Datei geschrieben und nicht zusaetzlich fachlich nach stdout dupliziert
 - alle neuen Formate muessen deterministisch sein, damit Golden-Outputs sinnvoll diffbar bleiben
 - Datums-, Laufzeit- oder Hostinformationen duerfen nicht automatisch in Reports erscheinen
 
 Vorgesehene Artefakte:
 
 - Anpassung der CLI-Formatvalidierung in `src/adapters/cli/`
+- Anpassung der CLI-Output-Validierung und der atomaren Dateiausgabe fuer Reportartefakte
 - Anpassung der Composition-Root-Verdrahtung in `src/main.cpp`
 - neue Adapter unter `src/adapters/output/`
 - Erweiterung von `src/adapters/CMakeLists.txt`
@@ -125,6 +131,8 @@ Wichtig:
 - numerische Metriken bleiben numerisch und werden nicht als lokalisierte Strings gerendert
 - die Reihenfolge von Objektfeldern soll im Adapter stabil bleiben, auch wenn JSON semantisch keine Feldreihenfolge garantiert
 - Pfade werden als Anzeige-Strings ausgegeben; kanonische Normalisierungsschluessel duerfen nur aufgenommen werden, wenn sie keinen instabilen Hostbezug in Goldens einfuehren
+- `docs/report-json.md` ist der verbindliche M5-Vertrag und dokumentiert fuer alle Felder Typ, Pflichtstatus, erlaubte Enum-Werte, Nullability, leere-Array-Regeln und Aenderungsregeln fuer kuenftige `format_version`-Erhoehungen
+- Tests pruefen nicht nur syntaktisch gueltiges JSON, sondern auch Pflichtfelder, Array-statt-Weglassen-Regeln, numerische Typen, bekannte Enum-Werte und `null` nur an dokumentierten Stellen
 
 Vorgesehene Artefakte:
 
@@ -132,7 +140,7 @@ Vorgesehene Artefakte:
 - `src/adapters/output/json_report_adapter.cpp`
 - `tests/adapters/test_json_report_adapter.cpp`
 - JSON-Golden-Outputs unter `tests/e2e/testdata/m5/`
-- Dokumentation `docs/report-json.md` oder ein entsprechender Abschnitt in `docs/guide.md`
+- Dokumentation `docs/report-json.md` als verbindlicher Formatvertrag; `docs/guide.md` verweist darauf nur nutzungsorientiert
 
 **Ergebnis**: `cmake-xray` besitzt einen versionierten, automatisierbaren Reportvertrag fuer Analyse- und Impact-Ergebnisse.
 
@@ -171,6 +179,7 @@ Wichtig:
 - Labels duerfen fuer Lesbarkeit gekuerzt werden, wenn der vollstaendige Pfad als Attribut erhalten bleibt
 - der Graph muss auch fuer leere Ergebnisse gueltiges DOT ausgeben
 - die Ausgabe ist ein Graphviz-Quelltext, keine gerenderte SVG-/PNG-Datei
+- Adapter- und Golden-Tests enthalten Sonderzeichenfaelle fuer IDs und Labels, zum Beispiel Leerzeichen, Anfuehrungszeichen, Backslashes und plattformtypische Pfadtrenner
 
 Vorgesehene Artefakte:
 
@@ -178,6 +187,7 @@ Vorgesehene Artefakte:
 - `src/adapters/output/dot_report_adapter.cpp`
 - `tests/adapters/test_dot_report_adapter.cpp`
 - DOT-Golden-Outputs unter `tests/e2e/testdata/m5/`
+- Validierung der DOT-Goldens mit `dot -Tsvg` in CI, sofern Graphviz verfuegbar ist; andernfalls dokumentierter Parser-/Syntax-Smoke mit demselben Escaping-Fokus
 - Nutzungsbeispiel fuer `dot -Tsvg` in der Dokumentation
 
 **Ergebnis**: Nutzer koennen vorhandene Analyse- und Impact-Ergebnisse in Graphviz-Werkzeuge ueberfuehren, ohne dass M5 eine neue fachliche Graphanalyse einfuehrt.
@@ -254,14 +264,15 @@ M5 macht die Bereitstellung aus dem Lastenheft verbindlich. Ziel ist nicht nur e
 
 Der Release-Pfad muss mindestens:
 
-- bei Tag-Push `vX.Y.Z` einen Release-Workflow starten
+- bei Tag-Push mit erlaubtem Semver-Tag einen Release-Workflow starten: regulaere Releases verwenden `vMAJOR.MINOR.PATCH`, Vorabversionen verwenden `vMAJOR.MINOR.PATCH-PRERELEASE`
+- Tags vor dem Build fail-fast validieren und unbekannte Muster wie `vfoo`, unvollstaendige Versionen oder Build-Metadaten ohne dokumentierte Freigabe abbrechen
 - Test-, Coverage-, Quality- und Runtime-Pfade vor dem Veroeffentlichen ausfuehren
 - ein Linux-CLI-Artefakt als `.tar.gz` erzeugen
 - im Archiv mindestens die ausfuehrbare Datei, Lizenz-/Hinweisdateien und kurze Nutzungsdokumentation enthalten
 - eine SHA-256-Pruefsumme erzeugen
 - ein OCI-kompatibles Runtime-Image bauen
 - das Image mit dem Versions-Tag veroeffentlichen
-- fuer regulaere Releases zusaetzlich `latest` pflegen und Vorabversionen davon ausnehmen
+- fuer regulaere Releases ohne Prerelease-Suffix zusaetzlich `latest` pflegen und Vorabversionen davon ausnehmen
 - GitHub-Release-Notes aus dem Changelog verwenden
 
 Wichtig:
@@ -270,6 +281,7 @@ Wichtig:
 - der Runtime-Container muss `cmake-xray --help` ohne weitere Toolchain ausfuehren koennen
 - die Dokumentation muss lokale Nutzung und CI-Nutzung des Containers zeigen
 - fehlgeschlagene Release-Schritte muessen klar sichtbar sein und keine Teilveroeffentlichung als Erfolg melden
+- die Release-Dokumentation muss die erlaubten Tag-Muster, Prerelease-Behandlung und `latest`-Regel explizit nennen
 
 Vorgesehene Artefakte:
 
@@ -330,13 +342,15 @@ M5 aktualisiert mindestens:
 Tests und Abnahme muessen mindestens abdecken:
 
 - Adapter-Unit-Tests fuer HTML, JSON und DOT
-- CLI-Tests fuer Formatwahl und ungueltige Formatwerte
+- CLI-Tests fuer Formatwahl, ungueltige Formatwerte und `--format html|json|dot --output <path>` fuer `analyze` und `impact`
+- CLI-Tests fuer atomare Dateiausgabe: erfolgreiche Writes erzeugen vollstaendige Reports, Fehlerfaelle hinterlassen kein halb geschriebenes Zielartefakt
 - CLI-Tests fuer `--verbose`, `--quiet` und gegenseitigen Ausschluss
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
 - Smoke-Test fuer Docker-Runtime-Image
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
-- Validierung, dass JSON syntaktisch gueltig ist und `format_version` enthaelt
-- Validierung, dass DOT syntaktisch als DOT-Quelle plausibel ist
+- Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
+- Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt und den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht
+- Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
 
 **Ergebnis**: M5 ist nicht nur implementiert, sondern ueber Beispiele, Referenzdaten und Release-Dokumentation nachvollziehbar abnehmbar.
 
@@ -366,9 +380,12 @@ Abhaengigkeiten:
 | Risiko | Auswirkung | Gegenmassnahme |
 |---|---|---|
 | JSON wird ohne klaren Vertrag eingefuehrt | Folgewerkzeuge brechen bei jeder Report-Aenderung | `format_version` dokumentieren und Golden-Tests fuer zentrale Felder pflegen |
+| `--output` bleibt nur teilweise fuer neue Formate nutzbar | Nutzer koennen neue Artefaktformate nicht verlaesslich in CI speichern | `--output` fuer `markdown`, `html`, `json` und `dot` explizit freischalten und atomare Schreibtests aufnehmen |
 | DOT suggeriert Target-Graph-Semantik, die M5 noch nicht besitzt | Nutzer interpretieren Graphen falsch | keine Target-zu-Target-Kanten erzeugen und Legende/Labels klar formulieren |
+| DOT-Escaping ist syntaktisch fehlerhaft | Graphviz-Berichte brechen erst bei Nutzern | Sonderzeichen-Goldens mit Graphviz oder Parser validieren |
 | HTML-Goldens werden durch kosmetische Details instabil | Tests werden teuer und rauschanfaellig | keine Zeitstempel, keine Zufalls-IDs, deterministische Struktur |
 | `--verbose` schreibt Zusatztext in maschinenlesbare Ausgaben | JSON-/DOT-Nutzung in CI bricht | stdout fuer maschinenlesbare Reports sauber halten; Zusatzdiagnostik nach `stderr` oder strukturiert ausgeben |
+| Release-Trigger akzeptiert ungueltige Tags | fehlerhafte Releases oder falsche `latest`-Tags entstehen | Semver-/Prerelease-Tags fail-fast validieren und `latest` nur fuer regulaere Releases setzen |
 | Release-Workflow funktioniert nur fuer lokale Pfade | Artefakte sind nicht real nutzbar | entpacktes Linux-Archiv und Container-Image separat smoke-testen |
 | Windows-Pfade brechen Golden-Tests | Portabilitaetsziel bleibt theoretisch | Pfadanzeige und Normalisierung explizit testen; Goldens plattformrobust gestalten |
 
