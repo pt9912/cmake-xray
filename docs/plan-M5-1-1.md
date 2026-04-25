@@ -10,15 +10,16 @@ Nach AP 1.1 ist noch kein vollstaendiger HTML-/JSON-/DOT-Adapter erforderlich. E
 
 Umsetzen:
 
-- CLI akzeptiert die M5-Formatwerte `console`, `markdown`, `html`, `json`, `dot`.
-- `--output` ist fuer `markdown`, `html`, `json`, `dot` erlaubt und fuer `console` verboten.
-- Erfolgreiche `--output`-Aufrufe schreiben Reports ausschliesslich in die Datei; stdout bleibt leer.
+- CLI kennt die M5-Formatwerte `console`, `markdown`, `html`, `json`, `dot`.
+- `console` und `markdown` bleiben in AP 1.1 die einzigen lauffaehigen Formate; `html`, `json` und `dot` werden als bekannte, aber noch nicht implementierte Formate mit eindeutiger Fehlermeldung abgelehnt, bis AP 1.2 bis AP 1.4 die jeweiligen Adapter verdrahten.
+- `--output` bleibt in AP 1.1 fuer das bestehende lauffaehige Artefaktformat `markdown` erlaubt und fuer `console` verboten; `html`, `json` und `dot` uebernehmen den Schreibvertrag erst mit ihrer Adapter-Implementierung.
+- Erfolgreiche `--output`-Aufrufe fuer lauffaehige Artefaktformate schreiben Reports ausschliesslich in die Datei; stdout bleibt leer.
 - Reportdateien werden ueber einen gemeinsamen atomaren Schreibpfad geschrieben.
 - `AnalysisResult` und `ImpactResult` enthalten ein gemeinsames `ReportInputs`-Value-Object.
 - `AnalyzeProjectRequest` und `AnalyzeImpactRequest` transportieren alle Eingabepfade und eine explizite Display-Basis.
-- `BuildModelResult` transportiert rohe File-API-Aufloesungsmetadaten.
+- `BuildModelResult` transportiert rohe File-API-Aufloesungsmetadaten ohne parallele Source-Root-Wahrheit.
 - Report-Ports bleiben ergebnisobjektzentriert; Adapter bekommen keinen CLI-Kontext.
-- Console-Quiet/Verbose bleibt ein CLI-owned Sonderfall und veraendert keine Artefaktadapter.
+- Quiet/Verbose bleibt fuer AP 1.5 reserviert; AP 1.1 stellt nur sicher, dass keine Verbosity-Parameter in Reportports oder Artefaktadapter eingefuehrt werden.
 
 Nicht umsetzen:
 
@@ -155,19 +156,20 @@ Alle Aufrufer in CLI, Tests und Port-Wiring werden auf den Request umgestellt.
 
 ## File-API-Aufloesungsmetadaten
 
-`BuildModelResult` erhaelt rohe, lexikalische Pfadmetadaten:
+`BuildModelResult` erhaelt rohe, lexikalische File-API-Pfadmetadaten. Das bestehende Feld `source_root` bleibt die fachliche Source-Root fuer File-API-Ergebnisse und wird nicht parallel durch ein zweites Source-Root-Feld ersetzt:
 
 ```cpp
 std::optional<std::filesystem::path> cmake_file_api_input_path;
 std::optional<std::filesystem::path> cmake_file_api_resolved_path;
-std::optional<std::filesystem::path> cmake_file_api_source_root;
+std::string source_root; // bestehendes Feld, weiterhin File-API-Source-Root
 ```
 
 Regeln:
 
 - Der `CmakeFileApiAdapter` setzt diese Werte, kennt aber keine Report-Display-Basis.
 - Adapter liefern rohe lexikalische Pfade, keine host-spezifisch normalisierten Display-Strings.
-- `ProjectAnalyzer` und `ImpactAnalyzer` konvertieren die Pfade relativ zu `report_display_base` in die `ReportInputs`-Display-Strings.
+- `source_root` bleibt die Quelle fuer bestehende Analyse- und Impact-Basislogik; AP 1.1 fuehrt kein zusaetzliches `cmake_file_api_source_root` mit abweichender Semantik ein.
+- `ProjectAnalyzer` und `ImpactAnalyzer` konvertieren rohe File-API-Pfade und `source_root` ueber die Display-Pfadregeln in die `ReportInputs`-Display-Strings.
 - Keine CLI- oder Adapterzustandswerte werden spaeter an Reportadapter nachgereicht.
 
 ## Display-Pfadregeln
@@ -182,8 +184,9 @@ std::optional<std::string> to_report_display_path(
 
 Regeln:
 
-- Relative CLI-Pfade werden lexikalisch normalisiert.
-- Absolute Pfade bleiben absolute Anzeige-Strings.
+- `report_display_base` dient nur als explizite Basis fuer relative Eingabe- und Adapterpfade, damit Services nicht vom Prozess-CWD abhaengen.
+- Relative Pfade werden gegen `report_display_base` interpretiert und danach als lexikalisch normalisierte relative Anzeige-Strings ausgegeben, wenn sie auch relativ eingegeben wurden.
+- Absolute Pfade werden nicht relativiert; sie bleiben absolute Anzeige-Strings.
 - Es erfolgt keine zusaetzliche kanonische Aufloesung ueber Symlinks, Home- oder Temp-Pfade.
 - Goldens mit Absolutpfaden verwenden nur fixture-stabile Pfade wie `/project/...`.
 - Interne Normalisierungsschluessel werden nicht in `ReportInputs` serialisiert.
@@ -217,11 +220,13 @@ Formatwerte:
 `--format`-Validierung:
 
 - Unbekannte Werte bleiben CLI-Verwendungsfehler mit Exit-Code `2`.
+- Bekannte, aber in AP 1.1 noch nicht lauffaehige Werte `html`, `json` und `dot` liefern ebenfalls Exit-Code `2`, aber mit eigener Fehlermeldung `--format <value> is recognized but not implemented in AP 1.1`.
 - Help-Text nennt alle fuenf Werte.
 
 `--output`-Validierung:
 
-- Erlaubt fuer `markdown`, `html`, `json`, `dot`.
+- In AP 1.1 erfolgreich erlaubt nur fuer `markdown`.
+- `html`, `json` und `dot` duerfen syntaktisch mit `--output` kombiniert werden, enden aber bis zur jeweiligen Adapter-Implementierung mit dem definierten `not implemented`-Fehler und duerfen keine Zieldatei erzeugen.
 - Verboten fuer `console`.
 - Verbotene Kombination bleibt Exit-Code `2`.
 - Fehlermeldung nennt, dass `--output` nur fuer artefaktorientierte Formate erlaubt ist.
@@ -229,11 +234,11 @@ Formatwerte:
 Report-Port-Auswahl:
 
 - `console` und `markdown` nutzen weiter bestehende Ports.
-- Fuer `html`, `json`, `dot` duerfen bis zur Implementierung der Adapter Stub-/Placeholder-Ports nur dann verdrahtet werden, wenn sie in Tests klar als noch nicht freigegebene Implementierung markiert sind. Besser ist, AP 1.1 nur Formatvalidierung und Port-Schnittstellen vorzubereiten und die konkrete Verdrahtung in AP 1.2 bis AP 1.4 zu finalisieren.
+- Fuer `html`, `json`, `dot` wird in AP 1.1 kein `GenerateReportPort` ausgewaehlt. Die CLI bricht vor Analyse und vor Dateierzeugung mit dem definierten `not implemented`-Fehler ab. AP 1.2 bis AP 1.4 ersetzen diese Sperre formatweise durch echte Port-Verdrahtung.
 
 ## `--output`-Schreibvertrag
 
-Mit `--output` gilt fuer alle artefaktorientierten Formate:
+Mit `--output` gilt in AP 1.1 fuer das lauffaehige Artefaktformat `markdown`; AP 1.2 bis AP 1.4 uebernehmen denselben Vertrag fuer `json`, `html` und `dot`:
 
 - Reportinhalt wird ausschliesslich in die Datei geschrieben.
 - Erfolgreicher stdout bleibt leer.
@@ -254,17 +259,14 @@ Atomic-Writer-Vertrag:
 
 ## Verbosity-Grenze
 
-AP 1.1 fuehrt keinen allgemeinen `OutputVerbosity`-Parameter in Reportports ein.
+AP 1.1 implementiert keine `--quiet`-/`--verbose`-CLI-Semantik. Diese Optionen gehoeren zu AP 1.5. AP 1.1 legt nur die technische Grenze fest, damit AP 1.5 spaeter keine fachlichen Reportports veraendern muss.
 
 Regeln:
 
 - `ReportWriterPort`, `GenerateReportPort` und fachliche Formatadapter bleiben frei von `OutputVerbosity`.
 - Artefaktinhalte werden nur durch Ergebnisdaten, Format und bei `analyze` durch `--top` bestimmt.
-- `--format console` ist der einzige CLI-owned Emissionspfad.
-- Console-Normalmodus bleibt fuer bestehende Compile-Database-only-Goldens byte-stabil.
-- Console-Quiet darf nur Ergebnisstatus, zentrale Zaehler und Warn-/Fehlerhinweise ausgeben.
-- Console-Verbose darf zusaetzlich Eingabeprovenienz, Beobachtungsherkunft, Target-Metadatenstatus und vollstaendige Diagnostics ausgeben.
-- JSON, HTML, Markdown und DOT duerfen durch Quiet/Verbose nicht inhaltlich veraendert werden.
+- `--format console` bleibt der einzige CLI-owned Emissionspfad, aber Quiet/Verbose-Varianten werden erst in AP 1.5 spezifiziert und getestet.
+- AP 1.1-Tests pruefen nur, dass keine neuen `OutputVerbosity`-Parameter oder Adapter-Sonderpfade entstehen.
 
 ## Adaptergrenzen
 
@@ -308,8 +310,7 @@ Erlaubte Golden-Aenderung:
 10. `--output`-Validierung fuer artefaktorientierte Formate erweitern und `console --output` ablehnen.
 11. Atomic-Write-/Replace-Wrapper einfuehren.
 12. CLI-Schreibpfad auf Atomic-Writer umstellen.
-13. Console-Quiet/Verbose als CLI-owned Emission vorbereiten, ohne Reportports zu erweitern.
-14. Tests aktualisieren und Golden-Kompatibilitaet pruefen.
+13. Tests aktualisieren und Golden-Kompatibilitaet pruefen.
 
 ## Tests
 
@@ -338,14 +339,15 @@ Unit-/Service-Tests:
 
 CLI-Tests:
 
-- `--format console|markdown|html|json|dot` wird akzeptiert.
+- `--format console|markdown` bleibt lauffaehig.
+- `--format html|json|dot` wird als bekannter, aber in AP 1.1 noch nicht implementierter Wert erkannt, liefert Exit-Code `2`, schreibt keine Zieldatei und startet keine Analyse.
 - ungueltiges `--format` ergibt Exit-Code `2`.
-- `--output` mit `markdown|html|json|dot` wird akzeptiert.
+- `--output` mit `markdown` wird akzeptiert.
+- `--output` mit `html|json|dot` erzeugt bis zur jeweiligen Adapter-Implementierung denselben `not implemented`-Fehler und keine Zieldatei.
 - `--format console --output out.txt` ergibt Exit-Code `2`.
 - erfolgreicher `--output`-Aufruf laesst stdout leer.
 - Fehler und Warnungen gehen nach `stderr`.
-- `--quiet --format json|html|markdown|dot` ohne `--output` gibt stdout byte-identisch zum Normalmodus aus.
-- `--quiet` und `--verbose` veraendern keine Artefaktinhalte.
+- Reportports und Formatadapter erhalten keinen `OutputVerbosity`-Parameter.
 
 Atomic-Writer-Tests:
 
@@ -368,7 +370,8 @@ AP 1.1 ist abgeschlossen, wenn:
 - die neuen Modell- und Request-Vertraege kompiliert und in Services genutzt werden;
 - kein neuer Reportadapter CLI-Kontext benoetigt;
 - `console --output` abgelehnt wird;
-- `--output` fuer artefaktorientierte Formate stdout leer laesst;
+- `--output` fuer `markdown` stdout leer laesst;
+- `html`, `json` und `dot` als bekannte, aber noch nicht implementierte Formate deterministisch vor Analyse und Dateierzeugung abgelehnt werden;
 - atomarer Write bestehende Zielartefakte bei Fehlern nicht veraendert;
 - `AnalyzeImpactPort` nicht mehr vom positionalen Altvertrag abhaengt oder dieser eindeutig als deprecated Wrapper ueber `AnalyzeImpactRequest` implementiert ist;
 - `ReportInputs` fuer Analyze und Impact vollstaendig in Service-Tests abgedeckt ist;
