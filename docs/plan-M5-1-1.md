@@ -94,12 +94,14 @@ struct ReportInputs {
 
 Regeln:
 
-- `ReportInputs` ist die alleinige Quelle fuer Report-Eingabepfade.
-- Nicht verwendete optionale Eingaben werden als `std::nullopt` modelliert und spaeter in JSON als `null` ausgegeben.
+- `ReportInputs` ist die kanonische Quelle fuer neue M5-Artefaktadapter und den spaeteren JSON-Vertrag.
+- Nicht verwendete optionale Eingaben werden im Modell als `std::nullopt` modelliert.
+- Die JSON-Serialisierung entscheidet pro Reporttyp, ob ein Modellfeld als JSON-`null` ausgegeben oder im jeweiligen Schema gar nicht angeboten wird. Insbesondere gehoeren `changed_file` und `changed_file_source` nicht zum Analyze-JSON-Vertrag.
 - Leere Strings sind fuer fehlende Eingaben verboten.
 - `changed_file` und `changed_file_source` sind nur fuer `impact` gesetzt.
 - Bei `analyze` bleiben `changed_file` und `changed_file_source` `std::nullopt`.
-- Bestehende skalare Felder `compile_database_path` und `changed_file` in Ergebnisobjekten werden entfernt oder nur noch als deprecated Mirror ohne eigene Semantik behalten. Falls sie fuer Rueckwaertskompatibilitaet temporaer bleiben, duerfen neue Adapter sie nicht als Quelle nutzen.
+- Bestehende skalare Felder `compile_database_path` und `changed_file` in Ergebnisobjekten bleiben in AP 1.1 als Legacy-Presentation-Felder erhalten, solange bestehende Console-/Markdown-Adapter sie direkt rendern.
+- Neue M5-Artefaktadapter duerfen diese Legacy-Felder nicht als Quelle nutzen.
 
 ### Ergebnisobjekte
 
@@ -114,6 +116,19 @@ ReportInputs inputs;
 ```cpp
 ReportInputs inputs;
 ```
+
+### Legacy-Presentation-Felder fuer Console/Markdown
+
+AP 1.1 migriert bestehende Console-/Markdown-Adapter nicht auf `ReportInputs`, weil diese Formate byte-stabil bleiben muessen.
+
+Regeln:
+
+- `AnalysisResult::compile_database_path` und `ImpactResult::compile_database_path` behalten exakt die bisher sichtbare Bedeutung fuer bestehende Console-/Markdown-Ausgaben.
+- `ImpactResult::changed_file` behaelt exakt die bisher sichtbare Bedeutung fuer bestehende Console-/Markdown-Ausgaben.
+- Bei File-API-only-Laeufen bleibt das alte `compile_database_path`-Legacy-Feld so befuellt wie vor AP 1.1, auch wenn `ReportInputs.compile_database_path == std::nullopt` ist und `ReportInputs.cmake_file_api_path` die neue Provenienz traegt.
+- Bei Mixed-Input-Laeufen bleiben die alten Legacy-Felder so befuellt, dass bestehende Console-/Markdown-Goldens unveraendert bleiben.
+- Legacy-Felder duerfen in AP 1.1 aus bestehender Rueckwaertskompatibilitaetslogik befuellt werden; sie sind keine Quelle fuer neue HTML-/JSON-/DOT-Adapter.
+- Eine spaetere Migration von Console/Markdown auf `ReportInputs` ist ein eigenes Arbeitspaket und muss eigene Golden-Aenderungen explizit begruenden.
 
 Die Includes in `analysis_result.h` und `impact_result.h` werden entsprechend angepasst.
 
@@ -331,11 +346,13 @@ Pflicht:
 - Bestehende M4-File-API- und Mixed-Input-Goldens fuer `console` und `markdown` bleiben ohne neue Optionen byte-stabil.
 - `--output` mit Markdown behaelt den M3-stdout-Vertrag: Erfolg laesst stdout leer.
 - `ReportInputs` ist in AP 1.1 Modellvorbereitung fuer spaetere JSON-/HTML-/DOT-Adapter und wird nicht neu in bestehenden Console-/Markdown-Reports angezeigt.
+- Legacy-Presentation-Felder bleiben fuer bestehende Console-/Markdown-Adapter bewusst erhalten und werden so befuellt, dass die Byte-Stabilitaet auch bei File-API-only- und Mixed-Input-Laeufen gilt.
 
 Verboten:
 
 - Console-/Markdown-Goldens duerfen in AP 1.1 nicht allein deshalb geaendert werden, weil `ReportInputs` intern verfuegbar ist.
 - Neue Provenienzsichtbarkeit in Console oder Markdown gehoert nicht zu AP 1.1 und braucht ein eigenes spaeteres Arbeitspaket oder eine explizite Formatentscheidung.
+- Neue HTML-/JSON-/DOT-Adapter duerfen nicht ueber die Legacy-Presentation-Felder implementiert werden.
 
 ## Implementierungsreihenfolge
 
@@ -346,7 +363,7 @@ Verboten:
 5. `BuildModelResult` um rohe File-API-Aufloesungsmetadaten erweitern.
 6. `ProjectAnalyzer` setzt `ReportInputs` fuer `analyze`.
 7. `ImpactAnalyzer` setzt `ReportInputs` fuer `impact`, inklusive `changed_file_source`.
-8. Deprecated skalare Pfadfelder entfernen oder als Mirror aus `ReportInputs` befuellen.
+8. Legacy-Presentation-Felder fuer bestehende Console-/Markdown-Adapter byte-stabil weiterbefuellen.
 9. CLI-Formatvalidierung auf fuenf Werte erweitern.
 10. `--output`-Validierung fuer artefaktorientierte Formate erweitern und `console --output` ablehnen.
 11. Atomic-Write-/Replace-Wrapper einfuehren.
@@ -366,9 +383,11 @@ Unit-/Service-Tests:
   - `cmake_file_api_path` gesetzt
   - `cmake_file_api_resolved_path` aus `BuildModelResult`
   - `cmake_file_api_source=cli`
+  - altes `AnalysisResult::compile_database_path` bleibt fuer Console/Markdown mit dem bisherigen File-API-Anzeigewert befuellt
 - `ReportInputs` bei Mixed-Analyze:
   - Compile Database und File API beide gesetzt
   - resolved File-API-Pfad kommt aus `BuildModelResult`
+  - alte skalare Ergebnisfelder behalten die bisherigen Console-/Markdown-Anzeigewerte
 - Impact mit relativem `changed_file` plus Compile Database:
   - `changed_file_source=compile_database_directory`
   - `changed_file` ist der normalisierte relative Pfad zur Compile-Database-Directory, zum Beispiel `src/lib.cpp`
@@ -412,6 +431,7 @@ Regressionstests:
 - bestehende File-API-Console- und File-API-Markdown-Goldens bleiben byte-stabil.
 - bestehende Mixed-Input-Console- und Mixed-Input-Markdown-Goldens bleiben byte-stabil.
 - Kein Regressionstest erwartet neue sichtbare `ReportInputs`-Provenienz in Console oder Markdown.
+- File-API-only-Regressionen pruefen explizit, dass der bisherige sichtbare Pfad in Console/Markdown unveraendert bleibt, obwohl `ReportInputs.compile_database_path == std::nullopt` ist.
 
 ## Abnahmekriterien
 
@@ -427,6 +447,7 @@ AP 1.1 ist abgeschlossen, wenn:
 - `ReportInputs` fuer Analyze und Impact vollstaendig in Service-Tests abgedeckt ist;
 - Compile-Database-only-, File-API- und Mixed-Input-Console-/Markdown-Goldens byte-stabil bleiben;
 - `ReportInputs` in AP 1.1 nicht neu in Console oder Markdown sichtbar wird;
+- bestehende Console-/Markdown-Adapter nur ueber die Legacy-Presentation-Felder byte-stabil gehalten werden, waehrend neue M5-Artefaktadapter `ReportInputs` verwenden muessen;
 - `git diff --check` sauber ist.
 
 ## Offene Folgearbeiten
