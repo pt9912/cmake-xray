@@ -124,14 +124,19 @@ Die Includes in `analysis_result.h` und `impact_result.h` werden entsprechend an
 Bestehenden Request erweitern:
 
 ```cpp
+struct InputPathArgument {
+    std::filesystem::path path;
+    bool was_relative{false};
+};
+
 struct AnalyzeProjectRequest {
-    std::string_view compile_commands_path;
-    std::string_view cmake_file_api_path;
+    std::optional<InputPathArgument> compile_commands_path;
+    std::optional<InputPathArgument> cmake_file_api_path;
     std::filesystem::path report_display_base;
 };
 ```
 
-`report_display_base` wird von der CLI gesetzt. In Tests wird sie explizit injiziert. Services duerfen fuer Report-Pfade nicht `std::filesystem::current_path()` lesen.
+`report_display_base` und `was_relative` werden von der CLI gesetzt. In Tests werden sie explizit injiziert. Services duerfen fuer Report-Pfade nicht `std::filesystem::current_path()` lesen und duerfen die urspruengliche Relativitaet eines Arguments nicht aus einem spaeter aufgeloesten Pfad ableiten.
 
 ### `AnalyzeImpactRequest`
 
@@ -139,9 +144,9 @@ Den positionalen Impact-Port ersetzen oder gleichwertig erweitern:
 
 ```cpp
 struct AnalyzeImpactRequest {
-    std::string_view compile_commands_path;
-    std::filesystem::path changed_file_path;
-    std::string_view cmake_file_api_path;
+    std::optional<InputPathArgument> compile_commands_path;
+    InputPathArgument changed_file_path;
+    std::optional<InputPathArgument> cmake_file_api_path;
     std::filesystem::path report_display_base;
 };
 
@@ -174,26 +179,57 @@ Regeln:
 
 ## Display-Pfadregeln
 
-Eine gemeinsame Hilfsfunktion in der Hexagon-Service-Schicht oder einem kleinen lokalen Helper:
+Eine gemeinsame Hilfsfunktion in der Hexagon-Service-Schicht oder einem kleinen lokalen Helper. Die Funktion bekommt neben dem Pfad auch die Display-Art, damit ein bereits aufgeloester Pfad nicht versehentlich wie ein originaler CLI-String behandelt wird:
 
 ```cpp
+enum class ReportPathDisplayKind {
+    input_argument,
+    resolved_adapter_path,
+};
+
+struct ReportPathDisplayInput {
+    std::optional<std::filesystem::path> path;
+    ReportPathDisplayKind kind{ReportPathDisplayKind::input_argument};
+    bool was_relative{false};
+};
+
 std::optional<std::string> to_report_display_path(
-    std::optional<std::filesystem::path> path,
+    ReportPathDisplayInput input,
     const std::filesystem::path& report_display_base);
 ```
 
-Regeln:
+Regeln fuer normale Eingabepfade:
 
-- `report_display_base` dient nur als explizite Basis fuer relative Eingabe- und Adapterpfade, damit Services nicht vom Prozess-CWD abhaengen.
-- Relative Pfade werden gegen `report_display_base` interpretiert und danach als lexikalisch normalisierte relative Anzeige-Strings ausgegeben, wenn sie auch relativ eingegeben wurden.
-- Absolute Pfade werden nicht relativiert; sie bleiben absolute Anzeige-Strings.
+- `compile_database_path` und `cmake_file_api_path` werden als `input_argument` behandelt.
+- `was_relative` wird beim Request-Aufbau aus dem urspruenglichen CLI-Argument bestimmt und nicht spaeter aus einem aufgeloesten Pfad rekonstruiert.
+- `report_display_base` dient nur als explizite Basis fuer relative normale Eingabepfade und Adapterpfade, damit Services nicht vom Prozess-CWD abhaengen.
+- Relative normale Eingabepfade werden gegen `report_display_base` interpretiert und danach als lexikalisch normalisierte relative Anzeige-Strings ausgegeben, wenn sie auch relativ eingegeben wurden.
+- Absolute normale Eingabepfade werden nicht relativiert; sie bleiben absolute Anzeige-Strings.
+
+Regeln fuer aufgeloeste Adapterpfade:
+
+- `cmake_file_api_resolved_path` wird als `resolved_adapter_path` behandelt.
+- Der Adapter liefert den rohen lexikalischen Build- oder Reply-Pfad, den er tatsaechlich verwendet hat.
+- Ist dieser Adapterpfad relativ, wird er gegen `report_display_base` interpretiert und als normalisierter relativer Anzeige-String ausgegeben.
+- Ist dieser Adapterpfad absolut, bleibt er absolut; Goldens mit solchen Pfaden verwenden fixture-stabile Werte wie `/project/...`.
+
+Gemeinsame Grenzen:
+
+- `changed_file` nutzt diese allgemeine Display-Regel nicht; dafuer gilt die separate Provenienzregel im naechsten Abschnitt.
 - Es erfolgt keine zusaetzliche kanonische Aufloesung ueber Symlinks, Home- oder Temp-Pfade.
-- Goldens mit Absolutpfaden verwenden nur fixture-stabile Pfade wie `/project/...`.
 - Interne Normalisierungsschluessel werden nicht in `ReportInputs` serialisiert.
 
 ## `changed_file`-Provenienz
 
-`ImpactAnalyzer` setzt:
+`ImpactAnalyzer` setzt `changed_file` und `changed_file_source` ueber eine eigene Regel. `report_display_base` wird fuer `changed_file` nicht verwendet, weil relative `--changed-file`-Werte fachlich gegen die Impact-Provenienz-Basis aufgeloest werden.
+
+Display- und Aufloesungsregeln:
+
+- Ist `changed_file_path` absolut, wird `changed_file` als lexikalisch normalisierter absoluter String ausgegeben und `changed_file_source=cli_absolute` gesetzt.
+- Ist `changed_file_path` relativ und `compile_commands_path` gesetzt, wird der Pfad fuer Analyse und Anzeige gegen die Compile-Database-Directory interpretiert. `changed_file` bleibt der lexikalisch normalisierte relative Pfad zu dieser Directory, nicht relativ zu `report_display_base`.
+- Ist `changed_file_path` relativ, keine Compile Database gesetzt und eine File-API-Source-Root vorhanden, wird der Pfad fuer Analyse und Anzeige gegen diese Source-Root interpretiert. `changed_file` bleibt der lexikalisch normalisierte relative Pfad zu dieser Source-Root.
+
+Quellen:
 
 - `changed_file_source = cli_absolute`, wenn `changed_file_path` absolut ist.
 - `changed_file_source = compile_database_directory`, wenn `changed_file_path` relativ ist und `compile_commands_path` gesetzt ist.
@@ -252,6 +288,9 @@ Atomic-Writer-Vertrag:
 - Temp-Datei wird im Zielverzeichnis angelegt.
 - Temp-Datei wird kollisionssicher und exklusiv erzeugt.
 - Temp-Dateiname nutzt ein erkennbares Praefix, zum Beispiel `.cmake-xray-`.
+- AP 1.1 garantiert leserseitig atomare Sichtbarkeit: Unter dem Zielnamen erscheint entweder der alte vollstaendige Inhalt oder der neue vollstaendige Inhalt.
+- AP 1.1 garantiert keine Crash-Dauerhaftigkeit nach Stromausfall oder Kernel-Abbruch.
+- Flush bedeutet hier Stream-/Handle-Flush zur Fehlererkennung vor dem Replace, nicht zwingend `fsync`, Directory-`fsync`, `_commit` oder `FlushFileBuffers`.
 - POSIX nutzt `rename` oder `renameat` fuer den finalen Replace.
 - Windows nutzt `ReplaceFileW` oder `MoveFileExW` mit `MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH`.
 - Zielpfad darf vor dem Replace nicht geloescht werden.
@@ -289,18 +328,20 @@ Erlaubt:
 Pflicht:
 
 - Bestehende M3-/M4-Compile-Database-only-Goldens fuer `console` und `markdown` bleiben ohne neue Optionen byte-stabil.
+- Bestehende M4-File-API- und Mixed-Input-Goldens fuer `console` und `markdown` bleiben ohne neue Optionen byte-stabil.
 - `--output` mit Markdown behaelt den M3-stdout-Vertrag: Erfolg laesst stdout leer.
+- `ReportInputs` ist in AP 1.1 Modellvorbereitung fuer spaetere JSON-/HTML-/DOT-Adapter und wird nicht neu in bestehenden Console-/Markdown-Reports angezeigt.
 
-Erlaubte Golden-Aenderung:
+Verboten:
 
-- M4-File-API- und Mixed-Input-Goldens duerfen sich gezielt aendern, wenn nur neue `ReportInputs`-Provenienz sichtbar wird.
-- Jede solche Aktualisierung muss im Testnamen oder Testkommentar als `ReportInputs`-Provenienz-Aenderung nachvollziehbar sein.
+- Console-/Markdown-Goldens duerfen in AP 1.1 nicht allein deshalb geaendert werden, weil `ReportInputs` intern verfuegbar ist.
+- Neue Provenienzsichtbarkeit in Console oder Markdown gehoert nicht zu AP 1.1 und braucht ein eigenes spaeteres Arbeitspaket oder eine explizite Formatentscheidung.
 
 ## Implementierungsreihenfolge
 
 1. `ReportInputs` und Enums einfuehren.
 2. `AnalysisResult` und `ImpactResult` um `inputs` erweitern.
-3. `AnalyzeProjectRequest` um `report_display_base` erweitern.
+3. `AnalyzeProjectRequest` um `InputPathArgument` und `report_display_base` erweitern.
 4. `AnalyzeImpactRequest` einfuehren und CLI/Tests auf Request umstellen.
 5. `BuildModelResult` um rohe File-API-Aufloesungsmetadaten erweitern.
 6. `ProjectAnalyzer` setzt `ReportInputs` fuer `analyze`.
@@ -330,12 +371,18 @@ Unit-/Service-Tests:
   - resolved File-API-Pfad kommt aus `BuildModelResult`
 - Impact mit relativem `changed_file` plus Compile Database:
   - `changed_file_source=compile_database_directory`
+  - `changed_file` ist der normalisierte relative Pfad zur Compile-Database-Directory, zum Beispiel `src/lib.cpp`
 - Impact mit relativem `changed_file` plus File API only:
   - `changed_file_source=file_api_source_root`
+  - `changed_file` ist der normalisierte relative Pfad zur File-API-Source-Root, zum Beispiel `src/lib.cpp`
 - Impact mit absolutem `changed_file`:
   - `changed_file_source=cli_absolute`
+  - `changed_file` ist der normalisierte absolute Pfad, zum Beispiel `/project/src/lib.cpp`
 - Services verwenden `report_display_base`; ein veraendertes Prozess-CWD darf Ergebnisse nicht aendern.
-- `AnalyzeImpactRequest` transportiert `compile_commands_path`, `changed_file_path`, `cmake_file_api_path`, `report_display_base`.
+- Relative normale Eingabepfade bleiben in `compile_database_path` und `cmake_file_api_path` als normalisierte relative Anzeige-Strings erhalten.
+- Absolute normale Eingabepfade bleiben in `compile_database_path` und `cmake_file_api_path` als absolute Anzeige-Strings erhalten.
+- `cmake_file_api_resolved_path` folgt der Adapterpfad-Regel und wird nicht aus dem originalen CLI-String rekonstruiert.
+- `AnalyzeImpactRequest` transportiert `compile_commands_path`, `changed_file_path`, `cmake_file_api_path`, `report_display_base` und die jeweilige `was_relative`-Information.
 
 CLI-Tests:
 
@@ -355,13 +402,16 @@ Atomic-Writer-Tests:
 - vorhandene Datei wird bei Erfolg ersetzt.
 - vorhandene Datei bleibt bei simuliertem Render-/Write-/Flush-/Replace-Fehler unveraendert.
 - Temp-Datei wird exklusiv erstellt; eine vorhandene Temp-Datei wird nicht ueberschrieben.
+- Tests pruefen leserseitige atomare Replace-Semantik, aber keine Crash-Dauerhaftigkeit nach Stromausfall.
 - Windows-Pfad nutzt die Windows-Replace-Implementierung oder einen abstrahierten Test-Doppelgaenger mit derselben Semantik.
 
 Regressionstests:
 
 - bestehende Compile-Database-only-Console-Goldens bleiben byte-stabil.
 - bestehende Compile-Database-only-Markdown-Goldens bleiben byte-stabil.
-- File-API-/Mixed-Golden-Aenderungen sind auf `ReportInputs`-Provenienz begrenzt.
+- bestehende File-API-Console- und File-API-Markdown-Goldens bleiben byte-stabil.
+- bestehende Mixed-Input-Console- und Mixed-Input-Markdown-Goldens bleiben byte-stabil.
+- Kein Regressionstest erwartet neue sichtbare `ReportInputs`-Provenienz in Console oder Markdown.
 
 ## Abnahmekriterien
 
@@ -375,7 +425,8 @@ AP 1.1 ist abgeschlossen, wenn:
 - atomarer Write bestehende Zielartefakte bei Fehlern nicht veraendert;
 - `AnalyzeImpactPort` nicht mehr vom positionalen Altvertrag abhaengt oder dieser eindeutig als deprecated Wrapper ueber `AnalyzeImpactRequest` implementiert ist;
 - `ReportInputs` fuer Analyze und Impact vollstaendig in Service-Tests abgedeckt ist;
-- Compile-Database-only-Console-/Markdown-Goldens byte-stabil bleiben;
+- Compile-Database-only-, File-API- und Mixed-Input-Console-/Markdown-Goldens byte-stabil bleiben;
+- `ReportInputs` in AP 1.1 nicht neu in Console oder Markdown sichtbar wird;
 - `git diff --check` sauber ist.
 
 ## Offene Folgearbeiten
