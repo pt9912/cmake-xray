@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.17` |
+| Version | `0.18` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -78,7 +78,7 @@ Fuer M5 benoetigt der Report-Pfad mindestens:
 
 Wichtig:
 
-- `console` und `markdown` duerfen sich fuer bestehende M3-/M4-Eingaben ohne neue Optionen nicht aendern
+- Rueckwaertskompatibilitaet wird fuer M5 differenziert behandelt: M3-/M4-Compile-Database-only-Goldens fuer `console` und `markdown` bleiben ohne neue Optionen byte-stabil; M4-File-API- und Mixed-Input-Goldens duerfen sich gezielt aendern, soweit `ReportInputs` neue Eingabeprovenienz sichtbar macht, und werden mit explizitem Hinweis aktualisiert
 - Formatadapter duerfen keine neuen Impact- oder Ranking-Entscheidungen treffen
 - JSON ist der einzige maschinenlesbare Vertragsausdruck in M5; HTML und DOT bleiben menschen- bzw. visualisierungsorientiert
 - stdout bleibt der Standard, wenn kein `--output` angegeben ist; mit `--output` wird der vollstaendige Reportinhalt in die Datei geschrieben und nicht zusaetzlich fachlich nach stdout dupliziert
@@ -401,6 +401,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - CLI-Tests fuer `--verbose`, `--quiet` und gegenseitigen Ausschluss
 - CLI-Golden-Tests, dass `--quiet --format json|dot|html|markdown` ohne `--output` denselben stdout-Report wie der Normalmodus ausgibt und keine Erfolgsmeldungen in stdout mischt
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
+- Regressionstests, dass bestehende Compile-Database-only-Console-/Markdown-Goldens byte-stabil bleiben, waehrend File-API-/Mixed-Input-Goldens nur fuer die dokumentierte `ReportInputs`-Provenienz aktualisiert werden
 - Golden- und CLI-Tests, dass `--top` bei `analyze` fuer Markdown, HTML, JSON und DOT konsistent wirkt und kein Artefaktformat implizit vollstaendige Listen ausgibt
 - DOT-Golden-Tests, dass `analyze --top N` fuer ausgegebene Top-Hotspots hoechstens `context_limit` betroffene Translation Units als Kontextknoten enthaelt, das globale `node_limit`-/`edge_limit`-Budget einhaelt und gekuerzten Kontext mit den verpflichtenden `context_*`-Node-Attributen sowie gekuerzte Graphen mit den verpflichtenden `graph_*`-Graph-Attributen kennzeichnet
 - DOT-Golden-Tests, dass `impact --format dot` das feste Impact-`node_limit`-/`edge_limit`-Budget einhaelt und Kuerzungen mit den verpflichtenden Graph-Attributen `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kennzeichnet
