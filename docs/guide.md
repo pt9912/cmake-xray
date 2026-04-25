@@ -247,6 +247,87 @@ vollstaendiger Ersatz fuer Build-System- oder Compilerwissen.
 | `3`  | Eingabedatei nicht lesbar           |
 | `4`  | Eingabedaten ungueltig              |
 
+## Quality Gate in einem Anwender-Projekt
+
+`cmake-xray` hat im aktuellen Stand keine konfigurierbaren Analyseschwellen.
+Die einzigen harten Fehlersignale sind die Exit-Codes `1`, `3` und `4` aus dem
+vorigen Abschnitt. Ein Quality Gate in einem Anwender-Projekt wird deshalb aus
+drei Bausteinen aufgebaut:
+
+1. Eingabedaten reproduzierbar erzeugen
+2. `cmake-xray` aus Build oder CI heraus aufrufen
+3. den Markdown-Report als Artefakt sichern
+
+Schwellen auf Reportinhalte sind nicht Bestandteil von `cmake-xray` und werden
+bei Bedarf ausserhalb des Tools gepflegt.
+
+### Eingabedaten im Anwender-Projekt erzeugen
+
+In der `CMakeLists.txt` des zu analysierenden Projekts wird die
+Compilation Database aktiviert:
+
+```cmake
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "" FORCE)
+```
+
+Fuer die Target-Sicht ueber die CMake File API wird vor dem ersten
+`cmake -B build` zusaetzlich eine Query-Datei abgelegt:
+
+```bash
+mkdir -p build/.cmake/api/v1/query
+touch build/.cmake/api/v1/query/codemodel-v2
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+### Analyse als CMake-Target
+
+Optional kann der Aufruf als `add_custom_target` in das Anwender-Projekt
+eingebunden werden:
+
+```cmake
+find_program(CMAKE_XRAY cmake-xray REQUIRED)
+
+add_custom_target(xray
+  COMMAND ${CMAKE_XRAY} analyze
+          --compile-commands ${CMAKE_BINARY_DIR}/compile_commands.json
+          --cmake-file-api  ${CMAKE_BINARY_DIR}
+          --format markdown
+          --output ${CMAKE_BINARY_DIR}/reports/xray-analyze.md
+          --top 20
+  VERBATIM)
+```
+
+Aufruf: `cmake --build build --target xray`.
+
+### CI-Integration
+
+Skizze fuer GitHub Actions, wenn `cmake-xray` im `PATH` des Runners liegt:
+
+```yaml
+- run: cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+- run: cmake --build build
+- run: cmake-xray analyze
+        --compile-commands build/compile_commands.json
+        --cmake-file-api  build
+        --format markdown --output build/xray.md --top 20
+- uses: actions/upload-artifact@v4
+  with: { name: cmake-xray, path: build/xray.md }
+```
+
+Der CI-Schritt schlaegt automatisch fehl, wenn `cmake-xray` einen Exit-Code
+ungleich `0` zurueckgibt.
+
+### Container-Variante
+
+Ohne lokale Installation kann das Runtime-Image verwendet werden:
+
+```bash
+docker run --rm -v "$PWD/build:/data:ro" \
+  ghcr.io/pt9912/cmake-xray:vX.Y.Z \
+  analyze --compile-commands /data/compile_commands.json --cmake-file-api /data
+```
+
 ## Verifikation
 
 Lokale Tests:
