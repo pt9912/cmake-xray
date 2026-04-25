@@ -29,7 +29,7 @@ Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**.
 | Phase 2 | Kernanalysen MVP              | Translation-Unit-Analyse, Include-Hotspots, Impact fuer Dateien    | gross            |
 | Phase 3 | Berichte und Qualitaet        | Markdown, Dokumentation, Referenzdaten, Performance-Baseline       | mittel           |
 | Phase 4 | Erweiterungen                 | Target-Sicht, HTML, JSON, weitere Plattformen                      | fortlaufend      |
-| Phase 5 | Weitere Erweiterungen nach M4 | HTML, JSON/DOT, Release, Plattformen, Detail-/Quiet-Modi          | fortlaufend      |
+| Phase 5 | Weitere Erweiterungen nach M4 | HTML, JSON/DOT, Release, Plattformen, Detail-/Quiet-Modi           | fortlaufend      |
 | Phase 6 | Weitere Erweiterungen nach M5 | weitere Konfiguration, Vergleichsansichten und verfeinerte Analyse | fortlaufend      |
 
 ### 2.1 Milestones
@@ -41,8 +41,8 @@ Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**.
 | **M2**       | `v0.3.0` | Phase 2 | `AK-03`, `AK-04`, `AK-05` erfuellt; heuristische Ergebnisse gekennzeichnet                                                                |
 | **M3 (MVP)** | `v1.0.0` | Phase 3 | Alle `AK-01` bis `AK-09` erfuellt; MVP lieferbar                                                                                          |
 | **M4**       | `v1.1.0` | Phase 4 | CMake File API als zweite Eingabequelle, TU-zu-Target-Zuordnung, targetbezogene Impact-Ausgabe; ohne `compile_commands.json` analysierbar |
-| **M5**       | `tbd`    | Phase 5 | HTML-Export, JSON-/DOT-Ausgaben, Release-Bereitstellung, Plattformunterstuetzung, Detail- und Quiet-Modi                                  |
-| **M6**       | `tbd`    | Phase 6 | weitere Konfiguration, Vergleichsansichten und verfeinerte Analyse                                                                         |
+| **M5**       | `v1.2.0` | Phase 5 | HTML-Export, JSON-/DOT-Ausgaben, Release-Bereitstellung, Plattformunterstuetzung, Detail- und Quiet-Modi                                  |
+| **M6**       | `tbd`    | Phase 6 | weitere Konfiguration, Vergleichsansichten und verfeinerte Analyse                                                                        |
 
 ## 3. Phasen im Detail
 
@@ -101,8 +101,8 @@ Ziel: Ergebnisse werden fuer reale Nutzung, Dokumentation und Absicherung stabil
 
 Ziel: nicht-MVP-Funktionen kontrolliert aufbauen.
 
-| Arbeitspaket                                                                                                                                                                                                                                             | Relevante Kennungen                               |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Arbeitspaket                                                                                                                                                                                                                                             | Relevante Kennungen            |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
 | `CmakeFileApiAdapter` (`BuildModelPort`): zweite primaere Eingabequelle fuer Kernanalysen und initiale Target-Sicht; Einstieg mit Translation-Unit-Beobachtungen ohne `compile_commands.json`, TU-zu-Target-Zuordnung und targetbezogener Impact-Ausgabe | `F-05`, `F-19`, `F-24`, `S-02` |
 
 Einzelne Arbeitspakete koennen bei Bedarf eigene Abschlusskriterien erhalten.
@@ -111,13 +111,13 @@ Einzelne Arbeitspakete koennen bei Bedarf eigene Abschlusskriterien erhalten.
 
 Ziel: Ausbaupunkte nach dem M4-Plan aufnehmen, ohne den M4-Fokus zu verwischen.
 
-| Arbeitspaket                                                                                                   | Relevante Kennungen            |
-| -------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| `HtmlReportAdapter`: HTML-Export                                                                                | `F-28`                         |
-| `JsonReportAdapter` und `DotReportAdapter`: JSON- und DOT-Ausgaben                                              | `F-29`, `F-30`, `NF-20`        |
+| Arbeitspaket                                                                                                      | Relevante Kennungen                     |
+| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `HtmlReportAdapter`: HTML-Export                                                                                  | `F-28`                                  |
+| `JsonReportAdapter` und `DotReportAdapter`: JSON- und DOT-Ausgaben                                                | `F-29`, `F-30`, `NF-20`                 |
 | Versionierte Release-Artefakte fuer Linux-CLI, OCI-kompatibles Container-Image und tag-basierter Release-Workflow | `F-43`, `F-44`, `NF-21`, `S-12`, `S-13` |
-| Erweiterte Plattformunterstuetzung                                                                              | `NF-08`, `NF-09`               |
-| Detail- und Quiet-Modi                                                                                          | `F-39`, `F-40`                 |
+| Erweiterte Plattformunterstuetzung                                                                                | `NF-08`, `NF-09`                        |
+| Detail- und Quiet-Modi                                                                                            | `F-39`, `F-40`                          |
 
 Hinweis: `F-39` (Soll) kann bei Bedarf in Phase 2 oder 3 vorgezogen werden, falls der detailreiche Modus fuer die Diagnose waehrend der MVP-Entwicklung selbst nuetzlich ist.
 
@@ -125,13 +125,13 @@ Hinweis: `F-39` (Soll) kann bei Bedarf in Phase 2 oder 3 vorgezogen werden, fall
 
 Ziel: zusaetzliche Ausbaupunkte nach dem bereits geplanten M5-Umfang aufnehmen, ohne die historische Planung der Phasen 0 bis 5 umzuschreiben.
 
-| Arbeitspaket                                                            | Relevante Kennungen            |
-| ----------------------------------------------------------------------- | ------------------------------ |
+| Arbeitspaket                                                                            | Relevante Kennungen            |
+| --------------------------------------------------------------------------------------- | ------------------------------ |
 | Direkte Target-Graph-Analysen und textuelle Darstellung direkter Target-Abhaengigkeiten | `F-18`                         |
-| Hervorhebung von Targets mit vielen ein- oder ausgehenden Abhaengigkeiten | `F-20`                         |
-| Priorisierung betroffener Targets ueber den Target-Graphen hinweg      | `F-25`                         |
-| Verfeinerte Include-Sicht jenseits des MVP                              | `F-16`, `F-17`                 |
-| Erweiterte Analysekonfiguration, Schwellenwerte und Vergleichsansichten | `F-10`, `F-11`, `F-37`, `F-38` |
+| Hervorhebung von Targets mit vielen ein- oder ausgehenden Abhaengigkeiten               | `F-20`                         |
+| Priorisierung betroffener Targets ueber den Target-Graphen hinweg                       | `F-25`                         |
+| Verfeinerte Include-Sicht jenseits des MVP                                              | `F-16`, `F-17`                 |
+| Erweiterte Analysekonfiguration, Schwellenwerte und Vergleichsansichten                 | `F-10`, `F-11`, `F-37`, `F-38` |
 
 ## 4. MVP-Abgrenzung
 
