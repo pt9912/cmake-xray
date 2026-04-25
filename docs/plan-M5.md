@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.23` |
+| Version | `0.24` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -82,8 +82,8 @@ Wichtig:
 - Formatadapter duerfen keine neuen Impact- oder Ranking-Entscheidungen treffen
 - JSON ist der vollstaendige maschinenlesbare Vertragsausdruck in M5; DOT bleibt visualisierungsorientiert, erhaelt aber einen begrenzt stabilen Metadatenvertrag fuer die explizit benannten Graph-/Node-Attribute
 - stdout bleibt der Standard, wenn kein `--output` angegeben ist; mit `--output` wird der vollstaendige Reportinhalt in die Datei geschrieben und nicht zusaetzlich fachlich nach stdout dupliziert
-- `--output` ersetzt vorhandene Zielartefakte bei erfolgreichem Schreiben; bei Render-, Schreib- oder Rename-Fehlern bleibt eine bereits vorhandene Zieldatei unveraendert erhalten
-- die atomare Dateiausgabe verwendet eine temporaere Datei im Zielverzeichnis und eine plattformsichere Replace-Operation, die auf Linux, macOS und Windows getestet wird
+- `--output` ersetzt vorhandene Zielartefakte bei erfolgreichem Schreiben; bei Render-, Schreib- oder Replace-Fehlern bleibt eine bereits vorhandene Zieldatei unveraendert erhalten
+- die atomare Dateiausgabe verwendet eine temporaere Datei im Zielverzeichnis und einen eigenen Replace-Wrapper statt nacktem `std::filesystem::rename(temp, target)`: POSIX nutzt `rename`/`renameat` fuer atomaren Replace, Windows nutzt `ReplaceFileW` oder `MoveFileExW` mit `MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH`; ein vorheriges Loeschen des Zielpfads ist nicht zulaessig, weil bei Fehlern die alte Datei unveraendert bleiben muss
 - fuer `analyze` folgen alle Reportformate derselben `--top`-Begrenzung fuer Ranking-, Hotspot- und vergleichbare Listenabschnitte; `impact` erhaelt in M5 keine `--top`-Option und keine implizite Begrenzung seiner strukturierten Ergebnislisten
 - DOT ist die visualisierungsorientierte Ausnahme: Auch `impact --format dot` wird ueber Graph-Budgets begrenzt, ohne das zugrunde liegende `ImpactResult` oder JSON-/HTML-/Markdown-Impact-Listen zu kuerzen
 - DOT bleibt fuer `analyze` und `impact` ein begrenztes Artefakt: Analyze-Hotspot-Kontext wird ueber ein separates, kleines `context_limit` begrenzt, beide DOT-Reporttypen werden ueber ein globales `node_limit`-/`edge_limit`-Budget begrenzt; Analyze-Hotspot-Knoten tragen bei vorhandenem Kontext die Attribute `context_total_count`, `context_returned_count`, `context_truncated`, und beide Reporttypen tragen immer die Graph-Attribute `graph_node_limit`, `graph_edge_limit`, `graph_truncated`
@@ -94,6 +94,7 @@ Vorgesehene Artefakte:
 
 - Anpassung der CLI-Formatvalidierung in `src/adapters/cli/`
 - Anpassung der CLI-Output-Validierung und der atomaren Dateiausgabe fuer Reportartefakte
+- gemeinsamer Atomic-Write-/Replace-Wrapper in der Infrastruktur- oder CLI-Adapter-Schicht mit plattformspezifischer Implementierung fuer POSIX und Windows
 - Anpassung der Composition-Root-Verdrahtung in `src/main.cpp`
 - Erweiterung von `src/hexagon/model/analysis_result.*` und `src/hexagon/model/impact_result.*` um ein strukturiertes `ReportInputs`-Modell, mindestens mit `compile_database_path`, `cmake_file_api_path` und bei `impact` `changed_file`
 - `ReportInputs` ist ab M5 die alleinige Quelle fuer Report-Eingabepfade; bestehende skalare Pfadfelder wie `AnalysisResult::compile_database_path` werden entfernt oder als deprecated Mirror ohne eigene Semantik markiert und duerfen nicht fuer JSON-`inputs` serialisiert werden
@@ -103,6 +104,7 @@ Vorgesehene Artefakte:
 - der `CmakeFileApiAdapter` gibt den aufgeloesten Build-/Reply-Directory-Pfad ueber Metadaten in `BuildModelResult` an Hexagon-Services zurueck; `ProjectAnalyzer` und `ImpactAnalyzer` duerfen diesen Wert nur aus `BuildModelResult` oder vorgelagerter Input-Resolution uebernehmen, nicht aus CLI- oder Adapterzustand nachreichen
 - `changed_file` nutzt fuer Display- und Provenienzregeln dieselbe fachliche Basis wie die Impact-Analyse: Bei Mixed-Input-Laeufen mit `--compile-commands` und `--cmake-file-api` hat die `compile_commands.json`-Directory Prioritaet; bei File-API-only-Laeufen wird die CMake-File-API-Source-Root verwendet. Der Pfad wird nicht pauschal relativ zum Prozess-Arbeitsverzeichnis interpretiert.
 - Driving-Requests fuer `ProjectAnalyzer` und `ImpactAnalyzer` tragen eine explizite Display-Basis wie `invocation_cwd` oder `report_display_base`, die von der CLI gesetzt und in Service-Tests injiziert wird; Services duerfen fuer Report-Pfade nicht implizit `std::filesystem::current_path()` lesen
+- der bisher positionale Impact-Port wird in M5 auf einen expliziten `AnalyzeImpactRequest` umgestellt oder gleichwertig erweitert; dieser Request enthaelt mindestens `compile_commands_path`, `changed_file_path`, `cmake_file_api_path`, `report_display_base` und die fuer `ReportInputs` noetigen Source-/Display-Metadaten
 - `ReportInputs` dokumentiert die Provenienz ueber strukturierte Zusatzfelder wie `compile_database_source`, `cmake_file_api_source` und `changed_file_source`; `compile_database_source` verwendet fuer M5 die Enum-Werte `cli`, `not_provided`, `cmake_file_api_source` verwendet `cli`, `not_provided`, und `changed_file_source` verwendet `compile_database_directory`, `file_api_source_root`, damit File-API-only- und Mixed-Input-Laeufe eindeutig auswertbar bleiben. `changed_file*`-Felder existieren nur im Impact-JSON-Vertrag, weil `analyze` keine geaenderte Datei verarbeitet; ein fehlendes `--changed-file` wird bei `impact` von der CLI abgelehnt und nicht als JSON-`not_provided` serialisiert.
 - Anpassung der Producer-Pfade in `ProjectAnalyzer`, `ImpactAnalyzer` und den zugehoerigen Driving-Request-/Port-Vertraegen, damit `ReportInputs` beim Erzeugen von `AnalysisResult` und `ImpactResult` vollstaendig gesetzt wird und nicht nachtraeglich in der CLI an Adapter uebergeben werden muss
 - Erweiterung von `src/hexagon/model/build_model_result.*` um Input-Metadaten fuer den aufgeloesten CMake-File-API-Build-/Reply-Pfad und die zugrunde liegende Source-Root, damit Adapter-Aufloesung fachlich transportiert werden kann
@@ -285,6 +287,7 @@ Entscheidungen fuer M5:
 - die dokumentierte und getestete CLI-Position ist command-lokal nach dem Subcommand, also `cmake-xray analyze --quiet ...` bzw. `cmake-xray impact --verbose ...`; globale Schreibweisen vor dem Subcommand sind in M5 nicht Teil des Vertrags
 - Verbosity ist kein fachlicher Report-Parameter, sondern steuert nur CLI-Emissionen wie Console-Zusammenfassung, Erfolgsmeldungen, `stderr`-Diagnostik und Fehlerkontext
 - `--format console` ist ausdruecklich ein CLI-owned Emissionspfad: quiet/normal/verbose werden dort in der CLI-Schicht entschieden; `ConsoleReportAdapter` kann fuer den Normalmodus bestehen bleiben, wird aber nicht zum allgemeinen Verbosity-Port-Vertrag
+- Console-Normalmodus bleibt fuer bestehende Compile-Database-only-Goldens byte-stabil; Console-Quiet gibt nur Ergebnisstatus, zentrale Zaehler und Warn-/Fehlerhinweise aus, waehrend Console-Verbose zusaetzlich Eingabeprovenienz, Beobachtungsherkunft, Target-Metadatenstatus und vollstaendige Diagnostics ausgeben darf. Die konkrete Abschnittsreihenfolge wird in Golden-Tests fixiert und muss dokumentiert werden.
 - `ReportWriterPort`, `GenerateReportPort` und die Formatadapter bleiben frei von einem `OutputVerbosity`-Parameter; Artefaktinhalte werden ausschliesslich durch Ergebnisdaten, Format und `analyze`-Top-Limit bestimmt
 - Standardverhalten ohne beide Optionen bleibt rueckwaertskompatibel
 - quiet beeinflusst nicht Exit-Codes
@@ -310,6 +313,7 @@ Der Release-Pfad muss mindestens:
 - Tags vor dem Build fail-fast validieren und unbekannte Muster wie `vfoo`, unvollstaendige Versionen oder Build-Metadaten ohne dokumentierte Freigabe abbrechen
 - die Root-`CMakeLists.txt`-`project(... VERSION ...)` bleibt numerisch (`MAJOR.MINOR.PATCH`), weil CMake dort keine Prerelease-Suffixe akzeptiert; die veroeffentlichte App-/Package-Version wird ueber eine zusaetzliche Quelle wie `XRAY_APP_VERSION` oder `XRAY_VERSION_SUFFIX` gebildet
 - `cmake-xray --version`, die von `ApplicationInfo` gelieferte kompilierte bzw. generierte App-Version, Paketmetadaten und Release-Tag muessen dieselbe veroeffentlichte Semver-Version ohne fuehrendes `v` melden; fuer `v1.2.0-rc.1` ist die erwartete App-Version also `1.2.0-rc.1`, waehrend die CMake-Projektversion `1.2.0` bleibt
+- die CLI erhaelt einen top-level `cmake-xray --version`-Pfad, der ohne Subcommand funktioniert, nur die veroeffentlichte App-Version ohne fuehrendes `v` auf stdout schreibt und keine Analyse initialisiert; das historische fuehrende `v` in statischen Versionsquellen wird entweder entfernt oder vor der Ausgabe normalisiert, aber Release-Checks pruefen die ausgegebene App-Version ohne `v`
 - Test-, Coverage-, Quality- und Runtime-Pfade vor dem Veroeffentlichen ausfuehren
 - Publishing-Schritte in einen finalen Release-Job nach allen Gates verschieben; Verify-/Build-Jobs duerfen Container und Archive bauen und testen, aber keine Images oder Release-Artefakte in externe Registries bzw. Releases pushen
 - ein Linux-CLI-Artefakt als `.tar.gz` erzeugen
@@ -339,6 +343,7 @@ Vorgesehene Artefakte:
 
 - Umstrukturierung von `.github/workflows/release.yml`: kein GHCR-Push im Verify-Job, bewusste macOS-/Windows-Artefaktbehandlung, Draft-Release vor Image-Publish und oeffentliche Release-Publikation als letzter Schritt
 - `scripts/release-dry-run.sh` als lokaler und CI-faehiger Entry-Point fuer Fake-Publisher, lokale Registry, Tag-/`latest`-Regeln und Publish-Reihenfolge
+- CLI-Adapter- und `ApplicationInfo`-Anpassung fuer `cmake-xray --version` ohne fuehrendes `v`
 - Pruefung und ggf. Anpassung von `Dockerfile`
 - Aktualisierung von `docs/releasing.md`
 - Aktualisierung von `README.md`
@@ -401,6 +406,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - CLI-Tests fuer Formatwahl, ungueltige Formatwerte und `--format html|json|dot --output <path>` fuer `analyze` und `impact`
 - CLI-Negativtest, dass `--format console --output <path>` abgelehnt wird, weil `--output` auf artefaktorientierte Formate begrenzt bleibt
 - CLI-Tests fuer atomare Dateiausgabe: erfolgreiche Writes erzeugen vollstaendige Reports, vorhandene Zieldateien werden bei Erfolg ersetzt, und Fehlerfaelle lassen vorhandene Zieldateien auf Linux, macOS und Windows unveraendert
+- Unit-/Integrationstests fuer den Atomic-Replace-Wrapper, die existierende Ziele ohne vorheriges Loeschen ersetzen, simulierte Fehlerpfade mit intakter alter Datei pruefen und unter Windows die gewaehlte `ReplaceFileW`-/`MoveFileExW`-Semantik abdecken
 - CLI-Tests, dass `--quiet` und `--verbose` command-lokal nach `analyze` bzw. `impact` akzeptiert werden und globale Positionen vor dem Subcommand nicht Teil des M5-Vertrags sind
 - CLI-Tests fuer `--verbose`, `--quiet` und gegenseitigen Ausschluss
 - CLI-Golden-Tests, dass `--quiet --format json|dot|html|markdown` ohne `--output` denselben stdout-Report wie der Normalmodus ausgibt und keine Erfolgsmeldungen in stdout mischt
@@ -417,13 +423,16 @@ Tests und Abnahme muessen mindestens abdecken:
 - JSON-Schema-/Golden-Tests fuer alle `*_source`-Enums: `compile_database_source=cli|not_provided`, `cmake_file_api_source=cli|not_provided` und `changed_file_source=compile_database_directory|file_api_source_root`; absolute-Pfad-Goldens muessen synthetische, fixture-stabile Pfade verwenden
 - JSON-Schema-/Golden-Tests fuer Mixed-Input-Impact-Laeufe, dass relative `changed_file`-Pfade auf Basis der `compile_commands.json`-Directory interpretiert werden und `inputs.changed_file_source=compile_database_directory` ausgeben; File-API-only-Laeufe verwenden `file_api_source_root`
 - Adapter-/Service-Tests, dass der vom `CmakeFileApiAdapter` aufgeloeste Build-/Reply-Pfad ueber `BuildModelResult` in `ReportInputs.cmake_file_api_resolved_path` landet und nicht aus CLI-Zustand nachgereicht wird
+- Port-/Service-Tests fuer `AnalyzeImpactRequest`, damit `compile_commands_path`, `changed_file_path`, `cmake_file_api_path` und `report_display_base` explizit transportiert und fuer `ReportInputs` genutzt werden
 - JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path` und `inputs.cmake_file_api_path` bei `analyze` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
 - JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path`, `inputs.cmake_file_api_path` und `inputs.changed_file` bei `impact` immer vorhanden sind; nicht verwendete optionale Analysequellen erscheinen als `null`, waehrend `inputs.changed_file` wegen der CLI-Pflicht fuer `impact` immer ein String ist
 - Service-Tests, dass `ProjectAnalyzer` und `ImpactAnalyzer` Report-Pfade relativ zur expliziten `invocation_cwd`-/`report_display_base`-Request-Basis serialisieren und nicht vom Prozess-CWD abhaengen
 - Tests, dass `--verbose` JSON-, Markdown-, HTML- und DOT-Artefakte nicht gegenueber dem Normalmodus veraendert und Zusatzdiagnostik nur Console/`stderr` betrifft
+- Console-Golden-Tests fuer Quiet-, Normal- und Verbose-Modus, die die groben Abschnittsvertraege und die Normalmodus-Rueckwaertskompatibilitaet absichern
 - Smoke-Test fuer Docker-Runtime-Image
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
 - Versionscheck, dass Root-`CMakeLists.txt` die numerische Basisversion meldet und `cmake-xray --version`, die kompilierte bzw. generierte `ApplicationInfo`-Version, App-/Package-Version-Quelle und Release-Tag dieselbe veroeffentlichte Semver-Version ohne fuehrendes `v` melden, inklusive Prerelease-Suffix bei Tags wie `v1.2.0-rc.1`
+- CLI-Test, dass `cmake-xray --version` ohne Subcommand funktioniert, ausschliesslich die App-Version ohne fuehrendes `v` nach stdout schreibt und keine Analyse-/Report-Pfade initialisiert
 - automatisierter Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
 - automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt: `scripts/release-dry-run.sh` und ein gleichnamiger bzw. eindeutig benannter Workflow-Job muessen GitHub-Schritte mit einem Fake-Publisher samt Assertions fuer Zustandsuebergaenge und Reihenfolge sowie OCI-Schritte mit lokaler Test-Registry fuer Tagging, `latest`-Regel, Push und Manifest-Pruefung ausfuehren, ohne externe Veroeffentlichung
 - dokumentierter manueller Dry-Run nur fuer Recovery-Pfade, die echte externe Publish-Zustaende in GitHub Releases oder GHCR voraussetzen
@@ -469,7 +478,7 @@ Abhaengigkeiten:
 | Analyze-Listen sind durch `--top` gekuerzt, ohne dies zu kennzeichnen | Automatisierung verwechselt kurze Ausgaben mit vollstaendigen Projektdaten | `limit`, `total_count`, `returned_count` und `truncated` fuer Analyze-Ranking- und Hotspot-Listen verpflichtend machen |
 | `--top` wird versehentlich auch fuer `impact` eingefuehrt | CLI- und Port-Vertraege divergieren und Impact-Ergebnisse werden unklar begrenzt | M5 begrenzt `--top` auf `analyze`; Impact akzeptiert keine Top-Option und gibt vollstaendige `ImpactResult`-Listen aus |
 | `--output` bleibt nur teilweise fuer neue Formate nutzbar | Nutzer koennen neue Artefaktformate nicht verlaesslich in CI speichern | `--output` fuer `markdown`, `html`, `json` und `dot` explizit freischalten und atomare Schreibtests aufnehmen |
-| Atomarer Write ueberschreibt vorhandene Dateien nicht portabel | Fehler koennen Zielartefakte zerstoeren oder Windows-Releases brechen | Replace-Semantik fuer existierende Dateien auf Linux, macOS und Windows testen; bei Fehler bleibt die alte Datei unveraendert |
+| Atomarer Write ueberschreibt vorhandene Dateien nicht portabel | Fehler koennen Zielartefakte zerstoeren oder Windows-Releases brechen | eigenen Replace-Wrapper mit POSIX-`rename`/`renameat` und Windows-`ReplaceFileW` oder `MoveFileExW` testen; kein vorheriges Loeschen des Zielpfads |
 | Analyze-Artefaktformate interpretieren `--top` unterschiedlich | Goldens, CLI-Ausgabe und Automatisierung liefern widerspruechliche Ergebnismengen | einheitliche Top-Limit-Regel fuer Markdown, HTML, JSON und DOT bei `analyze` festlegen und testen |
 | DOT-Hotspot-Kontext umgeht faktisch das `--top`-Limit | ein einzelner verbreiteter Header oder mehrere Top-Hotspots erzeugen sehr grosse Graphen trotz kleinem Top-Limit | DOT-Kontext mit separatem `context_limit` und globalem `node_limit`-/`edge_limit`-Budget begrenzen und Kuerzung maschinenlesbar kennzeichnen |
 | Impact-DOT ist trotz unbegrenztem `ImpactResult` zu gross | haeufig inkludierte Header erzeugen sehr grosse Graphviz-Reports | feste Impact-DOT-Budgets `node_limit = 100` und `edge_limit = 200` mit `graph_truncated` anwenden |
