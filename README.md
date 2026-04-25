@@ -1,7 +1,5 @@
 # cmake-xray
 
-Build visibility for CMake projects.
-
 `cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Der aktuelle Stand `v1.1.0` liest `compile_commands.json` und optional CMake-File-API-Reply-Daten, rankt auffaellige Translation Units, leitet heuristische Include-Hotspots ab, analysiert Datei-Impact und zeigt betroffene Targets an. Ergebnisse werden als Konsolen- oder Markdown-Report ausgegeben.
 
 ## Status
