@@ -39,6 +39,7 @@ Voraussichtlich zu aendern:
 - `src/hexagon/model/build_model_result.h`
 - `src/hexagon/ports/driving/analyze_project_port.h`
 - `src/hexagon/ports/driving/analyze_impact_port.h`
+- `src/hexagon/services/analysis_support.{h,cpp}`
 - `src/hexagon/services/project_analyzer.{h,cpp}`
 - `src/hexagon/services/impact_analyzer.{h,cpp}`
 - `src/adapters/input/cmake_file_api_adapter.{h,cpp}`
@@ -176,6 +177,16 @@ public:
 
 Alle Produktionsaufrufer in CLI, Composition Root, Tests und Port-Wiring werden auf den Request umgestellt. Der alte positionale virtuelle Portvertrag wird nicht als Produktionspfad behalten, weil er `report_display_base` und `was_relative` nicht korrekt transportieren kann. Falls ein temporaerer nicht-virtueller Testhelper fuer alte Testdaten noetig ist, muss er intern einen vollstaendigen `AnalyzeImpactRequest` mit expliziter Display-Basis bauen und darf nicht von CLI oder Port-Wiring genutzt werden.
 
+### `analysis_support`-Pfadbasis
+
+Bestehende Hilfsfunktionen in `src/hexagon/services/analysis_support.{h,cpp}` duerfen fuer Report- und Impact-Pfadbasen nicht mehr implizit `std::filesystem::current_path()` lesen.
+
+Regeln:
+
+- `compile_commands_base_directory()` oder ein gleichwertiger Ersatz bekommt die benoetigte Fallback-Basis explizit aus dem Request-Kontext.
+- Wenn `compile_commands_path` keinen Parent hat, wird `report_display_base` beziehungsweise die fachliche Request-Basis verwendet, nicht der aktuelle Prozess-CWD.
+- Service-Tests muessen einen veraenderten Prozess-CWD abdecken, damit ReportInputs und Impact-Aufloesung stabil bleiben.
+
 ## File-API-Aufloesungsmetadaten
 
 `BuildModelResult` erhaelt nur den vom Adapter tatsaechlich verwendeten, rohen File-API-Aufloesungspfad. Das bestehende Feld `source_root` bleibt die fachliche Source-Root fuer File-API-Ergebnisse und wird nicht parallel durch ein zweites Source-Root-Feld ersetzt:
@@ -221,8 +232,16 @@ Regeln fuer normale Eingabepfade:
 - `compile_database_path` und `cmake_file_api_path` werden als `input_argument` behandelt.
 - `was_relative` wird beim Request-Aufbau aus dem urspruenglichen CLI-Argument bestimmt und nicht spaeter aus einem aufgeloesten Pfad rekonstruiert.
 - `report_display_base` dient nur als explizite Basis fuer relative normale Eingabepfade und Adapterpfade, damit Services nicht vom Prozess-CWD abhaengen.
-- Relative normale Eingabepfade werden gegen `report_display_base` interpretiert und danach als lexikalisch normalisierte relative Anzeige-Strings ausgegeben, wenn sie auch relativ eingegeben wurden.
+- Relative normale Eingabepfade werden gegen `report_display_base` interpretiert und danach als lexikalisch normalisierte Anzeige-Strings relativ zu `report_display_base` ausgegeben, wenn sie auch relativ eingegeben wurden.
 - Absolute normale Eingabepfade werden nicht relativiert; sie bleiben absolute Anzeige-Strings.
+
+Beispiele mit `report_display_base=/repo`:
+
+- CLI-Eingabe `build/compile_commands.json` wird als `build/compile_commands.json` angezeigt.
+- CLI-Eingabe `./build/../out/compile_commands.json` wird als `out/compile_commands.json` angezeigt.
+- CLI-Eingabe `../repo/build/compile_commands.json` wird als `build/compile_commands.json` angezeigt, weil der Pfad relativ zur Display-Basis wieder in `/repo` liegt.
+- CLI-Eingabe `../other/build/compile_commands.json` wird als `../other/build/compile_commands.json` angezeigt.
+- CLI-Eingabe `/repo/build/compile_commands.json` bleibt `/repo/build/compile_commands.json`, weil absolute Eingaben nicht relativiert werden.
 
 Regeln fuer aufgeloeste Adapterpfade:
 
@@ -274,7 +293,7 @@ Formatwerte:
 `--format`-Validierung:
 
 - Unbekannte Werte bleiben CLI-Verwendungsfehler mit Exit-Code `2`.
-- Bekannte, aber in AP 1.1 noch nicht lauffaehige Werte `html`, `json` und `dot` liefern ebenfalls Exit-Code `2`, aber mit eigener Fehlermeldung `--format <value> is recognized but not implemented in AP 1.1`.
+- Bekannte, aber im aktuellen Build noch nicht lauffaehige Werte `html`, `json` und `dot` liefern ebenfalls Exit-Code `2`, aber mit eigener Fehlermeldung `--format <value> is recognized but not implemented in this build`.
 - Help-Text nennt alle fuenf Werte.
 
 `--output`-Validierung:
@@ -363,15 +382,16 @@ Verboten:
 2. `AnalysisResult` und `ImpactResult` um `inputs` erweitern.
 3. `AnalyzeProjectRequest` um `InputPathArgument` und `report_display_base` erweitern.
 4. `AnalyzeImpactRequest` einfuehren und den positionalen virtuellen Impact-Portvertrag aus dem Produktionspfad entfernen.
-5. `BuildModelResult` um rohe File-API-Aufloesungsmetadaten erweitern.
-6. `ProjectAnalyzer` setzt `ReportInputs` fuer `analyze`.
-7. `ImpactAnalyzer` setzt `ReportInputs` fuer `impact`, inklusive `changed_file_source`.
-8. Legacy-Presentation-Felder fuer bestehende Console-/Markdown-Adapter byte-stabil weiterbefuellen.
-9. CLI-Formatvalidierung auf fuenf Werte erweitern.
-10. `--output`-Validierung fuer artefaktorientierte Formate erweitern und `console --output` ablehnen.
-11. Atomic-Write-/Replace-Wrapper einfuehren.
-12. CLI-Schreibpfad auf Atomic-Writer umstellen.
-13. Tests aktualisieren und Golden-Kompatibilitaet pruefen.
+5. `analysis_support`-Pfadhelper so erweitern, dass Fallback-Basen explizit aus dem Request kommen und nicht aus dem Prozess-CWD.
+6. `BuildModelResult` um rohe File-API-Aufloesungsmetadaten erweitern.
+7. `ProjectAnalyzer` setzt `ReportInputs` fuer `analyze`.
+8. `ImpactAnalyzer` setzt `ReportInputs` fuer `impact`, inklusive `changed_file_source`.
+9. Legacy-Presentation-Felder fuer bestehende Console-/Markdown-Adapter byte-stabil weiterbefuellen.
+10. CLI-Formatvalidierung auf fuenf Werte erweitern.
+11. `--output`-Validierung fuer artefaktorientierte Formate erweitern und `console --output` ablehnen.
+12. Atomic-Write-/Replace-Wrapper einfuehren.
+13. CLI-Schreibpfad auf Atomic-Writer umstellen.
+14. Tests aktualisieren und Golden-Kompatibilitaet pruefen.
 
 ## Tests
 
@@ -402,6 +422,7 @@ Unit-/Service-Tests:
   - `changed_file_source=cli_absolute`
   - `changed_file` ist der normalisierte absolute Pfad, zum Beispiel `/project/src/lib.cpp`
 - Services verwenden `report_display_base`; ein veraendertes Prozess-CWD darf Ergebnisse nicht aendern.
+- `analysis_support`-Pfadhelper nutzen bei pfadlosen Compile-Database-Namen die explizite Request-Basis und nicht `std::filesystem::current_path()`.
 - Relative normale Eingabepfade bleiben in `compile_database_path` und `cmake_file_api_path` als normalisierte relative Anzeige-Strings erhalten.
 - Absolute normale Eingabepfade bleiben in `compile_database_path` und `cmake_file_api_path` als absolute Anzeige-Strings erhalten.
 - `cmake_file_api_resolved_path` folgt der Adapterpfad-Regel und wird nicht aus dem originalen CLI-String rekonstruiert.
@@ -411,7 +432,8 @@ Unit-/Service-Tests:
 CLI-Tests:
 
 - `--format console|markdown` bleibt lauffaehig.
-- `--format html|json|dot` wird als bekannter, aber in AP 1.1 noch nicht implementierter Wert erkannt, liefert Exit-Code `2`, schreibt keine Zieldatei und startet keine Analyse.
+- `--format html|json|dot` wird als bekannter, aber in diesem Build noch nicht implementierter Wert erkannt, liefert Exit-Code `2`, schreibt keine Zieldatei und startet keine Analyse.
+- Tests pruefen die stabile Fehlermeldung ohne Arbeitspaketnummer: `recognized but not implemented in this build`.
 - ungueltiges `--format` ergibt Exit-Code `2`.
 - `--output` mit `markdown` wird akzeptiert.
 - `--output` mit `html|json|dot` erzeugt bis zur jeweiligen Adapter-Implementierung denselben `not implemented`-Fehler und keine Zieldatei.
