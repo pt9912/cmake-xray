@@ -8,7 +8,7 @@ Ein JSON-Bericht fuer `analyze` soll mindestens enthalten:
 - `format_version`: Schema-/Formatversion aus `xray::hexagon::model::kReportFormatVersion`, initial `1`
 - `report_type`: `analyze`
 - `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell mit den Pflichtfeldern `compile_database_path`, `compile_database_source`, `cmake_file_api_path`, `cmake_file_api_resolved_path` und `cmake_file_api_source`
-- `summary`: Translation-Unit-Anzahl, Ranking-Anzahl, Hotspot-Anzahl, Top-Limit, Beobachtungsherkunft und Target-Metadatenstatus
+- `summary`: Translation-Unit-Anzahl, Ranking-Anzahl, Hotspot-Anzahl, Top-Limit, `include_analysis_heuristic`, Beobachtungsherkunft und Target-Metadatenstatus
 - `translation_unit_ranking`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items` inklusive Metriken, Diagnostics und Target-Zuordnungen
 - `include_hotspots`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items`
 - `diagnostics`: reportweite Diagnostics
@@ -41,6 +41,7 @@ Wichtig:
 - Nicht wiederherstellbare Eingabefehler vor Reporterzeugung, zum Beispiel nicht vorhandene Eingabedateien, ungueltige `compile_commands.json`-Dateien oder ungueltige CMake-File-API-Reply-Verzeichnisse, bleiben fuer `--format json` Textfehler auf `stderr`, liefern Exit-Code ungleich `0` und erzeugen kein JSON-Fehlerobjekt
 - Service-Ergebnisse mit Diagnostics oder Teildaten werden als regulaere JSON-Reports mit `diagnostics` ausgegeben; erfolgreiche Reporterzeugung bleibt Exit-Code `0`, sofern die bestehende CLI-Semantik fuer diese Serviceergebnisse nicht bereits Fehlercodes vorsieht
 - Schreib-, Render- und Output-Fehler bei `--format json` liefern Textfehler auf `stderr`, Exit-Code ungleich `0` und kein partielles JSON auf stdout; bei `--output` bleibt eine bestehende Zieldatei unveraendert
+- Render-Fehler umfassen JSON-Dump-/Serialisierungsfehler, UTF-8-/Escaping-Fehler und explizite Fehler aus der CLI-internen Render-Abstraktion; diese Fehler werden vor dem Atomic-Writer in Text-`stderr` und nonzero Exit uebersetzt. Tests nutzen einen werfenden oder fehlerliefernden Renderer-Stub, damit kein Adapter-spezifischer Sonderfall die Fehlergrenze umgeht.
 - JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
 - Felder mit leerer Menge werden als leere Arrays ausgegeben, nicht weggelassen, sofern sie Teil des Formatvertrags sind
 - optionale fachliche Informationen koennen `null` sein, wenn das Schema dies explizit dokumentiert
@@ -54,6 +55,7 @@ Wichtig:
 - `docs/report-json.md` und `docs/report-json.schema.json` entstehen vor oder im selben Umsetzungsschritt wie `JsonReportAdapter`; der Adapter darf nicht ohne verbindlichen Item-Vertrag fuer Ranking-, Hotspot-, Diagnostic-, Translation-Unit- und Target-Objekte landen
 - Der Item-Vertrag legt Pflichtkeys, optionale Keys, Enum-Schreibweisen, numerische Typen und deterministische Sortier-Tie-Breaker fest; Adaptertests pruefen exakte Keys und mindestens einen Tie-Breaker pro sortierter Item-Liste
 - Tests pruefen nicht nur syntaktisch gueltiges JSON, sondern auch Pflichtfelder, Array-statt-Weglassen-Regeln, numerische Typen, bekannte Enum-Werte und `null` nur an dokumentierten Stellen
+- `include_analysis_heuristic` ist im Analyze-JSON ein boolesches Pflichtfeld unter `summary`; Schema, Adaptertests und Goldens pruefen `true` und `false`, damit Consumer die Heuristik nicht aus Textdiagnostics ableiten muessen
 - E2E-Tests erzeugen die JSON-Ausgaben mit der echten CLI, vergleichen diese byte-stabil oder strukturell deterministisch gegen die Golden-Dateien und validieren genau die erzeugten Ausgaben gegen `docs/report-json.schema.json`; reine Schema-Validierung statischer Goldens reicht fuer AP 1.2 nicht aus
 - Die AP-1.1-Sperre fuer `--format json` wird in AP 1.2 entfernt oder auf andere noch nicht implementierte Formate begrenzt; `--format json` darf den Fehler `recognized but not implemented` nicht mehr liefern
 - AP 1.2 setzt den gemeinsamen Atomic-Writer aus AP 1.1 als vorhandene Voraussetzung voraus. Das Arbeitspaket muss vor der JSON-Freischaltung einen Test- oder CMake-Check besitzen, der den M5-konformen Writer referenziert; ohne diesen Check bleibt `--format json --output` nicht freigegeben.
@@ -82,12 +84,14 @@ Vorgesehene Artefakte:
 - CLI-/E2E-Tests fuer `analyze --format json`, `impact --format json`, `--format json --output <path>` und die Abwesenheit unstrukturierter Zusatztexte auf stdout
 - CLI-/E2E-Tests muessen die erzeugten JSON-Reports gegen die Golden-Dateien vergleichen; dieselben erzeugten Reports werden anschliessend gegen das Schema validiert, damit Adapterausgabe, Golden und Schema nicht auseinanderlaufen
 - JSON-Goldens fuer Compile-Database-only-, File-API-only- und Mixed-Input-Laeufe bei `analyze`, inklusive `compile_database_path`, `cmake_file_api_path`, `cmake_file_api_resolved_path`, `compile_database_source` und `cmake_file_api_source`
+- Analyze-Goldens decken fuer `translation_unit_ranking` und `include_hotspots` jeweils mindestens einen ungekuerzten Fall mit `truncated=false` und einen gekuerzten `--top`-Fall mit `truncated=true`, korrektem `limit`, `total_count` und `returned_count` ab
 - JSON-Goldens fuer `impact` mit Compile-Database-only-, File-API-only- und Mixed-Input-Provenienz; relative `changed_file`-Faelle pruefen `compile_database_directory` bei Mixed-Input und `file_api_source_root` bei File-API-only, absolute `changed_file` prueft `cli_absolute`
 - CLI-/E2E-Tests, dass erfolgreiche `--format json`-Aufrufe ohne `--output` gueltiges JSON auf stdout und leeres stderr liefern
 - CLI-/E2E-Tests, dass erfolgreiche `--format json --output <path>`-Aufrufe gueltiges JSON in die Datei schreiben sowie stdout und stderr leer lassen
 - CLI-/E2E-Tests pruefen, dass `--format json` nicht mehr den AP-1.1-Fehler `recognized but not implemented` liefert
 - CLI-/E2E-Tests fuer Fehlerpfade: Parser-/Verwendungsfehler, insbesondere `impact --format json` ohne `--changed-file`, Schreibfehler und nicht wiederherstellbare Eingabefehler liefern Text auf stderr und kein JSON-Fehlerobjekt; Service-Diagnostics erscheinen im regulaeren JSON-Report unter `diagnostics`
 - E2E-Fehlerfaelle fuer `--format json` decken mindestens nicht vorhandene Eingabepfade, ungueltiges Compile-Database-JSON und ungueltige CMake-File-API-Reply-Daten ab
+- CLI-/Schreibpfad-Tests decken einen simulierten JSON-Render-Fehler vor dem Atomic-Writer ab und pruefen nonzero Exit, Text auf stderr, leeres stdout und unveraenderte bestehende Zieldatei bei `--output`
 - JSON-`--output` nutzt den gemeinsamen M5-konformen Atomic-Writer aus AP 1.1; falls dieser Writer noch nicht vorhanden ist, ist AP 1.2 blockiert. Tests pruefen mindestens, dass ein simulierter Schreib-/Replace-Fehler eine bestehende JSON-Zieldatei unveraendert laesst
 
 **Ergebnis**: `cmake-xray` besitzt einen versionierten, automatisierbaren Reportvertrag fuer Analyse- und Impact-Ergebnisse.
