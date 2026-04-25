@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.25` |
+| Version | `0.26` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -105,7 +105,7 @@ Vorgesehene Artefakte:
 - `changed_file` nutzt fuer Display- und Provenienzregeln dieselbe fachliche Basis wie die Impact-Analyse: Bei Mixed-Input-Laeufen mit `--compile-commands` und `--cmake-file-api` hat die `compile_commands.json`-Directory Prioritaet; bei File-API-only-Laeufen wird die CMake-File-API-Source-Root verwendet. Der Pfad wird nicht pauschal relativ zum Prozess-Arbeitsverzeichnis interpretiert.
 - Driving-Requests fuer `ProjectAnalyzer` und `ImpactAnalyzer` tragen eine explizite Display-Basis wie `invocation_cwd` oder `report_display_base`, die von der CLI gesetzt und in Service-Tests injiziert wird; Services duerfen fuer Report-Pfade nicht implizit `std::filesystem::current_path()` lesen
 - der bisher positionale Impact-Port wird in M5 auf einen expliziten `AnalyzeImpactRequest` umgestellt oder gleichwertig erweitert; dieser Request enthaelt mindestens `compile_commands_path`, `changed_file_path`, `cmake_file_api_path`, `report_display_base` und die fuer `ReportInputs` noetigen Source-/Display-Metadaten
-- `ReportInputs` dokumentiert die Provenienz ueber strukturierte Zusatzfelder wie `compile_database_source`, `cmake_file_api_source` und `changed_file_source`; `compile_database_source` verwendet fuer M5 die Enum-Werte `cli`, `not_provided`, `cmake_file_api_source` verwendet `cli`, `not_provided`, und `changed_file_source` verwendet `compile_database_directory`, `file_api_source_root`, damit File-API-only- und Mixed-Input-Laeufe eindeutig auswertbar bleiben. `changed_file*`-Felder existieren nur im Impact-JSON-Vertrag, weil `analyze` keine geaenderte Datei verarbeitet; ein fehlendes `--changed-file` wird bei `impact` von der CLI abgelehnt und nicht als JSON-`not_provided` serialisiert.
+- `ReportInputs` dokumentiert die Provenienz ueber strukturierte Zusatzfelder wie `compile_database_source`, `cmake_file_api_source` und `changed_file_source`; `compile_database_source` verwendet fuer M5 die Enum-Werte `cli`, `not_provided`, `cmake_file_api_source` verwendet `cli`, `not_provided`, und `changed_file_source` verwendet `compile_database_directory`, `file_api_source_root`, `cli_absolute`, damit File-API-only-, Mixed-Input- und absolute-`--changed-file`-Laeufe eindeutig auswertbar bleiben. `changed_file*`-Felder existieren nur im Impact-JSON-Vertrag, weil `analyze` keine geaenderte Datei verarbeitet; ein fehlendes `--changed-file` wird bei `impact` von der CLI abgelehnt und nicht als JSON-`not_provided` serialisiert.
 - Anpassung der Producer-Pfade in `ProjectAnalyzer`, `ImpactAnalyzer` und den zugehoerigen Driving-Request-/Port-Vertraegen, damit `ReportInputs` beim Erzeugen von `AnalysisResult` und `ImpactResult` vollstaendig gesetzt wird und nicht nachtraeglich in der CLI an Adapter uebergeben werden muss
 - Erweiterung von `src/hexagon/model/build_model_result.*` um Input-Metadaten fuer den aufgeloesten CMake-File-API-Build-/Reply-Pfad und die zugrunde liegende Source-Root, damit Adapter-Aufloesung fachlich transportiert werden kann
 - `ReportWriterPort`/`GenerateReportPort` bleiben aus Adaptersicht ergebnisobjektzentriert; Signaturaenderungen sind nur zulaessig, wenn sie `ReportInputs` weiterhin als Teil des fachlichen Ergebnisvertrags transportieren und nicht als separaten CLI-Kontext in Adapter leaken
@@ -123,7 +123,7 @@ Der JSON-Export ist fuer Automatisierung, CI-Auswertung und Folgewerkzeuge gedac
 
 Ein JSON-Bericht fuer `analyze` soll mindestens enthalten:
 
-- `format`: fester Formatbezeichner, zum Beispiel `cmake-xray.analysis`
+- `format`: fester Formatbezeichner `cmake-xray.analysis`
 - `format_version`: Schema-/Formatversion, initial `1`
 - `report_type`: `analyze`
 - `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell, mindestens `compile_database_path`, `compile_database_source`, `cmake_file_api_path`, `cmake_file_api_resolved_path` und `cmake_file_api_source`
@@ -134,7 +134,7 @@ Ein JSON-Bericht fuer `analyze` soll mindestens enthalten:
 
 Ein JSON-Bericht fuer `impact` soll mindestens enthalten:
 
-- `format`: fester Formatbezeichner, zum Beispiel `cmake-xray.impact`
+- `format`: fester Formatbezeichner `cmake-xray.impact`
 - `format_version`: Schema-/Formatversion, initial `1`
 - `report_type`: `impact`
 - `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell, mindestens `compile_database_path`, `compile_database_source`, `cmake_file_api_path`, `cmake_file_api_resolved_path`, `cmake_file_api_source`, `changed_file` und `changed_file_source`
@@ -421,8 +421,9 @@ Tests und Abnahme muessen mindestens abdecken:
 - CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und ImpactResult-basierte JSON-, HTML- und Markdown-Reports keine implizite fachliche Ergebnisbegrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren; `impact --format dot` bleibt die visualisierungsorientierte Ausnahme mit festem `node_limit`-/`edge_limit`-Budget
 - JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` und `inputs.cmake_file_api_resolved_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
 - JSON-Schema-/Golden-Tests fuer `ReportInputs`-Pfad-Provenienz: CLI-relative Pfade, absolute Pfade, Build-Dir-vs.-Reply-Dir bei `--cmake-file-api` und relative `--changed-file` muessen stabile Display-Pfade und passende `*_source`-Enums liefern
-- JSON-Schema-/Golden-Tests fuer alle `*_source`-Enums: `compile_database_source=cli|not_provided`, `cmake_file_api_source=cli|not_provided` und `changed_file_source=compile_database_directory|file_api_source_root`; absolute-Pfad-Goldens muessen synthetische, fixture-stabile Pfade verwenden
-- JSON-Schema-/Golden-Tests fuer Mixed-Input-Impact-Laeufe, dass relative `changed_file`-Pfade auf Basis der `compile_commands.json`-Directory interpretiert werden und `inputs.changed_file_source=compile_database_directory` ausgeben; File-API-only-Laeufe verwenden `file_api_source_root`
+- JSON-Schema-/Golden-Tests fuer feste JSON-`format`-Werte `cmake-xray.analysis` und `cmake-xray.impact`
+- JSON-Schema-/Golden-Tests fuer alle `*_source`-Enums: `compile_database_source=cli|not_provided`, `cmake_file_api_source=cli|not_provided` und `changed_file_source=compile_database_directory|file_api_source_root|cli_absolute`; absolute-Pfad-Goldens muessen synthetische, fixture-stabile Pfade verwenden
+- JSON-Schema-/Golden-Tests fuer Mixed-Input-Impact-Laeufe, dass relative `changed_file`-Pfade auf Basis der `compile_commands.json`-Directory interpretiert werden und `inputs.changed_file_source=compile_database_directory` ausgeben; File-API-only-Laeufe verwenden `file_api_source_root`, absolute CLI-Pfade verwenden `cli_absolute`
 - Adapter-/Service-Tests, dass der vom `CmakeFileApiAdapter` aufgeloeste Build-/Reply-Pfad als roher lexikalischer Pfad ueber `BuildModelResult` transportiert wird, `ProjectAnalyzer`/`ImpactAnalyzer` daraus relativ zur `report_display_base` den Display-Pfad fuer `ReportInputs.cmake_file_api_resolved_path` erzeugen und kein CLI-Zustand in Adapter nachgereicht wird
 - Port-/Service-Tests fuer `AnalyzeImpactRequest`, damit `compile_commands_path`, `changed_file_path`, `cmake_file_api_path` und `report_display_base` explizit transportiert und fuer `ReportInputs` genutzt werden
 - JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path` und `inputs.cmake_file_api_path` bei `analyze` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
@@ -432,6 +433,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - Console-Golden-Tests fuer Quiet-, Normal- und Verbose-Modus, die die groben Abschnittsvertraege und die Normalmodus-Rueckwaertskompatibilitaet absichern
 - Smoke-Test fuer Docker-Runtime-Image
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
+- Pruefsummen-Test, dass die SHA-256-Datei existiert, den richtigen Linux-Archivnamen referenziert und gegen das erzeugte Archiv erfolgreich validiert
 - Versionscheck, dass Root-`CMakeLists.txt` die numerische Basisversion meldet und `cmake-xray --version`, die kompilierte bzw. generierte `ApplicationInfo`-Version, App-/Package-Version-Quelle und Release-Tag dieselbe veroeffentlichte Semver-Version ohne fuehrendes `v` melden, inklusive Prerelease-Suffix bei Tags wie `v1.2.0-rc.1`
 - CLI-Test, dass `cmake-xray --version` ohne Subcommand funktioniert, ausschliesslich die App-Version ohne fuehrendes `v` nach stdout schreibt und keine Analyse-/Report-Pfade initialisiert
 - automatisierter Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
