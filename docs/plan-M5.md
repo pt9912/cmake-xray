@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.20` |
+| Version | `0.21` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -99,7 +99,7 @@ Vorgesehene Artefakte:
 - `ReportInputs` ist ab M5 die alleinige Quelle fuer Report-Eingabepfade; bestehende skalare Pfadfelder wie `AnalysisResult::compile_database_path` werden entfernt oder als deprecated Mirror ohne eigene Semantik markiert und duerfen nicht fuer JSON-`inputs` serialisiert werden
 - `ReportInputs`-Felder sind im JSON-Vertrag immer vorhanden; gesetzte Pfade sind Strings, nicht gesetzte Eingaben sind `null`, und leere Strings duerfen nicht als Ersatz fuer fehlende Eingaben verwendet werden
 - `ReportInputs` serialisiert stabile Display-Pfade aus der fachlichen Eingabeaufloesung: CLI-relative Pfade werden relativ zum Arbeitsverzeichnis normalisiert, absolute Pfade bleiben absolute Anzeige-Strings, und normalisierte interne Schluessel werden nicht in `inputs` serialisiert
-- fuer CMake File API werden Original- und Aufloesungspfad getrennt modelliert: `cmake_file_api_path` enthaelt den originalen stabilen Display-Pfad der CLI-Eingabe, `cmake_file_api_resolved_path` enthaelt den tatsaechlich verwendeten Build- oder Reply-Directory-Pfad nach Adapter-Aufloesung; beide Felder sind immer vorhanden und bei fehlendem Wert `null`
+- fuer CMake File API werden Original- und Aufloesungspfad getrennt modelliert: `cmake_file_api_path` enthaelt den originalen stabilen Display-Pfad der CLI-Eingabe, `cmake_file_api_resolved_path` enthaelt den tatsaechlich verwendeten Build- oder Reply-Directory-Pfad nach Adapter-Aufloesung, folgt aber derselben Display-Pfad-Regel wie andere `ReportInputs`: relative Eingaben bleiben normalisierte relative Anzeige-Pfade, absolute Eingaben bleiben absolute Anzeige-Strings, und es erfolgt keine zusaetzliche Host-kanonische Aufloesung ueber Symlinks oder lokale Temp-/Home-Pfade. Beide Felder sind immer vorhanden und bei fehlendem Wert `null`
 - der `CmakeFileApiAdapter` gibt den aufgeloesten Build-/Reply-Directory-Pfad ueber Metadaten in `BuildModelResult` an Hexagon-Services zurueck; `ProjectAnalyzer` und `ImpactAnalyzer` duerfen diesen Wert nur aus `BuildModelResult` oder vorgelagerter Input-Resolution uebernehmen, nicht aus CLI- oder Adapterzustand nachreichen
 - `changed_file` nutzt fuer Display- und Provenienzregeln dieselbe fachliche Basis wie die Impact-Analyse: Bei Mixed-Input-Laeufen mit `--compile-commands` und `--cmake-file-api` hat die `compile_commands.json`-Directory Prioritaet; bei File-API-only-Laeufen wird die CMake-File-API-Source-Root verwendet. Der Pfad wird nicht pauschal relativ zum Prozess-Arbeitsverzeichnis interpretiert.
 - `ReportInputs` dokumentiert die Provenienz ueber strukturierte Zusatzfelder wie `compile_database_source`, `cmake_file_api_source` und `changed_file_source`; `changed_file_source` verwendet fuer M5 mindestens die Enum-Werte `compile_database_directory`, `file_api_source_root` und `not_provided`, damit File-API-only- und Mixed-Input-Laeufe eindeutig auswertbar bleiben
@@ -151,8 +151,10 @@ Wichtig:
 - DOT enthaelt bei `analyze --top N` die Top-N-Ranking- und Top-N-Hotspot-Knoten sowie begrenzte Kontextkanten; fuer einen Top-Hotspot werden hoechstens `context_limit` der in `IncludeHotspot` gespeicherten betroffenen Translation Units als Kontextknoten ausgegeben, auch wenn diese Translation Units nicht selbst im Top-N-Ranking liegen
 - DOT fuer `impact` ist trotz unbegrenztem `ImpactResult` ebenfalls budgetiert; der Graph enthaelt betroffene Translation Units und Targets nur bis zum globalen `node_limit`-/`edge_limit`-Budget und kennzeichnet Kuerzungen ueber `graph_truncated`
 - `context_limit` ist fuer M5 Teil des DOT-Formatvertrags, kleiner als oder gleich dem wirksamen `--top`-Limit bei `analyze` und nicht pro Hotspot zu einem unbeschraenkten Gesamtgraphen addierbar, weil zusaetzlich ein globales `node_limit`-/`edge_limit`-Budget gilt
-- M5 legt die DOT-Grenzen deterministisch fest: Fuer `analyze` gilt `context_limit = min(top_limit, 5)`, `node_limit = max(25, 4 * top_limit + 10)`, `edge_limit = max(40, 6 * top_limit + 20)`. Ohne explizites `--top` wird der wirksame Standard-Top-Wert der CLI verwendet. Fuer `impact` gilt mangels Top-Limit fest `node_limit = 100` und `edge_limit = 200`.
-- Kuerzung erfolgt deterministisch in stabiler Sortierreihenfolge: bei `analyze` zuerst primaere Top-Ranking-Knoten, dann Top-Hotspot-Knoten, dann Target-Knoten, dann Hotspot-Kontext-Translation-Units sortiert nach Anzeige-Pfad; bei `impact` zuerst geaenderte Datei, dann direkt betroffene Translation Units, heuristisch betroffene Translation Units und Targets, jeweils nach Anzeige-Pfad bzw. Target-Name sortiert. Kanten werden nur ausgegeben, wenn beide Endknoten im Budget enthalten sind, und innerhalb gleicher Prioritaet lexikografisch sortiert
+- M5 legt die DOT-Grenzen deterministisch und als M5-Formatvertrag fest: Fuer `analyze` gilt `context_limit = min(top_limit, 5)`, `node_limit = max(25, 4 * top_limit + 10)`, `edge_limit = max(40, 6 * top_limit + 20)`. Ohne explizites `--top` wird der wirksame Standard-Top-Wert der CLI verwendet. Fuer `impact` gilt mangels Top-Limit fest `node_limit = 100` und `edge_limit = 200`. Eine spaetere Konfigurierbarkeit waere eine explizite Vertragsaenderung mit Dokumentation, Tests und gegebenenfalls DOT-Metadaten fuer die wirksamen Limits.
+- Knotenkuerzung erfolgt deterministisch in stabiler Sortierreihenfolge: bei `analyze` zuerst primaere Top-Ranking-Knoten, dann Top-Hotspot-Knoten, dann Target-Knoten, dann Hotspot-Kontext-Translation-Units sortiert nach Anzeige-Pfad; bei `impact` zuerst geaenderte Datei, dann direkt betroffene Translation Units, heuristisch betroffene Translation Units und Targets, jeweils nach Anzeige-Pfad bzw. Target-Name sortiert
+- Kanten werden nur ausgegeben, wenn beide Endknoten im Budget enthalten sind. Bei erreichtem `edge_limit` gilt eine globale Kantenprioritaet mit lexikografischem Tie-Breaker nach stabiler Quell-ID, Ziel-ID und Kantenart: fuer `analyze` zuerst Translation-Unit-zu-Include-Hotspot-Kanten, dann Translation-Unit-zu-Target-Kanten; fuer `impact` zuerst geaenderte-Datei-zu-direkt-betroffener-Translation-Unit-Kanten, dann geaenderte-Datei-zu-heuristisch-betroffener-Translation-Unit-Kanten, dann direkt-betroffene-Translation-Unit-zu-Target-Kanten, dann heuristisch-betroffene-Translation-Unit-zu-Target-Kanten
+- DOT-Attributwerte verwenden fuer den M5-Metadatenvertrag eine exakte Lexik: Integer werden als unquoted ASCII-Dezimalzahlen ohne Vorzeichen geschrieben, Booleans als unquoted lowercase `true` oder `false`, Strings als quoted DOT-Strings mit deterministischem Escaping
 - bei Analyze-Hotspot-Kontext enthaelt jeder betroffene Hotspot-Knoten verpflichtend die Node-Attribute `context_total_count` integer, `context_returned_count` integer und `context_truncated` boolean; bei ungekuerztem Kontext ist `context_truncated=false`, und diese `context_*`-Attribute gelten nicht fuer `impact`
 - DOT enthaelt fuer `analyze` und `impact` immer die Graph-Attribute `graph_node_limit` integer, `graph_edge_limit` integer und `graph_truncated` boolean; bei ungekuerztem Graph ist `graph_truncated=false`, damit Consumer budgetierte M5-Ausgaben von aelteren oder unbudgetierten DOT-Ausgaben unterscheiden koennen. Kommentare duerfen nur zusaetzlich erscheinen und sind nicht Teil des Vertrags
 - JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
@@ -161,7 +163,7 @@ Wichtig:
 - numerische Metriken bleiben numerisch und werden nicht als lokalisierte Strings gerendert
 - die Reihenfolge von Objektfeldern soll im Adapter stabil bleiben, auch wenn JSON semantisch keine Feldreihenfolge garantiert
 - Pfade werden als Anzeige-Strings ausgegeben; kanonische Normalisierungsschluessel duerfen nur aufgenommen werden, wenn sie keinen instabilen Hostbezug in Goldens einfuehren
-- `docs/report-json.md` ist der verbindliche M5-Vertrag und dokumentiert fuer alle Felder Typ, Pflichtstatus, erlaubte Enum-Werte, Nullability, leere-Array-Regeln und Aenderungsregeln fuer kuenftige `format_version`-Erhoehungen
+- `docs/report-json.md` ist der verbindliche lesbare M5-Vertrag und dokumentiert fuer alle Felder Typ, Pflichtstatus, erlaubte Enum-Werte, Nullability, leere-Array-Regeln und Aenderungsregeln fuer kuenftige `format_version`-Erhoehungen; zusaetzlich entsteht ein maschinenlesbares Schema-Artefakt `docs/report-json.schema.json`, gegen das Golden-Outputs validiert werden
 - Tests pruefen nicht nur syntaktisch gueltiges JSON, sondern auch Pflichtfelder, Array-statt-Weglassen-Regeln, numerische Typen, bekannte Enum-Werte und `null` nur an dokumentierten Stellen
 
 Vorgesehene Artefakte:
@@ -170,7 +172,7 @@ Vorgesehene Artefakte:
 - `src/adapters/output/json_report_adapter.cpp`
 - `tests/adapters/test_json_report_adapter.cpp`
 - JSON-Golden-Outputs unter `tests/e2e/testdata/m5/`
-- Dokumentation `docs/report-json.md` als verbindlicher Formatvertrag; `docs/guide.md` verweist darauf nur nutzungsorientiert
+- Dokumentation `docs/report-json.md` als verbindlicher lesbarer Formatvertrag und `docs/report-json.schema.json` als maschinenlesbares Validierungsartefakt; `docs/guide.md` verweist darauf nur nutzungsorientiert
 
 **Ergebnis**: `cmake-xray` besitzt einen versionierten, automatisierbaren Reportvertrag fuer Analyse- und Impact-Ergebnisse.
 
@@ -205,7 +207,7 @@ Kanten in `impact`:
 Wichtig:
 
 - es werden keine Target-zu-Target-Kanten erzeugt, solange `F-18` nicht umgesetzt ist
-- die DOT-Budget-, Sortier- und Truncation-Regeln sind Bestandteil dieses Arbeitspakets: `analyze` verwendet `context_limit = min(top_limit, 5)`, `node_limit = max(25, 4 * top_limit + 10)` und `edge_limit = max(40, 6 * top_limit + 20)`; `impact` verwendet fest `node_limit = 100` und `edge_limit = 200`
+- die DOT-Budget-, Sortier-, Edge-Prioritaets-, Attributlexik- und Truncation-Regeln sind Bestandteil dieses Arbeitspakets: `analyze` verwendet `context_limit = min(top_limit, 5)`, `node_limit = max(25, 4 * top_limit + 10)` und `edge_limit = max(40, 6 * top_limit + 20)`; `impact` verwendet fest `node_limit = 100` und `edge_limit = 200`
 - Analyze-Hotspot-Kontext wird pro Hotspot-Knoten ueber die Node-Attribute `context_total_count`, `context_returned_count` und `context_truncated` beschrieben; das globale Graph-Budget wird fuer `analyze` und `impact` immer ueber die Graph-Attribute `graph_node_limit`, `graph_edge_limit` und `graph_truncated` beschrieben
 - DOT-IDs muessen deterministisch und korrekt escaped sein
 - Labels duerfen fuer Lesbarkeit gekuerzt werden, wenn der vollstaendige Pfad als Attribut erhalten bleibt
@@ -319,7 +321,7 @@ Der Release-Pfad muss mindestens:
 - GitHub-Release-Notes aus dem Changelog verwenden
 - den GitHub Release zunaechst als Draft oder staging-internen Release vorbereiten und erst nach erfolgreichem OCI-Image-Publish oeffentlich veroeffentlichen; der oeffentliche GitHub Release ist der letzte Publish-Schritt
 - einen dokumentierten Recovery-/Rollback-Pfad fuer den Fall bereitstellen, dass Draft-Erstellung, Image-Publish oder finale Release-Publikation fehlschlagen
-- einen automatisierten Release-Dry-Run gegen Mock-Targets bereitstellen: GitHub-Release-Operationen laufen gegen einen Fake- oder Noop-Publisher, OCI-Pushes muessen gegen ein lokales Container-Registry-Testziel laufen und Tagging, `latest`-Regel, Push und Manifest-Pruefung real ausueben; optionale echte Staging-Repositories duerfen ergaenzen, sind aber nicht Voraussetzung fuer M5
+- einen automatisierten Release-Dry-Run gegen Mock-Targets bereitstellen: GitHub-Release-Operationen laufen gegen einen Fake-Publisher, der Zustandsuebergaenge und Reihenfolge assertiert (`draft_release_created` vor OCI-Publish, OCI-Publish erfolgreich vor `release_published`, oeffentlicher Release als letzter Publish-Schritt); ein reiner Noop ohne aufgezeichnete Assertions reicht nicht. OCI-Pushes muessen gegen ein lokales Container-Registry-Testziel laufen und Tagging, `latest`-Regel, Push und Manifest-Pruefung real ausueben; optionale echte Staging-Repositories duerfen ergaenzen, sind aber nicht Voraussetzung fuer M5
 
 Wichtig:
 
@@ -405,6 +407,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - Golden- und CLI-Tests, dass `--top` bei `analyze` fuer Markdown, HTML, JSON und DOT konsistent wirkt und kein Artefaktformat implizit vollstaendige Listen ausgibt
 - DOT-Golden-Tests, dass `analyze --top N` fuer ausgegebene Top-Hotspots hoechstens `context_limit` betroffene Translation Units als Kontextknoten enthaelt, das globale `node_limit`-/`edge_limit`-Budget einhaelt, gekuerzten Kontext mit den verpflichtenden `context_*`-Node-Attributen kennzeichnet und die verpflichtenden `graph_*`-Graph-Attribute immer ausgibt
 - DOT-Golden-Tests, dass `impact --format dot` das feste Impact-`node_limit`-/`edge_limit`-Budget einhaelt und die verpflichtenden Graph-Attribute `graph_node_limit`, `graph_edge_limit` und `graph_truncated` immer ausgibt, mit `graph_truncated=false` im ungekuerzten Fall
+- DOT-Golden-Tests fuer erreichte `edge_limit`-Faelle, die die globale Kantenprioritaet, lexikografische Tie-Breaker und die exakte Attributlexik fuer Integer, Boolean und Strings pruefen
 - CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und ImpactResult-basierte JSON-, HTML- und Markdown-Reports keine implizite fachliche Ergebnisbegrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren; `impact --format dot` bleibt die visualisierungsorientierte Ausnahme mit festem `node_limit`-/`edge_limit`-Budget
 - JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` und `inputs.cmake_file_api_resolved_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
 - JSON-Schema-/Golden-Tests fuer `ReportInputs`-Pfad-Provenienz: CLI-relative Pfade, absolute Pfade, Build-Dir-vs.-Reply-Dir bei `--cmake-file-api` und relative `--changed-file` muessen stabile Display-Pfade und passende `*_source`-Enums liefern
@@ -417,10 +420,10 @@ Tests und Abnahme muessen mindestens abdecken:
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
 - Versionscheck, dass Root-`CMakeLists.txt` die numerische Basisversion meldet und `cmake-xray --version`, die kompilierte bzw. generierte `ApplicationInfo`-Version, App-/Package-Version-Quelle und Release-Tag dieselbe veroeffentlichte Semver-Version ohne fuehrendes `v` melden, inklusive Prerelease-Suffix bei Tags wie `v1.2.0-rc.1`
 - automatisierter Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
-- automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt: GitHub-Schritte duerfen Mock-/Noop-Publisher nutzen, OCI-Schritte muessen eine lokale Test-Registry fuer Tagging, `latest`-Regel, Push und Manifest-Pruefung verwenden, ohne externe Veroeffentlichung
+- automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt: GitHub-Schritte muessen einen Fake-Publisher mit Assertions fuer Zustandsuebergaenge und Reihenfolge nutzen, OCI-Schritte muessen eine lokale Test-Registry fuer Tagging, `latest`-Regel, Push und Manifest-Pruefung verwenden, ohne externe Veroeffentlichung
 - dokumentierter manueller Dry-Run nur fuer Recovery-Pfade, die echte externe Publish-Zustaende in GitHub Releases oder GHCR voraussetzen
 - Performance-Messung fuer den CMake-File-API-Pfad auf den bestehenden Referenzgroessen und Dokumentation der M5-Baseline in `docs/performance.md`
-- Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt und den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht
+- Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt, den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht und gegen `docs/report-json.schema.json` validiert
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
 
 **Ergebnis**: M5 ist nicht nur implementiert, sondern ueber Beispiele, Referenzdaten und Release-Dokumentation nachvollziehbar abnehmbar.
@@ -465,7 +468,7 @@ Abhaengigkeiten:
 | Analyze-Artefaktformate interpretieren `--top` unterschiedlich | Goldens, CLI-Ausgabe und Automatisierung liefern widerspruechliche Ergebnismengen | einheitliche Top-Limit-Regel fuer Markdown, HTML, JSON und DOT bei `analyze` festlegen und testen |
 | DOT-Hotspot-Kontext umgeht faktisch das `--top`-Limit | ein einzelner verbreiteter Header oder mehrere Top-Hotspots erzeugen sehr grosse Graphen trotz kleinem Top-Limit | DOT-Kontext mit separatem `context_limit` und globalem `node_limit`-/`edge_limit`-Budget begrenzen und Kuerzung maschinenlesbar kennzeichnen |
 | Impact-DOT ist trotz unbegrenztem `ImpactResult` zu gross | haeufig inkludierte Header erzeugen sehr grosse Graphviz-Reports | feste Impact-DOT-Budgets `node_limit = 100` und `edge_limit = 200` mit `graph_truncated` anwenden |
-| DOT-Grenzen werden unterschiedlich implementiert | Golden-Outputs werden instabil oder Graphen wachsen unerwartet | feste M5-Formeln fuer `context_limit`, `node_limit`, `edge_limit` und stabile Kuerzungsreihenfolge dokumentieren |
+| DOT-Grenzen werden unterschiedlich implementiert | Golden-Outputs werden instabil oder Graphen wachsen unerwartet | feste M5-Formeln fuer `context_limit`, `node_limit`, `edge_limit`, stabile Knoten-/Kantenkuerzung und exakte Attributlexik dokumentieren |
 | DOT-Kuerzungsmetadaten stehen nur in Kommentaren oder nur bei Kuerzung | Graphviz-Consumer koennen budgetierte M5-Ausgaben nicht verlaesslich erkennen | verpflichtende Graph-Attribute mit exakten Namen und Typen immer ausgeben; Kommentare nur zusaetzlich erlauben |
 | macOS-/Windows-Replace-Semantik wird nur dokumentiert, aber nicht getestet | atomare Dateiausgabe kann auf anderen Plattformen anders fehlschlagen | atomare Replace-Tests als CI-Gate fuer Linux, macOS und Windows aufnehmen |
 | `--verbose` veraendert HTML-/Markdown-/DOT-Artefakte | Golden-Outputs und CI-Artefakte werden durch Diagnosemodus instabil | Verbose-only-Inhalte fuer diese Artefakte ausschliessen und Zusatzdiagnostik auf Console/`stderr` beschraenken |
