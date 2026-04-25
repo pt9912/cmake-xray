@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.7` |
+| Version | `0.8` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -244,7 +244,7 @@ M5 erweitert die Bedienbarkeit um zwei Ausgabemodi. Beide Modi duerfen die beste
 - reportweite Diagnostics vollstaendig ausgeben
 - Eingabequellen, Beobachtungsherkunft und Target-Metadatenstatus sichtbar machen, sofern nicht ohnehin im Format enthalten
 - bei CLI-Fehlern zusaetzliche Kontextinformationen liefern, ohne Stacktraces oder interne Implementierungsdetails auszugeben
-- fuer `json` keine unstrukturierte Zusatztextausgabe auf `stdout` erzeugen; falls noetig, gehen Diagnosehinweise nach `stderr` oder in strukturierte JSON-Felder
+- fuer `json` keine unstrukturierte Zusatztextausgabe auf `stdout` und keine Verbose-only-Aenderung am JSON-Artefakt erzeugen; zusaetzliche Verbose-Diagnostik geht ausschliesslich nach `stderr`
 - fuer `markdown`, `html` und `dot` keine zusaetzlichen Verbose-only-Inhalte in Reportartefakte schreiben; verbose beeinflusst dort nur Console-/`stderr`-Diagnostik und bereits im fachlichen Ergebnis vorhandene Diagnostics
 
 `--quiet` soll mindestens:
@@ -312,7 +312,7 @@ Vorgesehene Artefakte:
 - Pruefung und ggf. Anpassung von `Dockerfile`
 - Aktualisierung von `docs/releasing.md`
 - Aktualisierung von `README.md`
-- Release-Smoke-Tests oder dokumentierte manuelle Pruefschritte
+- automatisierte Release-Smoke-Tests fuer entpacktes Linux-Archiv, Container-Runtime, Tag-Validierung und Versionskonsistenz; dokumentierte manuelle Schritte sind nur fuer echte externe Publish-/Recovery-Szenarien zulaessig
 
 **Ergebnis**: Nutzer koennen `cmake-xray` als versioniertes Linux-Artefakt oder Container-Image nutzen, ohne ein lokales Build-Verzeichnis zu kennen.
 
@@ -374,13 +374,13 @@ Tests und Abnahme muessen mindestens abdecken:
 - DOT-Golden-Tests, dass `analyze --top N` alle Translation Units eines ausgegebenen Top-Hotspots als Kontextknoten enthaelt, auch wenn diese nicht im Top-N-Ranking liegen
 - CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und Impact-Reports keine implizite Begrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren
 - JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
-- Tests, dass `--verbose` Markdown-, HTML- und DOT-Artefakte nicht gegenueber dem Normalmodus veraendert und Zusatzdiagnostik nur Console/`stderr` bzw. strukturierte vorhandene Diagnostics betrifft
+- Tests, dass `--verbose` JSON-, Markdown-, HTML- und DOT-Artefakte nicht gegenueber dem Normalmodus veraendert und Zusatzdiagnostik nur Console/`stderr` betrifft
 - Smoke-Test fuer Docker-Runtime-Image
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
 - Versionscheck, dass `cmake-xray --version`, `src/hexagon/model/application_info.h`, Root-`CMakeLists.txt` und Release-Tag konsistent `1.2.0` melden
-- Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
-- Release-Test oder dokumentierter Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt
-- Release-Test oder dokumentierter Dry-Run fuer Recovery-Pfade bei fehlgeschlagener Draft-Erstellung, fehlgeschlagenem OCI-Image-Publish und fehlgeschlagener finaler Release-Publikation
+- automatisierter Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
+- automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt, soweit ohne externe Veroeffentlichung moeglich
+- dokumentierter manueller Dry-Run nur fuer Recovery-Pfade, die echte externe Publish-Zustaende in GitHub Releases oder GHCR voraussetzen
 - Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt und den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
 
@@ -423,7 +423,7 @@ Abhaengigkeiten:
 | DOT suggeriert Target-Graph-Semantik, die M5 noch nicht besitzt | Nutzer interpretieren Graphen falsch | keine Target-zu-Target-Kanten erzeugen und Legende/Labels klar formulieren |
 | DOT-Escaping ist syntaktisch fehlerhaft | Graphviz-Berichte brechen erst bei Nutzern | Sonderzeichen-Goldens mit Graphviz oder Parser validieren |
 | HTML-Goldens werden durch kosmetische Details instabil | Tests werden teuer und rauschanfaellig | keine Zeitstempel, keine Zufalls-IDs, deterministische Struktur |
-| `--verbose` schreibt Zusatztext in maschinenlesbare Ausgaben | JSON-/DOT-Nutzung in CI bricht | stdout fuer maschinenlesbare Reports sauber halten; Zusatzdiagnostik nach `stderr` oder strukturiert ausgeben |
+| `--verbose` schreibt Zusatztext in maschinenlesbare Ausgaben | JSON-/DOT-Nutzung in CI bricht | stdout und Reportartefakte byte-stabil halten; Zusatzdiagnostik ausschliesslich nach `stderr` ausgeben |
 | Release-Trigger akzeptiert ungueltige Tags | fehlerhafte Releases oder falsche `latest`-Tags entstehen | Semver-/Prerelease-Tags fail-fast validieren und `latest` nur fuer regulaere Releases setzen |
 | macOS-/Windows-Artefakte werden trotz begrenzter Freigabe veroeffentlicht | Nutzer interpretieren Preview-Builds als offiziell unterstuetzte Releases | Release-Workflow entweder auf Linux/OCI begrenzen oder Plattformarchive deutlich als experimentell dokumentieren |
 | GHCR-Image wird vor Abschluss aller Release-Gates gepusht | Teilveroeffentlichung ohne passenden GitHub Release bleibt zurueck | GHCR-Push erst nach Build- und Smoke-Gates ausfuehren, aber vor finaler oeffentlicher Release-Publikation |
