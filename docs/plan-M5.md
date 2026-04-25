@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.13` |
+| Version | `0.14` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -98,6 +98,8 @@ Vorgesehene Artefakte:
 - Erweiterung von `src/hexagon/model/analysis_result.*` und `src/hexagon/model/impact_result.*` um ein strukturiertes `ReportInputs`-Modell, mindestens mit `compile_database_path`, `cmake_file_api_path` und bei `impact` `changed_file`
 - `ReportInputs` ist ab M5 die alleinige Quelle fuer Report-Eingabepfade; bestehende skalare Pfadfelder wie `AnalysisResult::compile_database_path` werden entfernt oder als deprecated Mirror ohne eigene Semantik markiert und duerfen nicht fuer JSON-`inputs` serialisiert werden
 - `ReportInputs`-Felder sind im JSON-Vertrag immer vorhanden; gesetzte Pfade sind Strings, nicht gesetzte Eingaben sind `null`, und leere Strings duerfen nicht als Ersatz fuer fehlende Eingaben verwendet werden
+- `ReportInputs` serialisiert stabile Display-Pfade aus der fachlichen Eingabeaufloesung: CLI-relative Pfade werden relativ zum Arbeitsverzeichnis normalisiert, absolute Pfade bleiben absolute Anzeige-Strings, und `cmake_file_api_path` bezeichnet den tatsaechlich verwendeten Build- oder Reply-Directory-Pfad nach CLI-Aufloesung; normalisierte interne Schluessel werden nicht in `inputs` serialisiert
+- `ReportInputs` dokumentiert die Provenienz ueber strukturierte Zusatzfelder wie `compile_database_source`, `cmake_file_api_source` und `changed_file_source` mit Enum-Werten wie `cli`, `derived`, `not_provided`, damit File-API-only- und Mixed-Input-Laeufe eindeutig auswertbar bleiben
 - Anpassung der Producer-Pfade in `ProjectAnalyzer`, `ImpactAnalyzer` und den zugehoerigen Driving-Request-/Port-Vertraegen, damit `ReportInputs` beim Erzeugen von `AnalysisResult` und `ImpactResult` vollstaendig gesetzt wird und nicht nachtraeglich in der CLI an Adapter uebergeben werden muss
 - `ReportWriterPort`/`GenerateReportPort` bleiben aus Adaptersicht ergebnisobjektzentriert; Signaturaenderungen sind nur zulaessig, wenn sie `ReportInputs` weiterhin als Teil des fachlichen Ergebnisvertrags transportieren und nicht als separaten CLI-Kontext in Adapter leaken
 - Verbosity bleibt eine CLI-Emission-Policy in `src/adapters/cli/` und `src/main.cpp`; `ReportWriterPort`/`GenerateReportPort` erhalten keinen `OutputVerbosity`-Parameter, und fachliche Reportadapter rendern keine Verbose-/Quiet-Sondervarianten
@@ -147,7 +149,7 @@ Wichtig:
 - `context_limit` ist fuer M5 Teil des DOT-Formatvertrags, kleiner als oder gleich dem wirksamen `--top`-Limit bei `analyze` und nicht pro Hotspot zu einem unbeschraenkten Gesamtgraphen addierbar, weil zusaetzlich ein globales `node_limit`-/`edge_limit`-Budget gilt
 - M5 legt die DOT-Grenzen deterministisch fest: Fuer `analyze` gilt `context_limit = min(top_limit, 5)`, `node_limit = max(25, 4 * top_limit + 10)`, `edge_limit = max(40, 6 * top_limit + 20)`. Ohne explizites `--top` wird der wirksame Standard-Top-Wert der CLI verwendet. Fuer `impact` gilt mangels Top-Limit fest `node_limit = 100` und `edge_limit = 200`.
 - Kuerzung erfolgt deterministisch in stabiler Sortierreihenfolge: bei `analyze` zuerst primaere Top-Ranking-Knoten, dann Top-Hotspot-Knoten, dann Target-Knoten, dann Hotspot-Kontext-Translation-Units sortiert nach Anzeige-Pfad; bei `impact` zuerst geaenderte Datei, dann direkt betroffene Translation Units, heuristisch betroffene Translation Units und Targets, jeweils nach Anzeige-Pfad bzw. Target-Name sortiert. Kanten werden nur ausgegeben, wenn beide Endknoten im Budget enthalten sind, und innerhalb gleicher Prioritaet lexikografisch sortiert
-- bei gekuerztem Hotspot-Kontext oder global gekuerztem Graph enthaelt DOT einen maschinenlesbaren Kommentar oder Graph-Attributsatz mit `context_total_count`, `context_returned_count`, `context_truncated`, `graph_node_limit`, `graph_edge_limit` und `graph_truncated`
+- bei gekuerztem Hotspot-Kontext oder global gekuerztem Graph enthaelt DOT verpflichtend Graph-Attribute mit exakt diesen Namen und Typen: `context_total_count` integer, `context_returned_count` integer, `context_truncated` boolean, `graph_node_limit` integer, `graph_edge_limit` integer und `graph_truncated` boolean; Kommentare duerfen nur zusaetzlich erscheinen und sind nicht Teil des Vertrags
 - JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
 - Felder mit leerer Menge werden als leere Arrays ausgegeben, nicht weggelassen, sofern sie Teil des Formatvertrags sind
 - optionale fachliche Informationen koennen `null` sein, wenn das Schema dies explizit dokumentiert
@@ -295,6 +297,7 @@ Der Release-Pfad muss mindestens:
 
 - bei Tag-Push mit erlaubtem Semver-Tag einen Release-Workflow starten: regulaere Releases verwenden `vMAJOR.MINOR.PATCH`, Vorabversionen verwenden `vMAJOR.MINOR.PATCH-PRERELEASE`
 - Tags vor dem Build fail-fast validieren und unbekannte Muster wie `vfoo`, unvollstaendige Versionen oder Build-Metadaten ohne dokumentierte Freigabe abbrechen
+- `cmake-xray --version`, `src/hexagon/model/application_info.h`, Root-`CMakeLists.txt` und Release-Tag muessen dieselbe Semver-Version ohne fuehrendes `v` melden; fuer `v1.2.0-rc.1` ist die erwartete Programmversion also `1.2.0-rc.1`, nicht nur `1.2.0`
 - Test-, Coverage-, Quality- und Runtime-Pfade vor dem Veroeffentlichen ausfuehren
 - Publishing-Schritte in einen finalen Release-Job nach allen Gates verschieben; Verify-/Build-Jobs duerfen Container und Archive bauen und testen, aber keine Images oder Release-Artefakte in externe Registries bzw. Releases pushen
 - ein Linux-CLI-Artefakt als `.tar.gz` erzeugen
@@ -307,7 +310,7 @@ Der Release-Pfad muss mindestens:
 - GitHub-Release-Notes aus dem Changelog verwenden
 - den GitHub Release zunaechst als Draft oder staging-internen Release vorbereiten und erst nach erfolgreichem OCI-Image-Publish oeffentlich veroeffentlichen; der oeffentliche GitHub Release ist der letzte Publish-Schritt
 - einen dokumentierten Recovery-/Rollback-Pfad fuer den Fall bereitstellen, dass Draft-Erstellung, Image-Publish oder finale Release-Publikation fehlschlagen
-- einen automatisierten Release-Dry-Run gegen Mock-Targets bereitstellen: GitHub-Release-Operationen laufen gegen einen Fake- oder Noop-Publisher, OCI-Pushes gegen ein lokales Container-Registry-Testziel oder werden als Buildx-Dry-Run/Noop simuliert; optionale echte Staging-Repositories duerfen ergaenzen, sind aber nicht Voraussetzung fuer M5
+- einen automatisierten Release-Dry-Run gegen Mock-Targets bereitstellen: GitHub-Release-Operationen laufen gegen einen Fake- oder Noop-Publisher, OCI-Pushes muessen gegen ein lokales Container-Registry-Testziel laufen und Tagging, `latest`-Regel, Push und Manifest-Pruefung real ausueben; optionale echte Staging-Repositories duerfen ergaenzen, sind aber nicht Voraussetzung fuer M5
 
 Wichtig:
 
@@ -388,18 +391,19 @@ Tests und Abnahme muessen mindestens abdecken:
 - CLI-Golden-Tests, dass `--quiet --format json|dot|html|markdown` ohne `--output` denselben stdout-Report wie der Normalmodus ausgibt und keine Erfolgsmeldungen in stdout mischt
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
 - Golden- und CLI-Tests, dass `--top` bei `analyze` fuer Markdown, HTML, JSON und DOT konsistent wirkt und kein Artefaktformat implizit vollstaendige Listen ausgibt
-- DOT-Golden-Tests, dass `analyze --top N` fuer ausgegebene Top-Hotspots hoechstens `context_limit` betroffene Translation Units als Kontextknoten enthaelt, das globale `node_limit`-/`edge_limit`-Budget einhaelt und gekuerzten Kontext bzw. gekuerzte Graphen mit `context_total_count`, `context_returned_count`, `context_truncated`, `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kennzeichnet
-- DOT-Golden-Tests, dass `impact --format dot` das feste Impact-`node_limit`-/`edge_limit`-Budget einhaelt und Kuerzungen mit `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kennzeichnet
+- DOT-Golden-Tests, dass `analyze --top N` fuer ausgegebene Top-Hotspots hoechstens `context_limit` betroffene Translation Units als Kontextknoten enthaelt, das globale `node_limit`-/`edge_limit`-Budget einhaelt und gekuerzten Kontext bzw. gekuerzte Graphen mit den verpflichtenden Graph-Attributen `context_total_count`, `context_returned_count`, `context_truncated`, `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kennzeichnet
+- DOT-Golden-Tests, dass `impact --format dot` das feste Impact-`node_limit`-/`edge_limit`-Budget einhaelt und Kuerzungen mit den verpflichtenden Graph-Attributen `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kennzeichnet
 - CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und Impact-Reports keine implizite Begrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren
 - JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
+- JSON-Schema-/Golden-Tests fuer `ReportInputs`-Pfad-Provenienz: CLI-relative Pfade, absolute Pfade, Build-Dir-vs.-Reply-Dir bei `--cmake-file-api` und relative `--changed-file` muessen stabile Display-Pfade und passende `*_source`-Enums liefern
 - JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path` und `inputs.cmake_file_api_path` bei `analyze` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
 - JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path`, `inputs.cmake_file_api_path` und `inputs.changed_file` bei `impact` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
 - Tests, dass `--verbose` JSON-, Markdown-, HTML- und DOT-Artefakte nicht gegenueber dem Normalmodus veraendert und Zusatzdiagnostik nur Console/`stderr` betrifft
 - Smoke-Test fuer Docker-Runtime-Image
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
-- Versionscheck, dass `cmake-xray --version`, `src/hexagon/model/application_info.h`, Root-`CMakeLists.txt` und Release-Tag konsistent `1.2.0` melden
+- Versionscheck, dass `cmake-xray --version`, `src/hexagon/model/application_info.h`, Root-`CMakeLists.txt` und Release-Tag dieselbe Semver-Version ohne fuehrendes `v` melden, inklusive Prerelease-Suffix bei Tags wie `v1.2.0-rc.1`
 - automatisierter Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
-- automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt ueber Mock-/Noop-Publisher oder lokale Test-Registry, ohne externe Veroeffentlichung
+- automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt: GitHub-Schritte duerfen Mock-/Noop-Publisher nutzen, OCI-Schritte muessen eine lokale Test-Registry fuer Tagging, `latest`-Regel, Push und Manifest-Pruefung verwenden, ohne externe Veroeffentlichung
 - dokumentierter manueller Dry-Run nur fuer Recovery-Pfade, die echte externe Publish-Zustaende in GitHub Releases oder GHCR voraussetzen
 - Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt und den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
@@ -434,6 +438,7 @@ Abhaengigkeiten:
 | JSON wird ohne klaren Vertrag eingefuehrt | Folgewerkzeuge brechen bei jeder Report-Aenderung | `format_version` dokumentieren und Golden-Tests fuer zentrale Felder pflegen |
 | JSON-`inputs` verlangt Daten, die nicht im Ergebnisobjekt stehen | Adapter muessten CLI-Zustand kennen oder der Vertrag bleibt unerfuellt | strukturiertes `ReportInputs`-Modell als Bestandteil von `AnalysisResult` und `ImpactResult` einfuehren |
 | JSON-`inputs` nutzt uneinheitliche Repraesentation fuer fehlende Pfade | Automatisierung muss `null`, leere Strings und fehlende Felder unterschiedlich abfangen | Felder immer ausgeben, gesetzte Pfade als String und fehlende Eingaben ausschliesslich als `null` serialisieren |
+| JSON-`inputs` nutzt instabile Pfad-Provenienz | Golden-Outputs und Folgewerkzeuge unterscheiden CLI-Strings, Reply-Dirs und Normalisierungsschluessel falsch | stabile Display-Pfade und `*_source`-Enums im JSON-Vertrag festlegen |
 | Alte skalare Eingabepfadfelder bleiben neben `ReportInputs` aktiv | File-API-only-Laeufe koennen falsche Pfade in `inputs.compile_database_path` ausgeben | `ReportInputs` als alleinige Quelle fuer Report-Eingaben festlegen; alte Felder entfernen oder nur deprecated spiegeln |
 | Producer setzen `ReportInputs` nicht vollstaendig | JSON/HTML/DOT zeigen bekannte File-API- oder Mixed-Input-Kontexte als `null` | `ProjectAnalyzer`, `ImpactAnalyzer` und Driving-Requests/-Ports als Producer explizit anpassen und testen |
 | Analyze-Listen sind durch `--top` gekuerzt, ohne dies zu kennzeichnen | Automatisierung verwechselt kurze Ausgaben mit vollstaendigen Projektdaten | `limit`, `total_count`, `returned_count` und `truncated` fuer Analyze-Ranking- und Hotspot-Listen verpflichtend machen |
@@ -444,6 +449,7 @@ Abhaengigkeiten:
 | DOT-Hotspot-Kontext umgeht faktisch das `--top`-Limit | ein einzelner verbreiteter Header oder mehrere Top-Hotspots erzeugen sehr grosse Graphen trotz kleinem Top-Limit | DOT-Kontext mit separatem `context_limit` und globalem `node_limit`-/`edge_limit`-Budget begrenzen und Kuerzung maschinenlesbar kennzeichnen |
 | Impact-DOT ist trotz unbegrenztem `ImpactResult` zu gross | haeufig inkludierte Header erzeugen sehr grosse Graphviz-Reports | feste Impact-DOT-Budgets `node_limit = 100` und `edge_limit = 200` mit `graph_truncated` anwenden |
 | DOT-Grenzen werden unterschiedlich implementiert | Golden-Outputs werden instabil oder Graphen wachsen unerwartet | feste M5-Formeln fuer `context_limit`, `node_limit`, `edge_limit` und stabile Kuerzungsreihenfolge dokumentieren |
+| DOT-Kuerzungsmetadaten stehen nur in Kommentaren | Graphviz-Consumer koennen Truncation nicht verlaesslich auslesen | verpflichtende Graph-Attribute mit exakten Namen und Typen verwenden; Kommentare nur zusaetzlich erlauben |
 | macOS-/Windows-Replace-Semantik wird nur dokumentiert, aber nicht getestet | atomare Dateiausgabe kann auf anderen Plattformen anders fehlschlagen | atomare Replace-Tests als CI-Gate fuer Linux, macOS und Windows aufnehmen |
 | `--verbose` veraendert HTML-/Markdown-/DOT-Artefakte | Golden-Outputs und CI-Artefakte werden durch Diagnosemodus instabil | Verbose-only-Inhalte fuer diese Artefakte ausschliessen und Zusatzdiagnostik auf Console/`stderr` beschraenken |
 | DOT suggeriert Target-Graph-Semantik, die M5 noch nicht besitzt | Nutzer interpretieren Graphen falsch | keine Target-zu-Target-Kanten erzeugen und Legende/Labels klar formulieren |
@@ -451,6 +457,8 @@ Abhaengigkeiten:
 | HTML-Goldens werden durch kosmetische Details instabil | Tests werden teuer und rauschanfaellig | keine Zeitstempel, keine Zufalls-IDs, deterministische Struktur |
 | `--verbose` schreibt Zusatztext in maschinenlesbare Ausgaben | JSON-/DOT-Nutzung in CI bricht | stdout und Reportartefakte byte-stabil halten; Zusatzdiagnostik ausschliesslich nach `stderr` ausgeben |
 | Release-Trigger akzeptiert ungueltige Tags | fehlerhafte Releases oder falsche `latest`-Tags entstehen | Semver-/Prerelease-Tags fail-fast validieren und `latest` nur fuer regulaere Releases setzen |
+| Prerelease-Versionen melden intern nur die Basisversion | `v1.2.0-rc.1`-Artefakte erscheinen als `1.2.0` und sind nicht eindeutig zuordenbar | `--version`, Versionsquellen und Tag muessen dieselbe Semver-Version inklusive Prerelease-Suffix melden |
+| OCI-Dry-Run nutzt nur Noop und prueft keinen Push | Tagging, `latest`, Registry-Push und Manifest-Probleme fallen erst im echten Release auf | lokale Test-Registry fuer OCI-Dry-Run verpflichtend machen; Noop nur fuer GitHub-Release-API-Schritte erlauben |
 | macOS-/Windows-Artefakte werden trotz begrenzter Freigabe veroeffentlicht | Nutzer interpretieren Preview-Builds als offiziell unterstuetzte Releases | Release-Workflow entweder auf Linux/OCI begrenzen oder Plattformarchive deutlich als experimentell dokumentieren |
 | GHCR-Image wird vor Abschluss aller Release-Gates gepusht | Teilveroeffentlichung ohne passenden GitHub Release bleibt zurueck | GHCR-Push erst nach Build- und Smoke-Gates ausfuehren, aber vor finaler oeffentlicher Release-Publikation |
 | Oeffentlicher GitHub Release entsteht vor erfolgreichem OCI-Publish | Release zeigt ein fehlendes Container-Artefakt oder falsche Installationshinweise | GitHub Release zuerst als Draft vorbereiten, OCI-Image veroeffentlichen und erst danach den Release oeffentlich machen |
