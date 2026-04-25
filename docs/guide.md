@@ -222,6 +222,95 @@ Kuratierte Beispielausgaben liegen unter [docs/examples](./examples):
 - [docs/examples/impact-console.txt](./examples/impact-console.txt)
 - [docs/examples/impact-report.md](./examples/impact-report.md)
 
+## Weitere Anwendungsfaelle
+
+Neben dem Quality-Gate-Pfad gibt es weitere Einsatzszenarien, die mit dem
+aktuellen Funktionsumfang abgedeckt sind. Sie nutzen dieselben Eingabedaten
+(`compile_commands.json` und optional CMake File API) und unterliegen
+denselben Heuristik-Hinweisen wie die regulaere Analyse.
+
+### PR-Review-Hilfe
+
+Fuer jede in einem Pull Request geaenderte Datei laesst sich abschaetzen,
+welche Translation Units und Targets davon plausibel betroffen sind. Reviewer
+sehen so die Reichweite einer Aenderung, bevor sie sich durch den Diff
+arbeiten:
+
+```bash
+cmake-xray impact \
+  --compile-commands build/compile_commands.json \
+  --cmake-file-api  build \
+  --changed-file include/common/config.h \
+  --format markdown
+```
+
+### Refactoring-Kandidaten finden
+
+Das TU-Ranking zeigt Translation Units mit besonders vielen
+Compilerargumenten, Include-Pfaden oder Defines. Solche TUs sind oft erste
+Kandidaten fuer Forward-Decls, IWYU oder das Schneiden von Header-Modulen:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --top 30
+```
+
+### Header-Hotspots stabilisieren
+
+Die Hotspot-Liste markiert Header, die von vielen TUs gezogen werden.
+Aenderungen an solchen Headern verursachen weitreichende Neukompilierung. Die
+Liste eignet sich als Eingangspunkt fuer Stabilitaetsmassnahmen wie PIMPL,
+kleinere Header oder Forward-Decls:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --format markdown \
+  --output build/reports/hotspots.md
+```
+
+### Test-Selection als Beschleuniger
+
+`impact` kann als Hinweis fuer eine engere Testauswahl genutzt werden. Die
+Auswertung beruht auf heuristischer Include-Aufloesung und darf nur als
+Beschleuniger eingesetzt werden, nicht als Ersatz fuer einen vollstaendigen
+Testlauf vor Release:
+
+```bash
+cmake-xray impact \
+  --cmake-file-api build \
+  --changed-file src/foo/bar.cpp
+```
+
+### Onboarding und Codebase-Karte
+
+Eine Erstanalyse mit Target-Sicht gibt neuen Entwicklern einen schnellen
+Ueberblick ueber Targets, zentrale Header und Schwerpunktdateien:
+
+```bash
+cmake-xray analyze \
+  --cmake-file-api build \
+  --top 20
+```
+
+### Vorher/Nachher-Vergleich
+
+Zwei Markdown-Reports vor und nach einem Refactoring koennen mit
+Standardwerkzeugen verglichen werden, um die Wirkung sichtbar zu machen.
+Einen eingebauten Vergleichsmodus gibt es im aktuellen Stand nicht:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --format markdown --output build/reports/xray-before.md
+# Refactoring durchfuehren und neu bauen
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --format markdown --output build/reports/xray-after.md
+diff -u build/reports/xray-before.md build/reports/xray-after.md
+```
+
 ## Heuristiken einordnen
 
 Include-Hotspots und Header-Impact beruhen im MVP auf heuristischer
