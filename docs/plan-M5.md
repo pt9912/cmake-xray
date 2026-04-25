@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.18` |
+| Version | `0.19` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -405,7 +405,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - Golden- und CLI-Tests, dass `--top` bei `analyze` fuer Markdown, HTML, JSON und DOT konsistent wirkt und kein Artefaktformat implizit vollstaendige Listen ausgibt
 - DOT-Golden-Tests, dass `analyze --top N` fuer ausgegebene Top-Hotspots hoechstens `context_limit` betroffene Translation Units als Kontextknoten enthaelt, das globale `node_limit`-/`edge_limit`-Budget einhaelt und gekuerzten Kontext mit den verpflichtenden `context_*`-Node-Attributen sowie gekuerzte Graphen mit den verpflichtenden `graph_*`-Graph-Attributen kennzeichnet
 - DOT-Golden-Tests, dass `impact --format dot` das feste Impact-`node_limit`-/`edge_limit`-Budget einhaelt und Kuerzungen mit den verpflichtenden Graph-Attributen `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kennzeichnet
-- CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und Impact-Reports keine implizite Begrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren
+- CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und ImpactResult-basierte JSON-, HTML- und Markdown-Reports keine implizite fachliche Ergebnisbegrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren; `impact --format dot` bleibt die visualisierungsorientierte Ausnahme mit festem `node_limit`-/`edge_limit`-Budget
 - JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` und `inputs.cmake_file_api_resolved_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
 - JSON-Schema-/Golden-Tests fuer `ReportInputs`-Pfad-Provenienz: CLI-relative Pfade, absolute Pfade, Build-Dir-vs.-Reply-Dir bei `--cmake-file-api` und relative `--changed-file` muessen stabile Display-Pfade und passende `*_source`-Enums liefern
 - Adapter-/Service-Tests, dass der vom `CmakeFileApiAdapter` aufgeloeste Build-/Reply-Pfad ueber `BuildModelResult` in `ReportInputs.cmake_file_api_resolved_path` landet und nicht aus CLI-Zustand nachgereicht wird
@@ -491,8 +491,8 @@ Abhaengigkeiten:
 | `F-28` | `HtmlReportAdapter` fuer `analyze` und `impact` |
 | `F-29` | `JsonReportAdapter` fuer `analyze` und `impact` |
 | `F-30` | `DotReportAdapter` fuer vorhandene Analyse- und Impact-Daten |
-| `F-35` | Formatwahl fuer `html`, `json` und `dot` |
-| `F-36` | Dateiausgabe ueber `--output` fuer artefaktorientierte Formate |
+| `F-35` | Eingabe- und Ausgabepfade, inklusive `ReportInputs`-Provenienz und Dateiausgabe ueber `--output` fuer artefaktorientierte Formate |
+| `F-36` | Formatwahl fuer `html`, `json` und `dot` |
 | `F-39` | `--verbose` fuer diagnoseorientierte CLI-Ausgabe |
 | `F-40` | `--quiet` fuer reduzierte CLI-Ausgabe |
 | `F-42` | begrenzte Analyze-Ausgabe mit `limit`, `total_count`, `returned_count` und `truncated` |
