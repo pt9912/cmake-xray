@@ -266,14 +266,14 @@ Regeln fuer normale Eingabepfade:
 - `compile_database_path` und `cmake_file_api_path` werden als `input_argument` behandelt.
 - `was_relative` wird beim Request-Aufbau aus dem urspruenglichen CLI-Argument bestimmt und nicht spaeter aus einem aufgeloesten Pfad rekonstruiert.
 - `report_display_base` dient nur als explizite Basis fuer relative normale Eingabepfade und Adapterpfade, damit Services nicht vom Prozess-CWD abhaengen.
-- Relative normale Eingabepfade werden gegen `report_display_base` interpretiert und danach als lexikalisch normalisierte Anzeige-Strings relativ zu `report_display_base` ausgegeben, wenn sie auch relativ eingegeben wurden.
+- Relative normale Eingabepfade werden fuer Laden und Validierung gegen `report_display_base` interpretiert, aber als Anzeige-Strings nur aus dem urspruenglichen CLI-Relativpfad lexikalisch normalisiert. Sie werden nicht auf einen basisrelativen kanonischen Pfad umgeschrieben.
 - Absolute normale Eingabepfade werden nicht relativiert; sie bleiben absolute Anzeige-Strings.
 
 Beispiele mit `report_display_base=/repo`:
 
 - CLI-Eingabe `build/compile_commands.json` wird als `build/compile_commands.json` angezeigt.
 - CLI-Eingabe `./build/../out/compile_commands.json` wird als `out/compile_commands.json` angezeigt.
-- CLI-Eingabe `../repo/build/compile_commands.json` wird als `build/compile_commands.json` angezeigt, weil der Pfad relativ zur Display-Basis wieder in `/repo` liegt.
+- CLI-Eingabe `../repo/build/compile_commands.json` wird als `../repo/build/compile_commands.json` angezeigt. Dass dieser Pfad relativ zur Display-Basis wieder in `/repo` liegt, aendert die Anzeige nicht.
 - CLI-Eingabe `../other/build/compile_commands.json` wird als `../other/build/compile_commands.json` angezeigt.
 - CLI-Eingabe `/repo/build/compile_commands.json` bleibt `/repo/build/compile_commands.json`, weil absolute Eingaben nicht relativiert werden.
 
@@ -368,10 +368,11 @@ Report-Port-Auswahl:
 
 Der bestehende Report-Port liefert fuer erfolgreiche Renderings weiter Reportinhalt als `std::string`. AP 1.1 muss fuer den gemeinsamen Dateischreibpfad trotzdem einen expliziten Fehlerkanal definieren, damit Render-Fehler vor dem Ersetzen der Zieldatei abgefangen werden koennen.
 
-Zulaessige Umsetzung:
+Umsetzung:
 
-- Entweder wird ein kleines `RenderResult`-/`Expected<std::string, RenderError>`-Value-Object fuer den CLI-Schreibpfad eingefuehrt.
-- Oder der CLI-Schreibpfad faengt dokumentierte Render-Exceptions aus Reportadaptern ab und mappt sie auf einen Render-Fehler.
+- Es wird ein kleines `RenderResult`-/`Expected<std::string, RenderError>`-Value-Object fuer den CLI-Schreibpfad eingefuehrt.
+- Reportadapter, die weiterhin `std::string` liefern, werden im CLI-Schreibpfad ueber einen Adapter-Wrapper in `RenderResult` gehoben.
+- Exceptions aus Reportadaptern sind kein primaerer Fehlervertrag; der CLI-Schreibpfad darf sie als Sicherheitsnetz abfangen und in `RenderError` mappen, aber neue Tests und neue Formatpfade pruefen den `RenderResult`-Pfad.
 
 Regeln:
 
@@ -403,6 +404,7 @@ Atomic-Writer-Vertrag:
 - Windows unterscheidet Zielzustaende:
   - fuer vorhandene Zielpfade nutzt der Wrapper `ReplaceFileW` oder `MoveFileExW` mit `MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH`;
   - fuer neue Zielpfade nutzt der Wrapper `MoveFileExW` mit `MOVEFILE_WRITE_THROUGH` ohne Replace-Erwartung oder eine gleichwertige exklusive Move-Primitive.
+- Die plattformspezifischen Operationen liegen hinter einer kleinen Atomic-File-Operation-Abstraktion, zum Beispiel `AtomicFilePlatformOps`, damit Neu-/Replace-/Fehlerpfade deterministisch auch ohne Windows-CI getestet werden koennen.
 - Zielpfad darf vor dem Replace nicht geloescht werden.
 - Zurueckbleibende Temp-Dateien nach Prozessabbruch sind erlaubt, aber unter dem Zielnamen darf nie ein teilgeschriebener Report sichtbar werden.
 
@@ -554,9 +556,9 @@ Atomic-Writer-Tests:
 - vorhandene Datei wird bei Erfolg ersetzt.
 - vorhandene Datei bleibt bei simuliertem Write-/Flush-/Replace-Fehler unveraendert.
 - Temp-Datei wird exklusiv erstellt; eine vorhandene Temp-Datei wird nicht ueberschrieben.
-- neue Zielpfade und vorhandene Zielpfade werden auf Windows ueber die jeweils passende Move-/Replace-Primitive getestet.
+- neue Zielpfade und vorhandene Zielpfade werden ueber die Atomic-File-Operation-Abstraktion gegen die jeweils passende Windows-Move-/Replace-Primitive getestet.
+- Falls Windows-CI verfuegbar ist, laeuft zusaetzlich ein Smoke-Test gegen die echte Plattformimplementierung; ohne Windows-CI ist der abstrahierte Test-Doppelgaenger das AP-1.1-Gate.
 - Tests pruefen leserseitige atomare Replace-Semantik, aber keine Crash-Dauerhaftigkeit nach Stromausfall.
-- Windows-Pfad nutzt die Windows-Replace-Implementierung oder einen abstrahierten Test-Doppelgaenger mit derselben Semantik.
 
 Regressionstests:
 
