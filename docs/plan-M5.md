@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.10` |
+| Version | `0.11` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -94,7 +94,8 @@ Vorgesehene Artefakte:
 - Anpassung der CLI-Formatvalidierung in `src/adapters/cli/`
 - Anpassung der CLI-Output-Validierung und der atomaren Dateiausgabe fuer Reportartefakte
 - Anpassung der Composition-Root-Verdrahtung in `src/main.cpp`
-- Erweiterung von `src/hexagon/model/analysis_result.*` und `src/hexagon/model/impact_result.*` um ein strukturiertes `ReportInputs`-Modell, mindestens mit `compile_database_path`, `cmake_file_api_path` und bei `impact` `changed_file`; nicht verwendete optionale Eingaben werden explizit als `null` oder leeres Feld nach dokumentierter Schema-Regel abgebildet
+- Erweiterung von `src/hexagon/model/analysis_result.*` und `src/hexagon/model/impact_result.*` um ein strukturiertes `ReportInputs`-Modell, mindestens mit `compile_database_path`, `cmake_file_api_path` und bei `impact` `changed_file`
+- `ReportInputs`-Felder sind im JSON-Vertrag immer vorhanden; gesetzte Pfade sind Strings, nicht gesetzte Eingaben sind `null`, und leere Strings duerfen nicht als Ersatz fuer fehlende Eingaben verwendet werden
 - Anpassung der Producer-Pfade in `ProjectAnalyzer`, `ImpactAnalyzer` und den zugehoerigen Driving-Request-/Port-Vertraegen, damit `ReportInputs` beim Erzeugen von `AnalysisResult` und `ImpactResult` vollstaendig gesetzt wird und nicht nachtraeglich in der CLI an Adapter uebergeben werden muss
 - `ReportWriterPort`/`GenerateReportPort` bleiben aus Adaptersicht ergebnisobjektzentriert; Signaturaenderungen sind nur zulaessig, wenn sie `ReportInputs` weiterhin als Teil des fachlichen Ergebnisvertrags transportieren und nicht als separaten CLI-Kontext in Adapter leaken
 - Verbosity bleibt eine CLI-Emission-Policy in `src/adapters/cli/` und `src/main.cpp`; `ReportWriterPort`/`GenerateReportPort` erhalten keinen `OutputVerbosity`-Parameter, und fachliche Reportadapter rendern keine Verbose-/Quiet-Sondervarianten
@@ -141,6 +142,8 @@ Wichtig:
 - Markdown, HTML und DOT folgen bei `analyze` ebenfalls der CLI-`--top`-Begrenzung; HTML und Markdown kennzeichnen begrenzte Abschnitte menschenlesbar
 - DOT enthaelt bei `analyze --top N` die Top-N-Ranking- und Top-N-Hotspot-Knoten sowie begrenzte Kontextkanten; fuer einen Top-Hotspot werden hoechstens `context_limit` der in `IncludeHotspot` gespeicherten betroffenen Translation Units als Kontextknoten ausgegeben, auch wenn diese Translation Units nicht selbst im Top-N-Ranking liegen
 - `context_limit` ist fuer M5 Teil des DOT-Formatvertrags, kleiner als oder gleich dem wirksamen `--top`-Limit und nicht pro Hotspot zu einem unbeschraenkten Gesamtgraphen addierbar, weil zusaetzlich ein globales `node_limit`-/`edge_limit`-Budget gilt
+- M5 legt die DOT-Grenzen deterministisch fest: `context_limit = min(top_limit, 5)`, `node_limit = max(25, 4 * top_limit + 10)`, `edge_limit = max(40, 6 * top_limit + 20)`. Ohne explizites `--top` wird der wirksame Standard-Top-Wert der CLI verwendet.
+- Kuerzung erfolgt deterministisch in stabiler Sortierreihenfolge: zuerst primaere Top-Ranking-Knoten, dann Top-Hotspot-Knoten, dann Target-Knoten, dann Hotspot-Kontext-Translation-Units sortiert nach Anzeige-Pfad; Kanten werden nur ausgegeben, wenn beide Endknoten im Budget enthalten sind, und innerhalb gleicher Prioritaet lexikografisch sortiert
 - bei gekuerztem Hotspot-Kontext oder global gekuerztem Graph enthaelt DOT einen maschinenlesbaren Kommentar oder Graph-Attributsatz mit `context_total_count`, `context_returned_count`, `context_truncated`, `graph_node_limit`, `graph_edge_limit` und `graph_truncated`
 - JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
 - Felder mit leerer Menge werden als leere Arrays ausgegeben, nicht weggelassen, sofern sie Teil des Formatvertrags sind
@@ -382,6 +385,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - DOT-Golden-Tests, dass `analyze --top N` fuer ausgegebene Top-Hotspots hoechstens `context_limit` betroffene Translation Units als Kontextknoten enthaelt, das globale `node_limit`-/`edge_limit`-Budget einhaelt und gekuerzten Kontext bzw. gekuerzte Graphen mit `context_total_count`, `context_returned_count`, `context_truncated`, `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kennzeichnet
 - CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und Impact-Reports keine implizite Begrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren
 - JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
+- JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path`, `inputs.cmake_file_api_path` und `inputs.changed_file` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
 - Tests, dass `--verbose` JSON-, Markdown-, HTML- und DOT-Artefakte nicht gegenueber dem Normalmodus veraendert und Zusatzdiagnostik nur Console/`stderr` betrifft
 - Smoke-Test fuer Docker-Runtime-Image
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
@@ -421,6 +425,7 @@ Abhaengigkeiten:
 |---|---|---|
 | JSON wird ohne klaren Vertrag eingefuehrt | Folgewerkzeuge brechen bei jeder Report-Aenderung | `format_version` dokumentieren und Golden-Tests fuer zentrale Felder pflegen |
 | JSON-`inputs` verlangt Daten, die nicht im Ergebnisobjekt stehen | Adapter muessten CLI-Zustand kennen oder der Vertrag bleibt unerfuellt | strukturiertes `ReportInputs`-Modell als Bestandteil von `AnalysisResult` und `ImpactResult` einfuehren |
+| JSON-`inputs` nutzt uneinheitliche Repraesentation fuer fehlende Pfade | Automatisierung muss `null`, leere Strings und fehlende Felder unterschiedlich abfangen | Felder immer ausgeben, gesetzte Pfade als String und fehlende Eingaben ausschliesslich als `null` serialisieren |
 | Producer setzen `ReportInputs` nicht vollstaendig | JSON/HTML/DOT zeigen bekannte File-API- oder Mixed-Input-Kontexte als `null` | `ProjectAnalyzer`, `ImpactAnalyzer` und Driving-Requests/-Ports als Producer explizit anpassen und testen |
 | Analyze-Listen sind durch `--top` gekuerzt, ohne dies zu kennzeichnen | Automatisierung verwechselt kurze Ausgaben mit vollstaendigen Projektdaten | `limit`, `total_count`, `returned_count` und `truncated` fuer Analyze-Ranking- und Hotspot-Listen verpflichtend machen |
 | `--top` wird versehentlich auch fuer `impact` eingefuehrt | CLI- und Port-Vertraege divergieren und Impact-Ergebnisse werden unklar begrenzt | M5 begrenzt `--top` auf `analyze`; Impact akzeptiert keine Top-Option und gibt vollstaendige `ImpactResult`-Listen aus |
@@ -428,6 +433,7 @@ Abhaengigkeiten:
 | Atomarer Write ueberschreibt vorhandene Dateien nicht portabel | Fehler koennen Zielartefakte zerstoeren oder Windows-Releases brechen | Replace-Semantik fuer existierende Dateien auf Linux, macOS und Windows testen; bei Fehler bleibt die alte Datei unveraendert |
 | Analyze-Artefaktformate interpretieren `--top` unterschiedlich | Goldens, CLI-Ausgabe und Automatisierung liefern widerspruechliche Ergebnismengen | einheitliche Top-Limit-Regel fuer Markdown, HTML, JSON und DOT bei `analyze` festlegen und testen |
 | DOT-Hotspot-Kontext umgeht faktisch das `--top`-Limit | ein einzelner verbreiteter Header oder mehrere Top-Hotspots erzeugen sehr grosse Graphen trotz kleinem Top-Limit | DOT-Kontext mit separatem `context_limit` und globalem `node_limit`-/`edge_limit`-Budget begrenzen und Kuerzung maschinenlesbar kennzeichnen |
+| DOT-Grenzen werden unterschiedlich implementiert | Golden-Outputs werden instabil oder Graphen wachsen unerwartet | feste M5-Formeln fuer `context_limit`, `node_limit`, `edge_limit` und stabile Kuerzungsreihenfolge dokumentieren |
 | macOS-/Windows-Replace-Semantik wird nur dokumentiert, aber nicht getestet | atomare Dateiausgabe kann auf anderen Plattformen anders fehlschlagen | atomare Replace-Tests als CI-Gate fuer Linux, macOS und Windows aufnehmen |
 | `--verbose` veraendert HTML-/Markdown-/DOT-Artefakte | Golden-Outputs und CI-Artefakte werden durch Diagnosemodus instabil | Verbose-only-Inhalte fuer diese Artefakte ausschliessen und Zusatzdiagnostik auf Console/`stderr` beschraenken |
 | DOT suggeriert Target-Graph-Semantik, die M5 noch nicht besitzt | Nutzer interpretieren Graphen falsch | keine Target-zu-Target-Kanten erzeugen und Legende/Labels klar formulieren |
