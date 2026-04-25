@@ -1,5 +1,6 @@
 add_library(
     xray_adapters
+    cli/atomic_report_writer.cpp
     cli/cli_adapter.cpp
     input/cmake_file_api_adapter.cpp
     input/compile_commands_json_adapter.cpp

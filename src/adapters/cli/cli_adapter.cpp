@@ -1,21 +1,12 @@
 #include "adapters/cli/cli_adapter.h"
 
-#include <cerrno>
-#include <cstdio>
 #include <cstddef>
 #include <filesystem>
 #include <optional>
 #include <string>
-#include <system_error>
 #include <utility>
 
 #include <CLI/CLI.hpp>
-
-#ifdef _WIN32
-#include <process.h>
-#else
-#include <unistd.h>
-#endif
 
 #include "adapters/cli/exit_codes.h"
 #include "hexagon/model/compile_database_result.h"
@@ -41,16 +32,6 @@ struct CliOptions {
     std::string output_path;
     std::string report_format{"console"};
     std::size_t top_limit{10};
-};
-
-struct OutputStreams {
-    std::ostream& out;
-    std::ostream& err;
-};
-
-struct ReportWriteError {
-    std::string path;
-    std::string reason;
 };
 
 int map_error_to_exit_code(CompileDatabaseError error) {
@@ -219,125 +200,38 @@ std::optional<int> validate_changed_file_required(const CliOptions& options, std
     return ExitCode::cli_usage_error;
 }
 
-std::string system_error_message(int error_number) {
-    return std::error_code(error_number == 0 ? EIO : error_number, std::generic_category())
-        .message();
-}
-
-std::filesystem::path report_output_directory(const std::filesystem::path& output_path) {
-    const auto parent = output_path.parent_path();
-    return parent.empty() ? std::filesystem::path{"."} : parent;
-}
-
-std::filesystem::path temporary_output_path(const std::filesystem::path& output_path,
-                                            std::size_t attempt) {
-    const auto file_name = output_path.filename().generic_string();
-    const auto temp_name = ".cmake-xray-" + (file_name.empty() ? std::string{"report"} : file_name) +
-#ifdef _WIN32
-                           "." + std::to_string(::_getpid()) + "." + std::to_string(attempt) +
-#else
-                           "." + std::to_string(::getpid()) + "." + std::to_string(attempt) +
-#endif
-                           ".tmp";
-    return report_output_directory(output_path) / temp_name;
-}
-
-std::optional<std::filesystem::path> reserve_temporary_output_path(
-    const std::filesystem::path& output_path) {
-    for (std::size_t attempt = 0; attempt < 64; ++attempt) {
-        const auto candidate = temporary_output_path(output_path, attempt);
-        std::error_code ec;
-        if (!std::filesystem::exists(candidate, ec) && !ec) return candidate;
-    }
-
-    return std::nullopt;
-}
-
-void remove_temporary_output(const std::filesystem::path& path) {
-    std::error_code ec;
-    std::filesystem::remove(path, ec);
-}
-
-std::optional<std::string> write_report_bytes(const std::filesystem::path& path,
-                                              std::string_view report) {
-    std::FILE* file = std::fopen(path.string().c_str(), "wb");
-    if (file == nullptr) return system_error_message(errno);
-
-    if (!report.empty()) {
-        const auto written = std::fwrite(report.data(), 1, report.size(), file);
-        if (written != report.size() || std::fflush(file) != 0) {
-            const auto error = system_error_message(errno);
-            std::fclose(file);
-            return error;
-        }
-    }
-
-    if (std::fclose(file) != 0) return system_error_message(errno);
-    return std::nullopt;
-}
-
-std::optional<ReportWriteError> write_report_file(const std::string& output_path,
-                                                  std::string_view report) {
-    const std::filesystem::path target_path{output_path};
-    const auto temp_path = reserve_temporary_output_path(target_path);
-    if (!temp_path.has_value()) {
-        return ReportWriteError{output_path, "cannot reserve a temporary report path"};
-    }
-
-    if (const auto error = write_report_bytes(*temp_path, report); error.has_value()) {
-        remove_temporary_output(*temp_path);
-        return ReportWriteError{output_path, *error};
-    }
-
-    std::error_code ec;
-    std::filesystem::rename(*temp_path, target_path, ec);
-    if (!ec) return std::nullopt;
-
-    remove_temporary_output(*temp_path);
-    return ReportWriteError{output_path, ec.message()};
-}
-
-int emit_report(const std::string& report, const CliOptions& options, OutputStreams streams) {
-    if (options.output_path.empty()) {
-        streams.out << report;
-        return ExitCode::success;
-    }
-
-    const auto write_error = write_report_file(options.output_path, report);
-    if (!write_error.has_value()) return ExitCode::success;
-
-    streams.err << "error: cannot write report: " << write_error->path << ": "
-                << write_error->reason << '\n';
-    streams.err << "hint: check the output path and directory permissions\n";
-    return ExitCode::unexpected_error;
-}
-
 const xray::hexagon::ports::driving::GenerateReportPort& select_report_port(
     ReportFormat format, const ReportPorts& report_ports) {
     return format == ReportFormat::markdown ? report_ports.markdown : report_ports.console;
 }
 
+int run_emit_for_renderer(const CliReportRenderer& renderer, const CliOptions& options,
+                          CliOutputStreams streams) {
+    PosixAtomicFilePlatformOps ops;
+    AtomicReportWriter writer{ops};
+    return emit_rendered_report(renderer, options.output_path, writer, streams);
+}
+
 int handle_analysis_result(const xray::hexagon::model::AnalysisResult& result,
                            const xray::hexagon::ports::driving::GenerateReportPort& report_port,
-                           const CliOptions& options, OutputStreams streams) {
+                           const CliOptions& options, CliOutputStreams streams) {
     if (!result.compile_database.is_success()) {
         format_error(streams.err, result.compile_database);
         return map_error_to_exit_code(result.compile_database.error());
     }
-
-    return emit_report(report_port.generate_analysis_report(result, options.top_limit), options,
-                       streams);
+    const AnalysisCliReportRenderer renderer{report_port, result, options.top_limit};
+    return run_emit_for_renderer(renderer, options, streams);
 }
 
 int handle_impact_result(const xray::hexagon::model::ImpactResult& result,
                          const xray::hexagon::ports::driving::GenerateReportPort& report_port,
-                         const CliOptions& options, OutputStreams streams) {
+                         const CliOptions& options, CliOutputStreams streams) {
     if (!result.compile_database.is_success()) {
         format_error(streams.err, result.compile_database);
         return map_error_to_exit_code(result.compile_database.error());
     }
-
-    return emit_report(report_port.generate_impact_report(result), options, streams);
+    const ImpactCliReportRenderer renderer{report_port, result};
+    return run_emit_for_renderer(renderer, options, streams);
 }
 
 xray::hexagon::ports::driving::InputPathArgument make_input_path_argument(
@@ -393,6 +287,53 @@ std::optional<int> validate_subcommand_options(const CliOptions& options, bool i
 
 }  // namespace
 
+int emit_rendered_report(const CliReportRenderer& renderer, std::string_view output_path,
+                         AtomicReportWriter& writer, CliOutputStreams streams) {
+    const auto result = renderer.render();
+    if (result.error.has_value()) {
+        streams.err << "error: cannot render report: " << result.error->message << '\n';
+        return ExitCode::unexpected_error;
+    }
+    const auto& content = result.content.value_or(std::string{});
+    if (output_path.empty()) {
+        streams.out << content;
+        return ExitCode::success;
+    }
+    const auto write_failure =
+        writer.write_atomic(std::filesystem::path{output_path}, content);
+    if (!write_failure.has_value()) return ExitCode::success;
+    streams.err << "error: cannot write report: " << write_failure->path << ": "
+                << write_failure->reason << '\n';
+    streams.err << "hint: check the output path and directory permissions\n";
+    return ExitCode::unexpected_error;
+}
+
+AnalysisCliReportRenderer::AnalysisCliReportRenderer(
+    const xray::hexagon::ports::driving::GenerateReportPort& port,
+    const xray::hexagon::model::AnalysisResult& result, std::size_t top_limit)
+    : port_(&port), result_(&result), top_limit_(top_limit) {}
+
+RenderResult AnalysisCliReportRenderer::render() const {
+    try {
+        return {port_->generate_analysis_report(*result_, top_limit_), std::nullopt};
+    } catch (const std::exception& e) {
+        return {std::nullopt, RenderError{e.what()}};
+    }
+}
+
+ImpactCliReportRenderer::ImpactCliReportRenderer(
+    const xray::hexagon::ports::driving::GenerateReportPort& port,
+    const xray::hexagon::model::ImpactResult& result)
+    : port_(&port), result_(&result) {}
+
+RenderResult ImpactCliReportRenderer::render() const {
+    try {
+        return {port_->generate_impact_report(*result_), std::nullopt};
+    } catch (const std::exception& e) {
+        return {std::nullopt, RenderError{e.what()}};
+    }
+}
+
 CliAdapter::CliAdapter(
     const xray::hexagon::ports::driving::AnalyzeProjectPort& analyze_project_port,
     const xray::hexagon::ports::driving::AnalyzeImpactPort& analyze_impact_port,
@@ -430,7 +371,7 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
         return *validation_error;
     }
 
-    OutputStreams streams{out, err};
+    const CliOutputStreams streams{out, err};
     const auto report_format = parse_report_format(options.report_format);
     const auto& report_port = select_report_port(report_format, report_ports_);
 

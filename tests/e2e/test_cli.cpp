@@ -15,7 +15,9 @@
 #include <unistd.h>
 #endif
 
+#include "adapters/cli/atomic_report_writer.h"
 #include "adapters/cli/cli_adapter.h"
+#include "adapters/cli/cli_report_renderer.h"
 #include "adapters/cli/exit_codes.h"
 #include "adapters/input/cmake_file_api_adapter.h"
 #include "adapters/input/compile_commands_json_adapter.h"
@@ -752,6 +754,165 @@ TEST_CASE_FIXTURE(CliFixture, "m3 output remains unchanged without file api") {
     CHECK(out.str().find("observation source") == std::string::npos);
     CHECK(out.str().find("target metadata") == std::string::npos);
     CHECK(err.str().empty());
+}
+
+namespace {
+
+class FailingRenderer final : public xray::adapters::cli::CliReportRenderer {
+public:
+    explicit FailingRenderer(std::string message) : message_(std::move(message)) {}
+
+    xray::adapters::cli::RenderResult render() const override {
+        return {std::nullopt, xray::adapters::cli::RenderError{message_}};
+    }
+
+private:
+    std::string message_;
+};
+
+class ThrowingGenerateReportPort final : public xray::hexagon::ports::driving::GenerateReportPort {
+public:
+    std::string generate_analysis_report(const AnalysisResult&,
+                                         std::size_t) const override {
+        throw std::runtime_error("analysis report exception");
+    }
+
+    std::string generate_impact_report(const ImpactResult&) const override {
+        throw std::runtime_error("impact report exception");
+    }
+};
+
+class SuccessRenderer final : public xray::adapters::cli::CliReportRenderer {
+public:
+    explicit SuccessRenderer(std::string content) : content_(std::move(content)) {}
+
+    xray::adapters::cli::RenderResult render() const override {
+        return {content_, std::nullopt};
+    }
+
+private:
+    std::string content_;
+};
+
+}  // namespace
+
+TEST_CASE("analysis cli report renderer maps thrown exceptions into a RenderError") {
+    const ThrowingGenerateReportPort port;
+    AnalysisResult result;
+    result.application = xray::hexagon::model::application_info();
+    const xray::adapters::cli::AnalysisCliReportRenderer renderer{port, result, 1};
+
+    const auto rendered = renderer.render();
+
+    CHECK_FALSE(rendered.content.has_value());
+    REQUIRE(rendered.error.has_value());
+    CHECK(rendered.error->message.find("analysis report exception") != std::string::npos);
+}
+
+TEST_CASE("impact cli report renderer maps thrown exceptions into a RenderError") {
+    const ThrowingGenerateReportPort port;
+    ImpactResult result;
+    result.application = xray::hexagon::model::application_info();
+    const xray::adapters::cli::ImpactCliReportRenderer renderer{port, result};
+
+    const auto rendered = renderer.render();
+
+    CHECK_FALSE(rendered.content.has_value());
+    REQUIRE(rendered.error.has_value());
+    CHECK(rendered.error->message.find("impact report exception") != std::string::npos);
+}
+
+TEST_CASE("emit_rendered_report keeps an existing file when the renderer reports an error") {
+    const TemporaryDirectory temp_dir;
+    const auto target = temp_dir.path() / "report.md";
+    {
+        std::ofstream existing(target);
+        existing << "untouched";
+    }
+
+    const FailingRenderer renderer{"simulated rendering failed"};
+    xray::adapters::cli::PosixAtomicFilePlatformOps ops;
+    xray::adapters::cli::AtomicReportWriter writer{ops};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const auto exit_code = xray::adapters::cli::emit_rendered_report(
+        renderer, target.string(), writer, xray::adapters::cli::CliOutputStreams{out, err});
+
+    CHECK(exit_code == ExitCode::unexpected_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("cannot render report") != std::string::npos);
+    CHECK(err.str().find("simulated rendering failed") != std::string::npos);
+    CHECK(read_text_file(target) == "untouched");
+    CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
+}
+
+TEST_CASE("emit_rendered_report writes nothing to stdout when the renderer reports an error") {
+    const FailingRenderer renderer{"render error path"};
+    xray::adapters::cli::PosixAtomicFilePlatformOps ops;
+    xray::adapters::cli::AtomicReportWriter writer{ops};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const auto exit_code =
+        xray::adapters::cli::emit_rendered_report(renderer, "", writer, xray::adapters::cli::CliOutputStreams{out, err});
+
+    CHECK(exit_code == ExitCode::unexpected_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("render error path") != std::string::npos);
+}
+
+TEST_CASE("emit_rendered_report streams content to stdout when output_path is empty") {
+    const SuccessRenderer renderer{"streamed body"};
+    xray::adapters::cli::PosixAtomicFilePlatformOps ops;
+    xray::adapters::cli::AtomicReportWriter writer{ops};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const auto exit_code =
+        xray::adapters::cli::emit_rendered_report(renderer, "", writer, xray::adapters::cli::CliOutputStreams{out, err});
+
+    CHECK(exit_code == ExitCode::success);
+    CHECK(out.str() == "streamed body");
+    CHECK(err.str().empty());
+}
+
+TEST_CASE("emit_rendered_report writes the content atomically to the target path") {
+    const TemporaryDirectory temp_dir;
+    const auto target = temp_dir.path() / "report.md";
+    const SuccessRenderer renderer{"file body"};
+    xray::adapters::cli::PosixAtomicFilePlatformOps ops;
+    xray::adapters::cli::AtomicReportWriter writer{ops};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const auto exit_code = xray::adapters::cli::emit_rendered_report(
+        renderer, target.string(), writer, xray::adapters::cli::CliOutputStreams{out, err});
+
+    CHECK(exit_code == ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().empty());
+    CHECK(read_text_file(target) == "file body");
+    CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
+}
+
+TEST_CASE("emit_rendered_report surfaces atomic writer failures with a write hint") {
+    const TemporaryDirectory temp_dir;
+    const auto missing_target = temp_dir.path() / "missing-dir" / "report.md";
+    const SuccessRenderer renderer{"will not land"};
+    xray::adapters::cli::PosixAtomicFilePlatformOps ops;
+    xray::adapters::cli::AtomicReportWriter writer{ops};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const auto exit_code = xray::adapters::cli::emit_rendered_report(
+        renderer, missing_target.string(), writer, xray::adapters::cli::CliOutputStreams{out, err});
+
+    CHECK(exit_code == ExitCode::unexpected_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("cannot write report") != std::string::npos);
+    CHECK(err.str().find("hint: check the output path") != std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(missing_target));
 }
 
 TEST_CASE("file api invalid maps to exit code 4 with file api hint") {

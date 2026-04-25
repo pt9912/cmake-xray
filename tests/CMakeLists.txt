@@ -4,6 +4,7 @@ add_executable(
     hexagon/test_analysis_support.cpp
     hexagon/test_project_analyzer.cpp
     hexagon/test_impact_analyzer.cpp
+    adapters/test_atomic_report_writer.cpp
     adapters/test_port_wiring.cpp
     adapters/test_cmake_file_api_adapter.cpp
     adapters/test_compile_commands_json.cpp
