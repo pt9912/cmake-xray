@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.5` |
+| Version | `0.6` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -84,7 +84,7 @@ Wichtig:
 - stdout bleibt der Standard, wenn kein `--output` angegeben ist; mit `--output` wird der vollstaendige Reportinhalt in die Datei geschrieben und nicht zusaetzlich fachlich nach stdout dupliziert
 - `--output` ersetzt vorhandene Zielartefakte bei erfolgreichem Schreiben; bei Render-, Schreib- oder Rename-Fehlern bleibt eine bereits vorhandene Zieldatei unveraendert erhalten
 - die atomare Dateiausgabe verwendet eine temporaere Datei im Zielverzeichnis und eine plattformsichere Replace-Operation, die auf Linux, macOS und Windows getestet wird
-- alle Reportformate folgen derselben `--top`-Begrenzung fuer Ranking-, Hotspot- und vergleichbare Listenabschnitte; kein Artefaktformat wechselt implizit auf unlimitierte Vollausgabe
+- fuer `analyze` folgen alle Reportformate derselben `--top`-Begrenzung fuer Ranking-, Hotspot- und vergleichbare Listenabschnitte; `impact` erhaelt in M5 keine `--top`-Option und keine implizite Ergebnisbegrenzung
 - alle neuen Formate muessen deterministisch sein, damit Golden-Outputs sinnvoll diffbar bleiben
 - Datums-, Laufzeit- oder Hostinformationen duerfen nicht automatisch in Reports erscheinen
 
@@ -94,6 +94,7 @@ Vorgesehene Artefakte:
 - Anpassung der CLI-Output-Validierung und der atomaren Dateiausgabe fuer Reportartefakte
 - Anpassung der Composition-Root-Verdrahtung in `src/main.cpp`
 - Erweiterung von `src/hexagon/model/analysis_result.*` und `src/hexagon/model/impact_result.*` um ein strukturiertes `ReportInputs`-Modell, mindestens mit `compile_database_path`, `cmake_file_api_path` und bei `impact` `changed_file`; nicht verwendete optionale Eingaben werden explizit als `null` oder leeres Feld nach dokumentierter Schema-Regel abgebildet
+- Anpassung der Producer-Pfade in `ProjectAnalyzer`, `ImpactAnalyzer` und den zugehoerigen Driving-Request-/Port-Vertraegen, damit `ReportInputs` beim Erzeugen von `AnalysisResult` und `ImpactResult` vollstaendig gesetzt wird und nicht nachtraeglich in der CLI an Adapter uebergeben werden muss
 - `ReportWriterPort`/`GenerateReportPort` bleiben aus Adaptersicht ergebnisobjektzentriert; Signaturaenderungen sind nur zulaessig, wenn sie `ReportInputs` weiterhin als Teil des fachlichen Ergebnisvertrags transportieren und nicht als separaten CLI-Kontext in Adapter leaken
 - neue Adapter unter `src/adapters/output/`
 - Erweiterung von `src/adapters/CMakeLists.txt`
@@ -132,8 +133,9 @@ Ein JSON-Bericht fuer `impact` soll mindestens enthalten:
 Wichtig:
 
 - `inputs` darf nur Felder enthalten, die stabil im fachlichen Ergebnis- oder Request-Modell verfuegbar sind; `cmake_file_api_path` ist als Feld fuer M5 verpflichtend, damit File-API- und Mixed-Input-Laeufe vollstaendig dokumentiert werden koennen
-- JSON folgt der CLI-`--top`-Begrenzung fuer Ranking- und Hotspot-Listen, muss aber ueber `limit`, `total_count`, `returned_count` und `truncated` eindeutig anzeigen, ob die Ausgabe gekuerzt wurde; eine unlimitierte JSON-Ausgabe waere nur nach expliziter Schema-Entscheidung zulaessig
-- Markdown, HTML und DOT folgen ebenfalls der CLI-`--top`-Begrenzung; HTML und Markdown kennzeichnen begrenzte Abschnitte menschenlesbar, DOT enthaelt nur die in der begrenzten Ergebnissicht dargestellten Knoten und Kanten
+- JSON folgt bei `analyze` der CLI-`--top`-Begrenzung fuer Ranking- und Hotspot-Listen, muss aber ueber `limit`, `total_count`, `returned_count` und `truncated` eindeutig anzeigen, ob die Ausgabe gekuerzt wurde; eine unlimitierte JSON-Ausgabe waere nur nach expliziter Schema-Entscheidung zulaessig
+- `impact`-JSON enthaelt in M5 keine `limit`-/`truncated`-Felder, solange der CLI- und Port-Vertrag keine Impact-Begrenzung kennt; alle betroffenen Translation Units und Targets aus dem `ImpactResult` werden ausgegeben
+- Markdown, HTML und DOT folgen bei `analyze` ebenfalls der CLI-`--top`-Begrenzung; HTML und Markdown kennzeichnen begrenzte Abschnitte menschenlesbar, DOT enthaelt nur die in der begrenzten Ergebnissicht dargestellten Knoten und Kanten
 - JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
 - Felder mit leerer Menge werden als leere Arrays ausgegeben, nicht weggelassen, sofern sie Teil des Formatvertrags sind
 - optionale fachliche Informationen koennen `null` sein, wenn das Schema dies explizit dokumentiert
@@ -241,6 +243,7 @@ M5 erweitert die Bedienbarkeit um zwei Ausgabemodi. Beide Modi duerfen die beste
 - Eingabequellen, Beobachtungsherkunft und Target-Metadatenstatus sichtbar machen, sofern nicht ohnehin im Format enthalten
 - bei CLI-Fehlern zusaetzliche Kontextinformationen liefern, ohne Stacktraces oder interne Implementierungsdetails auszugeben
 - fuer `json` keine unstrukturierte Zusatztextausgabe auf `stdout` erzeugen; falls noetig, gehen Diagnosehinweise nach `stderr` oder in strukturierte JSON-Felder
+- fuer `markdown`, `html` und `dot` keine zusaetzlichen Verbose-only-Inhalte in Reportartefakte schreiben; verbose beeinflusst dort nur Console-/`stderr`-Diagnostik und bereits im fachlichen Ergebnis vorhandene Diagnostics
 
 `--quiet` soll mindestens:
 
@@ -285,6 +288,7 @@ Der Release-Pfad muss mindestens:
 - das Image mit dem Versions-Tag veroeffentlichen
 - fuer regulaere Releases ohne Prerelease-Suffix zusaetzlich `latest` pflegen und Vorabversionen davon ausnehmen
 - GitHub-Release-Notes aus dem Changelog verwenden
+- einen dokumentierten Recovery-/Rollback-Pfad fuer den Fall bereitstellen, dass die GitHub-Release-Erstellung erfolgreich war, der nachgelagerte OCI-Image-Publish aber fehlschlaegt
 
 Wichtig:
 
@@ -294,6 +298,7 @@ Wichtig:
 - die Dokumentation muss lokale Nutzung und CI-Nutzung des Containers zeigen
 - fehlgeschlagene Release-Schritte muessen klar sichtbar sein und keine Teilveroeffentlichung als Erfolg melden
 - insbesondere darf kein GHCR-Image veroeffentlicht werden, bevor Build-Artefakte, Smoke-Tests und GitHub-Release-Erstellung erfolgreich abgeschlossen sind; falls technisch nicht erreichbar, muss ein expliziter Recovery-Pfad mit Loesch-/Retagging-Schritten dokumentiert werden
+- wenn die GitHub-Release-Erstellung erfolgreich war, der Image-Publish aber fehlschlaegt, muss der Workflow entweder den Release automatisch als Draft/failed markieren bzw. loeschen oder eine dokumentierte manuelle Recovery mit Nachpublish, Retagging und Release-Notes-Korrektur erzwingen
 - die Release-Dokumentation muss die erlaubten Tag-Muster, Prerelease-Behandlung und `latest`-Regel explizit nennen
 
 Vorgesehene Artefakte:
@@ -360,12 +365,15 @@ Tests und Abnahme muessen mindestens abdecken:
 - CLI-Tests fuer atomare Dateiausgabe: erfolgreiche Writes erzeugen vollstaendige Reports, vorhandene Zieldateien werden bei Erfolg ersetzt, und Fehlerfaelle lassen vorhandene Zieldateien auf Linux, macOS und Windows unveraendert
 - CLI-Tests fuer `--verbose`, `--quiet` und gegenseitigen Ausschluss
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
-- Golden- und CLI-Tests, dass `--top` fuer Markdown, HTML, JSON und DOT konsistent wirkt und kein Artefaktformat implizit vollstaendige Listen ausgibt
-- JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten Listen
+- Golden- und CLI-Tests, dass `--top` bei `analyze` fuer Markdown, HTML, JSON und DOT konsistent wirkt und kein Artefaktformat implizit vollstaendige Listen ausgibt
+- CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und Impact-Reports keine implizite Begrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren
+- JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
+- Tests, dass `--verbose` Markdown-, HTML- und DOT-Artefakte nicht gegenueber dem Normalmodus veraendert und Zusatzdiagnostik nur Console/`stderr` bzw. strukturierte vorhandene Diagnostics betrifft
 - Smoke-Test fuer Docker-Runtime-Image
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
 - Versionscheck, dass `cmake-xray --version`, `src/hexagon/model/application_info.h`, Root-`CMakeLists.txt` und Release-Tag konsistent `1.2.0` melden
 - Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
+- Release-Test oder dokumentierter Dry-Run fuer den Recovery-Pfad, wenn die GitHub-Release-Erstellung erfolgreich war, der OCI-Image-Publish danach aber fehlschlaegt
 - Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt und den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
 
@@ -398,10 +406,13 @@ Abhaengigkeiten:
 |---|---|---|
 | JSON wird ohne klaren Vertrag eingefuehrt | Folgewerkzeuge brechen bei jeder Report-Aenderung | `format_version` dokumentieren und Golden-Tests fuer zentrale Felder pflegen |
 | JSON-`inputs` verlangt Daten, die nicht im Ergebnisobjekt stehen | Adapter muessten CLI-Zustand kennen oder der Vertrag bleibt unerfuellt | strukturiertes `ReportInputs`-Modell als Bestandteil von `AnalysisResult` und `ImpactResult` einfuehren |
-| JSON-Listen sind durch `--top` gekuerzt, ohne dies zu kennzeichnen | Automatisierung verwechselt kurze Ausgaben mit vollstaendigen Projektdaten | `limit`, `total_count`, `returned_count` und `truncated` fuer Ranking- und Hotspot-Listen verpflichtend machen |
+| Producer setzen `ReportInputs` nicht vollstaendig | JSON/HTML/DOT zeigen bekannte File-API- oder Mixed-Input-Kontexte als `null` | `ProjectAnalyzer`, `ImpactAnalyzer` und Driving-Requests/-Ports als Producer explizit anpassen und testen |
+| Analyze-Listen sind durch `--top` gekuerzt, ohne dies zu kennzeichnen | Automatisierung verwechselt kurze Ausgaben mit vollstaendigen Projektdaten | `limit`, `total_count`, `returned_count` und `truncated` fuer Analyze-Ranking- und Hotspot-Listen verpflichtend machen |
+| `--top` wird versehentlich auch fuer `impact` eingefuehrt | CLI- und Port-Vertraege divergieren und Impact-Ergebnisse werden unklar begrenzt | M5 begrenzt `--top` auf `analyze`; Impact akzeptiert keine Top-Option und gibt vollstaendige `ImpactResult`-Listen aus |
 | `--output` bleibt nur teilweise fuer neue Formate nutzbar | Nutzer koennen neue Artefaktformate nicht verlaesslich in CI speichern | `--output` fuer `markdown`, `html`, `json` und `dot` explizit freischalten und atomare Schreibtests aufnehmen |
 | Atomarer Write ueberschreibt vorhandene Dateien nicht portabel | Fehler koennen Zielartefakte zerstoeren oder Windows-Releases brechen | Replace-Semantik fuer existierende Dateien auf Linux, macOS und Windows testen; bei Fehler bleibt die alte Datei unveraendert |
-| Artefaktformate interpretieren `--top` unterschiedlich | Goldens, CLI-Ausgabe und Automatisierung liefern widerspruechliche Ergebnismengen | einheitliche Top-Limit-Regel fuer Markdown, HTML, JSON und DOT festlegen und testen |
+| Analyze-Artefaktformate interpretieren `--top` unterschiedlich | Goldens, CLI-Ausgabe und Automatisierung liefern widerspruechliche Ergebnismengen | einheitliche Top-Limit-Regel fuer Markdown, HTML, JSON und DOT bei `analyze` festlegen und testen |
+| `--verbose` veraendert HTML-/Markdown-/DOT-Artefakte | Golden-Outputs und CI-Artefakte werden durch Diagnosemodus instabil | Verbose-only-Inhalte fuer diese Artefakte ausschliessen und Zusatzdiagnostik auf Console/`stderr` beschraenken |
 | DOT suggeriert Target-Graph-Semantik, die M5 noch nicht besitzt | Nutzer interpretieren Graphen falsch | keine Target-zu-Target-Kanten erzeugen und Legende/Labels klar formulieren |
 | DOT-Escaping ist syntaktisch fehlerhaft | Graphviz-Berichte brechen erst bei Nutzern | Sonderzeichen-Goldens mit Graphviz oder Parser validieren |
 | HTML-Goldens werden durch kosmetische Details instabil | Tests werden teuer und rauschanfaellig | keine Zeitstempel, keine Zufalls-IDs, deterministische Struktur |
@@ -409,6 +420,7 @@ Abhaengigkeiten:
 | Release-Trigger akzeptiert ungueltige Tags | fehlerhafte Releases oder falsche `latest`-Tags entstehen | Semver-/Prerelease-Tags fail-fast validieren und `latest` nur fuer regulaere Releases setzen |
 | macOS-/Windows-Artefakte werden trotz begrenzter Freigabe veroeffentlicht | Nutzer interpretieren Preview-Builds als offiziell unterstuetzte Releases | Release-Workflow entweder auf Linux/OCI begrenzen oder Plattformarchive deutlich als experimentell dokumentieren |
 | GHCR-Image wird vor Abschluss aller Release-Gates gepusht | Teilveroeffentlichung ohne passenden GitHub Release bleibt zurueck | Publish in finalen Job nach Build, Smoke-Tests und Release-Erstellung verschieben oder Recovery-Pfad dokumentieren |
+| GitHub Release wird erstellt, aber OCI-Publish schlaegt danach fehl | Release zeigt ein fehlendes Container-Artefakt oder falsche Installationshinweise | Recovery-/Rollback-Pfad fuer Draft/Loeschen, Nachpublish, Retagging und Release-Notes-Korrektur dokumentieren und trocken testen |
 | Release-Workflow funktioniert nur fuer lokale Pfade | Artefakte sind nicht real nutzbar | entpacktes Linux-Archiv und Container-Image separat smoke-testen |
 | Versionsquellen bleiben auf `1.1.0` | ein `v1.2.0`-Release meldet intern die alte Version | Root-`CMakeLists.txt`, `application_info.h`, `--version` und Release-Tag gemeinsam pruefen |
 | Windows-Pfade brechen Golden-Tests | Portabilitaetsziel bleibt theoretisch | Pfadanzeige und Normalisierung explizit testen; Goldens plattformrobust gestalten |
