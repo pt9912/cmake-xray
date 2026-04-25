@@ -294,6 +294,10 @@ Regeln fuer aufgeloeste Adapterpfade:
 - Der Adapter liefert den rohen lexikalischen Build- oder Reply-Pfad, den er tatsaechlich verwendet hat.
 - Der Service kombiniert diesen rohen Adapterpfad mit dem zugehoerigen `InputPathArgument` der File-API-Eingabe.
 - War die urspruengliche File-API-Eingabe relativ, wird ein absoluter roher Adapterpfad fuer die Anzeige lexikalisch relativ zu `report_display_base` dargestellt, sofern der Pfad unter dieser Basis liegt. Beispiel: `--cmake-file-api build` mit `report_display_base=/repo` und Adapterpfad `/repo/build/.cmake/api/v1/reply` wird als `build/.cmake/api/v1/reply` angezeigt.
+- "Unter `report_display_base`" wird segmentbasiert nach lexikalischer Normalisierung geprueft, nicht per String-Prefix. `/repo2/...` liegt nicht unter `/repo`.
+- Ist Adapterpfad und `report_display_base` lexikalisch gleich, wird `.` als Anzeige-String verwendet.
+- Wenn Root-Name oder Drive unterschiedlich sind, etwa `C:\repo` gegen `D:\repo`, gilt der Adapterpfad nicht als unter der Basis liegend und bleibt absolut.
+- Case-Sensitivity folgt der Plattformnormalisierung von `std::filesystem::path`: POSIX-Vergleiche bleiben case-sensitiv; Windows-Vergleiche werden fuer Drive-/Segmentvergleich case-insensitiv normalisiert.
 - War die urspruengliche File-API-Eingabe relativ und liegt der Adapterpfad nicht unter `report_display_base`, bleibt er absolut und muss in Goldens ueber fixture-stabile Pfade wie `/project/...` kontrolliert werden.
 - War die urspruengliche File-API-Eingabe absolut, bleibt ein absoluter Adapterpfad absolut.
 - Ist der rohe Adapterpfad relativ, wird er als lexikalisch normalisierter relativer Anzeige-String ausgegeben; Services duerfen ihn fuer IO gegen `report_display_base` interpretieren, aber nicht fuer die Anzeige basisrelativ kanonisieren.
@@ -387,7 +391,8 @@ Der bestehende Report-Port liefert fuer erfolgreiche Renderings weiter Reportinh
 
 Umsetzung:
 
-- Es wird ein kleines `RenderResult`-/`Expected<std::string, RenderError>`-Value-Object fuer den CLI-Schreibpfad eingefuehrt.
+- Es wird ein kleines eigenes `RenderResult`-Struct fuer den CLI-Schreibpfad eingefuehrt, zum Beispiel mit `std::optional<std::string> content` und `std::optional<RenderError> error`.
+- AP 1.1 fuehrt weder `std::expected` noch eine neue Expected-Dependency ein; der Code bleibt C++20-kompatibel.
 - Der CLI-Schreibpfad haengt fuer Tests an einer kleinen internen Renderer-Abstraktion, zum Beispiel `CliReportRenderer`, deren `render()` ein `RenderResult` liefert.
 - Reportadapter, die weiterhin `std::string` liefern, werden im CLI-Schreibpfad ueber einen Adapter-Wrapper in `RenderResult` gehoben.
 - Exceptions aus Reportadaptern sind kein primaerer Fehlervertrag; der CLI-Schreibpfad darf sie als Sicherheitsnetz abfangen und in `RenderError` mappen, aber neue Tests und neue Formatpfade pruefen den `RenderResult`-Pfad.
@@ -534,6 +539,7 @@ Unit-/Service-Tests:
 - `cmake_file_api_resolved_path` folgt der Adapterpfad-Regel und wird nicht aus dem originalen CLI-String rekonstruiert.
 - Bei relativer File-API-Eingabe und absolutem Adapterpfad unter `report_display_base` wird `cmake_file_api_resolved_path` als relativer Anzeige-String ausgegeben, zum Beispiel `build/.cmake/api/v1/reply`.
 - Ein Test deckt `--cmake-file-api build` mit `report_display_base=/repo` und rohem Adapterpfad `/repo/build/.cmake/api/v1/reply` ab, damit keine hostabhaengige Absolutform in `ReportInputs.cmake_file_api_resolved_path` landet.
+- Tests fuer die Unter-Basis-Pruefung decken mindestens `/repo` vs. `/repo2`, Gleichheit mit der Basis, Windows-Drive-Mismatch und plattformgerechte Case-Sensitivity ab.
 - Normale Eingabe-Displaypfade werden aus `InputPathArgument::original_argument` erzeugt; IO nutzt `path_for_io`.
 - Ein Test deckt `original_argument=./build/../out/compile_commands.json` und davon abweichendes `path_for_io` ab, damit die Anzeige nicht aus dem IO-Pfad rekonstruiert wird.
 - Ein Test stellt sicher, dass `changed_file_path.path_for_io` bei relativem `changed_file` nicht gegen `report_display_base`, sondern gegen die Impact-Provenienz-Basis ausgewertet wird.
