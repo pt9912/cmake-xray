@@ -57,6 +57,7 @@ Voraussichtlich zu aendern:
 Neue Dateien, falls kein passender Ort vorhanden ist:
 
 - `src/hexagon/model/report_inputs.h`
+- `src/hexagon/model/report_format_version.h`
 - `src/adapters/cli/atomic_report_writer.h`
 - `src/adapters/cli/atomic_report_writer.cpp`
 - `tests/adapters/test_atomic_report_writer.cpp`
@@ -79,6 +80,7 @@ enum class ChangedFileSource {
     compile_database_directory,
     file_api_source_root,
     cli_absolute,
+    unresolved_file_api_source_root,
 };
 
 struct ReportInputs {
@@ -108,6 +110,17 @@ Regeln:
 - Bei `analyze` bleiben `changed_file` und `changed_file_source` `std::nullopt`.
 - Bestehende skalare Felder `compile_database_path` und `changed_file` in Ergebnisobjekten bleiben in AP 1.1 als Legacy-Presentation-Felder erhalten, solange bestehende Console-/Markdown-Adapter sie direkt rendern.
 - Neue M5-Artefaktadapter duerfen diese Legacy-Felder nicht als Quelle nutzen.
+
+### Formatversion
+
+AP 1.1 legt die erste maschinenlesbare Reportformatversion fest, auch wenn JSON-Schema und JSON-Adapter erst in AP 1.2 folgen.
+
+Vertrag:
+
+- `format_version` startet mit dem Integerwert `1`.
+- Die Konstante lebt in `src/hexagon/model/report_format_version.h`.
+- JSON-Adapter, JSON-Schema, Dokumentation und Golden-Tests muessen spaeter dieselbe Konstante beziehungsweise denselben Wert verwenden.
+- AP 1.1 implementiert noch keinen JSON-Renderer, aber verhindert, dass AP 1.2 die Versionierungsentscheidung neu treffen muss.
 
 ### Ergebnisobjekte
 
@@ -144,6 +157,8 @@ Regeln:
 
 - Wenn ein Service ein `AnalysisResult` oder `ImpactResult` mit Diagnostics oder unvollstaendigen Daten zurueckgibt, muss `inputs` trotzdem aus dem Request befuellt sein.
 - Fehler beim Laden von Compile Database oder File API duerfen die bekannte Eingabeprovenienz nicht auf `nullopt` zuruecksetzen.
+- Wenn bei File-API-only-Impact ein relativer `changed_file_path` vorliegt und das File-API-Laden fehlschlaegt, bevor eine Source-Root bekannt ist, wird `inputs.changed_file` als normalisierter roher CLI-Relativpfad gesetzt und `inputs.changed_file_source=unresolved_file_api_source_root` verwendet.
+- `unresolved_file_api_source_root` ist eine Fehlerergebnis-Provenienz und darf bei erfolgreichen Impact-Ergebnissen nicht auftreten.
 - Ausgenommen sind reine CLI-Parser-/Verwendungsfehler, bei denen kein Service aufgerufen und kein Ergebnisobjekt erzeugt wird.
 - AP 1.1 definiert keinen stabilen `ReportInputs`-Vertrag fuer ungefangene Exceptions, die kein Ergebnisobjekt erzeugen.
 
@@ -283,6 +298,7 @@ Display- und Aufloesungsregeln:
 - Ist `changed_file_path.was_relative == false`, wird `changed_file` als lexikalisch normalisierter absoluter String ausgegeben und `changed_file_source=cli_absolute` gesetzt.
 - Ist `changed_file_path.was_relative == true` und `compile_commands_path` gesetzt, wird der Pfad fuer Analyse und Anzeige gegen die Compile-Database-Directory interpretiert. `changed_file` bleibt der lexikalisch normalisierte relative Pfad zu dieser Directory, nicht relativ zu `report_display_base`.
 - Ist `changed_file_path.was_relative == true`, keine Compile Database gesetzt und eine File-API-Source-Root vorhanden, wird der Pfad fuer Analyse und Anzeige gegen diese Source-Root interpretiert. `changed_file` bleibt der lexikalisch normalisierte relative Pfad zu dieser Source-Root.
+- Ist `changed_file_path.was_relative == true`, keine Compile Database gesetzt und wegen File-API-Ladefehler keine Source-Root bekannt, wird `changed_file` als normalisierter roher CLI-Relativpfad ausgegeben und `changed_file_source=unresolved_file_api_source_root` gesetzt.
 - Wenn `was_relative == true`, aber `path` bereits absolut vorliegt, wird der Anzeige-String relativ zur jeweiligen Provenienz-Basis berechnet; dadurch bleibt ein urspruenglich relatives `--changed-file` auch nach vorgelagerter Normalisierung ein relativer ReportInput.
 
 Quellen:
@@ -290,6 +306,7 @@ Quellen:
 - `changed_file_source = cli_absolute`, wenn `changed_file_path.was_relative == false`.
 - `changed_file_source = compile_database_directory`, wenn `changed_file_path.was_relative == true` und `compile_commands_path` gesetzt ist.
 - `changed_file_source = file_api_source_root`, wenn `changed_file_path.was_relative == true`, keine Compile Database gesetzt ist und File-API-Metadaten eine Source-Root liefern.
+- `changed_file_source = unresolved_file_api_source_root`, wenn `changed_file_path.was_relative == true`, keine Compile Database gesetzt ist und File-API-Metadaten wegen Ladefehler keine Source-Root liefern.
 
 Mixed-Input-Prioritaet:
 
@@ -343,6 +360,22 @@ Report-Port-Auswahl:
 
 - `console` und `markdown` nutzen weiter bestehende Ports.
 - Fuer `html`, `json`, `dot` wird in AP 1.1 kein `GenerateReportPort` ausgewaehlt. Die CLI bricht vor Analyse und vor Dateierzeugung mit dem definierten `not implemented`-Fehler ab. AP 1.2 bis AP 1.4 ersetzen diese Sperre formatweise durch echte Port-Verdrahtung.
+
+## Render-Fehlervertrag
+
+Der bestehende Report-Port liefert fuer erfolgreiche Renderings weiter Reportinhalt als `std::string`. AP 1.1 muss fuer den gemeinsamen Dateischreibpfad trotzdem einen expliziten Fehlerkanal definieren, damit Render-Fehler vor dem Ersetzen der Zieldatei abgefangen werden koennen.
+
+Zulaessige Umsetzung:
+
+- Entweder wird ein kleines `RenderResult`-/`Expected<std::string, RenderError>`-Value-Object fuer den CLI-Schreibpfad eingefuehrt.
+- Oder der CLI-Schreibpfad faengt dokumentierte Render-Exceptions aus Reportadaptern ab und mappt sie auf einen Render-Fehler.
+
+Regeln:
+
+- Render-Fehler werden vor Temp-Datei-Erstellung oder vor finalem Replace erkannt.
+- Bei Render-Fehler bleibt eine bestehende Zieldatei unveraendert.
+- Render-Fehler liefern einen CLI-Fehler-Exit-Code ungleich `0` und eine Fehlermeldung auf `stderr`.
+- Erfolgreiche Renderings bleiben unveraendert stringbasiert; AP 1.1 fuehrt keinen fachlichen Adapterkontext in den Render-Fehlerkanal ein.
 
 ## `--output`-Schreibvertrag
 
@@ -414,24 +447,29 @@ Verboten:
 ## Implementierungsreihenfolge
 
 1. `ReportInputs` und Enums einfuehren.
-2. `AnalysisResult` und `ImpactResult` um `inputs` erweitern.
-3. `AnalyzeProjectRequest` um `InputPathArgument` und `report_display_base` erweitern.
-4. `AnalyzeImpactRequest` einfuehren und den positionalen virtuellen Impact-Portvertrag aus dem Produktionspfad entfernen.
-5. `analysis_support`-Pfadhelper so erweitern, dass Fallback-Basen explizit aus dem Request kommen und nicht aus dem Prozess-CWD.
-6. `BuildModelResult` um rohe File-API-Aufloesungsmetadaten erweitern.
-7. `ProjectAnalyzer` setzt `ReportInputs` fuer `analyze`.
-8. `ImpactAnalyzer` setzt `ReportInputs` fuer `impact`, inklusive `changed_file_source`.
-9. Legacy-Presentation-Felder fuer bestehende Console-/Markdown-Adapter byte-stabil weiterbefuellen.
-10. CLI-Formatvalidierung auf fuenf Werte erweitern.
-11. `--output`-Validierung fuer artefaktorientierte Formate erweitern und `console --output` ablehnen.
-12. Atomic-Write-/Replace-Wrapper einfuehren.
-13. CLI-Schreibpfad auf Atomic-Writer umstellen.
-14. Tests aktualisieren und Golden-Kompatibilitaet pruefen.
+2. `format_version = 1` als fachliche Konstante einfuehren.
+3. `AnalysisResult` und `ImpactResult` um `inputs` erweitern.
+4. `AnalyzeProjectRequest` um `InputPathArgument` und `report_display_base` erweitern.
+5. `AnalyzeImpactRequest` einfuehren und den positionalen virtuellen Impact-Portvertrag aus dem Produktionspfad entfernen.
+6. `analysis_support`-Pfadhelper so erweitern, dass Fallback-Basen explizit aus dem Request kommen und nicht aus dem Prozess-CWD.
+7. `BuildModelResult` um rohe File-API-Aufloesungsmetadaten erweitern.
+8. `ProjectAnalyzer` setzt `ReportInputs` fuer `analyze`.
+9. `ImpactAnalyzer` setzt `ReportInputs` fuer `impact`, inklusive `changed_file_source`.
+10. Legacy-Presentation-Felder fuer bestehende Console-/Markdown-Adapter byte-stabil weiterbefuellen.
+11. CLI-Formatvalidierung auf fuenf Werte erweitern.
+12. `--output`-Validierung fuer artefaktorientierte Formate erweitern und `console --output` ablehnen.
+13. Render-Fehlerkanal fuer den CLI-Schreibpfad definieren.
+14. Atomic-Write-/Replace-Wrapper einfuehren.
+15. CLI-Schreibpfad auf Atomic-Writer umstellen.
+16. Tests aktualisieren und Golden-Kompatibilitaet pruefen.
 
 ## Tests
 
 Unit-/Service-Tests:
 
+- Formatversion:
+  - fachliche Konstante liefert `format_version = 1`
+  - Testname dokumentiert, dass AP 1.2 JSON diesen Wert wiederverwenden muss
 - `ReportInputs` bei Compile-Database-only-Analyze:
   - `compile_database_path` gesetzt
   - `compile_database_source=cli`
@@ -453,6 +491,9 @@ Unit-/Service-Tests:
 - Impact mit relativem `changed_file` plus File API only:
   - `changed_file_source=file_api_source_root`
   - `changed_file` ist der normalisierte relative Pfad zur File-API-Source-Root, zum Beispiel `src/lib.cpp`
+- Impact mit relativem `changed_file` plus File API only und File-API-Ladefehler vor bekannter Source-Root:
+  - `changed_file_source=unresolved_file_api_source_root`
+  - `changed_file` ist der normalisierte rohe CLI-Relativpfad
 - Impact mit absolutem `changed_file`:
   - `changed_file_source=cli_absolute`
   - `changed_file` ist der normalisierte absolute Pfad, zum Beispiel `/project/src/lib.cpp`
@@ -497,6 +538,7 @@ Atomic-Writer-Tests:
 - neue Datei wird vollstaendig geschrieben.
 - vorhandene Datei wird bei Erfolg ersetzt.
 - vorhandene Datei bleibt bei simuliertem Render-/Write-/Flush-/Replace-Fehler unveraendert.
+- simulierter Render-Fehler erzeugt keine ersetzte Zieldatei, liefert Exit-Code ungleich `0` und schreibt eine Fehlermeldung nach `stderr`.
 - Temp-Datei wird exklusiv erstellt; eine vorhandene Temp-Datei wird nicht ueberschrieben.
 - Tests pruefen leserseitige atomare Replace-Semantik, aber keine Crash-Dauerhaftigkeit nach Stromausfall.
 - Windows-Pfad nutzt die Windows-Replace-Implementierung oder einen abstrahierten Test-Doppelgaenger mit derselben Semantik.
@@ -515,6 +557,7 @@ Regressionstests:
 AP 1.1 ist abgeschlossen, wenn:
 
 - die neuen Modell- und Request-Vertraege kompiliert und in Services genutzt werden;
+- `format_version = 1` als fachliche Konstante existiert und getestet ist;
 - kein neuer Reportadapter CLI-Kontext benoetigt;
 - `console --output` abgelehnt wird;
 - `--output` fuer `markdown` stdout leer laesst;
@@ -525,6 +568,7 @@ AP 1.1 ist abgeschlossen, wenn:
 - kein Produktionspfad mehr eine `analysis_support`-Helper-API nutzt, die ihre Fallback-Basis aus dem Prozess-CWD ableitet;
 - `ReportInputs` fuer Analyze und Impact vollstaendig in Service-Tests abgedeckt ist;
 - `ReportInputs` auch fuer Service-Fehlerergebnisse aus dem Request befuellt wird, sofern ein Ergebnisobjekt zurueckgegeben wird;
+- File-API-only-Impact-Fehler vor bekannter Source-Root `changed_file_source=unresolved_file_api_source_root` setzen statt falsche Provenienz oder `nullopt` auszugeben;
 - `CmakeFileApiAdapter` den rohen aufgeloesten Build-/Reply-Pfad in `BuildModelResult::cmake_file_api_resolved_path` setzt und Adaptertests Build-Dir- sowie Reply-Dir-Eingaben abdecken;
 - Compile-Database-only-, File-API- und Mixed-Input-Console-/Markdown-Goldens byte-stabil bleiben;
 - `ReportInputs` in AP 1.1 nicht neu in Console oder Markdown sichtbar wird;
