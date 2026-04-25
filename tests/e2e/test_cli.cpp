@@ -286,13 +286,26 @@ TEST_CASE_FIXTURE(CliFixture, "markdown analyze can write atomically to an outpu
     CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
 }
 
-TEST_CASE_FIXTURE(CliFixture, "output requires markdown format") {
+TEST_CASE_FIXTURE(CliFixture, "output is rejected with the default console format") {
     CHECK(run({"analyze", "--compile-commands",
                fixture_path("m2/basic_project/compile_commands.json").c_str(), "--output",
                "report.md"}) == ExitCode::cli_usage_error);
-    CHECK(err.str().find("--output is only supported with --format markdown") !=
+    CHECK(err.str().find("--output is not supported with --format console") !=
           std::string::npos);
-    CHECK(err.str().find("use --format markdown") != std::string::npos);
+    CHECK(err.str().find("use an artifact-oriented format") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "console output rejection wins over a missing input source") {
+    const TemporaryDirectory temp_dir;
+    const auto target_path = (temp_dir.path() / "report.md").string();
+
+    CHECK(run({"analyze", "--format", "console", "--output", target_path.c_str()}) ==
+          ExitCode::cli_usage_error);
+    CHECK(err.str().find("--output is not supported with --format console") !=
+          std::string::npos);
+    CHECK(err.str().find("at least one input source") == std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(target_path));
 }
 
 TEST_CASE_FIXTURE(CliFixture, "markdown output write failures return exit 1 without leaving temp files") {
@@ -396,10 +409,79 @@ TEST_CASE_FIXTURE(CliFixture, "missing impact changed-file returns exit 2") {
           ExitCode::cli_usage_error);
 }
 
-TEST_CASE_FIXTURE(CliFixture, "invalid report format returns exit 2") {
+TEST_CASE_FIXTURE(CliFixture, "unknown report format value returns exit 2") {
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+               "yaml"}) == ExitCode::cli_usage_error);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "html format is recognized but not implemented") {
     CHECK(run({"analyze", "--compile-commands",
                fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
                "html"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--format html is recognized but not implemented in this build") !=
+          std::string::npos);
+    CHECK(err.str().find("only --format console and --format markdown are available") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "json format is recognized but not implemented") {
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+               "json"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--format json is recognized but not implemented in this build") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "dot format is recognized but not implemented") {
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+               "dot"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--format dot is recognized but not implemented in this build") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "not-implemented format wins over missing input source") {
+    CHECK(run({"analyze", "--format", "json"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--format json is recognized but not implemented in this build") !=
+          std::string::npos);
+    CHECK(err.str().find("at least one input source") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "not-implemented format wins over --output without creating a file") {
+    const TemporaryDirectory temp_dir;
+    const auto target_path = (temp_dir.path() / "report.json").string();
+
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+               "json", "--output", target_path.c_str()}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--format json is recognized but not implemented in this build") !=
+          std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(target_path));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact json without --changed-file returns not-implemented error") {
+    CHECK(run({"impact", "--cmake-file-api",
+               fixture_path("m4/file_api_only/build").c_str(), "--format", "json"}) ==
+          ExitCode::cli_usage_error);
+    CHECK(err.str().find("--format json is recognized but not implemented in this build") !=
+          std::string::npos);
+    CHECK(err.str().find("--changed-file") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "impact missing --changed-file with markdown returns exit 2") {
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+               "markdown"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("impact requires --changed-file") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "analyze --help mentions all five format values") {
+    REQUIRE(run({"analyze", "--help"}) == ExitCode::success);
+    for (const auto* value : {"console", "markdown", "html", "json", "dot"}) {
+        CHECK(out.str().find(value) != std::string::npos);
+    }
 }
 
 TEST_CASE_FIXTURE(CliFixture, "nonexistent file returns exit 3") {
