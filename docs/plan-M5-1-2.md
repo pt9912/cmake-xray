@@ -68,6 +68,8 @@ Voraussichtlich zu aendern:
 - `tests/adapters/test_json_report_adapter.cpp`
 - `tests/adapters/test_port_wiring.cpp`
 - `tests/e2e/test_cli.cpp`
+- `docs/guide.md`
+- `docs/quality.md`
 - `Dockerfile`
 - `.github/workflows/test.yml`
 - `.github/workflows/build.yml`
@@ -119,7 +121,7 @@ Ein JSON-Bericht fuer `analyze` enthaelt mindestens:
 - `inputs`: `compile_database_path`, `compile_database_source`, `cmake_file_api_path`, `cmake_file_api_resolved_path` und `cmake_file_api_source`.
 - `summary`: Translation-Unit-Anzahl, Ranking-Anzahl, Hotspot-Anzahl, Top-Limit, `include_analysis_heuristic`, Beobachtungsherkunft und Target-Metadatenstatus.
 - `translation_unit_ranking`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items` inklusive Metriken, Diagnostics und Target-Zuordnungen.
-- `include_hotspots`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items`.
+- `include_hotspots`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items`; Hotspot-Items enthalten betroffene Translation Units mit `affected_total_count`, `affected_returned_count`, `affected_truncated` und `affected_translation_units`.
 - `diagnostics`: reportweite Diagnostics.
 
 Analyze-spezifische Regeln:
@@ -127,6 +129,7 @@ Analyze-spezifische Regeln:
 - JSON folgt bei `analyze` der CLI-`--top`-Begrenzung fuer Ranking- und Hotspot-Listen.
 - `limit`, `total_count`, `returned_count` und `truncated` zeigen eindeutig, ob die Ausgabe gekuerzt wurde.
 - Eine unlimitierte JSON-Ausgabe waere nur nach expliziter Schema-Entscheidung zulaessig.
+- Die Unterliste `affected_translation_units` innerhalb eines Include-Hotspots ist in M5 ebenfalls begrenzt. Sie nutzt denselben effektiven `--top`-Wert als Obergrenze pro Hotspot und dokumentiert die Kuerzung ueber `affected_total_count`, `affected_returned_count` und `affected_truncated`.
 - `include_analysis_heuristic` ist ein boolesches Pflichtfeld unter `summary`.
 - Schema, Adaptertests und Goldens pruefen `include_analysis_heuristic=true` und `include_analysis_heuristic=false`.
 
@@ -167,13 +170,15 @@ AP 1.2 verwendet die in AP 1.1 eingefuehrte Konstante:
 
 ## Adapter- und Port-Grenzen
 
-`JsonReportAdapter` rendert ausschliesslich aus `AnalysisResult` und `ImpactResult`.
+`JsonReportAdapter` rendert fachliche Inhalte ausschliesslich aus `AnalysisResult` und `ImpactResult`.
 
 Regeln:
 
 - Der Adapter bekommt keinen CLI-Kontext.
 - Der Adapter verwendet `ReportInputs` als Eingabeprovenienz und nicht die Legacy-Presentation-Felder fuer Console/Markdown.
 - Der Adapter importiert `kReportFormatVersion` aus dem Modell.
+- Fuer Analyze darf der bestehende Renderparameter `effective_top_limit` beziehungsweise `write_analysis_report(result, effective_top_limit)` genutzt werden, solange er nur die Berichtssicht begrenzt und nicht als CLI-Kontext in JSON-Felder jenseits der dokumentierten Limit-Metadaten durchgereicht wird.
+- Alternativ darf `top_limit` als Ergebnis-/Reportview-Feld modelliert werden; AP 1.2 muss sich fuer genau einen Pfad entscheiden und ihn in Port-, Adapter- und Testschnittstellen konsistent umsetzen.
 - Der Adapter fuehrt keine HTML-, DOT- oder Markdown-spezifischen Metadaten ein.
 - Der Item-Vertrag legt Pflichtkeys, optionale Keys, Enum-Schreibweisen, numerische Typen und deterministische Sortier-Tie-Breaker fest.
 - Adaptertests pruefen exakte Keys und mindestens einen Tie-Breaker pro sortierter Item-Liste.
@@ -260,7 +265,8 @@ Bootstrap-Pfade:
 9. `--format json --output` an den gemeinsamen Atomic-Writer anbinden.
 10. E2E-Goldens fuer Analyze und Impact erzeugen.
 11. E2E-Tests mit Golden-Vergleich, Schema-Validierung, Stream-Vertrag und Fehlerfaellen ergaenzen.
-12. Abschliessend pruefen, dass Console-/Markdown-Goldens unveraendert bleiben.
+12. Nutzungsdokumentation in `docs/guide.md` und Test-/Qualitaetsumfang in `docs/quality.md` aktualisieren.
+13. Abschliessend pruefen, dass Console-/Markdown-Goldens unveraendert bleiben.
 
 ## Tests
 
@@ -291,7 +297,9 @@ E2E-Golden-Tests:
 - Reine Schema-Validierung statischer Goldens reicht nicht aus.
 - JSON-Goldens decken Compile-Database-only-, File-API-only- und Mixed-Input-Laeufe bei `analyze` ab.
 - Analyze-Goldens pruefen `compile_database_path`, `cmake_file_api_path`, `cmake_file_api_resolved_path`, `compile_database_source` und `cmake_file_api_source`.
+- File-API-Provenienz-Goldens pruefen mindestens einen `--cmake-file-api <build-dir>`-Fall und einen `--cmake-file-api <reply-dir>`-Fall, damit `cmake_file_api_path` und `cmake_file_api_resolved_path` nicht verwechselt werden.
 - Analyze-Goldens decken fuer `translation_unit_ranking` und `include_hotspots` jeweils mindestens einen ungekuerzten Fall mit `truncated=false` und einen gekuerzten `--top`-Fall mit `truncated=true`, korrektem `limit`, `total_count` und `returned_count` ab.
+- Analyze-Goldens decken fuer Hotspot-Items mindestens einen Fall ab, in dem `affected_translation_units` ueber `affected_total_count`, `affected_returned_count` und `affected_truncated` begrenzt wird.
 - JSON-Goldens decken `impact` mit Compile-Database-only-, File-API-only- und Mixed-Input-Provenienz ab.
 - Relative `changed_file`-Faelle pruefen `compile_database_directory` bei Mixed-Input und `file_api_source_root` bei File-API-only.
 - Absolute `changed_file`-Faelle pruefen `cli_absolute`.
@@ -338,8 +346,10 @@ AP 1.2 ist abnahmefaehig, wenn:
 - Echte CLI-Ausgaben gegen Goldens verglichen und anschliessend gegen das Schema validiert werden.
 - Analyze-Goldens Limit-/Truncation-Faelle fuer Ranking und Hotspots abdecken.
 - Impact-Goldens die relevanten `changed_file_source`-Faelle abdecken.
+- File-API-Goldens Build-Dir- und Reply-Dir-Eingaben fuer `cmake_file_api_resolved_path` abdecken.
 - Parser-, Eingabe-, Render- und Schreibfehler als Textfehler ohne JSON-Fehlerobjekt getestet sind.
 - Docker-, Coverage-, native Build- und Release-CTest-Pfade den JSON-Schema-Validator installieren oder eine gemeinsame Bootstrap-Schicht nutzen.
+- `docs/guide.md` die produktive JSON-Nutzung beschreibt und `docs/quality.md` die neuen JSON-Schema-, Golden- und E2E-Gates auffuehrt.
 - Console- und Markdown-Verhalten unveraendert bleibt.
 
 ## Offene Folgearbeiten
