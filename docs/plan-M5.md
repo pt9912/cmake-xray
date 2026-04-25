@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.26` |
+| Version | `0.27` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -24,7 +24,7 @@ M5 gilt als erreicht, wenn:
 - der JSON-Export fuer Projektanalyse und Impact-Analyse ein dokumentiertes Schema mit Formatversion, Pflichtfeldern, Typen, Enums, Nullability-Regeln und Array-Regeln ausgibt und fuer Automatisierung stabil nutzbar ist
 - der DOT-Export fuer die in M5 vorhandene Datenlage sinnvolle Graphviz-Diagramme erzeugt, ohne noch nicht implementierte Target-Graph-Semantik vorwegzunehmen
 - `--verbose` diagnoseorientierte Zusatzinformationen ausgibt; bei maschinenlesbaren Formaten duerfen diese Zusatzinformationen ausschliesslich ueber `stderr` erscheinen und weder stdout-Reports noch Artefaktinhalte veraendern
-- `--quiet` fuer erfolgreiche Console- und Status-Emissionen reduzierte Ausgabe liefert, ohne stdout-Reports fuer artefaktorientierte Formate zu kuerzen, und Fehler weiterhin verstaendlich auf `stderr` meldet
+- `--quiet` fuer erfolgreiche Console-Emissionen reduzierte Ausgabe liefert, ohne stdout-Reports fuer artefaktorientierte Formate zu kuerzen oder Erfolgsmeldungen bei Dateiausgabe einzufuehren, und Fehler weiterhin verstaendlich auf `stderr` meldet
 - ein tag-basierter Release-Workflow ein versioniertes Linux-CLI-Artefakt mit Pruefsumme erzeugt
 - ein OCI-kompatibles Container-Image fuer lokale Nutzung und CI erzeugt und dokumentiert wird
 - README, Release-Dokumentation und Beispiele die Nutzung ohne interne Build-Pfade wie `./build/cmake-xray` beschreiben
@@ -83,7 +83,7 @@ Wichtig:
 - JSON ist der vollstaendige maschinenlesbare Vertragsausdruck in M5; DOT bleibt visualisierungsorientiert, erhaelt aber einen begrenzt stabilen Metadatenvertrag fuer die explizit benannten Graph-/Node-Attribute
 - stdout bleibt der Standard, wenn kein `--output` angegeben ist; mit `--output` gilt weiterhin der M3-Vertrag: Der Reportinhalt wird ausschliesslich in die Datei geschrieben, erfolgreicher stdout bleibt leer, und Warnungen oder Fehler gehen nach `stderr`. Erfolgsmeldungen auf stdout sind fuer M5 mit `--output` nicht zulaessig, solange kein expliziter kuenftiger Status-Flag eingefuehrt wird.
 - `--output` ersetzt vorhandene Zielartefakte bei erfolgreichem Schreiben; bei Render-, Schreib- oder Replace-Fehlern bleibt eine bereits vorhandene Zieldatei unveraendert erhalten
-- die atomare Dateiausgabe verwendet eine temporaere Datei im Zielverzeichnis und einen eigenen Replace-Wrapper statt nacktem `std::filesystem::rename(temp, target)`: POSIX nutzt `rename`/`renameat` fuer atomaren Replace, Windows nutzt `ReplaceFileW` oder `MoveFileExW` mit `MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH`; ein vorheriges Loeschen des Zielpfads ist nicht zulaessig, weil bei Fehlern die alte Datei unveraendert bleiben muss
+- die atomare Dateiausgabe verwendet eine kollisionssicher und exklusiv angelegte temporaere Datei im Zielverzeichnis und einen eigenen Replace-Wrapper statt nacktem `std::filesystem::rename(temp, target)`: POSIX nutzt `rename`/`renameat` fuer atomaren Replace, Windows nutzt `ReplaceFileW` oder `MoveFileExW` mit `MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH`; ein vorheriges Loeschen des Zielpfads ist nicht zulaessig, weil bei Fehlern die alte Datei unveraendert bleiben muss
 - fuer `analyze` folgen alle Reportformate derselben `--top`-Begrenzung fuer Ranking-, Hotspot- und vergleichbare Listenabschnitte; `impact` erhaelt in M5 keine `--top`-Option und keine implizite Begrenzung seiner strukturierten Ergebnislisten
 - DOT ist die visualisierungsorientierte Ausnahme: Auch `impact --format dot` wird ueber Graph-Budgets begrenzt, ohne das zugrunde liegende `ImpactResult` oder JSON-/HTML-/Markdown-Impact-Listen zu kuerzen
 - DOT bleibt fuer `analyze` und `impact` ein begrenztes Artefakt: Analyze-Hotspot-Kontext wird ueber ein separates, kleines `context_limit` begrenzt, beide DOT-Reporttypen werden ueber ein globales `node_limit`-/`edge_limit`-Budget begrenzt; Analyze-Hotspot-Knoten tragen bei vorhandenem Kontext die Attribute `context_total_count`, `context_returned_count`, `context_truncated`, und beide Reporttypen tragen immer die Graph-Attribute `graph_node_limit`, `graph_edge_limit`, `graph_truncated`
