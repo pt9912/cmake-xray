@@ -1016,3 +1016,57 @@ TEST_CASE("impact analyzer preserves ReportInputs on compile database load failu
     REQUIRE(result.inputs.changed_file_source.has_value());
     CHECK(*result.inputs.changed_file_source == ChangedFileSource::compile_database_directory);
 }
+
+TEST_CASE("impact analyzer keeps changed_file relative when path_for_io is pre-resolved absolute") {
+    // Plan rule: when was_relative == true, services must not treat path_for_io as
+    // a fachlich aufgeloesten Impact-Pfad. Simulate a CLI that pre-resolved
+    // path_for_io to an absolute form: changed_file must still come from
+    // original_argument relative to the compile DB directory.
+    class FixedFileApiPort final : public xray::hexagon::ports::driven::BuildModelPort {
+    public:
+        xray::hexagon::model::BuildModelResult load_build_model(
+            std::string_view /*path*/) const override {
+            xray::hexagon::model::BuildModelResult result;
+            result.source = ObservationSource::derived;
+            result.target_metadata = TargetMetadataStatus::loaded;
+            result.source_root = "/project";
+            result.compile_database = CompileDatabaseResult{
+                CompileDatabaseError::none, {},
+                {CompileEntry::from_arguments(
+                    "/project/src/main.cpp", "/project/build/debug",
+                    {"clang++", "-c", "/project/src/main.cpp"})},
+                {}};
+            result.target_assignments = {
+                {"/project/src/main.cpp|/project/build/debug",
+                 {{"myapp", "EXECUTABLE", "myapp::EXECUTABLE"}}}};
+            return result;
+        }
+    };
+
+    const StubBuildModelPort compile_db_port;
+    const FixedFileApiPort file_api_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{compile_db_port, include_resolver_port,
+                                                           file_api_port};
+
+    AnalyzeImpactRequest request;
+    request.report_display_base = std::filesystem::path{"/"};
+    request.compile_commands_path =
+        InputPathArgument{std::filesystem::path{"/project/compile_commands.json"},
+                          std::filesystem::path{"/project/compile_commands.json"}, false};
+    // Pre-resolved absolute path_for_io with was_relative=true.
+    request.changed_file_path =
+        InputPathArgument{std::filesystem::path{"src/main.cpp"},
+                          std::filesystem::path{"/project/src/main.cpp"}, true};
+    request.cmake_file_api_path =
+        InputPathArgument{std::filesystem::path{"/tmp/build"},
+                          std::filesystem::path{"/tmp/build"}, false};
+
+    const auto result = analyzer.analyze_impact(request);
+
+    REQUIRE(result.inputs.changed_file_source.has_value());
+    CHECK(*result.inputs.changed_file_source == ChangedFileSource::compile_database_directory);
+    REQUIRE(result.inputs.changed_file.has_value());
+    CHECK(*result.inputs.changed_file == "src/main.cpp");
+    CHECK(result.changed_file == "src/main.cpp");
+}

@@ -3,11 +3,18 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
-#include <fcntl.h>
 #include <fstream>
 #include <string>
 #include <system_error>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#else
+#include <fcntl.h>
 #include <unistd.h>
+#endif
 
 namespace xray::adapters::cli {
 
@@ -58,16 +65,48 @@ std::optional<AtomicFileError> install_temp(AtomicFilePlatformOps& ops,
 
 }  // namespace
 
+namespace {
+
+unsigned long current_process_id() {
+#ifdef _WIN32
+    return static_cast<unsigned long>(::GetCurrentProcessId());
+#else
+    return static_cast<unsigned long>(::getpid());
+#endif
+}
+
+#ifdef _WIN32
+std::string windows_error_message(unsigned long code) {
+    LPSTR raw_buffer = nullptr;
+    const auto length = ::FormatMessageA(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+            FORMAT_MESSAGE_IGNORE_INSERTS,
+        nullptr, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        reinterpret_cast<LPSTR>(&raw_buffer), 0, nullptr);
+    std::string message;
+    if (raw_buffer != nullptr && length > 0) {
+        message.assign(raw_buffer, length);
+        ::LocalFree(raw_buffer);
+    } else {
+        message = "Windows error " + std::to_string(code);
+    }
+    return message;
+}
+#endif
+
+}  // namespace
+
 std::filesystem::path atomic_report_temp_path(const std::filesystem::path& target_path,
                                               std::size_t attempt) {
     const auto file_name = target_path.filename().generic_string();
     const auto base_name = file_name.empty() ? std::string{"report"} : file_name;
     const auto temp_name = ".cmake-xray-" + base_name + "." +
-                           std::to_string(::getpid()) + "." +
+                           std::to_string(current_process_id()) + "." +
                            std::to_string(attempt) + ".tmp";
     return target_directory(target_path) / temp_name;
 }
 
+#ifndef _WIN32
 std::optional<AtomicFileError> PosixAtomicFilePlatformOps::create_temp_exclusive(
     const std::filesystem::path& temp_path) {
     const int fd = ::open(temp_path.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0644);
@@ -97,6 +136,45 @@ void PosixAtomicFilePlatformOps::remove_temp_quiet(
     std::error_code ec;
     std::filesystem::remove(temp_path, ec);
 }
+#endif
+
+#ifdef _WIN32
+std::optional<AtomicFileError> WindowsAtomicFilePlatformOps::create_temp_exclusive(
+    const std::filesystem::path& temp_path) {
+    const HANDLE handle = ::CreateFileW(
+        temp_path.wstring().c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+        FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) {
+        return AtomicFileError{windows_error_message(::GetLastError())};
+    }
+    ::CloseHandle(handle);
+    return std::nullopt;
+}
+
+std::optional<AtomicFileError> WindowsAtomicFilePlatformOps::replace_existing(
+    const std::filesystem::path& temp_path, const std::filesystem::path& target_path) {
+    if (!::ReplaceFileW(target_path.wstring().c_str(), temp_path.wstring().c_str(),
+                         nullptr, REPLACEFILE_WRITE_THROUGH, nullptr, nullptr)) {
+        return AtomicFileError{windows_error_message(::GetLastError())};
+    }
+    return std::nullopt;
+}
+
+std::optional<AtomicFileError> WindowsAtomicFilePlatformOps::move_new(
+    const std::filesystem::path& temp_path, const std::filesystem::path& target_path) {
+    if (!::MoveFileExW(temp_path.wstring().c_str(), target_path.wstring().c_str(),
+                        MOVEFILE_WRITE_THROUGH)) {
+        return AtomicFileError{windows_error_message(::GetLastError())};
+    }
+    return std::nullopt;
+}
+
+void WindowsAtomicFilePlatformOps::remove_temp_quiet(
+    const std::filesystem::path& temp_path) noexcept {
+    std::error_code ec;
+    std::filesystem::remove(temp_path, ec);
+}
+#endif
 
 AtomicReportWriter::AtomicReportWriter(AtomicFilePlatformOps& ops) : ops_(&ops) {}
 

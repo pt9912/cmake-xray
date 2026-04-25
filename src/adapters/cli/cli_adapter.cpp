@@ -207,7 +207,7 @@ const xray::hexagon::ports::driving::GenerateReportPort& select_report_port(
 
 int run_emit_for_renderer(const CliReportRenderer& renderer, const CliOptions& options,
                           CliOutputStreams streams) {
-    PosixAtomicFilePlatformOps ops;
+    DefaultAtomicFilePlatformOps ops;
     AtomicReportWriter writer{ops};
     return emit_rendered_report(renderer, options.output_path, writer, streams);
 }

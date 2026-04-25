@@ -47,6 +47,28 @@ public:
     void remove_temp_quiet(const std::filesystem::path& temp_path) noexcept override;
 };
 
+#ifdef _WIN32
+class WindowsAtomicFilePlatformOps final : public AtomicFilePlatformOps {
+public:
+    std::optional<AtomicFileError> create_temp_exclusive(
+        const std::filesystem::path& temp_path) override;
+
+    std::optional<AtomicFileError> replace_existing(
+        const std::filesystem::path& temp_path,
+        const std::filesystem::path& target_path) override;
+
+    std::optional<AtomicFileError> move_new(
+        const std::filesystem::path& temp_path,
+        const std::filesystem::path& target_path) override;
+
+    void remove_temp_quiet(const std::filesystem::path& temp_path) noexcept override;
+};
+
+using DefaultAtomicFilePlatformOps = WindowsAtomicFilePlatformOps;
+#else
+using DefaultAtomicFilePlatformOps = PosixAtomicFilePlatformOps;
+#endif
+
 struct AtomicWriteFailure {
     std::string path;
     std::string reason;

@@ -462,6 +462,30 @@ TEST_CASE_FIXTURE(CliFixture, "not-implemented format wins over --output without
     CHECK_FALSE(std::filesystem::exists(target_path));
 }
 
+TEST_CASE_FIXTURE(CliFixture, "html --output also returns not-implemented without creating a file") {
+    const TemporaryDirectory temp_dir;
+    const auto target_path = (temp_dir.path() / "report.html").string();
+
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+               "html", "--output", target_path.c_str()}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--format html is recognized but not implemented in this build") !=
+          std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(target_path));
+}
+
+TEST_CASE_FIXTURE(CliFixture, "dot --output also returns not-implemented without creating a file") {
+    const TemporaryDirectory temp_dir;
+    const auto target_path = (temp_dir.path() / "report.dot").string();
+
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+               "dot", "--output", target_path.c_str()}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--format dot is recognized but not implemented in this build") !=
+          std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(target_path));
+}
+
 TEST_CASE_FIXTURE(CliFixture,
                   "impact json without --changed-file returns not-implemented error") {
     CHECK(run({"impact", "--cmake-file-api",
@@ -831,7 +855,7 @@ TEST_CASE("emit_rendered_report keeps an existing file when the renderer reports
     }
 
     const FailingRenderer renderer{"simulated rendering failed"};
-    xray::adapters::cli::PosixAtomicFilePlatformOps ops;
+    xray::adapters::cli::DefaultAtomicFilePlatformOps ops;
     xray::adapters::cli::AtomicReportWriter writer{ops};
 
     std::ostringstream out;
@@ -849,7 +873,7 @@ TEST_CASE("emit_rendered_report keeps an existing file when the renderer reports
 
 TEST_CASE("emit_rendered_report writes nothing to stdout when the renderer reports an error") {
     const FailingRenderer renderer{"render error path"};
-    xray::adapters::cli::PosixAtomicFilePlatformOps ops;
+    xray::adapters::cli::DefaultAtomicFilePlatformOps ops;
     xray::adapters::cli::AtomicReportWriter writer{ops};
 
     std::ostringstream out;
@@ -864,7 +888,7 @@ TEST_CASE("emit_rendered_report writes nothing to stdout when the renderer repor
 
 TEST_CASE("emit_rendered_report streams content to stdout when output_path is empty") {
     const SuccessRenderer renderer{"streamed body"};
-    xray::adapters::cli::PosixAtomicFilePlatformOps ops;
+    xray::adapters::cli::DefaultAtomicFilePlatformOps ops;
     xray::adapters::cli::AtomicReportWriter writer{ops};
 
     std::ostringstream out;
@@ -881,7 +905,7 @@ TEST_CASE("emit_rendered_report writes the content atomically to the target path
     const TemporaryDirectory temp_dir;
     const auto target = temp_dir.path() / "report.md";
     const SuccessRenderer renderer{"file body"};
-    xray::adapters::cli::PosixAtomicFilePlatformOps ops;
+    xray::adapters::cli::DefaultAtomicFilePlatformOps ops;
     xray::adapters::cli::AtomicReportWriter writer{ops};
 
     std::ostringstream out;
@@ -900,7 +924,7 @@ TEST_CASE("emit_rendered_report surfaces atomic writer failures with a write hin
     const TemporaryDirectory temp_dir;
     const auto missing_target = temp_dir.path() / "missing-dir" / "report.md";
     const SuccessRenderer renderer{"will not land"};
-    xray::adapters::cli::PosixAtomicFilePlatformOps ops;
+    xray::adapters::cli::DefaultAtomicFilePlatformOps ops;
     xray::adapters::cli::AtomicReportWriter writer{ops};
 
     std::ostringstream out;

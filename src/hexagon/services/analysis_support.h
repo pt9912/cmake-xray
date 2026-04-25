@@ -19,6 +19,12 @@ enum class ReportPathDisplayKind {
     resolved_adapter_path,
 };
 
+enum class ReportPathCasePolicy {
+    platform_default,
+    case_sensitive,    // POSIX semantics
+    case_insensitive,  // Windows drive/segment semantics
+};
+
 struct ReportPathDisplayInput {
     std::optional<std::filesystem::path> display_path;
     ReportPathDisplayKind kind{ReportPathDisplayKind::input_argument};
@@ -32,7 +38,8 @@ std::optional<std::filesystem::path> source_root_from_build_model(
     const model::BuildModelResult& build_model);
 
 std::optional<std::string> to_report_display_path(
-    ReportPathDisplayInput input, const std::filesystem::path& report_display_base);
+    ReportPathDisplayInput input, const std::filesystem::path& report_display_base,
+    ReportPathCasePolicy case_policy = ReportPathCasePolicy::platform_default);
 
 std::string normalize_path(const std::filesystem::path& path);
 std::string make_display_path(const std::string& normalized_path,

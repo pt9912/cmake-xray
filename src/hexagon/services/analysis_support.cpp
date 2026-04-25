@@ -320,22 +320,60 @@ TranslationUnitObservation build_translation_unit_observation(
 
 namespace {
 
+#ifdef _WIN32
+constexpr bool kPlatformPathsCaseInsensitive = true;
+#else
+constexpr bool kPlatformPathsCaseInsensitive = false;
+#endif
+
+bool resolve_case_insensitivity(ReportPathCasePolicy policy) {
+    if (policy == ReportPathCasePolicy::case_sensitive) return false;
+    if (policy == ReportPathCasePolicy::case_insensitive) return true;
+    return kPlatformPathsCaseInsensitive;
+}
+
+std::string maybe_case_fold(std::string value, bool case_insensitive) {
+    if (!case_insensitive) return value;
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return value;
+}
+
+bool paths_equal_with_policy(const std::filesystem::path& lhs,
+                              const std::filesystem::path& rhs, bool case_insensitive) {
+    return maybe_case_fold(lhs.generic_string(), case_insensitive) ==
+           maybe_case_fold(rhs.generic_string(), case_insensitive);
+}
+
 bool report_path_under_base(const std::filesystem::path& path,
-                            const std::filesystem::path& base) {
-    if (path.root_name() != base.root_name()) return false;
-    const auto relative = path.lexically_relative(base);
+                            const std::filesystem::path& base, bool case_insensitive) {
+    const auto path_text = maybe_case_fold(path.generic_string(), case_insensitive);
+    const auto base_text = maybe_case_fold(base.generic_string(), case_insensitive);
+    const std::filesystem::path folded_path{path_text};
+    const std::filesystem::path folded_base{base_text};
+    if (folded_path.root_name() != folded_base.root_name()) return false;
+    const auto relative = folded_path.lexically_relative(folded_base);
     if (relative.empty()) return false;
     const auto text = relative.generic_string();
     return text != ".." && !text.starts_with("../");
 }
 
+std::string strip_base_prefix(const std::filesystem::path& display_path,
+                               const std::filesystem::path& report_display_base) {
+    const auto base_str = report_display_base.generic_string();
+    auto strip_len = base_str.size();
+    if (strip_len > 0 && base_str.back() != '/') ++strip_len;
+    return display_path.generic_string().substr(strip_len);
+}
+
 std::string display_resolved_adapter_path(const std::filesystem::path& display_path,
-                                          const std::filesystem::path& report_display_base) {
-    if (display_path == report_display_base) return ".";
-    if (!report_path_under_base(display_path, report_display_base)) {
+                                          const std::filesystem::path& report_display_base,
+                                          bool case_insensitive) {
+    if (paths_equal_with_policy(display_path, report_display_base, case_insensitive)) return ".";
+    if (!report_path_under_base(display_path, report_display_base, case_insensitive)) {
         return display_path.generic_string();
     }
-    return display_path.lexically_relative(report_display_base).generic_string();
+    return strip_base_prefix(display_path, report_display_base);
 }
 
 }  // namespace
@@ -358,7 +396,8 @@ std::optional<std::filesystem::path> source_root_from_build_model(
 }
 
 std::optional<std::string> to_report_display_path(
-    ReportPathDisplayInput input, const std::filesystem::path& report_display_base) {
+    ReportPathDisplayInput input, const std::filesystem::path& report_display_base,
+    ReportPathCasePolicy case_policy) {
     if (!input.display_path.has_value()) return std::nullopt;
     const auto display = input.display_path->lexically_normal();
 
@@ -368,7 +407,8 @@ std::optional<std::string> to_report_display_path(
     if (!input.was_relative || !display.is_absolute()) {
         return display.generic_string();
     }
-    return display_resolved_adapter_path(display, report_display_base.lexically_normal());
+    return display_resolved_adapter_path(display, report_display_base.lexically_normal(),
+                                          resolve_case_insensitivity(case_policy));
 }
 
 std::string normalize_path(const std::filesystem::path& path) {

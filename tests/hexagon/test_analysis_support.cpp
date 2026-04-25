@@ -281,6 +281,57 @@ TEST_CASE("to_report_display_path keeps relative adapter path lexically normaliz
     CHECK(*display == "build/reply");
 }
 
+TEST_CASE("to_report_display_path with case_sensitive policy keeps mixed case under different paths") {
+    using xray::hexagon::services::ReportPathCasePolicy;
+    using xray::hexagon::services::ReportPathDisplayKind;
+    using xray::hexagon::services::to_report_display_path;
+    // POSIX semantics: /Repo and /repo are different paths.
+    const auto display = to_report_display_path(
+        {std::filesystem::path{"/Repo/build/.cmake/api/v1/reply"},
+         ReportPathDisplayKind::resolved_adapter_path, true},
+        std::filesystem::path{"/repo"}, ReportPathCasePolicy::case_sensitive);
+    REQUIRE(display.has_value());
+    CHECK(*display == "/Repo/build/.cmake/api/v1/reply");
+}
+
+TEST_CASE("to_report_display_path with case_insensitive policy folds drive and segment case") {
+    using xray::hexagon::services::ReportPathCasePolicy;
+    using xray::hexagon::services::ReportPathDisplayKind;
+    using xray::hexagon::services::to_report_display_path;
+    // Windows semantics: /Repo and /repo are the same path; display preserves
+    // the original case of the resolved adapter path.
+    const auto display = to_report_display_path(
+        {std::filesystem::path{"/Repo/Build/.cmake/api/v1/reply"},
+         ReportPathDisplayKind::resolved_adapter_path, true},
+        std::filesystem::path{"/repo"}, ReportPathCasePolicy::case_insensitive);
+    REQUIRE(display.has_value());
+    CHECK(*display == "Build/.cmake/api/v1/reply");
+}
+
+TEST_CASE("to_report_display_path with case_insensitive policy treats equal-with-different-case as base") {
+    using xray::hexagon::services::ReportPathCasePolicy;
+    using xray::hexagon::services::ReportPathDisplayKind;
+    using xray::hexagon::services::to_report_display_path;
+    const auto display = to_report_display_path(
+        {std::filesystem::path{"/REPO"},
+         ReportPathDisplayKind::resolved_adapter_path, true},
+        std::filesystem::path{"/repo"}, ReportPathCasePolicy::case_insensitive);
+    REQUIRE(display.has_value());
+    CHECK(*display == ".");
+}
+
+TEST_CASE("to_report_display_path with case_insensitive policy still rejects unrelated bases") {
+    using xray::hexagon::services::ReportPathCasePolicy;
+    using xray::hexagon::services::ReportPathDisplayKind;
+    using xray::hexagon::services::to_report_display_path;
+    const auto display = to_report_display_path(
+        {std::filesystem::path{"/repo2/build"},
+         ReportPathDisplayKind::resolved_adapter_path, true},
+        std::filesystem::path{"/repo"}, ReportPathCasePolicy::case_insensitive);
+    REQUIRE(display.has_value());
+    CHECK(*display == "/repo2/build");
+}
+
 TEST_CASE("report format version is one") {
     // AP 1.2 JSON adapter must reuse this same constant.
     CHECK(xray::hexagon::model::kReportFormatVersion == 1);

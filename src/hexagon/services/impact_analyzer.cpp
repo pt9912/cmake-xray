@@ -162,7 +162,7 @@ ChangedFileResolution resolve_changed_file_provenance(
 }
 
 void apply_changed_file_absolute(const InputPathArgument& arg, ImpactResult& result) {
-    const auto display = arg.path_for_io.lexically_normal().generic_string();
+    const auto display = arg.original_argument.lexically_normal().generic_string();
     result.inputs.changed_file = display;
     result.changed_file = display;
     result.changed_file_key = display;
@@ -177,7 +177,7 @@ void apply_changed_file_unresolved(const InputPathArgument& arg, ImpactResult& r
 
 void apply_changed_file_with_base(const InputPathArgument& arg,
                                   const std::filesystem::path& base, ImpactResult& result) {
-    result.changed_file_key = resolve_changed_file_key(base, arg.path_for_io);
+    result.changed_file_key = resolve_changed_file_key(base, arg.original_argument);
     result.changed_file = display_changed_file(base, result.changed_file_key);
     result.inputs.changed_file = result.changed_file;
 }

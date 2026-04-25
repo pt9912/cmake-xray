@@ -18,7 +18,7 @@ using xray::adapters::cli::atomic_report_temp_path;
 using xray::adapters::cli::AtomicFileError;
 using xray::adapters::cli::AtomicFilePlatformOps;
 using xray::adapters::cli::AtomicReportWriter;
-using xray::adapters::cli::PosixAtomicFilePlatformOps;
+using xray::adapters::cli::DefaultAtomicFilePlatformOps;
 using xray::adapters::cli::RenderError;
 using xray::adapters::cli::RenderResult;
 using xray::adapters::cli::StringFunctionCliReportRenderer;
@@ -261,9 +261,9 @@ TEST_CASE("atomic writer surfaces stream write failures and removes the temp") {
     CHECK(calls_contain_prefix(ops.calls, "remove:"));
 }
 
-TEST_CASE("posix platform ops create_temp_exclusive succeeds for a fresh path") {
+TEST_CASE("default platform ops create_temp_exclusive succeeds for a fresh path") {
     const TempDir dir;
-    PosixAtomicFilePlatformOps ops;
+    DefaultAtomicFilePlatformOps ops;
     const auto temp = dir.path() / ".cmake-xray-temp.tmp";
 
     const auto error = ops.create_temp_exclusive(temp);
@@ -272,9 +272,9 @@ TEST_CASE("posix platform ops create_temp_exclusive succeeds for a fresh path") 
     CHECK(std::filesystem::exists(temp));
 }
 
-TEST_CASE("posix platform ops create_temp_exclusive fails when the path already exists") {
+TEST_CASE("default platform ops create_temp_exclusive fails when the path already exists") {
     const TempDir dir;
-    PosixAtomicFilePlatformOps ops;
+    DefaultAtomicFilePlatformOps ops;
     const auto temp = dir.path() / ".cmake-xray-temp.tmp";
     {
         std::ofstream existing(temp);
@@ -286,9 +286,9 @@ TEST_CASE("posix platform ops create_temp_exclusive fails when the path already 
     CHECK_FALSE(error->message.empty());
 }
 
-TEST_CASE("posix platform ops replace_existing renames temp over target") {
+TEST_CASE("default platform ops replace_existing renames temp over target") {
     const TempDir dir;
-    PosixAtomicFilePlatformOps ops;
+    DefaultAtomicFilePlatformOps ops;
     const auto temp = dir.path() / ".cmake-xray-temp.tmp";
     const auto target = dir.path() / "report.md";
     {
@@ -307,17 +307,17 @@ TEST_CASE("posix platform ops replace_existing renames temp over target") {
     CHECK_FALSE(std::filesystem::exists(temp));
 }
 
-TEST_CASE("posix platform ops replace_existing fails when the temp does not exist") {
+TEST_CASE("default platform ops replace_existing fails when the temp does not exist") {
     const TempDir dir;
-    PosixAtomicFilePlatformOps ops;
+    DefaultAtomicFilePlatformOps ops;
     const auto error =
         ops.replace_existing(dir.path() / "missing.tmp", dir.path() / "target.md");
     REQUIRE(error.has_value());
 }
 
-TEST_CASE("posix platform ops move_new renames temp into a fresh target") {
+TEST_CASE("default platform ops move_new renames temp into a fresh target") {
     const TempDir dir;
-    PosixAtomicFilePlatformOps ops;
+    DefaultAtomicFilePlatformOps ops;
     const auto temp = dir.path() / ".cmake-xray-temp.tmp";
     const auto target = dir.path() / "report.md";
     {
@@ -331,24 +331,24 @@ TEST_CASE("posix platform ops move_new renames temp into a fresh target") {
     CHECK(read_file(target) == "fresh");
 }
 
-TEST_CASE("posix platform ops move_new fails when the temp does not exist") {
+TEST_CASE("default platform ops move_new fails when the temp does not exist") {
     const TempDir dir;
-    PosixAtomicFilePlatformOps ops;
+    DefaultAtomicFilePlatformOps ops;
     const auto error = ops.move_new(dir.path() / "missing.tmp", dir.path() / "target.md");
     REQUIRE(error.has_value());
 }
 
-TEST_CASE("posix platform ops remove_temp_quiet ignores missing files") {
+TEST_CASE("default platform ops remove_temp_quiet ignores missing files") {
     const TempDir dir;
-    PosixAtomicFilePlatformOps ops;
+    DefaultAtomicFilePlatformOps ops;
     ops.remove_temp_quiet(dir.path() / "never-existed.tmp");
     // Just verifies no exception escapes; nothing else to check.
     CHECK(true);
 }
 
-TEST_CASE("posix platform ops remove_temp_quiet deletes existing temp files") {
+TEST_CASE("default platform ops remove_temp_quiet deletes existing temp files") {
     const TempDir dir;
-    PosixAtomicFilePlatformOps ops;
+    DefaultAtomicFilePlatformOps ops;
     const auto temp = dir.path() / "victim.tmp";
     {
         std::ofstream existing(temp);
