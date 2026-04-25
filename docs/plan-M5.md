@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.16` |
+| Version | `0.17` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -31,7 +31,7 @@ M5 gilt als erreicht, wenn:
 - macOS- und Windows-Builds mindestens in CI oder dokumentierten Smoke-Checks bewertet sind; bekannte Einschraenkungen werden explizit dokumentiert
 - automatisierte Adapter-, CLI-, Golden-Output- und Release-Smoke-Tests die neuen Formate, Modi und Bereitstellungspfade absichern
 
-Relevante Kennungen: `F-28`, `F-29`, `F-30`, `F-39`, `F-40`, `F-43`, `F-44`, `NF-08`, `NF-09`, `NF-20`, `NF-21`, `S-06`, `S-07`, `S-08`, `S-12`, `S-13`
+Relevante Kennungen: `F-28`, `F-29`, `F-30`, `F-35`, `F-36`, `F-39`, `F-40`, `F-42`, `F-43`, `F-44`, `NF-08`, `NF-09`, `NF-20`, `NF-21`, `S-06`, `S-07`, `S-08`, `S-12`, `S-13`
 
 ### 0.3 Abgrenzung
 Bestandteil von M5 sind:
@@ -98,7 +98,8 @@ Vorgesehene Artefakte:
 - Erweiterung von `src/hexagon/model/analysis_result.*` und `src/hexagon/model/impact_result.*` um ein strukturiertes `ReportInputs`-Modell, mindestens mit `compile_database_path`, `cmake_file_api_path` und bei `impact` `changed_file`
 - `ReportInputs` ist ab M5 die alleinige Quelle fuer Report-Eingabepfade; bestehende skalare Pfadfelder wie `AnalysisResult::compile_database_path` werden entfernt oder als deprecated Mirror ohne eigene Semantik markiert und duerfen nicht fuer JSON-`inputs` serialisiert werden
 - `ReportInputs`-Felder sind im JSON-Vertrag immer vorhanden; gesetzte Pfade sind Strings, nicht gesetzte Eingaben sind `null`, und leere Strings duerfen nicht als Ersatz fuer fehlende Eingaben verwendet werden
-- `ReportInputs` serialisiert stabile Display-Pfade aus der fachlichen Eingabeaufloesung: CLI-relative Pfade werden relativ zum Arbeitsverzeichnis normalisiert, absolute Pfade bleiben absolute Anzeige-Strings, und `cmake_file_api_path` bezeichnet den tatsaechlich verwendeten Build- oder Reply-Directory-Pfad nach Adapter-Aufloesung; normalisierte interne Schluessel werden nicht in `inputs` serialisiert
+- `ReportInputs` serialisiert stabile Display-Pfade aus der fachlichen Eingabeaufloesung: CLI-relative Pfade werden relativ zum Arbeitsverzeichnis normalisiert, absolute Pfade bleiben absolute Anzeige-Strings, und normalisierte interne Schluessel werden nicht in `inputs` serialisiert
+- fuer CMake File API werden Original- und Aufloesungspfad getrennt modelliert: `cmake_file_api_path` enthaelt den originalen stabilen Display-Pfad der CLI-Eingabe, `cmake_file_api_resolved_path` enthaelt den tatsaechlich verwendeten Build- oder Reply-Directory-Pfad nach Adapter-Aufloesung; beide Felder sind immer vorhanden und bei fehlendem Wert `null`
 - der `CmakeFileApiAdapter` gibt den aufgeloesten Build-/Reply-Directory-Pfad ueber Metadaten in `BuildModelResult` an Hexagon-Services zurueck; `ProjectAnalyzer` und `ImpactAnalyzer` duerfen diesen Wert nur aus `BuildModelResult` oder vorgelagerter Input-Resolution uebernehmen, nicht aus CLI- oder Adapterzustand nachreichen
 - `changed_file` nutzt fuer Display- und Provenienzregeln dieselbe fachliche Basis wie die Impact-Analyse: relativ zur `compile_commands.json`-Directory oder zur CMake-File-API-Source-Root, nicht pauschal relativ zum Prozess-Arbeitsverzeichnis
 - `ReportInputs` dokumentiert die Provenienz ueber strukturierte Zusatzfelder wie `compile_database_source`, `cmake_file_api_source` und `changed_file_source` mit Enum-Werten wie `cli`, `derived`, `not_provided`, damit File-API-only- und Mixed-Input-Laeufe eindeutig auswertbar bleiben
@@ -122,7 +123,7 @@ Ein JSON-Bericht fuer `analyze` soll mindestens enthalten:
 - `format`: fester Formatbezeichner, zum Beispiel `cmake-xray.analysis`
 - `format_version`: Schema-/Formatversion, initial `1`
 - `report_type`: `analyze`
-- `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell, mindestens `compile_database_path`, `compile_database_source`, `cmake_file_api_path` und `cmake_file_api_source`
+- `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell, mindestens `compile_database_path`, `compile_database_source`, `cmake_file_api_path`, `cmake_file_api_resolved_path` und `cmake_file_api_source`
 - `summary`: Translation-Unit-Anzahl, Ranking-Anzahl, Hotspot-Anzahl, Top-Limit, Beobachtungsherkunft und Target-Metadatenstatus
 - `translation_unit_ranking`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items` inklusive Metriken, Diagnostics und Target-Zuordnungen
 - `include_hotspots`: Objekt mit `limit`, `total_count`, `returned_count`, `truncated` und deterministisch sortierten `items`
@@ -133,7 +134,7 @@ Ein JSON-Bericht fuer `impact` soll mindestens enthalten:
 - `format`: fester Formatbezeichner, zum Beispiel `cmake-xray.impact`
 - `format_version`: Schema-/Formatversion, initial `1`
 - `report_type`: `impact`
-- `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell, mindestens `compile_database_path`, `compile_database_source`, `cmake_file_api_path`, `cmake_file_api_source`, `changed_file` und `changed_file_source`
+- `inputs`: verwendete Eingabequellen aus dem strukturierten `ReportInputs`-Modell, mindestens `compile_database_path`, `compile_database_source`, `cmake_file_api_path`, `cmake_file_api_resolved_path`, `cmake_file_api_source`, `changed_file` und `changed_file_source`
 - `summary`: Anzahl betroffener Translation Units, Klassifikation, Beobachtungsherkunft, Target-Metadatenstatus und Anzahl betroffener Targets
 - `directly_affected_translation_units`
 - `heuristically_affected_translation_units`
@@ -387,6 +388,7 @@ M5 aktualisiert mindestens:
 - `docs/guide.md` mit praktischen Aufrufen fuer alle M5-Formate
 - `docs/releasing.md` mit finalem Artefaktumfang und Release-Verifikation
 - `docs/quality.md` mit M5-Testumfang und Plattform-Smokes
+- `docs/performance.md` mit File-API-Performance-Baseline als erster Folge-Meilenstein nach M4
 - `CHANGELOG.md` fuer `v1.2.0`
 
 Tests und Abnahme muessen mindestens abdecken:
@@ -403,9 +405,9 @@ Tests und Abnahme muessen mindestens abdecken:
 - DOT-Golden-Tests, dass `analyze --top N` fuer ausgegebene Top-Hotspots hoechstens `context_limit` betroffene Translation Units als Kontextknoten enthaelt, das globale `node_limit`-/`edge_limit`-Budget einhaelt und gekuerzten Kontext mit den verpflichtenden `context_*`-Node-Attributen sowie gekuerzte Graphen mit den verpflichtenden `graph_*`-Graph-Attributen kennzeichnet
 - DOT-Golden-Tests, dass `impact --format dot` das feste Impact-`node_limit`-/`edge_limit`-Budget einhaelt und Kuerzungen mit den verpflichtenden Graph-Attributen `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kennzeichnet
 - CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und Impact-Reports keine implizite Begrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren
-- JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
+- JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` und `inputs.cmake_file_api_resolved_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
 - JSON-Schema-/Golden-Tests fuer `ReportInputs`-Pfad-Provenienz: CLI-relative Pfade, absolute Pfade, Build-Dir-vs.-Reply-Dir bei `--cmake-file-api` und relative `--changed-file` muessen stabile Display-Pfade und passende `*_source`-Enums liefern
-- Adapter-/Service-Tests, dass der vom `CmakeFileApiAdapter` aufgeloeste Build-/Reply-Pfad ueber `BuildModelResult` in `ReportInputs.cmake_file_api_path` landet und nicht aus CLI-Zustand nachgereicht wird
+- Adapter-/Service-Tests, dass der vom `CmakeFileApiAdapter` aufgeloeste Build-/Reply-Pfad ueber `BuildModelResult` in `ReportInputs.cmake_file_api_resolved_path` landet und nicht aus CLI-Zustand nachgereicht wird
 - JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path` und `inputs.cmake_file_api_path` bei `analyze` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
 - JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path`, `inputs.cmake_file_api_path` und `inputs.changed_file` bei `impact` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
 - Tests, dass `--verbose` JSON-, Markdown-, HTML- und DOT-Artefakte nicht gegenueber dem Normalmodus veraendert und Zusatzdiagnostik nur Console/`stderr` betrifft
@@ -415,6 +417,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - automatisierter Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
 - automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt: GitHub-Schritte duerfen Mock-/Noop-Publisher nutzen, OCI-Schritte muessen eine lokale Test-Registry fuer Tagging, `latest`-Regel, Push und Manifest-Pruefung verwenden, ohne externe Veroeffentlichung
 - dokumentierter manueller Dry-Run nur fuer Recovery-Pfade, die echte externe Publish-Zustaende in GitHub Releases oder GHCR voraussetzen
+- Performance-Messung fuer den CMake-File-API-Pfad auf den bestehenden Referenzgroessen und Dokumentation der M5-Baseline in `docs/performance.md`
 - Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt und den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
 
@@ -449,7 +452,8 @@ Abhaengigkeiten:
 | JSON-`inputs` verlangt Daten, die nicht im Ergebnisobjekt stehen | Adapter muessten CLI-Zustand kennen oder der Vertrag bleibt unerfuellt | strukturiertes `ReportInputs`-Modell als Bestandteil von `AnalysisResult` und `ImpactResult` einfuehren |
 | JSON-`inputs` nutzt uneinheitliche Repraesentation fuer fehlende Pfade | Automatisierung muss `null`, leere Strings und fehlende Felder unterschiedlich abfangen | Felder immer ausgeben, gesetzte Pfade als String und fehlende Eingaben ausschliesslich als `null` serialisieren |
 | JSON-`inputs` nutzt instabile Pfad-Provenienz | Golden-Outputs und Folgewerkzeuge unterscheiden CLI-Strings, Reply-Dirs und Normalisierungsschluessel falsch | stabile Display-Pfade und `*_source`-Enums im JSON-Vertrag festlegen |
-| Aufgeloester File-API-Pfad bleibt im Adapter verborgen | `ReportInputs.cmake_file_api_path` kann nur durch CLI-/Adapter-Leakage oder falsch gesetzte Werte entstehen | `BuildModelResult` um Input-Metadaten erweitern oder vorgelagerte Input-Resolution einfuehren |
+| Originaler und aufgeloester CMake-File-API-Pfad werden vermischt | Folgewerkzeuge koennen Build-Dir- und Reply-Dir-Eingaben nicht reproduzierbar unterscheiden | `cmake_file_api_path` fuer Original-Display-Pfad und `cmake_file_api_resolved_path` fuer Adapter-Aufloesung getrennt serialisieren |
+| Aufgeloester File-API-Pfad bleibt im Adapter verborgen | `ReportInputs.cmake_file_api_resolved_path` kann nur durch CLI-/Adapter-Leakage oder falsch gesetzte Werte entstehen | `BuildModelResult` um Input-Metadaten erweitern oder vorgelagerte Input-Resolution einfuehren |
 | Alte skalare Eingabepfadfelder bleiben neben `ReportInputs` aktiv | File-API-only-Laeufe koennen falsche Pfade in `inputs.compile_database_path` ausgeben | `ReportInputs` als alleinige Quelle fuer Report-Eingaben festlegen; alte Felder entfernen oder nur deprecated spiegeln |
 | Producer setzen `ReportInputs` nicht vollstaendig | JSON/HTML/DOT zeigen bekannte File-API- oder Mixed-Input-Kontexte als `null` | `ProjectAnalyzer`, `ImpactAnalyzer` und Driving-Requests/-Ports als Producer explizit anpassen und testen |
 | Analyze-Listen sind durch `--top` gekuerzt, ohne dies zu kennzeichnen | Automatisierung verwechselt kurze Ausgaben mit vollstaendigen Projektdaten | `limit`, `total_count`, `returned_count` und `truncated` fuer Analyze-Ranking- und Hotspot-Listen verpflichtend machen |
@@ -475,7 +479,8 @@ Abhaengigkeiten:
 | GHCR-Image wird vor Abschluss aller Release-Gates gepusht | Teilveroeffentlichung ohne passenden GitHub Release bleibt zurueck | GHCR-Push erst nach Build- und Smoke-Gates ausfuehren, aber vor finaler oeffentlicher Release-Publikation |
 | Oeffentlicher GitHub Release entsteht vor erfolgreichem OCI-Publish | Release zeigt ein fehlendes Container-Artefakt oder falsche Installationshinweise | GitHub Release zuerst als Draft vorbereiten, OCI-Image veroeffentlichen und erst danach den Release oeffentlich machen |
 | Release-Workflow funktioniert nur fuer lokale Pfade | Artefakte sind nicht real nutzbar | entpacktes Linux-Archiv und Container-Image separat smoke-testen |
-| Versionsquellen bleiben auf `1.1.0` | ein `v1.2.0`-Release meldet intern die alte Version | Root-`CMakeLists.txt`, `application_info.h`, `--version` und Release-Tag gemeinsam pruefen |
+| File-API-Pfad hat keine Performance-Baseline | der erste Folge-Meilenstein nach M4 erfuellt die Performance-Dokumentation nicht | M5 misst den CMake-File-API-Pfad auf Referenzgroessen und aktualisiert `docs/performance.md` |
+| Versionsquellen bleiben auf `1.1.0` | ein `v1.2.0`-Release meldet intern die alte Version | numerische CMake-Projektversion, App-/Package-Version-Quelle, `application_info.h`, `--version` und Release-Tag gemeinsam pruefen |
 | Windows-Pfade brechen Golden-Tests | Portabilitaetsziel bleibt theoretisch | Pfadanzeige und Normalisierung explizit testen; Goldens plattformrobust gestalten |
 
 ## 4. Rueckverfolgbarkeit
@@ -485,8 +490,11 @@ Abhaengigkeiten:
 | `F-28` | `HtmlReportAdapter` fuer `analyze` und `impact` |
 | `F-29` | `JsonReportAdapter` fuer `analyze` und `impact` |
 | `F-30` | `DotReportAdapter` fuer vorhandene Analyse- und Impact-Daten |
+| `F-35` | Formatwahl fuer `html`, `json` und `dot` |
+| `F-36` | Dateiausgabe ueber `--output` fuer artefaktorientierte Formate |
 | `F-39` | `--verbose` fuer diagnoseorientierte CLI-Ausgabe |
 | `F-40` | `--quiet` fuer reduzierte CLI-Ausgabe |
+| `F-42` | begrenzte Analyze-Ausgabe mit `limit`, `total_count`, `returned_count` und `truncated` |
 | `F-43` | versioniertes Linux-CLI-Artefakt mit Pruefsumme |
 | `F-44` | OCI-kompatibles Container-Image |
 | `NF-08` | macOS-/Windows-Build- und Smoke-Bewertung |
