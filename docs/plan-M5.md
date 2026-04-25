@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.4` |
+| Version | `0.5` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -70,7 +70,7 @@ Fuer M5 benoetigt der Report-Pfad mindestens:
 - eine erweiterte Formatwahl in CLI und Composition Root fuer `console`, `markdown`, `html`, `json` und `dot`
 - eine erweiterte `--output`-Validierung fuer `markdown`, `html`, `json` und `dot` bei `analyze` und `impact`; `console` bleibt standardmaessig stdout-orientiert
 - ein gemeinsamer Schreibpfad fuer Reportdateien, der Zielartefakte atomar ueber temporaere Datei und Rename ersetzt und Fehler sauber an die CLI meldet
-- eine verpflichtende strukturierte Modell- oder Request-Erweiterung fuer stabile Report-Eingabequellen, damit Adapter weiterhin nur `AnalysisResult`- bzw. `ImpactResult`-Daten rendern und keine CLI-/Composition-Root-Details nachladen
+- eine verpflichtende strukturierte Modellerweiterung fuer stabile Report-Eingabequellen: `AnalysisResult` und `ImpactResult` enthalten ein gemeinsames `ReportInputs`-Value-Object, damit Adapter weiterhin nur Ergebnisobjekte rendern und keine CLI-/Composition-Root-Details nachladen
 - klare Adaptergrenzen: Jeder Report-Adapter rendert ausschliesslich vorhandene `AnalysisResult`- bzw. `ImpactResult`-Modelle
 - gemeinsame Hilfsfunktionen fuer stabile Sortierung, Text-Escaping, Pfadanzeige und Diagnostics, soweit dadurch Dopplung zwischen Adaptern reduziert wird
 - eine dokumentierte Formatversion fuer maschinenlesbare JSON-Ausgaben
@@ -82,6 +82,9 @@ Wichtig:
 - Formatadapter duerfen keine neuen Impact- oder Ranking-Entscheidungen treffen
 - JSON ist der einzige maschinenlesbare Vertragsausdruck in M5; HTML und DOT bleiben menschen- bzw. visualisierungsorientiert
 - stdout bleibt der Standard, wenn kein `--output` angegeben ist; mit `--output` wird der vollstaendige Reportinhalt in die Datei geschrieben und nicht zusaetzlich fachlich nach stdout dupliziert
+- `--output` ersetzt vorhandene Zielartefakte bei erfolgreichem Schreiben; bei Render-, Schreib- oder Rename-Fehlern bleibt eine bereits vorhandene Zieldatei unveraendert erhalten
+- die atomare Dateiausgabe verwendet eine temporaere Datei im Zielverzeichnis und eine plattformsichere Replace-Operation, die auf Linux, macOS und Windows getestet wird
+- alle Reportformate folgen derselben `--top`-Begrenzung fuer Ranking-, Hotspot- und vergleichbare Listenabschnitte; kein Artefaktformat wechselt implizit auf unlimitierte Vollausgabe
 - alle neuen Formate muessen deterministisch sein, damit Golden-Outputs sinnvoll diffbar bleiben
 - Datums-, Laufzeit- oder Hostinformationen duerfen nicht automatisch in Reports erscheinen
 
@@ -90,7 +93,8 @@ Vorgesehene Artefakte:
 - Anpassung der CLI-Formatvalidierung in `src/adapters/cli/`
 - Anpassung der CLI-Output-Validierung und der atomaren Dateiausgabe fuer Reportartefakte
 - Anpassung der Composition-Root-Verdrahtung in `src/main.cpp`
-- Erweiterung der fachlichen Ergebnis- oder Request-Modelle um ein strukturiertes `ReportInputs`-Modell, mindestens mit `compile_database_path`, `cmake_file_api_path` und bei `impact` `changed_file`; nicht verwendete optionale Eingaben werden explizit als `null` oder leeres Feld nach dokumentierter Schema-Regel abgebildet
+- Erweiterung von `src/hexagon/model/analysis_result.*` und `src/hexagon/model/impact_result.*` um ein strukturiertes `ReportInputs`-Modell, mindestens mit `compile_database_path`, `cmake_file_api_path` und bei `impact` `changed_file`; nicht verwendete optionale Eingaben werden explizit als `null` oder leeres Feld nach dokumentierter Schema-Regel abgebildet
+- `ReportWriterPort`/`GenerateReportPort` bleiben aus Adaptersicht ergebnisobjektzentriert; Signaturaenderungen sind nur zulaessig, wenn sie `ReportInputs` weiterhin als Teil des fachlichen Ergebnisvertrags transportieren und nicht als separaten CLI-Kontext in Adapter leaken
 - neue Adapter unter `src/adapters/output/`
 - Erweiterung von `src/adapters/CMakeLists.txt`
 - Dokumentation der JSON-Formatversion in `docs/`
@@ -129,6 +133,7 @@ Wichtig:
 
 - `inputs` darf nur Felder enthalten, die stabil im fachlichen Ergebnis- oder Request-Modell verfuegbar sind; `cmake_file_api_path` ist als Feld fuer M5 verpflichtend, damit File-API- und Mixed-Input-Laeufe vollstaendig dokumentiert werden koennen
 - JSON folgt der CLI-`--top`-Begrenzung fuer Ranking- und Hotspot-Listen, muss aber ueber `limit`, `total_count`, `returned_count` und `truncated` eindeutig anzeigen, ob die Ausgabe gekuerzt wurde; eine unlimitierte JSON-Ausgabe waere nur nach expliziter Schema-Entscheidung zulaessig
+- Markdown, HTML und DOT folgen ebenfalls der CLI-`--top`-Begrenzung; HTML und Markdown kennzeichnen begrenzte Abschnitte menschenlesbar, DOT enthaelt nur die in der begrenzten Ergebnissicht dargestellten Knoten und Kanten
 - JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
 - Felder mit leerer Menge werden als leere Arrays ausgegeben, nicht weggelassen, sofern sie Teil des Formatvertrags sind
 - optionale fachliche Informationen koennen `null` sein, wenn das Schema dies explizit dokumentiert
@@ -352,9 +357,10 @@ Tests und Abnahme muessen mindestens abdecken:
 
 - Adapter-Unit-Tests fuer HTML, JSON und DOT
 - CLI-Tests fuer Formatwahl, ungueltige Formatwerte und `--format html|json|dot --output <path>` fuer `analyze` und `impact`
-- CLI-Tests fuer atomare Dateiausgabe: erfolgreiche Writes erzeugen vollstaendige Reports, Fehlerfaelle hinterlassen kein halb geschriebenes Zielartefakt
+- CLI-Tests fuer atomare Dateiausgabe: erfolgreiche Writes erzeugen vollstaendige Reports, vorhandene Zieldateien werden bei Erfolg ersetzt, und Fehlerfaelle lassen vorhandene Zieldateien auf Linux, macOS und Windows unveraendert
 - CLI-Tests fuer `--verbose`, `--quiet` und gegenseitigen Ausschluss
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
+- Golden- und CLI-Tests, dass `--top` fuer Markdown, HTML, JSON und DOT konsistent wirkt und kein Artefaktformat implizit vollstaendige Listen ausgibt
 - JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten Listen
 - Smoke-Test fuer Docker-Runtime-Image
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
@@ -391,9 +397,11 @@ Abhaengigkeiten:
 | Risiko | Auswirkung | Gegenmassnahme |
 |---|---|---|
 | JSON wird ohne klaren Vertrag eingefuehrt | Folgewerkzeuge brechen bei jeder Report-Aenderung | `format_version` dokumentieren und Golden-Tests fuer zentrale Felder pflegen |
-| JSON-`inputs` verlangt Daten, die nicht im Ergebnis- oder Request-Modell stehen | Adapter muessten CLI-Zustand kennen oder der Vertrag bleibt unerfuellt | strukturiertes `ReportInputs`-Modell mit `compile_database_path`, `cmake_file_api_path` und `changed_file` als M5-Pflicht einfuehren |
+| JSON-`inputs` verlangt Daten, die nicht im Ergebnisobjekt stehen | Adapter muessten CLI-Zustand kennen oder der Vertrag bleibt unerfuellt | strukturiertes `ReportInputs`-Modell als Bestandteil von `AnalysisResult` und `ImpactResult` einfuehren |
 | JSON-Listen sind durch `--top` gekuerzt, ohne dies zu kennzeichnen | Automatisierung verwechselt kurze Ausgaben mit vollstaendigen Projektdaten | `limit`, `total_count`, `returned_count` und `truncated` fuer Ranking- und Hotspot-Listen verpflichtend machen |
 | `--output` bleibt nur teilweise fuer neue Formate nutzbar | Nutzer koennen neue Artefaktformate nicht verlaesslich in CI speichern | `--output` fuer `markdown`, `html`, `json` und `dot` explizit freischalten und atomare Schreibtests aufnehmen |
+| Atomarer Write ueberschreibt vorhandene Dateien nicht portabel | Fehler koennen Zielartefakte zerstoeren oder Windows-Releases brechen | Replace-Semantik fuer existierende Dateien auf Linux, macOS und Windows testen; bei Fehler bleibt die alte Datei unveraendert |
+| Artefaktformate interpretieren `--top` unterschiedlich | Goldens, CLI-Ausgabe und Automatisierung liefern widerspruechliche Ergebnismengen | einheitliche Top-Limit-Regel fuer Markdown, HTML, JSON und DOT festlegen und testen |
 | DOT suggeriert Target-Graph-Semantik, die M5 noch nicht besitzt | Nutzer interpretieren Graphen falsch | keine Target-zu-Target-Kanten erzeugen und Legende/Labels klar formulieren |
 | DOT-Escaping ist syntaktisch fehlerhaft | Graphviz-Berichte brechen erst bei Nutzern | Sonderzeichen-Goldens mit Graphviz oder Parser validieren |
 | HTML-Goldens werden durch kosmetische Details instabil | Tests werden teuer und rauschanfaellig | keine Zeitstempel, keine Zufalls-IDs, deterministische Struktur |
