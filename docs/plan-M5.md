@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M5 `cmake-xray` |
-| Version | `0.19` |
+| Version | `0.20` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](./quality.md), [Releasing](./releasing.md) |
@@ -80,13 +80,13 @@ Wichtig:
 
 - Rueckwaertskompatibilitaet wird fuer M5 differenziert behandelt: M3-/M4-Compile-Database-only-Goldens fuer `console` und `markdown` bleiben ohne neue Optionen byte-stabil; M4-File-API- und Mixed-Input-Goldens duerfen sich gezielt aendern, soweit `ReportInputs` neue Eingabeprovenienz sichtbar macht, und werden mit explizitem Hinweis aktualisiert
 - Formatadapter duerfen keine neuen Impact- oder Ranking-Entscheidungen treffen
-- JSON ist der einzige maschinenlesbare Vertragsausdruck in M5; HTML und DOT bleiben menschen- bzw. visualisierungsorientiert
+- JSON ist der vollstaendige maschinenlesbare Vertragsausdruck in M5; DOT bleibt visualisierungsorientiert, erhaelt aber einen begrenzt stabilen Metadatenvertrag fuer die explizit benannten Graph-/Node-Attribute
 - stdout bleibt der Standard, wenn kein `--output` angegeben ist; mit `--output` wird der vollstaendige Reportinhalt in die Datei geschrieben und nicht zusaetzlich fachlich nach stdout dupliziert
 - `--output` ersetzt vorhandene Zielartefakte bei erfolgreichem Schreiben; bei Render-, Schreib- oder Rename-Fehlern bleibt eine bereits vorhandene Zieldatei unveraendert erhalten
 - die atomare Dateiausgabe verwendet eine temporaere Datei im Zielverzeichnis und eine plattformsichere Replace-Operation, die auf Linux, macOS und Windows getestet wird
 - fuer `analyze` folgen alle Reportformate derselben `--top`-Begrenzung fuer Ranking-, Hotspot- und vergleichbare Listenabschnitte; `impact` erhaelt in M5 keine `--top`-Option und keine implizite Begrenzung seiner strukturierten Ergebnislisten
 - DOT ist die visualisierungsorientierte Ausnahme: Auch `impact --format dot` wird ueber Graph-Budgets begrenzt, ohne das zugrunde liegende `ImpactResult` oder JSON-/HTML-/Markdown-Impact-Listen zu kuerzen
-- DOT bleibt fuer `analyze` und `impact` ein begrenztes Artefakt: Analyze-Hotspot-Kontext wird ueber ein separates, kleines `context_limit` begrenzt, beide DOT-Reporttypen werden ueber ein globales `node_limit`-/`edge_limit`-Budget begrenzt; bei Kuerzung werden fuer Analyze-Hotspot-Knoten die Attribute `context_total_count`, `context_returned_count`, `context_truncated` und fuer beide Reporttypen die Graph-Attribute `graph_node_limit`, `graph_edge_limit`, `graph_truncated` kenntlich gemacht
+- DOT bleibt fuer `analyze` und `impact` ein begrenztes Artefakt: Analyze-Hotspot-Kontext wird ueber ein separates, kleines `context_limit` begrenzt, beide DOT-Reporttypen werden ueber ein globales `node_limit`-/`edge_limit`-Budget begrenzt; Analyze-Hotspot-Knoten tragen bei vorhandenem Kontext die Attribute `context_total_count`, `context_returned_count`, `context_truncated`, und beide Reporttypen tragen immer die Graph-Attribute `graph_node_limit`, `graph_edge_limit`, `graph_truncated`
 - alle neuen Formate muessen deterministisch sein, damit Golden-Outputs sinnvoll diffbar bleiben
 - Datums-, Laufzeit- oder Hostinformationen duerfen nicht automatisch in Reports erscheinen
 
@@ -101,8 +101,8 @@ Vorgesehene Artefakte:
 - `ReportInputs` serialisiert stabile Display-Pfade aus der fachlichen Eingabeaufloesung: CLI-relative Pfade werden relativ zum Arbeitsverzeichnis normalisiert, absolute Pfade bleiben absolute Anzeige-Strings, und normalisierte interne Schluessel werden nicht in `inputs` serialisiert
 - fuer CMake File API werden Original- und Aufloesungspfad getrennt modelliert: `cmake_file_api_path` enthaelt den originalen stabilen Display-Pfad der CLI-Eingabe, `cmake_file_api_resolved_path` enthaelt den tatsaechlich verwendeten Build- oder Reply-Directory-Pfad nach Adapter-Aufloesung; beide Felder sind immer vorhanden und bei fehlendem Wert `null`
 - der `CmakeFileApiAdapter` gibt den aufgeloesten Build-/Reply-Directory-Pfad ueber Metadaten in `BuildModelResult` an Hexagon-Services zurueck; `ProjectAnalyzer` und `ImpactAnalyzer` duerfen diesen Wert nur aus `BuildModelResult` oder vorgelagerter Input-Resolution uebernehmen, nicht aus CLI- oder Adapterzustand nachreichen
-- `changed_file` nutzt fuer Display- und Provenienzregeln dieselbe fachliche Basis wie die Impact-Analyse: relativ zur `compile_commands.json`-Directory oder zur CMake-File-API-Source-Root, nicht pauschal relativ zum Prozess-Arbeitsverzeichnis
-- `ReportInputs` dokumentiert die Provenienz ueber strukturierte Zusatzfelder wie `compile_database_source`, `cmake_file_api_source` und `changed_file_source` mit Enum-Werten wie `cli`, `derived`, `not_provided`, damit File-API-only- und Mixed-Input-Laeufe eindeutig auswertbar bleiben
+- `changed_file` nutzt fuer Display- und Provenienzregeln dieselbe fachliche Basis wie die Impact-Analyse: Bei Mixed-Input-Laeufen mit `--compile-commands` und `--cmake-file-api` hat die `compile_commands.json`-Directory Prioritaet; bei File-API-only-Laeufen wird die CMake-File-API-Source-Root verwendet. Der Pfad wird nicht pauschal relativ zum Prozess-Arbeitsverzeichnis interpretiert.
+- `ReportInputs` dokumentiert die Provenienz ueber strukturierte Zusatzfelder wie `compile_database_source`, `cmake_file_api_source` und `changed_file_source`; `changed_file_source` verwendet fuer M5 mindestens die Enum-Werte `compile_database_directory`, `file_api_source_root` und `not_provided`, damit File-API-only- und Mixed-Input-Laeufe eindeutig auswertbar bleiben
 - Anpassung der Producer-Pfade in `ProjectAnalyzer`, `ImpactAnalyzer` und den zugehoerigen Driving-Request-/Port-Vertraegen, damit `ReportInputs` beim Erzeugen von `AnalysisResult` und `ImpactResult` vollstaendig gesetzt wird und nicht nachtraeglich in der CLI an Adapter uebergeben werden muss
 - Erweiterung von `src/hexagon/model/build_model_result.*` um Input-Metadaten fuer den aufgeloesten CMake-File-API-Build-/Reply-Pfad und die zugrunde liegende Source-Root, damit Adapter-Aufloesung fachlich transportiert werden kann
 - `ReportWriterPort`/`GenerateReportPort` bleiben aus Adaptersicht ergebnisobjektzentriert; Signaturaenderungen sind nur zulaessig, wenn sie `ReportInputs` weiterhin als Teil des fachlichen Ergebnisvertrags transportieren und nicht als separaten CLI-Kontext in Adapter leaken
@@ -153,8 +153,8 @@ Wichtig:
 - `context_limit` ist fuer M5 Teil des DOT-Formatvertrags, kleiner als oder gleich dem wirksamen `--top`-Limit bei `analyze` und nicht pro Hotspot zu einem unbeschraenkten Gesamtgraphen addierbar, weil zusaetzlich ein globales `node_limit`-/`edge_limit`-Budget gilt
 - M5 legt die DOT-Grenzen deterministisch fest: Fuer `analyze` gilt `context_limit = min(top_limit, 5)`, `node_limit = max(25, 4 * top_limit + 10)`, `edge_limit = max(40, 6 * top_limit + 20)`. Ohne explizites `--top` wird der wirksame Standard-Top-Wert der CLI verwendet. Fuer `impact` gilt mangels Top-Limit fest `node_limit = 100` und `edge_limit = 200`.
 - Kuerzung erfolgt deterministisch in stabiler Sortierreihenfolge: bei `analyze` zuerst primaere Top-Ranking-Knoten, dann Top-Hotspot-Knoten, dann Target-Knoten, dann Hotspot-Kontext-Translation-Units sortiert nach Anzeige-Pfad; bei `impact` zuerst geaenderte Datei, dann direkt betroffene Translation Units, heuristisch betroffene Translation Units und Targets, jeweils nach Anzeige-Pfad bzw. Target-Name sortiert. Kanten werden nur ausgegeben, wenn beide Endknoten im Budget enthalten sind, und innerhalb gleicher Prioritaet lexikografisch sortiert
-- bei gekuerztem Analyze-Hotspot-Kontext enthaelt jeder betroffene Hotspot-Knoten verpflichtend die Node-Attribute `context_total_count` integer, `context_returned_count` integer und `context_truncated` boolean; diese `context_*`-Attribute gelten nicht fuer `impact`
-- bei global gekuerztem Graph enthaelt DOT fuer `analyze` und `impact` verpflichtend die Graph-Attribute `graph_node_limit` integer, `graph_edge_limit` integer und `graph_truncated` boolean; Kommentare duerfen nur zusaetzlich erscheinen und sind nicht Teil des Vertrags
+- bei Analyze-Hotspot-Kontext enthaelt jeder betroffene Hotspot-Knoten verpflichtend die Node-Attribute `context_total_count` integer, `context_returned_count` integer und `context_truncated` boolean; bei ungekuerztem Kontext ist `context_truncated=false`, und diese `context_*`-Attribute gelten nicht fuer `impact`
+- DOT enthaelt fuer `analyze` und `impact` immer die Graph-Attribute `graph_node_limit` integer, `graph_edge_limit` integer und `graph_truncated` boolean; bei ungekuerztem Graph ist `graph_truncated=false`, damit Consumer budgetierte M5-Ausgaben von aelteren oder unbudgetierten DOT-Ausgaben unterscheiden koennen. Kommentare duerfen nur zusaetzlich erscheinen und sind nicht Teil des Vertrags
 - JSON-Ausgaben muessen gueltiges UTF-8 und syntaktisch gueltiges JSON sein
 - Felder mit leerer Menge werden als leere Arrays ausgegeben, nicht weggelassen, sofern sie Teil des Formatvertrags sind
 - optionale fachliche Informationen koennen `null` sein, wenn das Schema dies explizit dokumentiert
@@ -206,7 +206,7 @@ Wichtig:
 
 - es werden keine Target-zu-Target-Kanten erzeugt, solange `F-18` nicht umgesetzt ist
 - die DOT-Budget-, Sortier- und Truncation-Regeln sind Bestandteil dieses Arbeitspakets: `analyze` verwendet `context_limit = min(top_limit, 5)`, `node_limit = max(25, 4 * top_limit + 10)` und `edge_limit = max(40, 6 * top_limit + 20)`; `impact` verwendet fest `node_limit = 100` und `edge_limit = 200`
-- Analyze-Hotspot-Kontext wird pro Hotspot-Knoten ueber die Node-Attribute `context_total_count`, `context_returned_count` und `context_truncated` beschrieben; globale Graph-Kuerzung wird fuer `analyze` und `impact` ueber die Graph-Attribute `graph_node_limit`, `graph_edge_limit` und `graph_truncated` beschrieben
+- Analyze-Hotspot-Kontext wird pro Hotspot-Knoten ueber die Node-Attribute `context_total_count`, `context_returned_count` und `context_truncated` beschrieben; das globale Graph-Budget wird fuer `analyze` und `impact` immer ueber die Graph-Attribute `graph_node_limit`, `graph_edge_limit` und `graph_truncated` beschrieben
 - DOT-IDs muessen deterministisch und korrekt escaped sein
 - Labels duerfen fuer Lesbarkeit gekuerzt werden, wenn der vollstaendige Pfad als Attribut erhalten bleibt
 - der Graph muss auch fuer leere Ergebnisse gueltiges DOT ausgeben
@@ -306,7 +306,7 @@ Der Release-Pfad muss mindestens:
 - bei Tag-Push mit erlaubtem Semver-Tag einen Release-Workflow starten: regulaere Releases verwenden `vMAJOR.MINOR.PATCH`, Vorabversionen verwenden `vMAJOR.MINOR.PATCH-PRERELEASE`
 - Tags vor dem Build fail-fast validieren und unbekannte Muster wie `vfoo`, unvollstaendige Versionen oder Build-Metadaten ohne dokumentierte Freigabe abbrechen
 - die Root-`CMakeLists.txt`-`project(... VERSION ...)` bleibt numerisch (`MAJOR.MINOR.PATCH`), weil CMake dort keine Prerelease-Suffixe akzeptiert; die veroeffentlichte App-/Package-Version wird ueber eine zusaetzliche Quelle wie `XRAY_APP_VERSION` oder `XRAY_VERSION_SUFFIX` gebildet
-- `cmake-xray --version`, `src/hexagon/model/application_info.h`, Paketmetadaten und Release-Tag muessen dieselbe veroeffentlichte Semver-Version ohne fuehrendes `v` melden; fuer `v1.2.0-rc.1` ist die erwartete App-Version also `1.2.0-rc.1`, waehrend die CMake-Projektversion `1.2.0` bleibt
+- `cmake-xray --version`, die von `ApplicationInfo` gelieferte kompilierte bzw. generierte App-Version, Paketmetadaten und Release-Tag muessen dieselbe veroeffentlichte Semver-Version ohne fuehrendes `v` melden; fuer `v1.2.0-rc.1` ist die erwartete App-Version also `1.2.0-rc.1`, waehrend die CMake-Projektversion `1.2.0` bleibt
 - Test-, Coverage-, Quality- und Runtime-Pfade vor dem Veroeffentlichen ausfuehren
 - Publishing-Schritte in einen finalen Release-Job nach allen Gates verschieben; Verify-/Build-Jobs duerfen Container und Archive bauen und testen, aber keine Images oder Release-Artefakte in externe Registries bzw. Releases pushen
 - ein Linux-CLI-Artefakt als `.tar.gz` erzeugen
@@ -382,7 +382,7 @@ Die neuen Formate und Release-Pfade sind nur dann nutzbar, wenn Beispiele, Golde
 
 M5 aktualisiert mindestens:
 
-- Versionsquellen fuer `v1.2.0`: Root-`CMakeLists.txt` fuer die numerische Projektversion, `src/hexagon/model/application_info.h` sowie eine App-/Package-Version-Quelle wie `XRAY_APP_VERSION` oder `XRAY_VERSION_SUFFIX` fuer `--version`-/Paketmetadaten inklusive Prerelease-Suffix
+- Versionsquellen fuer `v1.2.0`: Root-`CMakeLists.txt` fuer die numerische Projektversion sowie eine kompilierte oder generierte App-/Package-Version-Quelle wie `XRAY_APP_VERSION` oder `XRAY_VERSION_SUFFIX`, die von `ApplicationInfo` und Paketmetadaten fuer `--version` inklusive Prerelease-Suffix verwendet wird
 - `docs/examples/` mit repraesentativen HTML-, JSON- und DOT-Ausgaben
 - `README.md` mit Formatwahl, quiet/verbose und Release-/Container-Nutzung
 - `docs/guide.md` mit praktischen Aufrufen fuer alle M5-Formate
@@ -403,18 +403,19 @@ Tests und Abnahme muessen mindestens abdecken:
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
 - Regressionstests, dass bestehende Compile-Database-only-Console-/Markdown-Goldens byte-stabil bleiben, waehrend File-API-/Mixed-Input-Goldens nur fuer die dokumentierte `ReportInputs`-Provenienz aktualisiert werden
 - Golden- und CLI-Tests, dass `--top` bei `analyze` fuer Markdown, HTML, JSON und DOT konsistent wirkt und kein Artefaktformat implizit vollstaendige Listen ausgibt
-- DOT-Golden-Tests, dass `analyze --top N` fuer ausgegebene Top-Hotspots hoechstens `context_limit` betroffene Translation Units als Kontextknoten enthaelt, das globale `node_limit`-/`edge_limit`-Budget einhaelt und gekuerzten Kontext mit den verpflichtenden `context_*`-Node-Attributen sowie gekuerzte Graphen mit den verpflichtenden `graph_*`-Graph-Attributen kennzeichnet
-- DOT-Golden-Tests, dass `impact --format dot` das feste Impact-`node_limit`-/`edge_limit`-Budget einhaelt und Kuerzungen mit den verpflichtenden Graph-Attributen `graph_node_limit`, `graph_edge_limit` und `graph_truncated` kennzeichnet
+- DOT-Golden-Tests, dass `analyze --top N` fuer ausgegebene Top-Hotspots hoechstens `context_limit` betroffene Translation Units als Kontextknoten enthaelt, das globale `node_limit`-/`edge_limit`-Budget einhaelt, gekuerzten Kontext mit den verpflichtenden `context_*`-Node-Attributen kennzeichnet und die verpflichtenden `graph_*`-Graph-Attribute immer ausgibt
+- DOT-Golden-Tests, dass `impact --format dot` das feste Impact-`node_limit`-/`edge_limit`-Budget einhaelt und die verpflichtenden Graph-Attribute `graph_node_limit`, `graph_edge_limit` und `graph_truncated` immer ausgibt, mit `graph_truncated=false` im ungekuerzten Fall
 - CLI- und Port-Tests, dass `impact` in M5 keine `--top`-Option akzeptiert und ImpactResult-basierte JSON-, HTML- und Markdown-Reports keine implizite fachliche Ergebnisbegrenzung oder JSON-`limit`-/`truncated`-Felder einfuehren; `impact --format dot` bleibt die visualisierungsorientierte Ausnahme mit festem `node_limit`-/`edge_limit`-Budget
 - JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` und `inputs.cmake_file_api_resolved_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
 - JSON-Schema-/Golden-Tests fuer `ReportInputs`-Pfad-Provenienz: CLI-relative Pfade, absolute Pfade, Build-Dir-vs.-Reply-Dir bei `--cmake-file-api` und relative `--changed-file` muessen stabile Display-Pfade und passende `*_source`-Enums liefern
+- JSON-Schema-/Golden-Tests fuer Mixed-Input-Impact-Laeufe, dass relative `changed_file`-Pfade auf Basis der `compile_commands.json`-Directory interpretiert werden und `inputs.changed_file_source=compile_database_directory` ausgeben; File-API-only-Laeufe verwenden `file_api_source_root`
 - Adapter-/Service-Tests, dass der vom `CmakeFileApiAdapter` aufgeloeste Build-/Reply-Pfad ueber `BuildModelResult` in `ReportInputs.cmake_file_api_resolved_path` landet und nicht aus CLI-Zustand nachgereicht wird
 - JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path` und `inputs.cmake_file_api_path` bei `analyze` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
 - JSON-Schema-/Golden-Tests, dass `inputs.compile_database_path`, `inputs.cmake_file_api_path` und `inputs.changed_file` bei `impact` immer vorhanden sind und fehlende Eingaben als `null`, nie als leerer String oder weggelassenes Feld, erscheinen
 - Tests, dass `--verbose` JSON-, Markdown-, HTML- und DOT-Artefakte nicht gegenueber dem Normalmodus veraendert und Zusatzdiagnostik nur Console/`stderr` betrifft
 - Smoke-Test fuer Docker-Runtime-Image
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
-- Versionscheck, dass Root-`CMakeLists.txt` die numerische Basisversion meldet und `cmake-xray --version`, `src/hexagon/model/application_info.h`, App-/Package-Version-Quelle und Release-Tag dieselbe veroeffentlichte Semver-Version ohne fuehrendes `v` melden, inklusive Prerelease-Suffix bei Tags wie `v1.2.0-rc.1`
+- Versionscheck, dass Root-`CMakeLists.txt` die numerische Basisversion meldet und `cmake-xray --version`, die kompilierte bzw. generierte `ApplicationInfo`-Version, App-/Package-Version-Quelle und Release-Tag dieselbe veroeffentlichte Semver-Version ohne fuehrendes `v` melden, inklusive Prerelease-Suffix bei Tags wie `v1.2.0-rc.1`
 - automatisierter Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
 - automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt: GitHub-Schritte duerfen Mock-/Noop-Publisher nutzen, OCI-Schritte muessen eine lokale Test-Registry fuer Tagging, `latest`-Regel, Push und Manifest-Pruefung verwenden, ohne externe Veroeffentlichung
 - dokumentierter manueller Dry-Run nur fuer Recovery-Pfade, die echte externe Publish-Zustaende in GitHub Releases oder GHCR voraussetzen
@@ -465,7 +466,7 @@ Abhaengigkeiten:
 | DOT-Hotspot-Kontext umgeht faktisch das `--top`-Limit | ein einzelner verbreiteter Header oder mehrere Top-Hotspots erzeugen sehr grosse Graphen trotz kleinem Top-Limit | DOT-Kontext mit separatem `context_limit` und globalem `node_limit`-/`edge_limit`-Budget begrenzen und Kuerzung maschinenlesbar kennzeichnen |
 | Impact-DOT ist trotz unbegrenztem `ImpactResult` zu gross | haeufig inkludierte Header erzeugen sehr grosse Graphviz-Reports | feste Impact-DOT-Budgets `node_limit = 100` und `edge_limit = 200` mit `graph_truncated` anwenden |
 | DOT-Grenzen werden unterschiedlich implementiert | Golden-Outputs werden instabil oder Graphen wachsen unerwartet | feste M5-Formeln fuer `context_limit`, `node_limit`, `edge_limit` und stabile Kuerzungsreihenfolge dokumentieren |
-| DOT-Kuerzungsmetadaten stehen nur in Kommentaren | Graphviz-Consumer koennen Truncation nicht verlaesslich auslesen | verpflichtende Graph-Attribute mit exakten Namen und Typen verwenden; Kommentare nur zusaetzlich erlauben |
+| DOT-Kuerzungsmetadaten stehen nur in Kommentaren oder nur bei Kuerzung | Graphviz-Consumer koennen budgetierte M5-Ausgaben nicht verlaesslich erkennen | verpflichtende Graph-Attribute mit exakten Namen und Typen immer ausgeben; Kommentare nur zusaetzlich erlauben |
 | macOS-/Windows-Replace-Semantik wird nur dokumentiert, aber nicht getestet | atomare Dateiausgabe kann auf anderen Plattformen anders fehlschlagen | atomare Replace-Tests als CI-Gate fuer Linux, macOS und Windows aufnehmen |
 | `--verbose` veraendert HTML-/Markdown-/DOT-Artefakte | Golden-Outputs und CI-Artefakte werden durch Diagnosemodus instabil | Verbose-only-Inhalte fuer diese Artefakte ausschliessen und Zusatzdiagnostik auf Console/`stderr` beschraenken |
 | DOT suggeriert Target-Graph-Semantik, die M5 noch nicht besitzt | Nutzer interpretieren Graphen falsch | keine Target-zu-Target-Kanten erzeugen und Legende/Labels klar formulieren |
@@ -481,7 +482,7 @@ Abhaengigkeiten:
 | Oeffentlicher GitHub Release entsteht vor erfolgreichem OCI-Publish | Release zeigt ein fehlendes Container-Artefakt oder falsche Installationshinweise | GitHub Release zuerst als Draft vorbereiten, OCI-Image veroeffentlichen und erst danach den Release oeffentlich machen |
 | Release-Workflow funktioniert nur fuer lokale Pfade | Artefakte sind nicht real nutzbar | entpacktes Linux-Archiv und Container-Image separat smoke-testen |
 | File-API-Pfad hat keine Performance-Baseline | der erste Folge-Meilenstein nach M4 erfuellt die Performance-Dokumentation nicht | M5 misst den CMake-File-API-Pfad auf Referenzgroessen und aktualisiert `docs/performance.md` |
-| Versionsquellen bleiben auf `1.1.0` | ein `v1.2.0`-Release meldet intern die alte Version | numerische CMake-Projektversion, App-/Package-Version-Quelle, `application_info.h`, `--version` und Release-Tag gemeinsam pruefen |
+| Versionsquellen bleiben auf `1.1.0` | ein `v1.2.0`-Release meldet intern die alte Version | numerische CMake-Projektversion, kompilierte bzw. generierte `ApplicationInfo`-Version, App-/Package-Version-Quelle, `--version` und Release-Tag gemeinsam pruefen |
 | Windows-Pfade brechen Golden-Tests | Portabilitaetsziel bleibt theoretisch | Pfadanzeige und Normalisierung explizit testen; Goldens plattformrobust gestalten |
 
 ## 4. Rueckverfolgbarkeit
