@@ -165,7 +165,7 @@ AP 1.2 verwendet die in AP 1.1 eingefuehrte Konstante:
 - Adapter, Dokumentation, Schema-Tests und Goldens duerfen keine zweite Formatversionskonstante definieren.
 - `docs/report-json.schema.json` verwendet JSON Schema Draft 2020-12 und enthaelt `$schema: "https://json-schema.org/draft/2020-12/schema"`.
 - Das Schema ist fuer Vertragsobjekte geschlossen: Top-Level, `inputs`, `summary`, Ranking-/Hotspot-Container, Items, Diagnostics, Translation-Unit-Objekte, Target-Objekte und verschachtelte Unterobjekte setzen `additionalProperties: false` oder ein aequivalentes geschlossenes Schema. Unbekannte Felder werden in M5 hart abgelehnt.
-- `docs/report-json.schema.json` darf `format_version` mit `const: 1` absichern.
+- `docs/report-json.schema.json` muss `format_version` mit `const: 1` absichern.
 - Der `format_version`-`const`-Wert im Schema wird in einem CTest-Gate gegen `xray::hexagon::model::kReportFormatVersion` geprueft.
 - Ein Schema-Wert, der von der C++-Konstante abweicht, laesst AP 1.2 fehlschlagen.
 
@@ -243,7 +243,7 @@ Render-, Schreib- und Output-Fehler:
 Schema-Validierung:
 
 - Schema-Validierung erfolgt ueber ein repository-lokales Python-Testskript mit der Python-Bibliothek `jsonschema`.
-- Die Dependency wird in `tests/requirements-json-schema.txt` mit Version-Pin dokumentiert.
+- Die Dependency wird mit allen transitiven Python-Abhaengigkeiten vollstaendig reproduzierbar gepinnt, entweder ueber `tests/requirements-json-schema.txt` mit Hash-/Constraint-Pins oder ueber eine fest gebaute CI-/Docker-Image-Schicht.
 - Lokale CTest-Laeufe schlagen mit klarer Installationsanweisung fehl, wenn der Validator fehlt.
 - Der CTest-Schema-Test ueberspringt nicht still, wenn der Validator fehlt.
 - CTest selbst installiert keine Python-Packages und greift nicht auf das Netzwerk zu. Installation erfolgt ausschliesslich im Bootstrap-Schritt; der Test prueft nur die vorhandene Umgebung und gibt bei fehlendem Validator eine konkrete Installationsanweisung aus.
