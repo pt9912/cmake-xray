@@ -96,7 +96,9 @@ Regeln:
 
 - `ReportInputs` ist die kanonische Quelle fuer neue M5-Artefaktadapter und den spaeteren JSON-Vertrag.
 - Nicht verwendete optionale Eingaben werden im Modell als `std::nullopt` modelliert.
-- Die JSON-Serialisierung entscheidet pro Reporttyp, ob ein Modellfeld als JSON-`null` ausgegeben oder im jeweiligen Schema gar nicht angeboten wird. Insbesondere gehoeren `changed_file` und `changed_file_source` nicht zum Analyze-JSON-Vertrag.
+- Die spaetere JSON-Serialisierung gibt alle im jeweiligen Reporttyp definierten `inputs`-Felder immer aus; fehlende Eingaben werden dort als JSON-`null` serialisiert.
+- AP 1.1 darf keine offene Weglass-Option fuer Felder einfuehren, die im M5-JSON-Vertrag fuer den jeweiligen Reporttyp definiert sind.
+- `changed_file` und `changed_file_source` gehoeren nur zum Impact-Vertrag; sie werden bei Analyze im Modell als `std::nullopt` gehalten, sind aber keine Analyze-JSON-Felder.
 - Leere Strings sind fuer fehlende Eingaben verboten.
 - `changed_file` und `changed_file_source` sind nur fuer `impact` gesetzt.
 - Bei `analyze` bleiben `changed_file` und `changed_file_source` `std::nullopt`.
@@ -155,7 +157,7 @@ struct AnalyzeProjectRequest {
 
 ### `AnalyzeImpactRequest`
 
-Den positionalen Impact-Port ersetzen oder gleichwertig erweitern:
+Den positionalen Impact-Port ersetzen:
 
 ```cpp
 struct AnalyzeImpactRequest {
@@ -172,14 +174,13 @@ public:
 };
 ```
 
-Alle Aufrufer in CLI, Tests und Port-Wiring werden auf den Request umgestellt.
+Alle Produktionsaufrufer in CLI, Composition Root, Tests und Port-Wiring werden auf den Request umgestellt. Der alte positionale virtuelle Portvertrag wird nicht als Produktionspfad behalten, weil er `report_display_base` und `was_relative` nicht korrekt transportieren kann. Falls ein temporaerer nicht-virtueller Testhelper fuer alte Testdaten noetig ist, muss er intern einen vollstaendigen `AnalyzeImpactRequest` mit expliziter Display-Basis bauen und darf nicht von CLI oder Port-Wiring genutzt werden.
 
 ## File-API-Aufloesungsmetadaten
 
-`BuildModelResult` erhaelt rohe, lexikalische File-API-Pfadmetadaten. Das bestehende Feld `source_root` bleibt die fachliche Source-Root fuer File-API-Ergebnisse und wird nicht parallel durch ein zweites Source-Root-Feld ersetzt:
+`BuildModelResult` erhaelt nur den vom Adapter tatsaechlich verwendeten, rohen File-API-Aufloesungspfad. Das bestehende Feld `source_root` bleibt die fachliche Source-Root fuer File-API-Ergebnisse und wird nicht parallel durch ein zweites Source-Root-Feld ersetzt:
 
 ```cpp
-std::optional<std::filesystem::path> cmake_file_api_input_path;
 std::optional<std::filesystem::path> cmake_file_api_resolved_path;
 std::string source_root; // bestehendes Feld, weiterhin File-API-Source-Root
 ```
@@ -189,7 +190,9 @@ Regeln:
 - Der `CmakeFileApiAdapter` setzt diese Werte, kennt aber keine Report-Display-Basis.
 - Adapter liefern rohe lexikalische Pfade, keine host-spezifisch normalisierten Display-Strings.
 - `source_root` bleibt die Quelle fuer bestehende Analyse- und Impact-Basislogik; AP 1.1 fuehrt kein zusaetzliches `cmake_file_api_source_root` mit abweichender Semantik ein.
-- `ProjectAnalyzer` und `ImpactAnalyzer` konvertieren rohe File-API-Pfade und `source_root` ueber die Display-Pfadregeln in die `ReportInputs`-Display-Strings.
+- `ReportInputs.cmake_file_api_path` kommt ausschliesslich aus `AnalyzeProjectRequest::cmake_file_api_path` oder `AnalyzeImpactRequest::cmake_file_api_path`, inklusive `was_relative` und `report_display_base`.
+- `ReportInputs.cmake_file_api_resolved_path` kommt ausschliesslich aus `BuildModelResult::cmake_file_api_resolved_path` und wird in den Services ueber die Display-Pfadregeln konvertiert.
+- Der Adapter transportiert den originalen CLI-Eingabepfad nicht zurueck; er koennte `was_relative` und `report_display_base` nicht verlaesslich rekonstruieren.
 - Keine CLI- oder Adapterzustandswerte werden spaeter an Reportadapter nachgereicht.
 
 ## Display-Pfadregeln
@@ -359,7 +362,7 @@ Verboten:
 1. `ReportInputs` und Enums einfuehren.
 2. `AnalysisResult` und `ImpactResult` um `inputs` erweitern.
 3. `AnalyzeProjectRequest` um `InputPathArgument` und `report_display_base` erweitern.
-4. `AnalyzeImpactRequest` einfuehren und CLI/Tests auf Request umstellen.
+4. `AnalyzeImpactRequest` einfuehren und den positionalen virtuellen Impact-Portvertrag aus dem Produktionspfad entfernen.
 5. `BuildModelResult` um rohe File-API-Aufloesungsmetadaten erweitern.
 6. `ProjectAnalyzer` setzt `ReportInputs` fuer `analyze`.
 7. `ImpactAnalyzer` setzt `ReportInputs` fuer `impact`, inklusive `changed_file_source`.
@@ -383,6 +386,7 @@ Unit-/Service-Tests:
   - `cmake_file_api_path` gesetzt
   - `cmake_file_api_resolved_path` aus `BuildModelResult`
   - `cmake_file_api_source=cli`
+  - `cmake_file_api_path` kommt aus dem Request, nicht aus `BuildModelResult`
   - altes `AnalysisResult::compile_database_path` bleibt fuer Console/Markdown mit dem bisherigen File-API-Anzeigewert befuellt
 - `ReportInputs` bei Mixed-Analyze:
   - Compile Database und File API beide gesetzt
@@ -402,6 +406,7 @@ Unit-/Service-Tests:
 - Absolute normale Eingabepfade bleiben in `compile_database_path` und `cmake_file_api_path` als absolute Anzeige-Strings erhalten.
 - `cmake_file_api_resolved_path` folgt der Adapterpfad-Regel und wird nicht aus dem originalen CLI-String rekonstruiert.
 - `AnalyzeImpactRequest` transportiert `compile_commands_path`, `changed_file_path`, `cmake_file_api_path`, `report_display_base` und die jeweilige `was_relative`-Information.
+- Es gibt keinen virtuellen positionalen `AnalyzeImpactPort` mehr im CLI- oder Composition-Root-Pfad.
 
 CLI-Tests:
 
@@ -443,7 +448,7 @@ AP 1.1 ist abgeschlossen, wenn:
 - `--output` fuer `markdown` stdout leer laesst;
 - `html`, `json` und `dot` als bekannte, aber noch nicht implementierte Formate deterministisch vor Analyse und Dateierzeugung abgelehnt werden;
 - atomarer Write bestehende Zielartefakte bei Fehlern nicht veraendert;
-- `AnalyzeImpactPort` nicht mehr vom positionalen Altvertrag abhaengt oder dieser eindeutig als deprecated Wrapper ueber `AnalyzeImpactRequest` implementiert ist;
+- `AnalyzeImpactPort` im Produktionspfad nur noch den `AnalyzeImpactRequest`-Vertrag anbietet;
 - `ReportInputs` fuer Analyze und Impact vollstaendig in Service-Tests abgedeckt ist;
 - Compile-Database-only-, File-API- und Mixed-Input-Console-/Markdown-Goldens byte-stabil bleiben;
 - `ReportInputs` in AP 1.1 nicht neu in Console oder Markdown sichtbar wird;
