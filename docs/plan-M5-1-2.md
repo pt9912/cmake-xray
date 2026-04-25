@@ -53,7 +53,7 @@ AP 1.2 baut auf folgenden AP-1.1-Vertraegen auf:
 
 AP 1.2 entfernt die AP-1.1-Sperre fuer `--format json` oder begrenzt sie auf andere noch nicht implementierte Formate. `--format json` darf nach AP 1.2 den Fehler `recognized but not implemented` nicht mehr liefern.
 
-Falls der M5-konforme Atomic-Writer aus AP 1.1 noch nicht vorhanden oder nicht testbar ist, bleibt `--format json --output <path>` in AP 1.2 blockiert.
+Falls der M5-konforme Atomic-Writer aus AP 1.1 noch nicht vorhanden oder nicht testbar ist, ist AP 1.2 insgesamt nicht abnahmefaehig. Eine teilweise Abnahme nur fuer JSON-stdout ohne JSON-Dateiausgabe ist nicht zulaessig.
 
 ## Dateien
 
@@ -68,6 +68,7 @@ Voraussichtlich zu aendern:
 - `tests/adapters/test_json_report_adapter.cpp`
 - `tests/adapters/test_port_wiring.cpp`
 - `tests/e2e/test_cli.cpp`
+- `tests/e2e/run_e2e.sh`
 - `docs/guide.md`
 - `docs/quality.md`
 - `Dockerfile`
@@ -152,6 +153,7 @@ Impact-spezifische Regeln:
 
 - Bei `impact` ist `changed_file` wegen der CLI-Pflicht ein String.
 - `changed_file_source` ist einer der in `docs/report-json.md` dokumentierten Enum-Werte.
+- `unresolved_file_api_source_root` aus AP 1.1 ist in JSON v1 kein erlaubter `changed_file_source`-Wert. Dieser Wert beschreibt File-API-Fehlerergebnisse im Modell; AP 1.2 behandelt nicht wiederherstellbare File-API-Ladefehler als Textfehler ohne JSON-Report.
 - `impact`-JSON enthaelt in M5 keine `limit`-/`truncated`-Felder, solange der CLI- und Port-Vertrag keine Impact-Begrenzung kennt.
 - Alle betroffenen Translation Units und Targets aus dem `ImpactResult` werden ausgegeben.
 
@@ -182,6 +184,7 @@ Regeln:
 - Alternativ darf `top_limit` als Ergebnis-/Reportview-Feld modelliert werden; AP 1.2 muss sich fuer genau einen Pfad entscheiden und ihn in Port-, Adapter- und Testschnittstellen konsistent umsetzen.
 - Der Adapter fuehrt keine HTML-, DOT- oder Markdown-spezifischen Metadaten ein.
 - Der Item-Vertrag legt Pflichtkeys, optionale Keys, Enum-Schreibweisen, numerische Typen und deterministische Sortier-Tie-Breaker fest.
+- Der Schema-Vertrag fuer `changed_file_source` enthaelt in JSON v1 nur Werte, die in erfolgreichen JSON-Reports auftreten koennen; Modellwerte fuer text-only Fehlerpfade werden nicht vorsorglich als JSON-Enum freigegeben.
 - Adaptertests pruefen exakte Keys und mindestens einen Tie-Breaker pro sortierter Item-Liste.
 - Report-Ports bleiben ergebnisobjektzentriert.
 
@@ -291,6 +294,7 @@ Port- und Wiring-Tests:
 - `tests/adapters/test_port_wiring.cpp` prueft, dass `json` an den `JsonReportAdapter` verdrahtet ist.
 - Tests pruefen, dass keine zweite Formatversionskonstante im Adapter oder Wiring verwendet wird.
 - Port-/Wiring-Tests pruefen ausdruecklich, dass `--format json` nicht in den bestehenden Console-Fallback faellt und keinen Console-Adapter nutzt.
+- Binary-Smoke-Tests ueber `tests/e2e/run_e2e.sh` und das CTest-Ziel `e2e_binary` pruefen, dass auch die echte Binary inklusive `src/main.cpp` den JSON-Adapter verdrahtet.
 
 E2E-Golden-Tests:
 
@@ -306,11 +310,13 @@ E2E-Golden-Tests:
 - JSON-Goldens decken `impact` mit Compile-Database-only-, File-API-only- und Mixed-Input-Provenienz ab.
 - Relative `changed_file`-Faelle pruefen `compile_database_directory` bei Mixed-Input und `file_api_source_root` bei File-API-only.
 - Absolute `changed_file`-Faelle pruefen `cli_absolute`.
+- Schema- oder Adaptertests pruefen, dass `changed_file_source=unresolved_file_api_source_root` in JSON v1 nicht akzeptiert wird.
 
 CLI- und Stream-Tests:
 
 - `analyze --format json` liefert gueltiges JSON auf stdout und leeres stderr.
 - `impact --format json` liefert gueltiges JSON auf stdout und leeres stderr.
+- Binary-E2E-Smokes fuehren `analyze --format json` und mindestens einen `impact --format json`-Fall ueber die gebaute `cmake-xray`-Binary aus, nicht nur ueber direkt instanziierte CLI-Adaptertests.
 - `--format json --output <path>` schreibt gueltiges JSON in die Datei.
 - Erfolgreiche `--format json --output <path>`-Aufrufe lassen stdout und stderr leer.
 - Tests pruefen, dass `--format json` nicht mehr den AP-1.1-Fehler `recognized but not implemented` liefert.
@@ -352,6 +358,7 @@ AP 1.2 ist abnahmefaehig, wenn:
 - Analyze-Goldens Limit-/Truncation-Faelle fuer Ranking und Hotspots abdecken.
 - Impact-Goldens die relevanten `changed_file_source`-Faelle abdecken.
 - File-API-Goldens Build-Dir- und Reply-Dir-Eingaben fuer `cmake_file_api_resolved_path` abdecken.
+- Binary-E2E-Smokes die JSON-Verdrahtung der echten Binary inklusive `src/main.cpp` abdecken.
 - Parser-, Eingabe-, Render- und Schreibfehler als Textfehler ohne JSON-Fehlerobjekt getestet sind.
 - Docker-, Coverage-, native Build- und Release-CTest-Pfade den JSON-Schema-Validator installieren oder eine gemeinsame Bootstrap-Schicht nutzen.
 - CTest bleibt offline und reproduzierbar; fehlende Validator-Dependencies fuehren zu einer klaren Fehlermeldung statt zu Netzwerkzugriffen oder stillen Skips.
