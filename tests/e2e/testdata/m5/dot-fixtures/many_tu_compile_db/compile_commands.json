@@ -1,0 +1,332 @@
+[
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_00.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=0",
+      "-c",
+      "/project/src/file_00.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_01.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=1",
+      "-c",
+      "/project/src/file_01.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_02.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=2",
+      "-c",
+      "/project/src/file_02.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_03.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=3",
+      "-c",
+      "/project/src/file_03.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_04.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=4",
+      "-c",
+      "/project/src/file_04.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_05.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=5",
+      "-c",
+      "/project/src/file_05.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_06.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=6",
+      "-c",
+      "/project/src/file_06.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_07.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=7",
+      "-c",
+      "/project/src/file_07.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_08.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=8",
+      "-c",
+      "/project/src/file_08.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_09.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=9",
+      "-c",
+      "/project/src/file_09.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_10.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=10",
+      "-c",
+      "/project/src/file_10.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_11.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=11",
+      "-c",
+      "/project/src/file_11.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_12.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=12",
+      "-c",
+      "/project/src/file_12.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_13.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=13",
+      "-c",
+      "/project/src/file_13.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_14.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=14",
+      "-c",
+      "/project/src/file_14.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_15.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=15",
+      "-c",
+      "/project/src/file_15.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_16.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=16",
+      "-c",
+      "/project/src/file_16.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_17.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=17",
+      "-c",
+      "/project/src/file_17.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_18.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=18",
+      "-c",
+      "/project/src/file_18.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_19.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=19",
+      "-c",
+      "/project/src/file_19.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_20.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=20",
+      "-c",
+      "/project/src/file_20.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_21.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=21",
+      "-c",
+      "/project/src/file_21.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_22.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=22",
+      "-c",
+      "/project/src/file_22.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_23.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=23",
+      "-c",
+      "/project/src/file_23.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_24.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=24",
+      "-c",
+      "/project/src/file_24.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_25.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=25",
+      "-c",
+      "/project/src/file_25.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_26.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=26",
+      "-c",
+      "/project/src/file_26.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_27.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=27",
+      "-c",
+      "/project/src/file_27.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_28.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=28",
+      "-c",
+      "/project/src/file_28.cpp"
+    ]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/file_29.cpp",
+    "arguments": [
+      "c++",
+      "-I/project/include",
+      "-DFILE=29",
+      "-c",
+      "/project/src/file_29.cpp"
+    ]
+  }
+]

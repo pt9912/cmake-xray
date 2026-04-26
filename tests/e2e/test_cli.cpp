@@ -594,6 +594,77 @@ TEST_CASE("dot impact refuses to render when changed_file_source is unresolved_f
     CHECK(err.str().find("digraph cmake_xray_impact") == std::string::npos);
 }
 
+TEST_CASE_FIXTURE(CliFixture, "dot impact analyze emits valid DOT and empty stderr") {
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--format", "dot"}) ==
+            ExitCode::success);
+    CHECK(err.str().empty());
+    CHECK(out.str().find("digraph cmake_xray_impact {") != std::string::npos);
+    CHECK(out.str().find("changed_file [") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "dot impact --output writes the file with empty streams") {
+    const TemporaryDirectory temp_dir;
+    const auto target = temp_dir.path() / "impact.dot";
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--format", "dot", "--output",
+                 target.string().c_str()}) == ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().empty());
+    REQUIRE(std::filesystem::is_regular_file(target));
+    const auto contents = read_text_file(target);
+    CHECK(contents.find("digraph cmake_xray_impact {") != std::string::npos);
+    CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
+}
+
+TEST_CASE_FIXTURE(CliFixture, "dot analyze with non-existent compile-commands emits text error") {
+    const TemporaryDirectory temp_dir;
+    const auto missing = (temp_dir.path() / "no-such.json").string();
+    CHECK(run({"analyze", "--compile-commands", missing.c_str(), "--format", "dot"}) !=
+          ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    // No DOT graph leaks into either stream.
+    CHECK(err.str().find("digraph") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "dot analyze with invalid compile-commands JSON emits text error") {
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("invalid_syntax/compile_commands.json").c_str(), "--format",
+               "dot"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    CHECK(err.str().find("digraph") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "dot analyze with --top 0 is rejected by the existing PositiveNumber check") {
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+               "dot", "--top", "0"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    CHECK(err.str().find("digraph") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "dot impact rejects --top because impact has no top semantics") {
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(),
+               "--changed-file", "include/common/shared.h", "--format", "dot", "--top",
+               "5"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "dot impact without --changed-file returns the changed-file required error") {
+    CHECK(run({"impact", "--cmake-file-api",
+               fixture_path("m4/file_api_only/build").c_str(), "--format", "dot"}) !=
+          ExitCode::success);
+    CHECK(err.str().find("impact requires --changed-file") != std::string::npos);
+    CHECK(out.str().empty());
+}
+
 TEST_CASE_FIXTURE(CliFixture, "dot analyze --output writes the file with empty streams") {
     const TemporaryDirectory temp_dir;
     const auto target = temp_dir.path() / "report.dot";
@@ -1094,6 +1165,49 @@ TEST_CASE("json --output keeps the existing target file when the JSON renderer t
     CHECK(err.str().find("cannot render report") != std::string::npos);
     CHECK(err.str().find("analysis report exception") != std::string::npos);
     CHECK(read_text_file(target) == "{\"untouched\": true}");
+    CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
+}
+
+TEST_CASE("dot --output keeps the existing target file when the DOT renderer throws") {
+    AnalysisResult success_result;
+    success_result.application = xray::hexagon::model::application_info();
+    success_result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    const StubAnalyzeProjectPort analyze_project_port{success_result};
+    const StubAnalyzeImpactPort analyze_impact_port;
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const ThrowingGenerateReportPort dot_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port};
+    const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
+
+    const TemporaryDirectory temp_dir;
+    const auto target = temp_dir.path() / "report.dot";
+    {
+        std::ofstream existing(target);
+        existing << "digraph untouched { foo; }";
+    }
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const auto target_path = target.string();
+    const char* argv[] = {"cmake-xray",
+                          "analyze",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--format",
+                          "dot",
+                          "--output",
+                          target_path.c_str()};
+    const int exit_code = cli.run(8, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("cannot render report") != std::string::npos);
+    CHECK(read_text_file(target) == "digraph untouched { foo; }");
     CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
 }
 

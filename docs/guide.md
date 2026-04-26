@@ -209,6 +209,29 @@ cmake-xray analyze \
   --top 20
 ```
 
+DOT-Ausgabe fuer Graphviz-Visualisierung:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --format dot \
+  --top 20 > build/reports/analyze.dot
+dot -Tsvg build/reports/analyze.dot > build/reports/analyze.svg
+```
+
+DOT ist Graphviz-Quelltext, kein gerendertes Bild. Format, Knoten- und
+Kantenarten, Attributlexik, Sortier- und Budgetregeln sind in
+[docs/report-dot.md](./report-dot.md) verbindlich dokumentiert. Mit
+`--output <path>` schreibt der Adapter den Bericht atomar:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --format dot \
+  --output build/reports/analyze.dot \
+  --top 20
+```
+
 JSON ist der maschinenlesbare Reportvertrag von `cmake-xray`. Format,
 Pflichtfelder, Enum-Werte und Sortierregeln sind in
 [docs/report-json.md](./report-json.md) verbindlich dokumentiert; das JSON
@@ -259,6 +282,21 @@ cmake-xray impact \
   --format json \
   --output build/reports/impact.json
 ```
+
+DOT-Ausgabe fuer Impact-Visualisierung:
+
+```bash
+cmake-xray impact \
+  --compile-commands build/compile_commands.json \
+  --changed-file include/common/config.h \
+  --format dot \
+  --output build/reports/impact.dot
+dot -Tsvg build/reports/impact.dot > build/reports/impact.svg
+```
+
+Direkte Impact-Kanten erscheinen mit `style="solid"`, heuristische mit
+`style="dashed"`, sodass Direktheit und Heuristik im gerenderten Bild
+visuell unterscheidbar bleiben.
 
 Der Impact-JSON-Bericht enthaelt zusaetzlich `inputs.changed_file` und
 `inputs.changed_file_source`. Erlaubte Werte fuer `changed_file_source` sind

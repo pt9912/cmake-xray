@@ -1,0 +1,22 @@
+[
+  {
+    "directory": "/project/build",
+    "file": "/project/src/app.cpp",
+    "arguments": ["c++", "-I/project/include", "-iquote/project/src", "-DAPP=1", "-c", "/project/src/app.cpp"]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/core.cpp",
+    "arguments": ["c++", "-I/project/include", "-c", "/project/src/core.cpp"]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/util.cpp",
+    "arguments": ["c++", "-I/project/include", "-c", "/project/src/util.cpp"]
+  },
+  {
+    "directory": "/project/build",
+    "file": "/project/src/tool.cpp",
+    "arguments": ["c++", "-I/project/include", "-DTOOL=1", "-c", "/project/src/tool.cpp"]
+  }
+]

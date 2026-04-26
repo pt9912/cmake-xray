@@ -1,0 +1,12 @@
+digraph cmake_xray_analysis {
+  xray_report_type="analyze";
+  format_version=1;
+  graph_node_limit=30;
+  graph_edge_limit=50;
+  graph_truncated=false;
+  tu_1 [kind="translation_unit", rank=1, label="file_00.cpp", path="/project/src/file_00.cpp", directory="/project/build", unique_key="/project/src/file_00.cpp|/project/build"];
+  tu_2 [kind="translation_unit", rank=2, label="file_01.cpp", path="/project/src/file_01.cpp", directory="/project/build", unique_key="/project/src/file_01.cpp|/project/build"];
+  tu_3 [kind="translation_unit", rank=3, label="file_02.cpp", path="/project/src/file_02.cpp", directory="/project/build", unique_key="/project/src/file_02.cpp|/project/build"];
+  tu_4 [kind="translation_unit", rank=4, label="file_03.cpp", path="/project/src/file_03.cpp", directory="/project/build", unique_key="/project/src/file_03.cpp|/project/build"];
+  tu_5 [kind="translation_unit", rank=5, label="file_04.cpp", path="/project/src/file_04.cpp", directory="/project/build", unique_key="/project/src/file_04.cpp|/project/build"];
+}

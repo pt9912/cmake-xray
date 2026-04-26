@@ -1,0 +1,12 @@
+[
+  {
+    "directory": "/project/build with spaces",
+    "file": "/project/src/quoted \"name\".cpp",
+    "arguments": ["c++", "-I/project/include", "-c", "/project/src/quoted \"name\".cpp"]
+  },
+  {
+    "directory": "/project/build/win\\style",
+    "file": "/project/src/back\\slash.cpp",
+    "arguments": ["c++", "-I/project/include", "-c", "/project/src/back\\slash.cpp"]
+  }
+]

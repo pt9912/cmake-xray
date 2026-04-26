@@ -1,0 +1,10 @@
+digraph cmake_xray_analysis {
+  xray_report_type="analyze";
+  format_version=1;
+  graph_node_limit=25;
+  graph_edge_limit=40;
+  graph_truncated=false;
+  tu_1 [kind="translation_unit", rank=1, label="main.cpp", path="/project/src/main.cpp", directory="/project/build", unique_key="/project/src/main.cpp|/project/build"];
+  target_1 [kind="target", label="app", name="app", type="EXECUTABLE", unique_key="app::EXECUTABLE"];
+  tu_1 -> target_1 [kind="tu_target"];
+}

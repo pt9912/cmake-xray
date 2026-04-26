@@ -7,3 +7,18 @@
 #
 # Tranche A creates this manifest empty; Tranche C adds the analyze and
 # impact goldens that lock the DOT contract in place.
+
+# Analyze goldens
+analyze_compile_db_only.dot
+analyze_file_api_only.dot
+analyze_mixed_input.dot
+analyze_default_top.dot
+analyze_top_truncated.dot
+analyze_budget_truncated.dot
+analyze_escaping.dot
+
+# Impact goldens
+impact_compile_db_direct.dot
+impact_file_api_only.dot
+impact_mixed_input.dot
+impact_budget_untruncated.dot

@@ -1,0 +1,12 @@
+digraph cmake_xray_impact {
+  xray_report_type="impact";
+  format_version=1;
+  graph_node_limit=100;
+  graph_edge_limit=200;
+  graph_truncated=false;
+  changed_file [kind="changed_file", label="main.cpp", path="/project/src/main.cpp"];
+  direct_tu_1 [kind="translation_unit", impact="direct", label="main.cpp", path="src/main.cpp", directory="build", unique_key="/project/src/main.cpp|/project/build"];
+  target_1 [kind="target", impact="direct", label="app", name="app", type="EXECUTABLE", unique_key="app::EXECUTABLE"];
+  changed_file -> direct_tu_1 [kind="changed_file_direct_tu", style="solid"];
+  direct_tu_1 -> target_1 [kind="direct_tu_target", style="solid"];
+}
