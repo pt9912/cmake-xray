@@ -131,7 +131,7 @@ DOT-IDs:
 - Der Adapter bildet IDs aus Knotentyp und stabiler Position nach der dokumentierten Sortier- und Budgetlogik, zum Beispiel `tu_1`, `hotspot_1`, `target_1` und `changed_file`.
 - Edge-Ausgaben referenzieren ausschliesslich diese stabilen IDs.
 - Rohe nutzergelieferte Pfade, Target-Namen und Diagnostics duerfen nie unescaped als ID erscheinen.
-- Innerhalb eines Knotentyps wird nach fachlicher Identitaet dedupliziert: Translation Units und Include-Hotspots nach Anzeige-Pfad, Targets nach Target-Name, geaenderte Datei als einzelner Impact-Knoten.
+- Innerhalb eines Knotentyps wird nach fachlicher Identitaet dedupliziert: Translation Units nach `TranslationUnitReference::unique_key`, Include-Hotspots nach Anzeige-Pfad, Targets nach `TargetInfo::unique_key`, geaenderte Datei als einzelner Impact-Knoten.
 
 ### Gemeinsame Graph-Attribute
 
@@ -164,7 +164,9 @@ Pflichtattribute fuer Translation-Unit-Knoten:
 
 - `kind="translation_unit"`.
 - `label`: gekuerztes oder ungekuerztes Leselabel.
-- `path`: vollstaendiger Anzeige-Pfad.
+- `path`: vollstaendiger Anzeige-Pfad aus `TranslationUnitReference::source_path`.
+- `directory`: Anzeige-Directory aus `TranslationUnitReference::directory`.
+- `unique_key`: fachlicher Translation-Unit-Schluessel aus `TranslationUnitReference::unique_key`.
 
 Optionale Translation-Unit-Attribute:
 
@@ -183,8 +185,10 @@ Pflichtattribute fuer Include-Hotspot-Knoten:
 Pflichtattribute fuer Target-Knoten:
 
 - `kind="target"`.
-- `label`: Target-Name.
-- `name`: Target-Name.
+- `label`: Target-Anzeigename.
+- `name`: Target-Anzeigename aus `TargetInfo::display_name`.
+- `type`: Target-Typ aus `TargetInfo::type`.
+- `unique_key`: fachlicher Target-Schluessel aus `TargetInfo::unique_key`.
 
 ### Kanten
 
@@ -228,14 +232,14 @@ Knotenkandidaten werden deterministisch in dieser Reihenfolge aufgenommen:
 1. primaere Top-Ranking-Translation-Units.
 2. Top-Hotspot-Knoten.
 3. Target-Knoten fuer Translation Units aus der Kandidatenmenge.
-4. Hotspot-Kontext-Translation-Units, sortiert nach Anzeige-Pfad.
+4. Hotspot-Kontext-Translation-Units, sortiert nach `source_path`, `directory` und `unique_key`.
 
 Tie-Breaker:
 
-- Translation Units nach Anzeige-Pfad, wenn die fachliche Ranking-Sortierung gleich ist.
+- Translation Units nach `source_path`, `directory` und `unique_key`, wenn die fachliche Ranking-Sortierung gleich ist.
 - Include-Hotspots nach Anzeige-Pfad, wenn Hotspot-Metriken gleich sind.
-- Targets nach Target-Name.
-- Kontext-Translation-Units nach Anzeige-Pfad.
+- Targets nach `display_name`, `type` und `unique_key`.
+- Kontext-Translation-Units nach `source_path`, `directory` und `unique_key`.
 
 Wenn `node_limit` erreicht ist, werden spaetere Kandidaten nicht aufgenommen und `graph_truncated=true` gesetzt.
 
@@ -285,14 +289,18 @@ Pflichtattribute fuer Translation-Unit-Knoten:
 - `kind="translation_unit"`.
 - `impact`: `direct` oder `heuristic`.
 - `label`: gekuerztes oder ungekuerztes Leselabel.
-- `path`: vollstaendiger Anzeige-Pfad.
+- `path`: vollstaendiger Anzeige-Pfad aus `TranslationUnitReference::source_path`.
+- `directory`: Anzeige-Directory aus `TranslationUnitReference::directory`.
+- `unique_key`: fachlicher Translation-Unit-Schluessel aus `TranslationUnitReference::unique_key`.
 
 Pflichtattribute fuer Target-Knoten:
 
 - `kind="target"`.
 - `impact`: `direct` oder `heuristic`, wenn der Target-Status eindeutig aus `ImpactResult` ableitbar ist.
-- `label`: Target-Name.
-- `name`: Target-Name.
+- `label`: Target-Anzeigename.
+- `name`: Target-Anzeigename aus `TargetInfo::display_name`.
+- `type`: Target-Typ aus `TargetInfo::type`.
+- `unique_key`: fachlicher Target-Schluessel aus `TargetInfo::unique_key`.
 
 Wenn ein Target sowohl direkt als auch heuristisch betroffen ist, gewinnt `impact="direct"` fuer den Target-Knoten. Der Adapter darf daraus keine zusaetzliche fachliche Priorisierung ableiten; es ist nur eine Darstellungsregel.
 
@@ -311,7 +319,9 @@ Pflichtattribute fuer Kanten:
 Style-Regeln:
 
 - Direkte Impact-Kanten muessen sich von heuristischen Kanten unterscheiden.
-- Die Unterscheidung erfolgt ueber stabile DOT-Attribute, zum Beispiel `style="solid"` fuer direkt und `style="dashed"` fuer heuristisch.
+- Die Unterscheidung erfolgt ueber das stabile DOT-Attribut `style`.
+- Kanten mit `kind="changed_file_direct_tu"` und `kind="direct_tu_target"` tragen verpflichtend `style="solid"`.
+- Kanten mit `kind="changed_file_heuristic_tu"` und `kind="heuristic_tu_target"` tragen verpflichtend `style="dashed"`.
 - Style-Attribute sind Teil des Golden-Vertrags und duerfen nicht zufaellig oder Graphviz-versionabhaengig sein.
 
 Regeln:
@@ -341,9 +351,9 @@ Regeln:
 Knotenkandidaten werden deterministisch in dieser Reihenfolge aufgenommen:
 
 1. geaenderte Datei.
-2. direkt betroffene Translation Units, sortiert nach Anzeige-Pfad.
-3. heuristisch betroffene Translation Units, sortiert nach Anzeige-Pfad.
-4. Target-Knoten, sortiert nach Target-Name.
+2. direkt betroffene Translation Units, sortiert nach `source_path`, `directory` und `unique_key`.
+3. heuristisch betroffene Translation Units, sortiert nach `source_path`, `directory` und `unique_key`.
+4. Target-Knoten, sortiert nach `display_name`, `type` und `unique_key`.
 
 Wenn `node_limit` erreicht ist, werden spaetere Kandidaten nicht aufgenommen und `graph_truncated=true` gesetzt.
 
@@ -554,6 +564,11 @@ Adaptertests:
 - Tests pruefen Escaping fuer Leerzeichen, Anfuehrungszeichen, Backslashes, Newline, Tab und plattformtypische Pfadtrenner.
 - Tests pruefen stabile Node-ID-Erzeugung ohne rohe Pfade als IDs.
 - Tests pruefen mindestens einen Tie-Breaker pro sortierter Node- und Edge-Gruppe.
+- Tests pruefen, dass Translation Units mit gleichem `source_path` und unterschiedlichem `directory` beziehungsweise `unique_key` als getrennte Knoten erhalten bleiben.
+- Tests pruefen, dass Targets mit gleichem `display_name` und unterschiedlichem `type` beziehungsweise `unique_key` als getrennte Knoten erhalten bleiben.
+- Tests pruefen die Pflichtattribute `directory` und `unique_key` fuer Translation-Unit-Knoten.
+- Tests pruefen die Pflichtattribute `type` und `unique_key` fuer Target-Knoten.
+- Tests pruefen die exakten Impact-Style-Werte `style="solid"` fuer direkte Kanten und `style="dashed"` fuer heuristische Kanten.
 - Tests pruefen leere Analyze- und Impact-Ergebnisse als gueltigen DOT-Graph.
 
 Budget- und Truncation-Tests:
@@ -637,6 +652,10 @@ AP 1.3 ist abnahmefaehig, wenn:
 - Impact-DOT die festen M5-Budgets `node_limit = 100` und `edge_limit = 200` verwendet.
 - Knoten- und Kantenkuerzung deterministisch ist und `graph_truncated` korrekt setzt.
 - DOT-IDs, Labels und Attributwerte deterministisch und korrekt escaped sind.
+- Translation Units nach `TranslationUnitReference::unique_key` und Targets nach `TargetInfo::unique_key` dedupliziert werden, ohne gleichnamige Modellobjekte zusammenzuklappen.
+- Translation-Unit-Knoten `directory` und `unique_key` ausgeben.
+- Target-Knoten `type` und `unique_key` ausgeben.
+- Direkte und heuristische Impact-Kanten die exakt dokumentierten `style`-Attribute tragen.
 - Leere Ergebnisse gueltigen DOT-Quelltext erzeugen.
 - Echte CLI-Ausgaben gegen Goldens verglichen und anschliessend syntaktisch validiert werden.
 - Binary-E2E-Smokes die DOT-Verdrahtung der echten Binary inklusive `src/main.cpp` abdecken.
