@@ -538,6 +538,26 @@ Nicht wiederherstellbare Eingabefehler:
 - Diese Fehler erzeugen kein HTML-Fehlerdokument.
 - Exit-Code ist ungleich `0`.
 
+Impact-Negativfall-Matrix:
+
+| Fall | Zeitpunkt | Ergebnis |
+|---|---|---|
+| `impact --format html` ohne `--changed-file` | CLI-Usage-Validierung vor Analyse | Textfehler auf `stderr`, nonzero Exit, kein HTML |
+| `impact --format html --top N` | CLI-Usage-Validierung vor Analyse | Textfehler auf `stderr`, nonzero Exit, kein HTML |
+| `impact --format html --changed-file ""` | CLI-Usage- oder Pfadvalidierung vor Analyse, falls leerer Wert erzeugbar ist | Textfehler auf `stderr`, nonzero Exit, kein HTML |
+| nicht vorhandene Compile-Database oder File-API-Eingabe | Eingabeladen vor Reporterzeugung | Textfehler auf `stderr`, nonzero Exit, kein HTML |
+| ungueltige Compile-Database oder File-API-Reply-Daten | Eingabeladen vor Reporterzeugung | Textfehler auf `stderr`, nonzero Exit, kein HTML |
+| `ReportInputs.changed_file == std::nullopt` in einem sonst erzeugten `ImpactResult` | HTML-Render-Precondition | Render-Fehler als Text auf `stderr`, nonzero Exit, kein HTML |
+| `ReportInputs.changed_file_source == unresolved_file_api_source_root` | HTML-Render-Precondition | Textfehler auf `stderr`, nonzero Exit, kein HTML |
+| erfolgreiches `ImpactResult` mit Diagnostics | normale Reporterzeugung | HTML-Report mit Diagnostics-Section, Exit `0` |
+
+Praezedenz:
+
+1. CLI-Usage-Fehler gewinnen vor Eingabeladen.
+2. Eingabeladefehler gewinnen vor Reporterzeugung.
+3. HTML-Render-Preconditions werden erst auf einem vorhandenen `ImpactResult` geprueft.
+4. Schreib-/Output-Fehler werden erst nach erfolgreichem Vollrendern behandelt.
+
 Service-Ergebnisse mit Diagnostics:
 
 - Service-Ergebnisse mit Diagnostics oder Teildaten koennen als regulaere HTML-Reports ausgegeben werden.
@@ -594,6 +614,15 @@ Kein produktiver CLI-Adapter; Vertrag, Hilfsfunktionen und Testskelett.
 
 Abnahme Tranche A: alle Docker-Gates gruen; Escape-Tests pruefen `<`, `>`, `&`, Anfuehrungszeichen, Apostroph, Backslash, Newline und `<script>`-artige Eingaben; CSS-Tests pruefen keine externen Ressourcen und kein JavaScript.
 
+Definition of Done Tranche A:
+
+- [ ] `docs/report-html.md` dokumentiert den HTML-Vertrag.
+- [ ] erste Adaptertests fuer Struktur, Escaping, CSS und Leersaetze existieren.
+- [ ] CSS ist statisch, inline-faehig und frei von externen Ressourcen.
+- [ ] Manifest fuer HTML-Goldens existiert.
+- [ ] `docs/quality.md` beschreibt den HTML-Testumfang.
+- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+
 ### Tranche B - Adapter, Wiring, CLI-Freischaltung
 
 Der Adapter funktioniert; E2E-Goldens folgen erst in Tranche C.
@@ -610,6 +639,17 @@ Der Adapter funktioniert; E2E-Goldens folgen erst in Tranche C.
 10. Regressionscheck, dass bestehende Console-/Markdown-/JSON-/DOT-Goldens unveraendert bleiben.
 
 Abnahme Tranche B: alle Docker-Gates gruen; `--format html` produziert vollstaendiges HTML; `recognized but not implemented` nicht mehr fuer `html`; Console-, Markdown-, JSON- und DOT-Goldens byte-stabil.
+
+Definition of Done Tranche B:
+
+- [ ] `HtmlReportAdapter` rendert Analyze und Impact aus Ergebnisobjekten.
+- [ ] `ReportPorts` und `src/main.cpp` verdrahten HTML ueber `ReportGenerator`.
+- [ ] `--format html` ist fuer `analyze` und `impact` lauffaehig.
+- [ ] `--format html --output <path>` nutzt den gemeinsamen Atomic-Writer-Pfad.
+- [ ] stdout/stderr-Vertrag fuer erfolgreiche stdout- und Dateiausgabe ist getestet.
+- [ ] Formatverfuegbarkeitsmeldungen enthalten keine HTML-Not-Implemented-Reste.
+- [ ] bestehende Console-/Markdown-/JSON-/DOT-Goldens bleiben unveraendert.
+- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 ### Tranche C - E2E-Goldens, CLI-/Stream-/Fehler-Tests, Beispiele und Nutzerdoku
 
@@ -651,6 +691,18 @@ Echte Binary-Verifikation und Vertragsfestschreibung der CLI-Ausgaben.
 
 Abnahme Tranche C: alle Docker-Gates aus `README.md` und `docs/quality.md` gruen; `e2e_binary` gruen; alle HTML-Goldens sind byte-stabil; Escaping-, Struktur-, Accessibility-Basis-, Top-Limit- und Leersatzvertraege sind durch Goldens und Adaptertests abgedeckt; globale Abnahmekriterien dieses Plans erfuellt.
 
+Definition of Done Tranche C:
+
+- [ ] Analyze- und Impact-HTML-Goldens decken die in Tranche C gelisteten Faelle ab.
+- [ ] Escaping-Goldens decken HTML-Sonderzeichen und Whitespace-Normalisierung ab.
+- [ ] leere Sections zeigen dokumentierte Leersaetze.
+- [ ] `--output` schreibt nur in die Datei; stdout und stderr bleiben bei Erfolg leer.
+- [ ] Fehlerpfade erzeugen Textfehler und kein HTML-Fehlerdokument.
+- [ ] `e2e_binary` deckt `analyze --format html` und `impact --format html` ab.
+- [ ] `docs/examples/` enthaelt stabile Analyze- und Impact-Beispielberichte.
+- [ ] `README.md`, `docs/guide.md` und `docs/quality.md` sind aktualisiert.
+- [ ] Coverage-, Lizard- und Clang-Tidy-Gates sind gruen.
+
 ### Tranche D - Optionale Haertung
 
 Ohne diese Tranche gilt AP 1.4 als abgenommen, sobald Tranche C gruen ist.
@@ -660,6 +712,12 @@ Ohne diese Tranche gilt AP 1.4 als abgenommen, sobald Tranche C gruen ist.
 - Druckdarstellung weiter verbessern, solange Goldens deterministisch bleiben.
 - Optionaler HTML-Struktur-Smoke, falls er in Tranche C noch nicht noetig war.
 - Zusaetzliche gezielte Regressionstests fuer Grenzfaelle, die ueber die verpflichtenden Coverage-, Lizard- und Clang-Tidy-Gates aus Tranche C hinausgehen.
+
+Definition of Done Tranche D:
+
+- [ ] Jede zusaetzliche Haertung ist durch einen fokussierten Test oder ein Golden abgesichert.
+- [ ] Keine optionale Haertung veraendert den dokumentierten AP-1.4-Vertrag ohne Update von `docs/report-html.md`.
+- [ ] Docker-Gates aus `README.md` und `docs/quality.md` bleiben gruen.
 
 ## Entscheidungen
 
