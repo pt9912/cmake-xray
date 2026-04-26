@@ -84,6 +84,17 @@ TEST_CASE("compute_analyze_budget pins edge_limit to max(40, 6*top + 20)") {
     CHECK(compute_analyze_budget(100).edge_limit == 620);
 }
 
+TEST_CASE("compute_analyze_budget clamps adversarially large top_limit to a sane bound") {
+    // The clamp prevents 4*top_limit / 6*top_limit from wrapping a 64-bit
+    // std::size_t. Anything above the documented clamp produces the same
+    // budget as the clamp value itself.
+    const auto at_clamp = compute_analyze_budget(100000);
+    const auto over_clamp = compute_analyze_budget(200000);
+    CHECK(at_clamp.context_limit == over_clamp.context_limit);
+    CHECK(at_clamp.node_limit == over_clamp.node_limit);
+    CHECK(at_clamp.edge_limit == over_clamp.edge_limit);
+}
+
 TEST_CASE("compute_impact_budget pins fixed M5 budgets and zero context_limit") {
     const auto budget = compute_impact_budget();
     CHECK(budget.node_limit == 100);

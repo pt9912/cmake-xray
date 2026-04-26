@@ -12,14 +12,28 @@
 
 set -euo pipefail
 
+# Prevent MSYS2/Git Bash from rewriting Unix-style paths and mirror the
+# AP-1.2 lesson from run_e2e.sh so this script is safe to call from
+# tests/e2e/run_e2e.sh on Windows once Tranche C wires it up.
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL="*"
+
+native_path() {
+    if command -v cygpath >/dev/null 2>&1; then
+        cygpath -m "$1"
+    else
+        printf '%s' "$1"
+    fi
+}
+
 if [ "$#" -ne 3 ]; then
     echo "usage: $0 <dot-binary> <reports-dir> <manifest>" >&2
     exit 2
 fi
 
-DOT_BIN="$1"
-REPORTS_DIR="$2"
-MANIFEST="$3"
+DOT_BIN="$(native_path "$1")"
+REPORTS_DIR="$(native_path "$2")"
+MANIFEST="$(native_path "$3")"
 
 if [ ! -x "$DOT_BIN" ] && ! command -v "$DOT_BIN" >/dev/null 2>&1; then
     echo "error: dot binary not executable: $DOT_BIN" >&2

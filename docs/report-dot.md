@@ -1,5 +1,7 @@
 # DOT Report Contract
 
+> **Implementierungsstand:** AP M5-1.3 Tranche A liefert Vertrag, Helfer und Syntax-Gates plus minimales Knoten-Rendering (Graph-Header, Translation-Unit-Knoten in `analyze`, Changed-File-Knoten in `impact`). Hotspots, Targets, Kanten, Kontext-Expansion und Budget-Enforcement folgen in Tranche B; produktive CLI-Verdrahtung von `--format dot` ebenfalls in Tranche B. Bis dahin lehnt die CLI `--format dot` weiterhin als `recognized but not implemented in this build` ab.
+
 ## Zweck
 
 Dieses Dokument ist der verbindliche Vertrag fuer den Graphviz-DOT-Report von `cmake-xray`. Der Vertrag wird durch CTest-Gates gegen `dot -Tsvg` (Docker-Pfad) und `tests/validate_dot_reports.py` (native CI-Fallback) abgesichert, durch Goldens unter `tests/e2e/testdata/m5/dot-reports/` byte-stabil festgehalten und durch Adapter-Unit-Tests in `xray_tests` gegen die Vertragsregeln geprueft.

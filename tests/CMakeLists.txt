@@ -101,6 +101,10 @@ add_test(
 )
 set_tests_properties(dot_report_python_validation_rejects_broken_dot PROPERTIES WILL_FAIL TRUE)
 
+# find_program runs at configure time. Installing graphviz after configure
+# silently disables the gate; re-run `cmake -B build` to register the test.
+# Docker stages bake graphviz into the toolchain layer so the gate is always
+# active in the canonical CI paths.
 find_program(DOT_PROGRAM dot)
 if(DOT_PROGRAM AND BASH_PROGRAM)
     add_test(

@@ -21,11 +21,19 @@ DotBudget compute_analyze_budget(std::size_t top_limit) {
     // docs/report-dot.md: context_limit = min(top_limit, 5);
     //                    node_limit = max(25, 4 * top_limit + 10);
     //                    edge_limit = max(40, 6 * top_limit + 20).
+    //
+    // Clamp top_limit to a sane upper bound before the multiplications so
+    // 4*top_limit and 6*top_limit cannot wrap a 64-bit std::size_t for
+    // adversarial inputs. The CLI's PositiveNumber validator already rejects
+    // 0; this clamp protects only against intentionally large inputs that
+    // would still be useless graphs.
+    constexpr std::size_t kTopLimitClamp = 100'000;
+    const auto bounded_top = top_limit < kTopLimitClamp ? top_limit : kTopLimitClamp;
     DotBudget budget{};
-    budget.context_limit = top_limit < 5 ? top_limit : 5;
-    const auto node_candidate = 4 * top_limit + 10;
+    budget.context_limit = bounded_top < 5 ? bounded_top : 5;
+    const auto node_candidate = 4 * bounded_top + 10;
     budget.node_limit = node_candidate < 25 ? std::size_t{25} : node_candidate;
-    const auto edge_candidate = 6 * top_limit + 20;
+    const auto edge_candidate = 6 * bounded_top + 20;
     budget.edge_limit = edge_candidate < 40 ? std::size_t{40} : edge_candidate;
     return budget;
 }

@@ -116,8 +116,14 @@ def validate_graph_header(text: str) -> tuple[int, str | None]:
 
 
 def validate_balanced_braces(text: str) -> tuple[int, str | None]:
+    # Quoted strings track an `escape_pending` flag instead of looking at a
+    # single previous character so that legitimate trailing backslashes
+    # (`"foo\\"` ends in an escaped backslash and a real closing quote) parse
+    # correctly. Walking forward, a `\` toggles the flag; the next character
+    # is consumed as escaped and resets the flag.
     depth = 0
     in_string = False
+    escape_pending = False
     in_line_comment = False
     in_block_comment = False
     prev_char = ""
@@ -133,12 +139,17 @@ def validate_balanced_braces(text: str) -> tuple[int, str | None]:
             prev_char = ch
             continue
         if in_string:
-            if ch == '"' and prev_char != "\\":
+            if escape_pending:
+                escape_pending = False
+            elif ch == "\\":
+                escape_pending = True
+            elif ch == '"':
                 in_string = False
             prev_char = ch
             continue
         if ch == '"':
             in_string = True
+            escape_pending = False
             prev_char = ch
             continue
         if ch == "/" and prev_char == "/":
@@ -166,12 +177,17 @@ def validate_balanced_braces(text: str) -> tuple[int, str | None]:
 def validate_string_escapes(text: str) -> tuple[int, str | None]:
     # Inside quoted strings, every literal control character must be a
     # documented escape (\\, \", \n, \r, \t, \xHH). Raw control characters are
-    # contract violations.
+    # contract violations. escape_pending counts backslash-escaped characters
+    # forward so that "foo\\" terminates correctly.
     in_string = False
-    prev_char = ""
+    escape_pending = False
     for index, ch in enumerate(text):
         if in_string:
-            if ch == '"' and prev_char != "\\":
+            if escape_pending:
+                escape_pending = False
+            elif ch == "\\":
+                escape_pending = True
+            elif ch == '"':
                 in_string = False
             elif ord(ch) < 0x20:
                 return EXIT_VALIDATION_FAILED, (
@@ -179,27 +195,32 @@ def validate_string_escapes(text: str) -> tuple[int, str | None]:
         else:
             if ch == '"':
                 in_string = True
-        prev_char = ch
+                escape_pending = False
     return EXIT_OK, None
 
 
 def validate_required_graph_attributes(text: str) -> tuple[int, str | None]:
     # Every required attribute must appear at least once outside a string.
-    # We use a simple state machine that tracks whether we are inside a quoted
-    # string and accumulates non-string-context text for substring matches.
+    # Same forward-walking escape state machine as the brace counter so that
+    # quoted strings ending with `\\` close correctly without consuming the
+    # following non-string body text.
     out: list[str] = []
     in_string = False
-    prev_char = ""
+    escape_pending = False
     for ch in text:
         if in_string:
-            if ch == '"' and prev_char != "\\":
+            if escape_pending:
+                escape_pending = False
+            elif ch == "\\":
+                escape_pending = True
+            elif ch == '"':
                 in_string = False
         else:
             if ch == '"':
                 in_string = True
+                escape_pending = False
             else:
                 out.append(ch)
-        prev_char = ch
     body = "".join(out)
     missing = [name for name in REQUIRED_GRAPH_ATTRIBUTES if name not in body]
     if missing:
