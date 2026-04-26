@@ -1,10 +1,13 @@
 #include <doctest/doctest.h>
 
+#include <fstream>
 #include <string>
 #include <vector>
 
 #include <filesystem>
 #include <optional>
+
+#include <nlohmann/json.hpp>
 
 #include "hexagon/model/build_model_result.h"
 #include "hexagon/model/compile_entry.h"
@@ -346,4 +349,25 @@ TEST_CASE("to_report_display_path with case_insensitive policy still rejects unr
 TEST_CASE("report format version is one") {
     // AP 1.2 JSON adapter must reuse this same constant.
     CHECK(xray::hexagon::model::kReportFormatVersion == 1);
+}
+
+TEST_CASE("report-json schema format_version const matches kReportFormatVersion") {
+    // AP 1.2 Tranche A gate: docs/report-json.schema.json must declare a
+    // const value for FormatVersion that matches the C++ constant. Mismatches
+    // are a hard fail because the schema, the adapter, and any downstream
+    // tooling have to agree on a single version source.
+    // Schema path comes from a compile definition so the test does not depend
+    // on the current working directory and stays correct if WORKING_DIRECTORY
+    // is ever dropped from xray_tests.
+    const auto schema_path = std::filesystem::path{XRAY_REPORT_JSON_SCHEMA_PATH};
+    std::ifstream stream{schema_path};
+    REQUIRE(stream.is_open());
+    nlohmann::json schema;
+    stream >> schema;
+    REQUIRE(schema.contains("$defs"));
+    REQUIRE(schema["$defs"].contains("FormatVersion"));
+    const auto& format_version_def = schema["$defs"]["FormatVersion"];
+    REQUIRE(format_version_def.contains("const"));
+    CHECK(format_version_def["const"].get<int>() ==
+          xray::hexagon::model::kReportFormatVersion);
 }

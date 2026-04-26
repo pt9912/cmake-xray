@@ -117,6 +117,25 @@ docker build --target runtime -t cmake-xray .
 docker run --rm cmake-xray --help
 ```
 
+## JSON-Reportvertrag
+
+Der maschinenlesbare JSON-Reportvertrag ist in [docs/report-json.md](./report-json.md) dokumentiert und durch [docs/report-json.schema.json](./report-json.schema.json) (JSON Schema Draft 2020-12) formal abgesichert. Zwei CTest-Gates schuetzen den Vertrag in jeder Build-Matrix:
+
+- **Schema-Wohlgeformtheit und Manifest-Paritaet** ueber `tests/validate_json_schema.py`. Der CTest-Eintrag heisst `report_json_schema_validation`. Er prueft die Schema-Datei gegen das Draft-2020-12-Meta-Schema, gleicht das Manifest unter `tests/e2e/testdata/m5/json-reports/manifest.txt` mit dem Verzeichnis ab und validiert jedes gelistete Golden gegen das Schema.
+- **Formatversionskonsistenz** im Test `report-json schema format_version const matches kReportFormatVersion` in `xray_tests`. Er parst das Schema und prueft den `$defs/FormatVersion/const`-Wert gegen die C++-Konstante `xray::hexagon::model::kReportFormatVersion` in `src/hexagon/model/report_format_version.h`.
+
+Beide Gates sind verpflichtend und werden ueber alle in diesem Dokument aufgefuehrten Docker-Pfade sowie ueber die nativen Build-Matrizen in `.github/workflows/build.yml` und `.github/workflows/release.yml` ausgefuehrt.
+
+### Validator-Abhaengigkeit
+
+Das Validatorskript benoetigt das Python-Paket `jsonschema` (Version `>=4.10,<5`) inklusive `Draft202012Validator`. Die Bootstrap-Pfade sind:
+
+- **Docker**: das `toolchain`-Stage in [Dockerfile](../Dockerfile) installiert `python3-jsonschema` ueber `apt`. Alle abgeleiteten Stages, die `ctest` ausfuehren (`test`, `coverage`, `coverage-check`), erben die Abhaengigkeit.
+- **Native CI** (Linux/macOS/Windows-Matrizen): die GitHub-Workflows installieren das Paket vor `ctest` ueber `python -m pip install -r tests/requirements-json-schema.txt`.
+- **Lokale Entwickler**: derselbe `pip install`-Befehl. Auf Debian/Ubuntu reicht alternativ `apt-get install python3-jsonschema`.
+
+CTest schlaegt mit konkreter Installationsanweisung fehl, wenn das Paket nicht installiert ist. Der Test wird nicht still uebersprungen und greift nicht auf das Netzwerk zu.
+
 ## Zusammenhang mit Releasing
 
 Fuer M3 und spaetere Releases sind mindestens diese Docker-Pfade massgeblich:

@@ -1,0 +1,18 @@
+# JSON Schema validator dependencies for cmake-xray (AP M5-1.2 Tranche A).
+#
+# Used by tests/validate_json_schema.py to enforce the JSON report contract
+# in docs/report-json.schema.json.
+#
+# Reproducibility strategy:
+# - Docker (Ubuntu 24.04): the apt package python3-jsonschema is pre-installed
+#   in the test and coverage stages of the Dockerfile. This file is then a
+#   no-op on those paths.
+# - Native CI (macOS / Windows / Linux without apt): install via
+#   `pip install --upgrade pip && pip install -r tests/requirements-json-schema.txt`
+#   before running ctest.
+# - Local developer machines: same as native CI.
+#
+# Version constraint covers JSON Schema Draft 2020-12 support (added in 4.0).
+# Upgrade to a hash-pinned `pip-compile --generate-hashes` lockfile when the
+# project gains a Python tooling baseline.
+jsonschema>=4.10,<5

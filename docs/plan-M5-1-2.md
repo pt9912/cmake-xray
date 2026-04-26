@@ -260,19 +260,84 @@ Bootstrap-Pfade:
 
 ## Implementierungsreihenfolge
 
-1. JSON-Vertrag in `docs/report-json.md` und `docs/report-json.schema.json` festlegen.
-2. Schema-Validator-Skript und gepinnte Requirements anlegen.
-3. CTest-Gates fuer Schema-Validierung und Formatversionskonsistenz einhaengen.
-4. CI-/Docker-Bootstrap fuer alle `ctest`-Pfade einrichten.
-5. `JsonReportAdapter` fuer `AnalysisResult` und `ImpactResult` implementieren.
-6. Adaptertests fuer Pflichtfelder, Typen, Enums, Nullability, Sortierung und Tie-Breaker ergaenzen.
-7. JSON in Composition Root und Port-Wiring verdrahten.
-8. AP-1.1-Sperre fuer `--format json` entfernen.
-9. `--format json --output` an den gemeinsamen Atomic-Writer anbinden.
-10. E2E-Goldens fuer Analyze und Impact erzeugen.
-11. E2E-Tests mit Golden-Vergleich, Schema-Validierung, Stream-Vertrag und Fehlerfaellen ergaenzen.
-12. Nutzungsdokumentation in `docs/guide.md` und Test-/Qualitaetsumfang in `docs/quality.md` aktualisieren.
-13. Abschliessend pruefen, dass Console-/Markdown-Goldens unveraendert bleiben.
+Die Umsetzung erfolgt in drei verbindlichen Tranchen plus einer optionalen Haertungstranche. Jede Tranche endet mit einem vollstaendigen Lauf der Docker-Gates aus `README.md` ("Tests und Quality Gates") und `docs/quality.md`. Die globalen Abnahmekriterien dieses Plans gelten zusaetzlich am Ende von Tranche C.
+
+### Tranche A - Vertrag, Schema, Validator, CI-Bootstrap
+
+Kein produktiver Adapter; Infrastruktur, Doku und Gates.
+
+1. JSON-Vertrag in `docs/report-json.md` festlegen, einschliesslich Typ, Pflichtstatus, Enum-Werten, Nullability, Sortier-Tie-Breakern und der Ausnahme `unresolved_file_api_source_root` aus dem JSON-Enum.
+2. `docs/report-json.schema.json` (Draft 2020-12) anlegen, mit `additionalProperties: false` auf jedem Vertragsobjekt und `format_version: {const: 1}`.
+3. `tests/validate_json_schema.py` und `tests/requirements-json-schema.txt` mit Hash-Pins anlegen; CTest meldet fehlende Validatorabhaengigkeiten mit konkreter Installationsanweisung statt still zu skippen.
+4. Manifest `tests/e2e/testdata/m5/json-reports/manifest.txt` anlegen, in Tranche A noch ohne Report-Goldens.
+5. CTest-Gates einhaengen:
+   - Schema-Wohlgeformtheit gegen Meta-Schema.
+   - `format_version`-Konsistenzgate gegen `xray::hexagon::model::kReportFormatVersion`.
+6. `Dockerfile`-Bootstrap fuer Validator-Layer in `test`- und `coverage`-Stages.
+7. `.github/workflows/test.yml`, `.github/workflows/build.yml` und `.github/workflows/release.yml` um Validator-Bootstrap erweitern. Alle drei Workflows fuehren `ctest` in mindestens einer Stage aus.
+8. `docs/quality.md` um die neuen Schema- und Versionsgates ergaenzen.
+
+Abnahme Tranche A: alle Docker-Gates gruen; das `format_version`-Konsistenzgate failt nachweislich, wenn die C++-Konstante kuenstlich von `1` abweicht.
+
+### Tranche B - Adapter, Wiring, Adaptertests
+
+Der Adapter funktioniert; E2E-Goldens folgen erst in Tranche C.
+
+1. Top-Limit-Pfad: `JsonReportAdapter` nutzt `effective_top_limit` als Renderparameter analog zu `MarkdownReportAdapter` und `ConsoleReportAdapter`; der bestehende `GenerateReportPort::generate_analysis_report(result, top_limit)`-Vertrag bleibt unveraendert.
+2. `src/adapters/output/json_report_adapter.{h,cpp}` implementieren; Adapter rendert ausschliesslich aus `AnalysisResult`/`ImpactResult` ueber `ReportInputs`, importiert `kReportFormatVersion` und schreibt stabile Feldreihenfolge mit deterministischen Tie-Breakern.
+3. Composition Root in `src/main.cpp` und `ReportPorts` um den JSON-Port erweitern.
+4. CLI-Adapter `src/adapters/cli/cli_adapter.{h,cpp}` so anpassen, dass `--format json` als implementiert gilt, an den JSON-Port verdrahtet wird und mit `--output` ueber den AP-1.1-Atomic-Writer schreibt; AP-1.1-Sperre fuer `--format json` entfernen, `html` und `dot` bleiben weiter abgewiesen.
+5. `tests/adapters/test_json_report_adapter.cpp` mit Pflichtfeldern, Typen, Enums, Nullability, mindestens einem Tie-Breaker pro sortierter Liste sowie `include_analysis_heuristic=true` und `=false` ergaenzen.
+6. `tests/adapters/test_port_wiring.cpp` so erweitern, dass `--format json` an den JSON-Adapter verdrahtet ist und nicht in den Console-Fallback faellt; Schema-Fail-Test prueft, dass ein gerenderter JSON-Output mit `changed_file_source=unresolved_file_api_source_root` vom Schema abgelehnt wird.
+7. Regressionscheck, dass bestehende Console-/Markdown-Goldens unveraendert bleiben.
+
+Abnahme Tranche B: alle Docker-Gates gruen; `--format json` produziert gueltiges JSON mit `format=cmake-xray.analysis` bzw. `cmake-xray.impact`; `recognized but not implemented` nicht mehr fuer `json`; Console-/Markdown-Goldens byte-stabil.
+
+### Tranche C - E2E-Goldens, CLI-/Stream-/Fehler-Tests, Nutzerdoku
+
+Echte Binary-Verifikation und Vertragsfestschreibung der CLI-Ausgaben.
+
+1. Analyze-Goldens unter `tests/e2e/testdata/m5/json-reports/` als statische Dateien anlegen; CMake-File-API-Fixtures verwenden `/project/...`-Pfade analog zu `tests/e2e/testdata/m4/`, damit Goldens hostunabhaengig byte-stabil bleiben. Abgedeckt sind mindestens:
+   - Compile-Database-only.
+   - File-API-only mit `--cmake-file-api <build-dir>`.
+   - File-API-only mit `--cmake-file-api <reply-dir>`, damit `cmake_file_api_path` und `cmake_file_api_resolved_path` nicht verwechselt werden.
+   - Mixed-Input.
+   - `translation_unit_ranking` ungekuerzt (`truncated=false`) und gekuerzt (`truncated=true`) ueber `--top`.
+   - `include_hotspots` ungekuerzt und gekuerzt.
+   - Hotspot-Item mit gekuerzten `affected_translation_units` (`affected_truncated=true`).
+2. Impact-Goldens erzeugen, abgedeckt sind mindestens:
+   - Compile-Database-only mit relativem `--changed-file` (`changed_file_source=compile_database_directory`).
+   - File-API-only mit relativem `--changed-file` (`changed_file_source=file_api_source_root`).
+   - Mixed-Input mit relativem `--changed-file` (Mixed-Prioritaet, `changed_file_source=compile_database_directory`).
+   - Absolutes `--changed-file` (`changed_file_source=cli_absolute`).
+3. Manifest aktualisieren; der Schema-Validator gleicht Verzeichnis und Manifest beidseitig ab.
+4. `tests/e2e/test_cli.cpp` erweitern um:
+   - JSON-stdout-Vertrag, leeres stderr, gueltiges JSON.
+   - `--format json --output <path>`: Datei geschrieben, stdout und stderr leer, atomar.
+   - JSON-Render-Fehler ueber injizierten `CliReportRenderer`-Doppelgaenger; bestehende Zieldatei bleibt unveraendert, kein partielles JSON auf stdout.
+   - Fehlerpfade: `impact --format json` ohne `--changed-file`, nicht vorhandene Eingaben, ungueltiges `compile_commands.json`, ungueltige File-API-Reply-Daten, Schreibfehler. Alle als Text auf stderr, nonzero Exit, kein JSON-Fehlerobjekt.
+5. `tests/e2e/run_e2e.sh` und das CTest-Ziel `e2e_binary` um Binary-Smokes fuer `analyze --format json` und mindestens einen `impact --format json`-Fall ergaenzen, sodass die Verdrahtung inklusive `src/main.cpp` getestet ist.
+6. `docs/guide.md` um die produktive Nutzung von `--format json` und `--format json --output` ergaenzen; `docs/quality.md` um die in Tranche C neu hinzukommenden Golden- und E2E-Gates ergaenzen.
+
+Abnahme Tranche C: alle Docker-Gates gruen; `e2e_binary` gruen; alle gelisteten Goldens validieren gegen das Schema; Fehlerpfade liefern Text-`stderr` ohne JSON-Fehlerobjekt; globale Abnahmekriterien dieses Plans erfuellt.
+
+### Tranche D - Optionale Haertung
+
+Ohne diese Tranche gilt AP 1.2 als abgenommen, sobald Tranche C gruen ist.
+
+- Plattformspezifische Pfad-Edge-Cases in JSON-Goldens, etwa Windows-Drives.
+- UTF-8-/Escape-Edge-Cases, etwa Unicode-Pfade und Steuerzeichen in Diagnostics.
+- Coverage-Luecken, falls Tranche C die 100%-Schwelle unterschreitet.
+- Neu eingefuehrte Lizard-/Clang-Tidy-Findings beheben.
+
+## Entscheidungen
+
+Diese Entscheidungen sind vor Umsetzungsbeginn getroffen und in die Tranchen eingearbeitet:
+
+- Goldens-Pfadstabilitaet: statische Fixtures mit `/project/...`-Pfaden analog zu `tests/e2e/testdata/m4/`. Begruendung: konsistent mit dem bestehenden M4-File-API-Layout, hostunabhaengig byte-stabil, keine zusaetzliche Build-Step-Abhaengigkeit fuer Goldenerzeugung. Verankert in Tranche C, Schritt 1.
+- Top-Limit-Pfad: `effective_top_limit` als Renderparameter. Begruendung: `GenerateReportPort::generate_analysis_report(result, top_limit)` ist der etablierte Port-Vertrag, den `MarkdownReportAdapter` und `ConsoleReportAdapter` bereits nutzen; ein Reportview-Feld waere ein Bruch, ohne dass JSON davon profitiert. Verankert in Tranche B, Schritt 1.
+- Limit-Quelle fuer `affected_translation_units`: AP 1.2 fuehrt keine zusaetzliche CLI-Option ein und nutzt denselben effektiven `--top`-Wert pro Hotspot. Verankert im JSON-Dokumentvertrag, Abschnitt "Analyze-spezifische Regeln".
+- Release-Workflow: `.github/workflows/release.yml` wird in Tranche A erweitert. Begruendung: der Workflow fuehrt sowohl in der nativen Build-Matrix `ctest` aus als auch die Docker-Stages `test` und `coverage-check`, die alle den JSON-Schema-Validator benoetigen.
 
 ## Tests
 

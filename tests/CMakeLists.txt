@@ -20,6 +20,15 @@ target_link_libraries(
         doctest::doctest
         xray_hexagon
         xray_adapters
+        nlohmann_json::nlohmann_json
+)
+
+# Pass the absolute schema path to the format-version consistency test so it
+# stays cwd-independent even if a future change drops the WORKING_DIRECTORY
+# property below.
+target_compile_definitions(
+    xray_tests PRIVATE
+    XRAY_REPORT_JSON_SCHEMA_PATH="${PROJECT_SOURCE_DIR}/docs/report-json.schema.json"
 )
 
 if(MSVC)
@@ -51,3 +60,17 @@ if(BASH_PROGRAM)
                 ${PROJECT_SOURCE_DIR}/tests/e2e/testdata
     )
 endif()
+
+# AP M5-1.2 Tranche A: schema-syntax + manifest gate for the JSON report
+# contract. The validator script fails loud (exit 2) if the jsonschema Python
+# dependency is missing; CTest must never silently skip this gate.
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
+add_test(
+    NAME report_json_schema_validation
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
+            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/json-reports
+            --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/json-reports/manifest.txt
+)

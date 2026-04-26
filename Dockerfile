@@ -2,6 +2,11 @@ FROM ubuntu:24.04 AS toolchain
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# python3 + python3-jsonschema satisfy the AP M5-1.2 Tranche A validator gate
+# (tests/validate_json_schema.py). The test and coverage stages run ctest,
+# which invokes the validator; the toolchain layer keeps the dependency
+# centrally installed for every derived stage that runs ctest. The runtime
+# stage uses a separate base image and is not affected.
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         build-essential \
@@ -9,6 +14,8 @@ RUN apt-get update \
         cmake \
         git \
         libcap-dev \
+        python3 \
+        python3-jsonschema \
         time \
     && rm -rf /var/lib/apt/lists/*
 
