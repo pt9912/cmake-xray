@@ -485,6 +485,89 @@ TEST_CASE("json summary maps partial target_metadata") {
     CHECK(doc["summary"]["observation_source"] == "derived");
 }
 
+TEST_CASE("json output escapes JSON-special characters in diagnostic messages") {
+    AnalysisResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.diagnostics = {
+        {DiagnosticSeverity::warning, "quote: \" backslash: \\ tab:\t newline:\n"},
+    };
+
+    const JsonReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 1);
+
+    // Round-trip: parsing the rendered JSON yields the original message bytes.
+    const auto doc = parse(rendered);
+    REQUIRE(doc["diagnostics"].size() == 1);
+    CHECK(doc["diagnostics"][0]["message"] ==
+          "quote: \" backslash: \\ tab:\t newline:\n");
+
+    // Raw JSON carries the escape sequences instead of literal control chars,
+    // so a downstream tool that sees the JSON without a parser still gets a
+    // valid document.
+    CHECK(rendered.find("\\\"") != std::string::npos);
+    CHECK(rendered.find("\\\\") != std::string::npos);
+    CHECK(rendered.find("\\t") != std::string::npos);
+    CHECK(rendered.find("\\n") != std::string::npos);
+}
+
+TEST_CASE("json output preserves UTF-8 in paths, diagnostics, and target names") {
+    ImpactResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.target_metadata = TargetMetadataStatus::loaded;
+    result.affected_translation_units = {
+        ImpactedTranslationUnit{
+            reference("src/t\xc3\xb6ster.cpp", "build/r\xc3\xa9sum\xc3\xa9",
+                      "src/t\xc3\xb6ster.cpp|build"),
+            ImpactKind::direct,
+            {},
+        },
+    };
+    result.affected_targets = {
+        ImpactedTarget{TargetInfo{"\xe6\xb5\x8b\xe8\xaf\x95\xe5\xba\x93",
+                                   "STATIC_LIBRARY", "cjk::STATIC"},
+                       TargetImpactClassification::direct},
+    };
+    result.diagnostics = {
+        {DiagnosticSeverity::note, "umlaut \xc3\xa4\xc3\xb6\xc3\xbc"},
+    };
+    result.inputs = ReportInputs{
+        std::nullopt, ReportInputSource::not_provided,
+        std::nullopt, std::nullopt, ReportInputSource::not_provided,
+        std::optional<std::string>{"src/t\xc3\xb6ster.cpp"},
+        std::optional<ChangedFileSource>{ChangedFileSource::cli_absolute},
+    };
+    result.changed_file = "src/t\xc3\xb6ster.cpp";
+    result.heuristic = false;
+
+    const JsonReportAdapter adapter;
+    const auto rendered = adapter.write_impact_report(result);
+
+    // Round-trip with nlohmann::json: every UTF-8 byte sequence that goes in
+    // comes back unchanged.
+    const auto doc = parse(rendered);
+    CHECK(doc["inputs"]["changed_file"] == "src/t\xc3\xb6ster.cpp");
+    REQUIRE(doc["directly_affected_translation_units"].size() == 1);
+    CHECK(doc["directly_affected_translation_units"][0]["reference"]["source_path"]
+          == "src/t\xc3\xb6ster.cpp");
+    CHECK(doc["directly_affected_translation_units"][0]["reference"]["directory"]
+          == "build/r\xc3\xa9sum\xc3\xa9");
+    REQUIRE(doc["directly_affected_targets"].size() == 1);
+    CHECK(doc["directly_affected_targets"][0]["display_name"]
+          == "\xe6\xb5\x8b\xe8\xaf\x95\xe5\xba\x93");
+    REQUIRE(doc["diagnostics"].size() == 1);
+    CHECK(doc["diagnostics"][0]["message"] == "umlaut \xc3\xa4\xc3\xb6\xc3\xbc");
+
+    // UTF-8 bytes appear as raw bytes in the JSON output (nlohmann's default
+    // does not switch them to \uXXXX escapes), so the document stays compact
+    // and human-grepable.
+    CHECK(rendered.find("t\xc3\xb6ster") != std::string::npos);
+    CHECK(rendered.find("r\xc3\xa9sum\xc3\xa9") != std::string::npos);
+    CHECK(rendered.find("\xe6\xb5\x8b\xe8\xaf\x95\xe5\xba\x93") != std::string::npos);
+    CHECK(rendered.find("\xc3\xa4\xc3\xb6\xc3\xbc") != std::string::npos);
+}
+
 TEST_CASE("schema rejects rendered JSON whose changed_file_source is unresolved_file_api_source_root") {
     // The unresolved_file_api_source_root model value is an internal AP 1.1
     // error provenance. JSON v1 deliberately excludes it; the CLI emits a
