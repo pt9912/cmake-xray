@@ -259,10 +259,10 @@ Regeln:
 - `include hotspots` zeigt bis `top_limit` Hotspots und bis `top_limit` Kontext-Translation-Units pro Hotspot.
 - `targets` zeigt eindeutige Targets nach `display_name`, `type`, `unique_key`, sofern Target-Metadaten vorhanden sind.
 - `diagnostics` zeigt reportweite Diagnostics vollstaendig in Modellreihenfolge.
-- Ranking-Eintraege behalten die sortierte Reihenfolge aus `AnalysisResult::translation_units` nach Anwendung von `top_limit`; bei zusaetzlich abgeleiteten Verbose-Listen wird nach `rank`, `source_path`, `directory`, `unique_key` sortiert.
-- Include-Hotspots behalten die Reihenfolge aus `AnalysisResult::include_hotspots` nach Anwendung von `top_limit`; bei zusaetzlich abgeleiteten Verbose-Listen wird nach `header_path` sortiert.
-- Hotspot-Kontext-Translation-Units werden pro Hotspot nach `source_path`, `directory`, `unique_key` sortiert, sofern die Modellreihenfolge nicht bereits explizit im Reportvertrag verwendet wird.
-- Item-Diagnostics und reportweite Diagnostics behalten die Modellreihenfolge.
+- Ranking-Eintraege werden nach `rank`, `source_path`, `directory`, `unique_key` sortiert und danach auf `top_limit` begrenzt.
+- Include-Hotspots werden nach `affected_translation_units.size()` absteigend, dann `header_path` aufsteigend sortiert und danach auf `top_limit` begrenzt.
+- Hotspot-Kontext-Translation-Units werden pro Hotspot nach `source_path`, `directory`, `unique_key` sortiert und danach auf `top_limit` begrenzt.
+- Item-Diagnostics und reportweite Diagnostics werden in der Reihenfolge ihres `std::vector`-Indexes ausgegeben; der Index ist der Tie-Breaker und wird nicht aus Maps oder Sets rekonstruiert.
 - Targets werden immer nach `display_name`, `type`, `unique_key` sortiert.
 - Verbose Analyze stdout endet mit genau einem Newline.
 - Verbose Analyze stderr bleibt bei erfolgreichem Console-Report leer.
@@ -295,7 +295,7 @@ Regeln:
 - Direct- und Heuristic-Translation-Unit-Sections werden getrennt nach `ImpactKind` gebildet; innerhalb jeder Section wird nach `source_path`, `directory`, `unique_key` sortiert.
 - Direct- und Heuristic-Target-Sections werden getrennt nach `TargetImpactClassification` gebildet; innerhalb jeder Section wird nach `display_name`, `type`, `unique_key` sortiert.
 - Translation-Unit-Zielzuordnungen innerhalb einer Zeile werden nach `display_name`, `type`, `unique_key` sortiert.
-- Reportweite Diagnostics behalten die Modellreihenfolge.
+- Reportweite Diagnostics werden in der Reihenfolge ihres `std::vector`-Indexes ausgegeben; der Index ist der Tie-Breaker und wird nicht aus Maps oder Sets rekonstruiert.
 - Verbose Impact stdout endet mit genau einem Newline.
 - Verbose Impact stderr bleibt bei erfolgreichem Console-Report leer.
 
@@ -359,6 +359,7 @@ Verbose-`stderr` fuer erfolgreiche Artefaktformate enthaelt maximal:
 Regeln:
 
 - Reihenfolge ist exakt wie oben.
+- `top_limit` erscheint nicht in Verbose-`stderr` fuer Artefaktformate. Bei `analyze` beeinflusst `top_limit` ausschliesslich den Reportinhalt; bei `impact` gibt es keinen `top_limit`.
 - Fehlende optionale Werte werden als `not provided` geschrieben.
 - Es werden keine Hostpfade ergaenzt, die nicht bereits im Ergebnis vorhanden sind.
 - Keine Stacktraces, Typnamen oder internen Funktionsnamen.
@@ -371,6 +372,9 @@ Regeln:
 - Eingabefehler bleiben Textfehler auf `stderr`.
 - Render- und Schreibfehler bleiben Textfehler auf `stderr`.
 - `--format console --output <path>` ist immer ein Usage-Fehler: Text auf `stderr`, nonzero Exit, leeres stdout, keine Zieldatei.
+- Der stderr-Inhalt fuer `--format console --output <path>` ist exakt:
+  1. `error: --output is not supported with --format console`
+  2. `hint: use an artifact-oriented format such as --format markdown, --format json, --format dot or --format html when writing a report file`
 - Quiet und Verbose aendern Exit-Codes nicht.
 - Quiet unterdrueckt keine Fehler.
 - Verbose darf Fehlerkontext auf `stderr` ergaenzen, aber keine Stacktraces oder internen Implementierungsdetails ausgeben.
@@ -408,7 +412,20 @@ Erlaubte Zeilen:
 Regeln:
 
 - Zeilen erscheinen nach der normalen Fehlermeldung.
-- Fuer Render- und Schreibfehler mit `--verbose --output` ist die stderr-Sequenz exakt: zuerst die bestehende Fehlermeldung, danach die erlaubten `verbose:`-Zeilen in der oben dokumentierten Reihenfolge. Weitere stderr-Zeilen sind nicht zulaessig.
+- Fuer Renderfehler mit `--verbose` ist die stderr-Sequenz exakt:
+  1. `error: cannot render report: <message>`
+  2. `verbose: command=<analyze|impact>`
+  3. `verbose: format=<format>`
+  4. `verbose: output=<stdout|file>`
+  5. `verbose: validation_stage=render`
+- Fuer Schreibfehler mit `--verbose --output` ist die stderr-Sequenz exakt:
+  1. `error: cannot write report: <path>: <reason>`
+  2. `hint: check the output path and directory permissions`
+  3. `verbose: command=<analyze|impact>`
+  4. `verbose: format=<format>`
+  5. `verbose: output=file`
+  6. `verbose: validation_stage=write`
+- Weitere stderr-Zeilen sind fuer Render- und Schreibfehler in AP 1.5 nicht zulaessig.
 - Fuer Render- und Schreibfehler ohne `--verbose` bleibt stderr auf die bestehende Fehlermeldung und bestehende Hint-Zeilen beschraenkt.
 - `validation_stage` wird aus der CLI-Schicht gesetzt, nicht aus Exception-Typen abgeleitet.
 - Keine C++-Typnamen.
@@ -534,8 +551,8 @@ Parser- und CLI-Tests:
 - `analyze --quiet --verbose` liefert Usage-Fehler.
 - `impact --quiet --verbose` liefert Usage-Fehler.
 - globale `--quiet`-/`--verbose`-Positionen vor dem Subcommand liefern nonzero Usage-Fehler.
-- `analyze --format console --output report.txt` liefert Text auf stderr, nonzero Exit, leeres stdout und erzeugt keine Datei.
-- `impact --format console --output report.txt` liefert Text auf stderr, nonzero Exit, leeres stdout und erzeugt keine Datei.
+- `analyze --format console --output report.txt` liefert exakt die dokumentierte stderr-Fehlermeldung mit Hint, nonzero Exit, leeres stdout und erzeugt keine Datei.
+- `impact --format console --output report.txt` liefert exakt die dokumentierte stderr-Fehlermeldung mit Hint, nonzero Exit, leeres stdout und erzeugt keine Datei.
 - `impact --verbose` ohne `--changed-file` liefert Text auf stderr, nonzero Exit und keinen stdout-Report.
 
 Console-Tests:
@@ -557,6 +574,7 @@ Artefakt-Tests:
 - `--verbose --format markdown` ohne `--output` ist stdout-byte-identisch zum Normalmodus.
 - `--quiet --format json` ohne `--output` ist stdout-byte-identisch zum Normalmodus.
 - `--verbose --format json` ohne `--output` ist stdout-byte-identisch zum Normalmodus und bleibt gueltiges JSON.
+- Artefakt-Verbose-stderr enthaelt keinen `top_limit`-Eintrag.
 - `--quiet --format dot` und `--verbose --format dot` werden analog getestet, sobald DOT umgesetzt ist.
 - `--quiet --format html` und `--verbose --format html` werden analog getestet, sobald HTML umgesetzt ist.
 - `--quiet --format json --output out.json` schreibt dieselbe Datei wie Normalmodus und laesst stdout/stderr leer.
@@ -569,8 +587,9 @@ Fehlerpfad-Tests:
 - Quiet unterdrueckt Eingabefehler nicht.
 - Quiet unterdrueckt Render-/Schreibfehler nicht.
 - Verbose ergaenzt Fehlerkontext nur auf stderr.
-- `--verbose --format json --output out.json` mit simuliertem Render- oder Schreibfehler schreibt zuerst die normale Fehlermeldung und danach nur die dokumentierten `verbose:`-Kontextzeilen.
-- `--verbose --format markdown --output out.md` mit simuliertem Render- oder Schreibfehler folgt derselben stderr-Reihenfolge; DOT und HTML werden entsprechend ergaenzt, sobald die Formate umgesetzt sind.
+- `--verbose --format json --output out.json` mit simuliertem Renderfehler schreibt exakt die dokumentierte Renderfehler-Sequenz.
+- `--verbose --format json --output out.json` mit simuliertem Schreibfehler schreibt exakt die dokumentierte Schreibfehler-Sequenz.
+- `--verbose --format markdown --output out.md` mit simuliertem Render- oder Schreibfehler folgt denselben stderr-Sequenzen; DOT und HTML werden entsprechend ergaenzt, sobald die Formate umgesetzt sind.
 - Verbose-Fehlerkontext enthaelt keine Stacktraces, C++-Typnamen oder internen Funktionsnamen.
 - Fehler erzeugen keine JSON-, DOT- oder HTML-Fehlerdokumente.
 
