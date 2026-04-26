@@ -667,7 +667,7 @@ Echte Binary-Verifikation und Vertragsfestschreibung der CLI-Ausgaben.
 2. Impact-Goldens erzeugen. Abgedeckt sind mindestens:
    - Compile-Database-only mit relativem `--changed-file`.
    - File-API-only mit relativem `--changed-file`.
-   - mindestens ein absolutes `--changed-file`, damit Quoting, Pfadnormalisierung und Labelbildung fuer absolute Pfade regressionsgeschuetzt sind.
+   - mindestens ein absolutes `--changed-file`, damit Quoting, Pfadnormalisierung und Labelbildung fuer absolute Pfade regressionsgeschuetzt sind. AP-1.2-/1.3-Lehre: das absolute Golden bekommt Per-Plattform-Varianten (zum Beispiel `impact_absolute.html` und `impact_absolute_windows.html`), weil POSIX `/project/...` als absolut akzeptiert, Windows aber `C:/project/...` verlangt. `tests/e2e/run_e2e.sh` waehlt das passende Golden ueber `case "$(uname -s)"`.
    - Mixed-Input.
    - direkte und heuristische Translation Units.
    - direkte und heuristische Targets.
@@ -684,7 +684,7 @@ Echte Binary-Verifikation und Vertragsfestschreibung der CLI-Ausgaben.
    - Negativtest, dass `--top 0 --format html` abgelehnt wird und kein HTML entsteht.
 6. `tests/e2e/run_e2e.sh` und das CTest-Ziel `e2e_binary` um Binary-Smokes fuer `analyze --format html` und mindestens einen `impact --format html`-Fall ergaenzen, sodass die Verdrahtung inklusive `src/main.cpp` getestet ist.
 7. Beispielberichte unter `docs/examples/` erzeugen oder als stabile Fixtures ablegen, mindestens `analyze.html` und `impact.html`.
-8. `README.md` um HTML in Formatliste und Beispiele ergaenzen.
+8. `README.md` um HTML in Formatliste und Beispiele ergaenzen — als Pflichtbestandteil des Tranche-C-Commits, nicht als separater Folge-Commit (AP-1.2-/1.3-Lehre).
 9. `docs/guide.md` um produktive Nutzung von `--format html` und `--format html --output` ergaenzen.
 10. `docs/quality.md` um die in Tranche C neu hinzukommenden HTML-Golden-, Struktur- und E2E-Gates ergaenzen.
 11. Coverage-, Lizard- und Clang-Tidy-Gates muessen nach AP 1.4 weiterhin gruen sein; neue Befunde aus dem HTML-Adapter werden in Tranche C behoben und nicht auf Tranche D verschoben.
@@ -732,6 +732,9 @@ Diese Entscheidungen sind vor Umsetzungsbeginn getroffen und in die Tranchen ein
 - HTML nutzt `ReportInputs` fuer Provenienz. Begruendung: Neue M5-Artefaktadapter duerfen nicht auf Legacy-Presentation-Felder fuer Console/Markdown zurueckfallen.
 - CSS bleibt statisch und file-local. Begruendung: AP 1.4 braucht kein Frontend-Asset-System und keine neue Build-Abhaengigkeit.
 - Python-Struktur-Smoke bleibt standardbibliotheks-only, falls er eingefuehrt wird. Begruendung: HTML-Gates sollen keine neue Dependency-Kette neben dem JSON-Schema-Validator einfuehren.
+- Keine neuen pip-Dependencies in AP 1.4. Begruendung: AP-1.2-Lehre: jeder neue Python-Validator zog Hash-Pinning und einen `requirements*.txt`-Eintrag im Workflow nach sich. AP 1.4 verzichtet darauf, indem der optionale Struktur-Smoke ausschliesslich `html.parser`, `re` und `pathlib` aus der Standardbibliothek nutzt; falls trotzdem eine externe Dependency entsteht, ist sie zwingend ueber `pip-compile --generate-hashes` zu pinnen, bevor sie in den CI-Workflows aktiviert wird.
+- README-Pflicht in Tranche C: Header, Feature-Liste und "nicht Ziel"-Liste werden gleichzeitig mit der HTML-Freischaltung aktualisiert. Begruendung: AP-1.2-/1.3-Lehre, dass die README-Aktualisierung sonst als separater Folge-Commit nachgezogen werden muss; Tranche C bringt sie in den Hauptcommit.
+- Per-Plattform-Goldens fuer absolute Pfadeingaben. Begruendung: AP-1.2-/1.3-Lehre nach Windows-MSYS-CI-Failure: `/project/...` ist auf POSIX absolut, auf Windows aber relativ; ein einziges Golden kann beide Plattformen nicht byte-stabil abdecken. AP 1.4 fuehrt `*_windows.html`-Varianten ein, sobald ein Goldenfall absolute `--changed-file`-Pfade verwendet, und `tests/e2e/run_e2e.sh` waehlt ueber `case "$(uname -s)"` das passende Golden.
 
 ## Tests
 

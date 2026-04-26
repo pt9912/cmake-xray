@@ -161,6 +161,18 @@ Der visualisierungsorientierte DOT-Reportvertrag ist in [docs/report-dot.md](./r
 
 CTest selbst installiert keine Systempakete und greift nicht auf das Netzwerk zu. Installation von Graphviz oder Python-Abhaengigkeiten erfolgt ausschliesslich im Bootstrap-Schritt der jeweiligen Umgebung.
 
+## HTML-Reportvertrag
+
+Der menschenlesbare HTML-Reportvertrag ist in [docs/report-html.md](./report-html.md) dokumentiert. AP M5-1.4 fuehrt den HTML-Adapter in drei verbindlichen Tranchen plus optionaler Tranche D ein. Folgende Gates sichern den Vertrag:
+
+- **HTML-Adapter-Vertrag (Tranche A)** in `xray_tests` ueber `tests/adapters/test_html_report_adapter.cpp`. Pflichtgeruest (`<!doctype html>`, `<html lang="en">`, einziges `h1`, einziges `main`, `head`-Reihenfolge), Escape-Regeln fuer Textknoten und Attribute, Whitespace-Normalisierung (LF/CRLF/CR/Tab/Control-Bytes), CSS-Pflichtmerkmale (keine externen Ressourcen, keine Animationen, keine `@import`/`url(...)`-Referenzen, System-Fontstack, Druckpfad) und das `kReportFormatVersion`-Meta sind dort verbindlich abgesichert.
+- **HTML-Goldens und Manifest (Tranche C)** unter `tests/e2e/testdata/m5/html-reports/` mit `manifest.txt`. Tranche A legt das Manifest leer an; Tranche C fuegt Compile-DB-only-, File-API-only-, Mixed-Input-, Default-Top-, Top-Truncated-, Hotspot-Kontext-Kuerzungs-, Leersatz- und Escaping-Faelle bei `analyze` sowie Compile-DB-, File-API-, Mixed-Input-, Direct-/Heuristic-Translation-Unit-, Direct-/Heuristic-Target-, Leersatz- und Absolute-`--changed-file`-Faelle bei `impact` hinzu. Per-Plattform-Goldens (`*_windows.html`) decken host-divergente Pfadsemantik ab.
+- **HTML-Wiring (Tranche B)** in `xray_tests` ueber `tests/adapters/test_port_wiring.cpp`. Tests stellen sicher, dass `--format html` ueber Composition Root und CLI bis zum `HtmlReportAdapter` durchverdrahtet ist und nicht in den Console-Fallback faellt.
+- **Binary-E2E-Smokes (Tranche C)** ueber `tests/e2e/run_e2e.sh` und das CTest-Ziel `e2e_binary`. Die echte `cmake-xray`-Binary erzeugt HTML-Berichte fuer mindestens je einen Analyze- und Impact-Fall; Ausgaben werden byte-stabil gegen die Goldens verglichen.
+- **Optionaler HTML-Struktur-Smoke** (`tests/validate_html_reports.py`, falls in Tranche A oder D angelegt) bleibt standardbibliotheks-only und prueft `<!doctype html>`, einziges `h1`, kein `script`, keine externen Ressourcen.
+
+CTest selbst installiert keine Systempakete und greift nicht auf das Netzwerk zu. AP 1.4 fuehrt keine neuen pip-Dependencies ein; falls eine spaetere HTML-Vertragsversion das doch tut, ist Hash-Pinning ueber `pip-compile --generate-hashes` Pflicht.
+
 ## Zusammenhang mit Releasing
 
 Fuer M3 und spaetere Releases sind mindestens diese Docker-Pfade massgeblich:

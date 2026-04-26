@@ -1,0 +1,8 @@
+# Manifest of cmake-xray HTML report goldens (AP M5-1.4).
+#
+# Each non-comment, non-blank line names exactly one .html golden file in
+# this directory. Tranche A creates this manifest empty; Tranche C adds the
+# analyze and impact goldens that lock the HTML contract in place. Per-
+# platform variants (*_windows.html) cover host-divergent path semantics
+# for absolute --changed-file inputs — see comments in tests/e2e/run_e2e.sh
+# for the case "$(uname -s)" branching.

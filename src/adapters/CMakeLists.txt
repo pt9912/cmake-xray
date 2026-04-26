@@ -7,6 +7,7 @@ add_library(
     input/source_parsing_include_adapter.cpp
     output/console_report_adapter.cpp
     output/dot_report_adapter.cpp
+    output/html_report_adapter.cpp
     output/json_report_adapter.cpp
     output/markdown_report_adapter.cpp
 )
