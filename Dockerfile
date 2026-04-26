@@ -3,16 +3,20 @@ FROM ubuntu:24.04 AS toolchain
 ENV DEBIAN_FRONTEND=noninteractive
 
 # python3 + python3-jsonschema satisfy the AP M5-1.2 Tranche A validator gate
-# (tests/validate_json_schema.py). The test and coverage stages run ctest,
-# which invokes the validator; the toolchain layer keeps the dependency
-# centrally installed for every derived stage that runs ctest. The runtime
-# stage uses a separate base image and is not affected.
+# (tests/validate_json_schema.py). graphviz satisfies the AP M5-1.3 Tranche
+# A DOT syntax gate (`dot -Tsvg`); the Python fallback in
+# tests/validate_dot_reports.py uses only stdlib and runs alongside the
+# Graphviz path. The test and coverage stages run ctest, which invokes both
+# validators; the toolchain layer keeps the dependencies centrally installed
+# for every derived stage that runs ctest. The runtime stage uses a separate
+# base image and is not affected.
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         build-essential \
         ca-certificates \
         cmake \
         git \
+        graphviz \
         libcap-dev \
         python3 \
         python3-jsonschema \

@@ -139,6 +139,24 @@ Das Validatorskript benoetigt das Python-Paket `jsonschema` (Version `>=4.10,<5`
 
 CTest schlaegt mit konkreter Installationsanweisung fehl, wenn das Paket nicht installiert ist. Der Test wird nicht still uebersprungen und greift nicht auf das Netzwerk zu.
 
+## DOT-Reportvertrag
+
+Der visualisierungsorientierte DOT-Reportvertrag ist in [docs/report-dot.md](./report-dot.md) dokumentiert. Drei CTest-Gates sichern den Vertrag:
+
+- **DOT-Python-Syntax-Gate** ueber `tests/validate_dot_reports.py`. Der CTest-Eintrag heisst `dot_report_python_validation`. Er prueft Pflichtattribute (`xray_report_type`, `format_version`, `graph_node_limit`, `graph_edge_limit`, `graph_truncated`), digraph-Namensvertrag, balancierte Klammern und Quoted-String-Escape-Regeln. Der Validator nutzt nur die Python-Standardbibliothek und laeuft auf jedem Host mit `python3` auf dem PATH.
+- **DOT-Graphviz-Syntax-Gate** ueber `dot -Tsvg`. Der CTest-Eintrag heisst `dot_report_graphviz_validation` und ist nur registriert, wenn `dot` zur Build-Zeit auffindbar ist. Im Docker-Stage ist `graphviz` per apt installiert; native CI-Matrizen ohne Graphviz fuehren nur den Python-Pfad aus.
+- **Negativtests** `dot_report_python_validation_rejects_broken_dot` und `dot_report_graphviz_validation_rejects_broken_dot` (Letzterer nur mit Graphviz vorhanden) verifizieren via `WILL_FAIL`, dass beide Gates ein bewusst kaputtes DOT-Fixture unter `tests/adapters/fixtures/dot_broken_sample.dot` ablehnen. So bleibt nachweisbar, dass die Gates echte Verstoesse erkennen und nicht still passen.
+
+### Bootstrap-Matrix
+
+| Umgebung | Aktiver Pfad | Installation |
+|---|---|---|
+| Docker (`test`, `coverage`, `coverage-check`) | beide Gates | `graphviz` und `python3-jsonschema` via apt im `toolchain`-Stage |
+| Native CI Linux/macOS/Windows (`build.yml`, `release.yml`) | Python-Fallback | reine Standardbibliothek; `python3` durch `setup-python` |
+| Lokale Entwicklung | beide Gates, falls Graphviz installiert | Graphviz via System-Paketmanager |
+
+CTest selbst installiert keine Systempakete und greift nicht auf das Netzwerk zu. Installation von Graphviz oder Python-Abhaengigkeiten erfolgt ausschliesslich im Bootstrap-Schritt der jeweiligen Umgebung.
+
 ## Zusammenhang mit Releasing
 
 Fuer M3 und spaetere Releases sind mindestens diese Docker-Pfade massgeblich:

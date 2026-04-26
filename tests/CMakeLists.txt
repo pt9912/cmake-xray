@@ -9,6 +9,7 @@ add_executable(
     adapters/test_cmake_file_api_adapter.cpp
     adapters/test_compile_commands_json.cpp
     adapters/test_console_report_adapter.cpp
+    adapters/test_dot_report_adapter.cpp
     adapters/test_json_report_adapter.cpp
     adapters/test_markdown_report_adapter.cpp
     adapters/test_source_parsing_include_adapter.cpp
@@ -75,3 +76,44 @@ add_test(
             --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/json-reports
             --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/json-reports/manifest.txt
 )
+
+# AP M5-1.3 Tranche A: DOT contract gates. The Python fallback uses only
+# stdlib and runs in every environment with python3 on PATH. The Graphviz
+# path runs in addition wherever the `dot` binary is installed (Docker
+# toolchain via apt). Both gates share the same manifest and goldens; both
+# fail loud if the manifest or a golden is malformed.
+add_test(
+    NAME dot_report_python_validation
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_dot_reports.py
+            --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/dot-reports
+            --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/dot-reports/manifest.txt
+)
+
+# Negative gate: feeding a deliberately broken DOT must fail validation.
+# WILL_FAIL inverts the test outcome so a passing (exit 0) result is
+# treated as a failure of the broken-DOT detector.
+add_test(
+    NAME dot_report_python_validation_rejects_broken_dot
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_dot_reports.py
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/dot_broken_sample.dot
+)
+set_tests_properties(dot_report_python_validation_rejects_broken_dot PROPERTIES WILL_FAIL TRUE)
+
+find_program(DOT_PROGRAM dot)
+if(DOT_PROGRAM AND BASH_PROGRAM)
+    add_test(
+        NAME dot_report_graphviz_validation
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/validate_dot_via_graphviz.sh
+                ${DOT_PROGRAM}
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/dot-reports
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/dot-reports/manifest.txt
+    )
+
+    add_test(
+        NAME dot_report_graphviz_validation_rejects_broken_dot
+        COMMAND ${DOT_PROGRAM} -Tsvg ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/dot_broken_sample.dot
+    )
+    set_tests_properties(dot_report_graphviz_validation_rejects_broken_dot PROPERTIES WILL_FAIL TRUE)
+endif()

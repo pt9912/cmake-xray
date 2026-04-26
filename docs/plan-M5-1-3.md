@@ -72,6 +72,11 @@ Voraussichtlich zu aendern:
 - `tests/adapters/test_port_wiring.cpp`
 - `tests/e2e/test_cli.cpp`
 - `tests/e2e/run_e2e.sh`
+- `Dockerfile`
+- `.github/workflows/test.yml`
+- `.github/workflows/build.yml`
+- `.github/workflows/release.yml`, falls Release-Smokes oder Release-CTest-Laeufe das DOT-Syntax-Gate ausfuehren
+- `README.md`
 - `docs/guide.md`
 - `docs/quality.md`
 
@@ -83,7 +88,7 @@ Neue Dateien:
 - `docs/report-dot.md`
 - DOT-Report-Goldens unter `tests/e2e/testdata/m5/dot-reports/`
 - Golden-Manifest `tests/e2e/testdata/m5/dot-reports/manifest.txt` oder eine gleichwertige explizite Liste aller DOT-Report-Goldens
-- optional `tests/validate_dot_reports.py` oder ein gleichwertiges repository-lokales DOT-Syntax-Smoke-Skript, falls Graphviz nicht in allen Testpfaden verfuegbar ist
+- `tests/validate_dot_reports.py` als repository-lokaler DOT-Syntax-Smoke fuer Pfade ohne Graphviz
 
 ## DOT-Dokumentvertrag
 
@@ -497,20 +502,31 @@ Render-, Schreib- und Output-Fehler:
 
 ## Graphviz- und Syntax-Validierung
 
-DOT-Goldens muessen syntaktisch validiert werden.
+DOT-Goldens muessen syntaktisch validiert werden. Es gibt einen verbindlichen Zwei-Pfad-Bootstrap mit fester Pfadwahl pro CI-Umgebung; eine ad-hoc-Skip-Logik ist verboten.
 
-Bevorzugter Pfad:
+### Docker-Pfad: Graphviz `dot -Tsvg`
 
-- CI- und Docker-Testumgebung stellen Graphviz bereit.
-- Ein CTest-Gate rendert alle DOT-Goldens mit `dot -Tsvg`.
+- Der `toolchain`-Stage in `Dockerfile` installiert das `graphviz`-apt-Paket. Alle abgeleiteten Stages, die `ctest` ausfuehren (`test`, `coverage`, `coverage-check`), erben den Validator.
+- Ein CTest-Gate rendert alle DOT-Goldens und die produzierten Binary-Outputs mit `dot -Tsvg`.
 - Das SVG-Ergebnis wird nicht als Golden versioniert; der Test prueft nur erfolgreiche DOT-Parsing-/Rendering-Faehigkeit.
 
-Fallback-Pfad, falls Graphviz in einem Testpfad nicht verfuegbar ist:
+### Native-Pfad: Python-Fallback-Smoke
 
-- Ein repository-lokaler Parser-/Syntax-Smoke prueft mindestens balancierte Graphstruktur, quoted String-Escaping, Attributlisten und Edge-/Node-Statements.
-- Der Fallback darf nicht still skippen.
-- Der Fallback muss dieselben Escaping-Goldens verarbeiten wie der Graphviz-Pfad.
-- `docs/quality.md` dokumentiert, welcher Pfad in welcher Umgebung aktiv ist.
+- `tests/validate_dot_reports.py` ist ein repository-lokales Python-Skript, das DOT-Quelltext parser- und attributbasiert validiert (balancierte Graphstruktur, quoted-String-Escaping, Attributlisten, Edge-/Node-Statements, Pflichtattribute).
+- Der Skriptpfad und Eingabedateipfade werden in Bash-Aufrufen ueber den vorhandenen `native_path`-Helper geroutet, damit MSYS-Bash-POSIX-Pfade auf Windows-Python korrekt aufgeloest werden (siehe AP-1.2-Lehre).
+- Der Fallback nutzt nur die Standardbibliothek; falls dennoch externe Python-Abhaengigkeiten noetig werden, werden sie ueber `tests/requirements-dot-validator.in` und ein per `pip-compile --generate-hashes` erzeugtes Lockfile `tests/requirements-dot-validator.txt` hash-gepinnt installiert. Der Workflow-Schritt ruft `pip install --require-hashes` auf.
+- Der Fallback darf nicht still skippen; fehlende Validator-Voraussetzungen liefern eine konkrete Installationsanweisung und nonzero Exit.
+- Der Fallback verarbeitet dieselben Goldens und dieselben Escape-Erwartungen wie der Graphviz-Pfad.
+
+### Bootstrap-Matrix
+
+| Umgebung | Pfad | Installation |
+|---|---|---|
+| Docker (`test`, `coverage`, `coverage-check`) | Graphviz `dot -Tsvg` | apt im `toolchain`-Stage |
+| Native CI Linux/macOS/Windows (`build.yml`, `release.yml`) | Python-Fallback `tests/validate_dot_reports.py` | reine Standardbibliothek; bei Bedarf hash-gepinnte `pip install --require-hashes` |
+| Lokale Entwicklung | bevorzugt Graphviz, sonst Python-Fallback | Graphviz via System-Paketmanager oder ohne Install fuer den Fallback |
+
+`docs/quality.md` dokumentiert die aktive Pfadwahl pro CI-Lauf.
 
 CTest selbst installiert keine Systempakete und greift nicht auf das Netzwerk zu. Installation von Graphviz oder Parser-Abhaengigkeiten erfolgt ausschliesslich im Bootstrap-Schritt der jeweiligen Umgebung.
 
@@ -526,11 +542,13 @@ Kein produktiver CLI-Adapter; Vertrag, Hilfsfunktionen und Testskelett.
 2. `tests/adapters/test_dot_report_adapter.cpp` mit ersten Escape-, ID- und Attributlexik-Tests anlegen.
 3. DOT-Escaping- und Label-Hilfen file-local im Adapter implementieren; Extraktion in eine output-interne Utility ist in AP 1.3 nicht vorgesehen.
 4. Budgetberechnung fuer Analyze und Impact als klein testbare Funktionen implementieren.
-5. CTest-Gate fuer DOT-Goldens vorbereiten: Graphviz `dot -Tsvg` oder dokumentierter Fallback-Syntax-Smoke.
-6. Manifest `tests/e2e/testdata/m5/dot-reports/manifest.txt` anlegen, in Tranche A noch ohne vollstaendige CLI-Goldens.
-7. `docs/quality.md` um das neue DOT-Syntax-Gate ergaenzen.
+5. CTest-Gates fuer DOT-Goldens einhaengen: das Graphviz-Gate ruft `dot -Tsvg` ueber alle Goldens; das Fallback-Gate ruft `tests/validate_dot_reports.py` ueber dieselben Goldens. Beide Gates teilen das Manifest und nutzen native_path-Konvertierung in Bash-Aufrufen.
+6. `Dockerfile`-Bootstrap fuer den `graphviz`-apt-Layer im `toolchain`-Stage einbauen.
+7. `.github/workflows/test.yml`, `.github/workflows/build.yml` und `.github/workflows/release.yml` so anpassen, dass das Python-Fallback-Smoke vor `ctest` verfuegbar ist; falls es externe Python-Abhaengigkeiten benoetigt, werden diese ueber `pip install --require-hashes -r tests/requirements-dot-validator.txt` installiert.
+8. Manifest `tests/e2e/testdata/m5/dot-reports/manifest.txt` anlegen, in Tranche A noch ohne vollstaendige CLI-Goldens.
+9. `docs/quality.md` um die neuen DOT-Syntax-Gates und die Bootstrap-Matrix ergaenzen.
 
-Abnahme Tranche A: alle Docker-Gates gruen; Escape-/Attributlexik-Tests pruefen Leerzeichen, Anfuehrungszeichen, Backslashes und plattformtypische Pfadtrenner.
+Abnahme Tranche A: alle Docker-Gates gruen; Escape-/Attributlexik-Tests pruefen Leerzeichen, Anfuehrungszeichen, Backslashes und plattformtypische Pfadtrenner; das Graphviz-Gate failt nachweislich bei kuenstlich kaputtem DOT, das Fallback-Smoke failt bei demselben kaputten DOT mit konkreter Fehlermeldung.
 
 ### Tranche B - Adapter, Wiring, CLI-Freischaltung
 
@@ -561,7 +579,7 @@ Echte Binary-Verifikation und Vertragsfestschreibung der CLI-Ausgaben.
    - `--top`-Fall ohne Kuerzung (`graph_truncated=false`).
    - `--top`-Fall mit `context_limit`-Kuerzung.
    - Fall mit gleichzeitig wirksamem `context_limit`, `node_limit` und `edge_limit`.
-   - leeres Ergebnis mit gueltigem DOT und `graph_truncated=false`.
+   - "leeres" Ergebnis: ein Compile-Database- oder File-API-Fixture, das nach Analyse zu `translation_units=[]`, `include_hotspots=[]` und `target_assignments=[]` fuehrt; der erzeugte DOT-Graph enthaelt nur die Pflicht-Graph-Attribute, keinen Node und keine Edge, und setzt `graph_truncated=false`.
 2. Impact-Goldens erzeugen. Abgedeckt sind mindestens:
    - Compile-Database-only mit relativem `--changed-file`.
    - File-API-only mit relativem `--changed-file`.
@@ -578,10 +596,12 @@ Echte Binary-Verifikation und Vertragsfestschreibung der CLI-Ausgaben.
    - DOT-Render-Fehler ueber injizierten `CliReportRenderer`-Doppelgaenger; bestehende Zieldatei bleibt unveraendert, kein partieller DOT auf stdout.
    - Fehlerpfade: `impact --format dot` ohne `--changed-file`, nicht vorhandene Eingaben, ungueltiges `compile_commands.json`, ungueltige File-API-Reply-Daten, Schreibfehler. Alle als Text auf stderr, nonzero Exit, kein DOT-Fehlergraph.
    - Negativtest, dass `impact` keine `--top`-Option akzeptiert.
-6. `tests/e2e/run_e2e.sh` und das CTest-Ziel `e2e_binary` um Binary-Smokes fuer `analyze --format dot` und mindestens einen `impact --format dot`-Fall ergaenzen, sodass die Verdrahtung inklusive `src/main.cpp` getestet ist.
-7. `docs/guide.md` um produktive Nutzung von `--format dot`, `--format dot --output` und `dot -Tsvg` ergaenzen.
-8. `docs/quality.md` um die in Tranche C neu hinzukommenden DOT-Golden-, Syntax- und E2E-Gates ergaenzen.
-9. Coverage-, Lizard- und Clang-Tidy-Gates muessen nach AP 1.3 weiterhin gruen sein; neue Befunde aus dem DOT-Adapter werden in Tranche C behoben und nicht auf Tranche D verschoben.
+   - Negativtest, dass `--top 0` mit `--format dot` ueber den bestehenden `CLI::PositiveNumber`-Validator vor jeder Formatselektion abgelehnt wird; AP 1.3 fuegt keine eigene `--top`-Validierung hinzu.
+6. `tests/e2e/run_e2e.sh` und das CTest-Ziel `e2e_binary` um Binary-Smokes fuer `analyze --format dot` und mindestens einen `impact --format dot`-Fall ergaenzen, sodass die Verdrahtung inklusive `src/main.cpp` getestet ist. Pfade zum Validator-Skript und zu erzeugten DOT-Outputs werden ueber den vorhandenen `native_path`-Helper geroutet.
+7. `README.md` aktualisieren: Header-Tagline, Feature-Liste und "nicht Ziel"-Liste muessen den produktiven DOT-Vertrag widerspiegeln, sodass nur noch HTML als nicht-Ziel uebrig bleibt.
+8. `docs/guide.md` um produktive Nutzung von `--format dot`, `--format dot --output` und ein `dot -Tsvg`-Beispiel ergaenzen.
+9. `docs/quality.md` um die in Tranche C neu hinzukommenden DOT-Golden-, Syntax- und E2E-Gates ergaenzen.
+10. Coverage-, Lizard- und Clang-Tidy-Gates muessen nach AP 1.3 weiterhin gruen sein; neue Befunde aus dem DOT-Adapter werden in Tranche C behoben und nicht auf Tranche D verschoben.
 
 Abnahme Tranche C: alle Docker-Gates gruen; `e2e_binary` gruen; alle DOT-Goldens sind syntaktisch gueltig; Budget-, Truncation-, Kontext- und Escaping-Vertraege sind durch Goldens und Adaptertests abgedeckt; globale Abnahmekriterien dieses Plans erfuellt.
 
@@ -606,6 +626,11 @@ Diese Entscheidungen sind vor Umsetzungsbeginn getroffen und in die Tranchen ein
 - Impact erhaelt kein `--top`. Begruendung: M5 begrenzt nur die DOT-Graphsicht; fachliche Impact-Ergebnislisten bleiben vollstaendig.
 - Target-zu-Target-Kanten bleiben verboten. Begruendung: Diese Kanten waeren eine neue Target-Graph-Analyse und gehoeren zu M6 beziehungsweise `F-18`.
 - Diagnostics werden nicht als Pflichtknoten modelliert. Begruendung: AP 1.3 braucht einen stabilen Graphvertrag fuer fachliche Ergebnisbeziehungen; Diagnostic-Visualisierung waere ein eigener Vertrag.
+- Bootstrap-Pfadwahl: Docker-Stages installieren Graphviz via apt im `toolchain`-Layer; native CI-Matrizen nutzen `tests/validate_dot_reports.py` als Fallback. Begruendung: Graphviz auf Windows-Runnern via Chocolatey ist plattformspezifisch fummelig, ein reines Python-Skript funktioniert plattformuebergreifend ohne neue Toolchain-Abhaengigkeit. Verankert in der Bootstrap-Matrix und in Tranche A, Schritt 5-7.
+- Falls der Python-Fallback externe Abhaengigkeiten erhaelt, werden sie hash-gepinnt: `tests/requirements-dot-validator.in` als Quelle, `tests/requirements-dot-validator.txt` per `pip-compile --generate-hashes` regeneriert, Workflows installieren mit `pip install --require-hashes`. Begruendung: AP-1.2-Lehre, dass `--require-hashes` auch fuer einzelne Test-Tools die Reproduzierbarkeit der CI sichert.
+- Native_path-Pflicht: jeder Bash-Aufruf eines Python-Skripts in `tests/e2e/run_e2e.sh` und CTest-Targets routet Skript- und Eingabepfade ueber den vorhandenen `native_path`-Helper. Begruendung: AP-1.2-Lehre nach Windows-MSYS-CI-Failure (POSIX `/d/...` aufgeloest zu `D:\d\...`); jeder neue Validator-Pfad muss diese Lektion respektieren.
+- README.md-Pflicht in Tranche C: Header, Feature-Liste und "nicht Ziel"-Liste werden gleichzeitig mit der DOT-Freischaltung aktualisiert. Begruendung: AP-1.2-Lehre, dass die README-Aktualisierung sonst als Folge-Commit nachgezogen werden muss; Tranche C bringt sie in den Hauptcommit.
+- `--top 0` bleibt durch den bestehenden `CLI::PositiveNumber`-Validator abgelehnt. Begruendung: Die Pruefung greift vor jeder Formatselektion und ist plattformunabhaengig stabil; AP 1.3 fuegt keine eigene `--top`-Validierung hinzu und braucht damit keinen DOT-spezifischen Validator-Sonderweg.
 
 ## Tests
 

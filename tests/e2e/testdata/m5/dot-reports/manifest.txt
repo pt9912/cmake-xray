@@ -1,0 +1,9 @@
+# Manifest of cmake-xray DOT report goldens (AP M5-1.3).
+#
+# Each non-comment, non-blank line names exactly one .dot golden file in
+# this directory. tests/validate_dot_reports.py and the Graphviz dot -Tsvg
+# CTest gate both consume this manifest and require directory/manifest
+# parity.
+#
+# Tranche A creates this manifest empty; Tranche C adds the analyze and
+# impact goldens that lock the DOT contract in place.

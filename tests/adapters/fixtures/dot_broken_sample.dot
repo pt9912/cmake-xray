@@ -1,0 +1,5 @@
+digraph wrong_name {
+  xray_report_type="analyze";
+  graph_truncated=false;
+  "unterminated_string;
+}
