@@ -122,8 +122,13 @@ M5 legt eine exakte Attributlexik fest:
 - Strings werden als quoted DOT-Strings geschrieben.
 - Stringwerte escapen mindestens Backslash, Anfuehrungszeichen, Newline, Carriage Return und Tab deterministisch.
 - Unbekannte Steuerzeichen werden deterministisch escaped oder durch eine dokumentierte Ersatzsequenz ausgegeben; rohe Steuerzeichen sind in Goldens nicht zulaessig.
-- Labels duerfen fuer Lesbarkeit gekuerzt werden, wenn der vollstaendige Pfad oder Name als separates Attribut erhalten bleibt.
-- Gekuerzte Labels verwenden ausschliesslich ASCII, zum Beispiel `...`, keine Unicode-Ellipse.
+- Labels werden deterministisch aus dem jeweiligen Anzeige-Wert gebildet und duerfen nie die einzige Quelle fuer fachliche Identitaet sein.
+- Fuer Pfadlabels wird zuerst die letzte Pfadkomponente verwendet; Trenner sind `/` und `\`. Wenn keine letzte Komponente bestimmbar ist, wird der vollstaendige Anzeige-Pfad verwendet.
+- Fuer Target-Labels wird `TargetInfo::display_name` verwendet.
+- Labels mit hoechstens 48 Zeichen werden unveraendert ausgegeben.
+- Labels mit mehr als 48 Zeichen werden per Middle-Truncation auf exakt 48 Zeichen gekuerzt: die ersten 22 Zeichen, dann `...`, dann die letzten 23 Zeichen.
+- Gekuerzte Labels verwenden ausschliesslich ASCII, keine Unicode-Ellipse.
+- Vollstaendige Pfade, Namen, Directories, Typen und Schluessel bleiben in den jeweiligen `path`-, `name`-, `directory`-, `type`- und `unique_key`-Attributen unverkuerzt erhalten.
 
 DOT-IDs:
 
@@ -133,17 +138,36 @@ DOT-IDs:
 - Rohe nutzergelieferte Pfade, Target-Namen und Diagnostics duerfen nie unescaped als ID erscheinen.
 - Innerhalb eines Knotentyps wird nach fachlicher Identitaet dedupliziert: Translation Units nach `TranslationUnitReference::unique_key`, Include-Hotspots nach Anzeige-Pfad, Targets nach `TargetInfo::unique_key`, geaenderte Datei als einzelner Impact-Knoten.
 
+Statement-Reihenfolge:
+
+- Die Ausgabe beginnt mit der `digraph`-Zeile.
+- Danach folgen Graph-Attribute in exakt dieser Reihenfolge: `xray_report_type`, `format_version`, `graph_node_limit`, `graph_edge_limit`, `graph_truncated`.
+- Danach folgen Node-Statements in der fuer Analyze beziehungsweise Impact dokumentierten Knotenprioritaet.
+- Danach folgen Edge-Statements in der fuer Analyze beziehungsweise Impact dokumentierten Kantenprioritaet.
+- Die Ausgabe endet mit der schliessenden Graph-Klammer.
+
+Attribut-Reihenfolge innerhalb von Statements:
+
+- Translation-Unit-Knoten: `kind`, optional `impact`, optional `rank`, optional `context_only`, `label`, `path`, `directory`, `unique_key`.
+- Include-Hotspot-Knoten: `kind`, `label`, `path`, `context_total_count`, `context_returned_count`, `context_truncated`.
+- Target-Knoten: `kind`, optional `impact`, `label`, `name`, `type`, `unique_key`.
+- Changed-File-Knoten: `kind`, `label`, `path`.
+- Kanten: `kind`, optional `style`.
+- Optionale Attribute werden nur ausgegeben, wenn sie fuer den jeweiligen Knoten- oder Kantentyp definiert sind; wenn sie erscheinen, behalten sie die oben festgelegte Position.
+
 ### Gemeinsame Graph-Attribute
 
 Jeder DOT-Report enthaelt mindestens:
 
 - `xray_report_type`: quoted String, `analyze` oder `impact`.
+- `format_version`: Integer, initial `1`.
 - `graph_node_limit`: Integer.
 - `graph_edge_limit`: Integer.
 - `graph_truncated`: Boolean.
 
 Regeln:
 
+- `format_version` verwendet denselben initialen Wert wie `xray::hexagon::model::kReportFormatVersion`, damit DOT-Consumer M5-DOT von kuenftigen Vertragsversionen unterscheiden koennen.
 - `graph_node_limit` und `graph_edge_limit` geben die fuer diesen Report wirksamen Budgets aus.
 - `graph_truncated=false` wird auch bei ungekuerztem Graph verpflichtend ausgegeben.
 - `graph_truncated=true`, wenn ein Kandidatenknoten oder eine Kandidatenkante wegen `node_limit`, `edge_limit` oder Analyze-`context_limit` nicht im finalen Graph enthalten ist.
@@ -177,7 +201,7 @@ Pflichtattribute fuer Include-Hotspot-Knoten:
 
 - `kind="include_hotspot"`.
 - `label`: gekuerztes oder ungekuerztes Leselabel.
-- `path`: vollstaendiger Anzeige-Pfad.
+- `path`: vollstaendiger Anzeige-Pfad aus `IncludeHotspot::header_path`.
 - `context_total_count`: Integer.
 - `context_returned_count`: Integer.
 - `context_truncated`: Boolean.
@@ -203,6 +227,8 @@ Pflichtattribute fuer Kanten:
 
 Regeln:
 
+- Analyze-Kanten tragen kein `style`-Attribut.
+- Analyze-Kanten tragen kein `label`-Attribut.
 - Kanten werden nur ausgegeben, wenn beide Endknoten im finalen Graph enthalten sind.
 - Es werden keine Include-zu-Include-Kanten erzeugt.
 - Es werden keine Target-zu-Target-Kanten erzeugt.
@@ -221,6 +247,7 @@ edge_limit = max(40, 6 * top_limit + 20)
 Regeln:
 
 - Ohne explizites `--top` wird der wirksame Standard-Top-Wert der CLI verwendet.
+- `top_limit=0` ist ein gueltiger Edge-Case: `context_limit=0`, `node_limit=25` und `edge_limit=40`; es werden keine primaeren Ranking- oder Hotspot-Knoten aufgenommen. Das Auslassen fachlicher Daten durch `top_limit=0` ist keine DOT-Budget-Kuerzung und setzt fuer sich allein nicht `graph_truncated=true`.
 - `context_limit` gilt pro ausgegebenem Hotspot, erzeugt aber keinen unbegrenzten Gesamtgraphen, weil zusaetzlich `node_limit` und `edge_limit` gelten.
 - Top-Ranking- und Top-Hotspot-Listen folgen derselben `--top`-Begrenzung wie Markdown, HTML und JSON.
 - Der DOT-Adapter kuerzt nur die Graphsicht, nicht das zugrunde liegende `AnalysisResult`.
@@ -282,7 +309,12 @@ Pflichtattribute fuer den Knoten der geaenderten Datei:
 
 - `kind="changed_file"`.
 - `label`: gekuerztes oder ungekuerztes Leselabel.
-- `path`: vollstaendiger Anzeige-Pfad aus `ReportInputs.changed_file` beziehungsweise dem fachlichen Impact-Ergebnis.
+- `path`: vollstaendiger Anzeige-Pfad aus `ReportInputs.changed_file`.
+
+Regeln:
+
+- Erfolgreiche Impact-DOT-Reports setzen `ReportInputs.changed_file` voraus.
+- `changed_file_source=unresolved_file_api_source_root` ist ein File-API-Fehlerpfad und wird in AP 1.3 nicht als DOT-Graph gerendert; die CLI meldet diesen Fall als Textfehler auf `stderr`, liefert nonzero Exit und erzeugt keinen DOT-Fehlergraphen.
 
 Pflichtattribute fuer Translation-Unit-Knoten:
 
@@ -326,6 +358,7 @@ Style-Regeln:
 
 Regeln:
 
+- Impact-Kanten tragen kein `label`-Attribut.
 - Kanten werden nur ausgegeben, wenn beide Endknoten im finalen Graph enthalten sind.
 - Es werden keine Target-zu-Target-Kanten erzeugt.
 - Es werden keine Include-Kanten in Impact-DOT erzeugt, solange sie nicht explizit im `ImpactResult` vorhanden sind.
@@ -379,7 +412,7 @@ Regeln:
 - Der Adapter bekommt keinen CLI-Kontext.
 - Der Adapter verwendet `ReportInputs` als Eingabeprovenienz, wo Provenienz fuer DOT-Attribute benoetigt wird.
 - Der Adapter nutzt nicht die Legacy-Presentation-Felder fuer Console/Markdown als kanonische Quelle fuer M5-Provenienz.
-- Fuer Analyze darf der bestehende Renderparameter `effective_top_limit` beziehungsweise `write_analysis_report(result, effective_top_limit)` genutzt werden, solange er nur die Berichtssicht begrenzt.
+- Fuer Analyze darf der bestehende Renderparameter `top_limit` beziehungsweise `write_analysis_report(result, top_limit)` genutzt werden, solange er nur die Berichtssicht begrenzt. Gemeint ist der von der CLI bereits validierte und wirksame Top-Wert.
 - `impact` bekommt keinen Top-Limit-Parameter.
 - Der Adapter fuehrt keine JSON-, HTML- oder Markdown-spezifischen Metadaten ein.
 - Der Adapter trifft keine neuen Impact-, Ranking- oder Target-Priorisierungsentscheidungen.
@@ -424,6 +457,7 @@ Nicht wiederherstellbare Eingabefehler:
 
 - Fehler vor Reporterzeugung bleiben fuer `--format dot` Textfehler auf `stderr`.
 - Beispiele sind nicht vorhandene Eingabedateien, ungueltige `compile_commands.json`-Dateien und ungueltige CMake-File-API-Reply-Verzeichnisse.
+- Ein `ImpactResult` mit `ReportInputs.changed_file_source=unresolved_file_api_source_root` gilt fuer DOT als nicht renderbares Fehlerergebnis, weil der Changed-File-Knoten keine belastbare fachliche Basis hat.
 - Diese Fehler erzeugen keinen DOT-Fehlergraphen.
 - Exit-Code ist ungleich `0`.
 
@@ -470,7 +504,7 @@ Die Umsetzung erfolgt in drei verbindlichen Tranchen plus einer optionalen Haert
 
 Kein produktiver CLI-Adapter; Vertrag, Hilfsfunktionen und Testskelett.
 
-1. DOT-Vertrag in `docs/report-dot.md` festlegen, einschliesslich Graphnamen, Attributlexik, Escaping, Node-/Edge-Kinds, Budgets, Sortier-Tie-Breakern und Weglassregeln.
+1. DOT-Vertrag in `docs/report-dot.md` festlegen, einschliesslich Graphnamen, `format_version`, Attributlexik, Label-Kuerzungsalgorithmus, Statement-/Attribut-Reihenfolge, Escaping, Node-/Edge-Kinds, Budgets, Sortier-Tie-Breakern und Weglassregeln.
 2. `tests/adapters/test_dot_report_adapter.cpp` mit ersten Escape-, ID- und Attributlexik-Tests anlegen.
 3. DOT-Escaping- und Label-Hilfen im Adapter oder einer output-internen Utility implementieren.
 4. Budgetberechnung fuer Analyze und Impact als klein testbare Funktionen implementieren.
@@ -484,11 +518,11 @@ Abnahme Tranche A: alle Docker-Gates gruen; Escape-/Attributlexik-Tests pruefen 
 
 Der Adapter funktioniert; E2E-Goldens folgen erst in Tranche C.
 
-1. `src/adapters/output/dot_report_adapter.{h,cpp}` implementieren; Adapter rendert ausschliesslich aus `AnalysisResult`/`ImpactResult` und nutzt `effective_top_limit` nur fuer Analyze.
+1. `src/adapters/output/dot_report_adapter.{h,cpp}` implementieren; Adapter rendert ausschliesslich aus `AnalysisResult`/`ImpactResult` und nutzt `top_limit` nur fuer Analyze.
 2. Analyze-DOT mit Top-Ranking-, Hotspot-, Target- und Kontextknoten implementieren.
 3. Impact-DOT mit geaenderter Datei, direkt/heuristisch betroffenen Translation Units und Target-Knoten implementieren.
 4. Node- und Edge-Budgetierung inklusive finalem Entfernen reiner unverbundener Kontextknoten implementieren.
-5. Composition Root in `src/main.cpp` und Reportports um den DOT-Port erweitern.
+5. Composition Root in `src/main.cpp` und Reportports um den DOT-Port erweitern; `ReportPorts` in `src/adapters/cli/cli_adapter.h` erhaelt ein explizites `dot`-Feld oder eine gleichwertig typisierte Formatzuordnung.
 6. CLI-Adapter `src/adapters/cli/cli_adapter.{h,cpp}` so anpassen, dass `--format dot` als implementiert gilt, an den DOT-Port verdrahtet wird und mit `--output` ueber den AP-1.1-Atomic-Writer schreibt.
 7. AP-1.1-Sperre fuer `--format dot` entfernen; noch nicht umgesetzte Formate bleiben weiter abgewiesen.
 8. `tests/adapters/test_port_wiring.cpp` so erweitern, dass `--format dot` an den `DotReportAdapter` verdrahtet ist und nicht in den Console-Fallback faellt.
@@ -527,6 +561,7 @@ Echte Binary-Verifikation und Vertragsfestschreibung der CLI-Ausgaben.
 6. `tests/e2e/run_e2e.sh` und das CTest-Ziel `e2e_binary` um Binary-Smokes fuer `analyze --format dot` und mindestens einen `impact --format dot`-Fall ergaenzen, sodass die Verdrahtung inklusive `src/main.cpp` getestet ist.
 7. `docs/guide.md` um produktive Nutzung von `--format dot`, `--format dot --output` und `dot -Tsvg` ergaenzen.
 8. `docs/quality.md` um die in Tranche C neu hinzukommenden DOT-Golden-, Syntax- und E2E-Gates ergaenzen.
+9. Coverage-, Lizard- und Clang-Tidy-Gates muessen nach AP 1.3 weiterhin gruen sein; neue Befunde aus dem DOT-Adapter werden in Tranche C behoben und nicht auf Tranche D verschoben.
 
 Abnahme Tranche C: alle Docker-Gates gruen; `e2e_binary` gruen; alle DOT-Goldens sind syntaktisch gueltig; Budget-, Truncation-, Kontext- und Escaping-Vertraege sind durch Goldens und Adaptertests abgedeckt; globale Abnahmekriterien dieses Plans erfuellt.
 
@@ -537,8 +572,7 @@ Ohne diese Tranche gilt AP 1.3 als abgenommen, sobald Tranche C gruen ist.
 - Zusaetzliche plattformspezifische Pfad-Edge-Cases, etwa Windows-Drives und UNC-aehnliche Strings.
 - UTF-8-/Escape-Edge-Cases, etwa Unicode-Pfade und Steuerzeichen in Diagnostics, sofern das Projekt Unicode-Goldens in M5 bewusst freigibt.
 - Graphviz-Smokes fuer mehrere Ausgabeformate, zum Beispiel `dot -Tsvg` und `dot -Tplain`.
-- Coverage-Luecken, falls Tranche C die 100%-Schwelle unterschreitet.
-- Neu eingefuehrte Lizard-/Clang-Tidy-Findings beheben.
+- Zusaetzliche gezielte Regressionstests fuer Grenzfaelle, die ueber die verpflichtenden Coverage-, Lizard- und Clang-Tidy-Gates aus Tranche C hinausgehen.
 
 ## Entscheidungen
 
@@ -547,7 +581,7 @@ Diese Entscheidungen sind vor Umsetzungsbeginn getroffen und in die Tranchen ein
 - DOT ist Graphviz-Quelltext, kein gerendertes Bild. Begruendung: Graphviz-Ausgaben sollen in CI und Dokumentation flexibel weiterverarbeitet werden; Rendering ist Tooling des Nutzers.
 - Node-IDs sind adaptergenerierte ASCII-IDs statt roher Pfade. Begruendung: Pfade enthalten Sonderzeichen und Plattformtrenner; Attribute transportieren die fachliche Identitaet stabiler und testbarer.
 - Budgets sind fuer M5 fest und nicht konfigurierbar. Begruendung: DOT soll grobe Visualisierung liefern, ohne neue CLI-Komplexitaet oder unbegrenzte Graphen einzufuehren.
-- Analyze nutzt `effective_top_limit` als Renderparameter. Begruendung: Das entspricht dem etablierten `GenerateReportPort::generate_analysis_report(result, top_limit)`-Vertrag und vermeidet CLI-Kontext im Adapter.
+- Analyze nutzt `top_limit` als Renderparameter. Begruendung: Das entspricht dem etablierten `GenerateReportPort::generate_analysis_report(result, top_limit)`-Vertrag und vermeidet CLI-Kontext im Adapter.
 - Impact erhaelt kein `--top`. Begruendung: M5 begrenzt nur die DOT-Graphsicht; fachliche Impact-Ergebnislisten bleiben vollstaendig.
 - Target-zu-Target-Kanten bleiben verboten. Begruendung: Diese Kanten waeren eine neue Target-Graph-Analyse und gehoeren zu M6 beziehungsweise `F-18`.
 - Diagnostics werden nicht als Pflichtknoten modelliert. Begruendung: AP 1.3 braucht einen stabilen Graphvertrag fuer fachliche Ergebnisbeziehungen; Diagnostic-Visualisierung waere ein eigener Vertrag.
@@ -558,8 +592,12 @@ Adaptertests:
 
 - `tests/adapters/test_dot_report_adapter.cpp` prueft Analyze- und Impact-Serialisierung.
 - Tests pruefen `digraph cmake_xray_analysis` und `digraph cmake_xray_impact`.
-- Tests pruefen Pflichtattribute `xray_report_type`, `graph_node_limit`, `graph_edge_limit` und `graph_truncated`.
+- Tests pruefen Pflichtattribute `xray_report_type`, `format_version`, `graph_node_limit`, `graph_edge_limit` und `graph_truncated`.
+- Tests pruefen Statement-Reihenfolge: Graph-Attribute, dann Node-Statements, dann Edge-Statements.
+- Tests pruefen die dokumentierte Attribut-Reihenfolge innerhalb von Graph-, Node- und Edge-Statements.
+- Tests pruefen den Label-Kuerzungsalgorithmus inklusive 48-Zeichen-Grenze und Middle-Truncation.
 - Tests pruefen Analyze-Hotspot-Attribute `context_total_count`, `context_returned_count` und `context_truncated`.
+- Tests pruefen, dass Include-Hotspot-`path` aus `IncludeHotspot::header_path` stammt.
 - Tests pruefen Integer-, Boolean- und String-Lexik exakt.
 - Tests pruefen Escaping fuer Leerzeichen, Anfuehrungszeichen, Backslashes, Newline, Tab und plattformtypische Pfadtrenner.
 - Tests pruefen stabile Node-ID-Erzeugung ohne rohe Pfade als IDs.
@@ -569,6 +607,8 @@ Adaptertests:
 - Tests pruefen die Pflichtattribute `directory` und `unique_key` fuer Translation-Unit-Knoten.
 - Tests pruefen die Pflichtattribute `type` und `unique_key` fuer Target-Knoten.
 - Tests pruefen die exakten Impact-Style-Werte `style="solid"` fuer direkte Kanten und `style="dashed"` fuer heuristische Kanten.
+- Tests pruefen, dass Analyze-Kanten kein `style`-Attribut tragen und keine Kanten ein `label`-Attribut traegt.
+- Tests pruefen, dass `changed_file_source=unresolved_file_api_source_root` fuer DOT als Textfehler ohne DOT-Graph behandelt wird.
 - Tests pruefen leere Analyze- und Impact-Ergebnisse als gueltigen DOT-Graph.
 
 Budget- und Truncation-Tests:
@@ -576,6 +616,7 @@ Budget- und Truncation-Tests:
 - Analyze-Tests pruefen `context_limit = min(top_limit, 5)`.
 - Analyze-Tests pruefen `node_limit = max(25, 4 * top_limit + 10)`.
 - Analyze-Tests pruefen `edge_limit = max(40, 6 * top_limit + 20)`.
+- Analyze-Tests pruefen den Edge-Case `top_limit=0` mit `context_limit=0`, `node_limit=25`, `edge_limit=40` und ohne primaere Ranking-/Hotspot-Knoten.
 - Impact-Tests pruefen `node_limit = 100` und `edge_limit = 200`.
 - Tests pruefen `graph_truncated=false` im ungekuerzten Fall.
 - Tests pruefen `graph_truncated=true`, wenn Knoten oder Kanten wegen Budget fehlen.
@@ -619,6 +660,7 @@ Fehlerpfad-Tests:
 - Nicht vorhandene Eingabepfade liefern Text auf stderr, nonzero Exit und keinen DOT-Fehlergraphen.
 - Ungueltiges Compile-Database-JSON liefert Text auf stderr, nonzero Exit und keinen DOT-Fehlergraphen.
 - Ungueltige CMake-File-API-Reply-Daten liefern Text auf stderr, nonzero Exit und keinen DOT-Fehlergraphen.
+- `changed_file_source=unresolved_file_api_source_root` liefert Text auf stderr, nonzero Exit und keinen DOT-Fehlergraphen.
 - Schreibfehler liefern Text auf stderr, nonzero Exit und keinen DOT-Fehlergraphen.
 - CLI-/Schreibpfad-Tests decken einen simulierten DOT-Render-Fehler vor dem Atomic-Writer ab.
 - Der simulierte Render-Fehler prueft nonzero Exit, Text auf stderr, leeres stdout und unveraenderte bestehende Zieldatei bei `--output`.
@@ -647,7 +689,11 @@ AP 1.3 ist abnahmefaehig, wenn:
 - Impact-DOT die Knotenarten geaenderte Datei, direkt betroffene Translation Unit, heuristisch betroffene Translation Unit und Target abbildet, sofern diese Daten vorhanden sind.
 - Keine Target-zu-Target-Kanten erzeugt werden.
 - Alle DOT-Reports die Graph-Attribute `graph_node_limit`, `graph_edge_limit` und `graph_truncated` enthalten.
+- Alle DOT-Reports das Graph-Attribut `format_version=1` enthalten.
+- Statement- und Attribut-Reihenfolge byte-stabil und dokumentiert sind.
+- Label-Kuerzung byte-stabil nach dem dokumentierten 48-Zeichen-Middle-Truncation-Algorithmus erfolgt.
 - Analyze-Hotspot-Knoten die Attribute `context_total_count`, `context_returned_count` und `context_truncated` enthalten.
+- Analyze-Hotspot-Knoten `path` aus `IncludeHotspot::header_path` ausgeben.
 - Analyze-DOT die festen M5-Formeln fuer `context_limit`, `node_limit` und `edge_limit` verwendet.
 - Impact-DOT die festen M5-Budgets `node_limit = 100` und `edge_limit = 200` verwendet.
 - Knoten- und Kantenkuerzung deterministisch ist und `graph_truncated` korrekt setzt.
@@ -662,6 +708,7 @@ AP 1.3 ist abnahmefaehig, wenn:
 - Parser-, Eingabe-, Render- und Schreibfehler als Textfehler ohne DOT-Fehlergraph getestet sind.
 - `docs/guide.md` die produktive DOT-Nutzung und ein `dot -Tsvg`-Beispiel beschreibt.
 - `docs/quality.md` die neuen DOT-Syntax-, Golden- und E2E-Gates auffuehrt.
+- Coverage-, Lizard- und Clang-Tidy-Gates nach AP 1.3 gruen bleiben.
 - Console-, Markdown- und JSON-Verhalten unveraendert bleibt.
 
 ## Offene Folgearbeiten
