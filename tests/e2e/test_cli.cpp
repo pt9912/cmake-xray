@@ -23,6 +23,7 @@
 #include "adapters/input/compile_commands_json_adapter.h"
 #include "adapters/input/source_parsing_include_adapter.h"
 #include "adapters/output/console_report_adapter.h"
+#include "adapters/output/json_report_adapter.h"
 #include "adapters/output/markdown_report_adapter.h"
 #include "hexagon/model/application_info.h"
 #include "hexagon/model/compile_database_result.h"
@@ -42,6 +43,7 @@ using xray::adapters::input::CmakeFileApiAdapter;
 using xray::adapters::input::CompileCommandsJsonAdapter;
 using xray::adapters::input::SourceParsingIncludeAdapter;
 using xray::adapters::output::ConsoleReportAdapter;
+using xray::adapters::output::JsonReportAdapter;
 using xray::adapters::output::MarkdownReportAdapter;
 using xray::hexagon::model::AnalysisResult;
 using xray::hexagon::model::CompileDatabaseError;
@@ -58,14 +60,17 @@ struct CliFixture {
     SourceParsingIncludeAdapter include_resolver_adapter;
     ConsoleReportAdapter console_report_adapter;
     MarkdownReportAdapter markdown_report_adapter;
+    JsonReportAdapter json_report_adapter;
     ProjectAnalyzer project_analyzer{compile_database_adapter, include_resolver_adapter,
                                      file_api_adapter};
     ImpactAnalyzer impact_analyzer{compile_database_adapter, include_resolver_adapter,
                                    file_api_adapter};
     ReportGenerator console_report_generator{console_report_adapter};
     ReportGenerator markdown_report_generator{markdown_report_adapter};
+    ReportGenerator json_report_generator{json_report_adapter};
     xray::adapters::cli::ReportPorts report_ports{console_report_generator,
-                                                  markdown_report_generator};
+                                                  markdown_report_generator,
+                                                  json_report_generator};
     CliAdapter cli{project_analyzer, impact_analyzer, report_ports};
     std::ostringstream out;
     std::ostringstream err;
@@ -423,16 +428,18 @@ TEST_CASE_FIXTURE(CliFixture, "html format is recognized but not implemented") {
                "html"}) == ExitCode::cli_usage_error);
     CHECK(err.str().find("--format html is recognized but not implemented in this build") !=
           std::string::npos);
-    CHECK(err.str().find("only --format console and --format markdown are available") !=
+    CHECK(err.str().find(
+              "--format console, --format markdown, and --format json are available") !=
           std::string::npos);
 }
 
-TEST_CASE_FIXTURE(CliFixture, "json format is recognized but not implemented") {
-    CHECK(run({"analyze", "--compile-commands",
-               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
-               "json"}) == ExitCode::cli_usage_error);
-    CHECK(err.str().find("--format json is recognized but not implemented in this build") !=
-          std::string::npos);
+TEST_CASE_FIXTURE(CliFixture, "json analyze format is implemented and emits JSON") {
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+                 "json", "--top", "2"}) == ExitCode::success);
+    CHECK(err.str().empty());
+    CHECK(out.str().find("\"format\": \"cmake-xray.analysis\"") != std::string::npos);
+    CHECK(out.str().find("recognized but not implemented") == std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture, "dot format is recognized but not implemented") {
@@ -444,22 +451,10 @@ TEST_CASE_FIXTURE(CliFixture, "dot format is recognized but not implemented") {
 }
 
 TEST_CASE_FIXTURE(CliFixture, "not-implemented format wins over missing input source") {
-    CHECK(run({"analyze", "--format", "json"}) == ExitCode::cli_usage_error);
-    CHECK(err.str().find("--format json is recognized but not implemented in this build") !=
+    CHECK(run({"analyze", "--format", "html"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--format html is recognized but not implemented in this build") !=
           std::string::npos);
     CHECK(err.str().find("at least one input source") == std::string::npos);
-}
-
-TEST_CASE_FIXTURE(CliFixture, "not-implemented format wins over --output without creating a file") {
-    const TemporaryDirectory temp_dir;
-    const auto target_path = (temp_dir.path() / "report.json").string();
-
-    CHECK(run({"analyze", "--compile-commands",
-               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
-               "json", "--output", target_path.c_str()}) == ExitCode::cli_usage_error);
-    CHECK(err.str().find("--format json is recognized but not implemented in this build") !=
-          std::string::npos);
-    CHECK_FALSE(std::filesystem::exists(target_path));
 }
 
 TEST_CASE_FIXTURE(CliFixture, "html --output also returns not-implemented without creating a file") {
@@ -487,11 +482,20 @@ TEST_CASE_FIXTURE(CliFixture, "dot --output also returns not-implemented without
 }
 
 TEST_CASE_FIXTURE(CliFixture,
-                  "impact json without --changed-file returns not-implemented error") {
+                  "impact json without --changed-file returns the changed-file required error") {
     CHECK(run({"impact", "--cmake-file-api",
                fixture_path("m4/file_api_only/build").c_str(), "--format", "json"}) ==
           ExitCode::cli_usage_error);
-    CHECK(err.str().find("--format json is recognized but not implemented in this build") !=
+    CHECK(err.str().find("impact requires --changed-file") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact json without --changed-file returns the changed-file required error "
+                  "when html would still claim not-implemented") {
+    CHECK(run({"impact", "--cmake-file-api",
+               fixture_path("m4/file_api_only/build").c_str(), "--format", "html"}) ==
+          ExitCode::cli_usage_error);
+    CHECK(err.str().find("--format html is recognized but not implemented in this build") !=
           std::string::npos);
     CHECK(err.str().find("--changed-file") == std::string::npos);
 }
@@ -580,8 +584,10 @@ TEST_CASE("invalid entries report is truncated after 20 diagnostics") {
     const StubAnalyzeImpactPort analyze_impact_port;
     const StubGenerateReportPort console_report_port;
     const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
     const xray::adapters::cli::ReportPorts report_ports{console_report_port,
-                                                        markdown_report_port};
+                                                        markdown_report_port,
+                                                        json_report_port};
     const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
     std::ostringstream out;
     std::ostringstream err;
@@ -610,8 +616,10 @@ TEST_CASE("unexpected compile database errors map to exit code 1") {
     const StubAnalyzeImpactPort analyze_impact_port;
     const StubGenerateReportPort console_report_port;
     const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
     const xray::adapters::cli::ReportPorts report_ports{console_report_port,
-                                                        markdown_report_port};
+                                                        markdown_report_port,
+                                                        json_report_port};
     const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
     std::ostringstream out;
     std::ostringstream err;
@@ -639,8 +647,10 @@ TEST_CASE("file api not accessible maps to exit code 3 with file api hint") {
     const StubAnalyzeImpactPort analyze_impact_port;
     const StubGenerateReportPort console_report_port;
     const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
     const xray::adapters::cli::ReportPorts report_ports{console_report_port,
-                                                        markdown_report_port};
+                                                        markdown_report_port,
+                                                        json_report_port};
     const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
     std::ostringstream out;
     std::ostringstream err;
@@ -956,8 +966,10 @@ TEST_CASE("file api invalid maps to exit code 4 with file api hint") {
     const StubAnalyzeImpactPort analyze_impact_port;
     const StubGenerateReportPort console_report_port;
     const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
     const xray::adapters::cli::ReportPorts report_ports{console_report_port,
-                                                        markdown_report_port};
+                                                        markdown_report_port,
+                                                        json_report_port};
     const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
     std::ostringstream out;
     std::ostringstream err;

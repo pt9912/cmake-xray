@@ -15,6 +15,7 @@ namespace xray::adapters::cli {
 struct ReportPorts {
     const xray::hexagon::ports::driving::GenerateReportPort& console;
     const xray::hexagon::ports::driving::GenerateReportPort& markdown;
+    const xray::hexagon::ports::driving::GenerateReportPort& json;
 };
 
 struct CliOutputStreams {
