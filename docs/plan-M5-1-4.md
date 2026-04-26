@@ -153,7 +153,7 @@ Regeln:
 - `title` ist `cmake-xray analyze report` oder `cmake-xray impact report`.
 - `main[data-report-type]` ist `analyze` oder `impact`.
 - Das `style`-Element ist byte-stabil und fuer Analyze und Impact identisch.
-- Das `style`-Element steht im `head` nach den `meta`-Elementen und vor `title` nur dann, wenn `docs/report-html.md` diese Reihenfolge explizit so festlegt. AP 1.4 legt die Reihenfolge wie oben fest.
+- Die `head`-Reihenfolge ist hart festgelegt: `meta charset`, `meta viewport`, `meta xray-report-format-version`, `title`, `style`.
 - Der Adapter erzeugt keine optionalen Meta-Tags fuer Generator, Zeit, Host, Commit oder Buildpfad.
 
 ### CSS-Vertrag
@@ -182,7 +182,9 @@ HTML-Escaping ist Pflicht fuer alle nutzer- oder eingabedatenbasierten Inhalte:
 
 - Textknoten escapen mindestens `&`, `<` und `>`.
 - Attributwerte escapen mindestens `&`, `<`, `>`, `"` und `'`.
-- Newlines, Tabs und Carriage Returns in Textinhalten werden deterministisch als Whitespace ausgegeben oder in `pre`/`code`-Kontexten sichtbar erhalten; die konkrete Regel wird in `docs/report-html.md` festgelegt und golden-getestet.
+- AP 1.4 erzeugt keine `pre`- oder `code`-Elemente fuer fachliche Werte.
+- Whitespace in fachlichen Textwerten wird vor dem HTML-Escaping einheitlich normalisiert: `\r\n` und `\r` werden zu `\n`, jedes `\n` wird als sichtbarer Separator ` / ` ausgegeben, jedes `\t` wird zu einem einzelnen Leerzeichen, und sonstige ASCII-Control-Zeichen unter `0x20` werden zu einem einzelnen Leerzeichen.
+- Pfade, Target-Namen, Directories, Diagnostics, Input-Werte und Summary-Werte nutzen denselben Whitespace-Vertrag.
 - Rohes HTML aus Pfaden, Target-Namen, Diagnostics oder Compile-Argumenten wird nie interpretiert.
 - URLs werden in AP 1.4 nicht aus fachlichen Daten erzeugt; Pfade werden als Text ausgegeben, nicht als Links.
 - Leere Strings werden als leerer Textwert nur ausgegeben, wenn das Modell tatsaechlich einen leeren String enthaelt. Fehlende optionale Eingaben aus `ReportInputs` werden als sichtbarer Text `not provided` ausgegeben.
@@ -487,6 +489,7 @@ Regeln:
 - Der Adapter nutzt nicht die Legacy-Presentation-Felder fuer Console/Markdown als kanonische Quelle fuer HTML-Provenienz.
 - Fuer Analyze darf der bestehende Renderparameter `top_limit` beziehungsweise `write_analysis_report(result, top_limit)` genutzt werden, solange er nur die Berichtssicht begrenzt. Gemeint ist der von der CLI bereits validierte und wirksame Top-Wert.
 - `impact` bekommt keinen Top-Limit-Parameter.
+- Der Adapter rendert immer zuerst vollstaendig in einen `std::string` oder gleichwertigen Speicherpuffer und gibt erst nach erfolgreichem Abschluss des Renderns an die CLI zurueck. Streaming in `std::ostream` waehrend des Renderns ist fuer AP 1.4 nicht zulaessig.
 - Der Adapter fuehrt keine JSON- oder DOT-spezifischen Metadaten ein.
 - Der Adapter trifft keine neuen Impact-, Ranking- oder Target-Priorisierungsentscheidungen.
 - Report-Ports bleiben ergebnisobjektzentriert.
@@ -546,7 +549,7 @@ Render-, Schreib- und Output-Fehler:
 
 - Schreib-, Render- und Output-Fehler liefern Textfehler auf `stderr`.
 - Exit-Code ist ungleich `0`.
-- Render-Fehler vor Emission schreiben kein partielles HTML auf stdout.
+- Render-Fehler vor Emission schreiben kein partielles HTML auf stdout, weil die CLI HTML erst nach erfolgreichem Vollrendern des kompletten Strings auf stdout oder in den Atomic-Writer uebergibt.
 - Bei echten stdout-Transportfehlern koennen bereits geschriebene Bytes nicht zurueckgenommen werden; die CLI erkennt solche Fehler best-effort nach dem Schreiben und meldet sie als Textfehler auf `stderr`.
 - Bei `--output` bleibt eine bestehende Zieldatei unveraendert.
 - Render-Fehler umfassen HTML-Escaping-/Serialisierungsfehler und explizite Fehler aus der CLI-internen Render-Abstraktion.
@@ -683,6 +686,7 @@ Adaptertests:
 - Tests pruefen Pflichtsections und Section-Reihenfolge.
 - Tests pruefen Tabellenstruktur mit `thead`, `tbody`, `th scope="col"` und stabiler Spaltenreihenfolge.
 - Tests pruefen HTML-Escaping fuer Textknoten und Attributwerte.
+- Tests pruefen Whitespace-Normalisierung fuer Newline, CRLF, Carriage Return, Tab und ASCII-Control-Zeichen in Diagnostics, Pfaden und Target-Namen.
 - Tests pruefen keine unescaped `<script>`-artigen Strings.
 - Tests pruefen CSS-Klassen als feste Literale ohne nutzergelieferte Werte.
 - Tests pruefen Leersaetze fuer jede leere Section.
@@ -741,6 +745,7 @@ Fehlerpfad-Tests:
 - Schreibfehler liefern Text auf stderr, nonzero Exit und kein HTML-Fehlerdokument.
 - CLI-/Schreibpfad-Tests decken einen simulierten HTML-Render-Fehler vor dem Atomic-Writer ab.
 - Der simulierte Render-Fehler prueft nonzero Exit, Text auf stderr, leeres stdout und unveraenderte bestehende Zieldatei bei `--output`.
+- Tests pruefen, dass der HTML-Adapter vor jeder Emission vollstaendig in einen String rendert und kein partieller stdout-Report entstehen kann, wenn der Renderer vor Rueckgabe fehlschlaegt.
 
 Atomic-Writer-Tests:
 
@@ -766,6 +771,7 @@ AP 1.4 ist abnahmefaehig, wenn:
 - HTML-Reports vollstaendige HTML5-Dokumente mit inline CSS sind.
 - HTML-Reports keine externen Ressourcen, kein JavaScript und keine HTML-Kommentare enthalten.
 - Alle nutzergelieferten Inhalte und Pfade korrekt HTML-escaped werden.
+- Whitespace in fachlichen Textwerten nach dem dokumentierten einheitlichen Vertrag normalisiert wird.
 - Dokument-, Abschnitts-, Tabellen- und Attributreihenfolge byte-stabil und dokumentiert sind.
 - `format_version` in HTML-Metadaten den Wert von `xray::hexagon::model::kReportFormatVersion` verwendet.
 - Analyze-HTML die Sections Header, Inputs, Ranking, Hotspots, Target Metadata und Diagnostics enthaelt.
