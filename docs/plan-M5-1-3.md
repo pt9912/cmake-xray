@@ -113,8 +113,7 @@ Allgemeine DOT-Regeln:
 - Impact verwendet den Graphnamen `cmake_xray_impact`.
 - Der Graph ist deterministisch: gleiche Eingabedaten und gleicher wirksamer `--top`-Wert erzeugen byte-stabile DOT-Ausgabe.
 - Datums-, Laufzeit-, Hostnamen- oder Build-Umgebungsinformationen duerfen nicht automatisch erscheinen.
-- Kommentare duerfen nur zusaetzlich erscheinen und sind nicht Teil des stabilen Vertrags. Golden-Tests duerfen nicht auf Kommentare angewiesen sein.
-- Alle fachlich relevanten Informationen stehen in Graph-, Node- oder Edge-Attributen, nicht ausschliesslich in Kommentaren.
+- AP 1.3 erzeugt keine DOT-Kommentare. Alle fachlich relevanten Informationen stehen in Graph-, Node- oder Edge-Attributen.
 - DOT erzeugt keine JSON-, HTML- oder Markdown-spezifischen Metadaten.
 - DOT darf keine Target-zu-Target-Kanten erzeugen, solange `F-18` nicht umgesetzt ist.
 
@@ -488,7 +487,7 @@ Service-Ergebnisse mit Diagnostics:
 
 - Service-Ergebnisse mit Diagnostics oder Teildaten koennen als regulaere DOT-Reports ausgegeben werden.
 - Diagnostics werden in AP 1.3 nicht als eigene Diagnostic-Knoten modelliert, solange kein stabiler Graphvertrag dafuer definiert ist.
-- Wenn Diagnostics fuer Lesbarkeit aufgenommen werden, dann nur als deterministisch escaped Graph-Kommentar oder Graph-Attribut ausserhalb des Pflichtvertrags; Golden-Tests duerfen Pflichtverhalten nicht an optionale Kommentare koppeln.
+- Diagnostics werden in AP 1.3 auch nicht als DOT-Kommentare ausgegeben. Eine spaetere Diagnostic-Visualisierung braucht einen eigenen Vertrag mit deterministischer Sortierung, Filterregel und Golden-Tests.
 
 Render-, Schreib- und Output-Fehler:
 
@@ -504,15 +503,22 @@ Render-, Schreib- und Output-Fehler:
 
 DOT-Goldens muessen syntaktisch validiert werden. Es gibt einen verbindlichen Zwei-Pfad-Bootstrap mit fester Pfadwahl pro CI-Umgebung; eine ad-hoc-Skip-Logik ist verboten.
 
+Pro CI-Umgebung ist genau ein DOT-Syntax-CTest-Target aktiv:
+
+- Docker-CTest-Laeufe aktivieren `dot_graphviz_validation`.
+- Native CI-CTest-Laeufe aktivieren `dot_python_validation`.
+- Das jeweils andere Target wird in dieser Umgebung gar nicht registriert, statt zur Laufzeit zu skippen.
+- Lokale Entwicklung darf beide Targets anbieten, wenn beide Validatoren vorhanden sind; fuer die verpflichtenden CI-Gates gilt aber die exklusive Matrix unten.
+
 ### Docker-Pfad: Graphviz `dot -Tsvg`
 
 - Der `toolchain`-Stage in `Dockerfile` installiert das `graphviz`-apt-Paket. Alle abgeleiteten Stages, die `ctest` ausfuehren (`test`, `coverage`, `coverage-check`), erben den Validator.
-- Ein CTest-Gate rendert alle DOT-Goldens und die produzierten Binary-Outputs mit `dot -Tsvg`.
+- Das CTest-Target `dot_graphviz_validation` rendert alle DOT-Goldens und die produzierten Binary-Outputs mit `dot -Tsvg`.
 - Das SVG-Ergebnis wird nicht als Golden versioniert; der Test prueft nur erfolgreiche DOT-Parsing-/Rendering-Faehigkeit.
 
 ### Native-Pfad: Python-Fallback-Smoke
 
-- `tests/validate_dot_reports.py` ist ein repository-lokales Python-Skript, das DOT-Quelltext parser- und attributbasiert validiert (balancierte Graphstruktur, quoted-String-Escaping, Attributlisten, Edge-/Node-Statements, Pflichtattribute).
+- Das CTest-Target `dot_python_validation` ruft `tests/validate_dot_reports.py` auf. Das Skript ist repository-lokal und validiert DOT-Quelltext parser- und attributbasiert (balancierte Graphstruktur, quoted-String-Escaping, Attributlisten, Edge-/Node-Statements, Pflichtattribute).
 - Der Skriptpfad und Eingabedateipfade werden in Bash-Aufrufen ueber den vorhandenen `native_path`-Helper geroutet, damit MSYS-Bash-POSIX-Pfade auf Windows-Python korrekt aufgeloest werden (siehe AP-1.2-Lehre).
 - Der Fallback nutzt nur die Standardbibliothek; falls dennoch externe Python-Abhaengigkeiten noetig werden, werden sie ueber `tests/requirements-dot-validator.in` und ein per `pip-compile --generate-hashes` erzeugtes Lockfile `tests/requirements-dot-validator.txt` hash-gepinnt installiert. Der Workflow-Schritt ruft `pip install --require-hashes` auf.
 - Der Fallback darf nicht still skippen; fehlende Validator-Voraussetzungen liefern eine konkrete Installationsanweisung und nonzero Exit.
@@ -522,13 +528,13 @@ DOT-Goldens muessen syntaktisch validiert werden. Es gibt einen verbindlichen Zw
 
 | Umgebung | Pfad | Installation |
 |---|---|---|
-| Docker (`test`, `coverage`, `coverage-check`) | Graphviz `dot -Tsvg` | apt im `toolchain`-Stage |
-| Native CI Linux/macOS/Windows (`build.yml`, `release.yml`) | Python-Fallback `tests/validate_dot_reports.py` | reine Standardbibliothek; bei Bedarf hash-gepinnte `pip install --require-hashes` |
+| Docker (`test`, `coverage`, `coverage-check`) | `dot_graphviz_validation` | apt im `toolchain`-Stage |
+| Native CI Linux/macOS/Windows (`build.yml`, `release.yml`) | `dot_python_validation` | reine Standardbibliothek; bei Bedarf hash-gepinnte `pip install --require-hashes` |
 | Lokale Entwicklung | bevorzugt Graphviz, sonst Python-Fallback | Graphviz via System-Paketmanager oder ohne Install fuer den Fallback |
 
 `docs/quality.md` dokumentiert die aktive Pfadwahl pro CI-Lauf.
 
-CTest selbst installiert keine Systempakete und greift nicht auf das Netzwerk zu. Installation von Graphviz oder Parser-Abhaengigkeiten erfolgt ausschliesslich im Bootstrap-Schritt der jeweiligen Umgebung.
+CTest selbst installiert keine Systempakete, greift nicht auf das Netzwerk zu und entscheidet nicht dynamisch per Skip, welches DOT-Syntax-Gate gilt. Installation von Graphviz oder Parser-Abhaengigkeiten erfolgt ausschliesslich im Bootstrap-Schritt der jeweiligen Umgebung.
 
 ## Implementierungsreihenfolge
 
@@ -542,13 +548,13 @@ Kein produktiver CLI-Adapter; Vertrag, Hilfsfunktionen und Testskelett.
 2. `tests/adapters/test_dot_report_adapter.cpp` mit ersten Escape-, ID- und Attributlexik-Tests anlegen.
 3. DOT-Escaping- und Label-Hilfen file-local im Adapter implementieren; Extraktion in eine output-interne Utility ist in AP 1.3 nicht vorgesehen.
 4. Budgetberechnung fuer Analyze und Impact als klein testbare Funktionen implementieren.
-5. CTest-Gates fuer DOT-Goldens einhaengen: das Graphviz-Gate ruft `dot -Tsvg` ueber alle Goldens; das Fallback-Gate ruft `tests/validate_dot_reports.py` ueber dieselben Goldens. Beide Gates teilen das Manifest und nutzen native_path-Konvertierung in Bash-Aufrufen.
+5. CTest-Gates fuer DOT-Goldens einhaengen, aber exklusiv pro Umgebung registrieren: Docker registriert nur `dot_graphviz_validation`, native CI registriert nur `dot_python_validation`. Beide Gates teilen das Manifest; der Python-Pfad nutzt native_path-Konvertierung in Bash-Aufrufen.
 6. `Dockerfile`-Bootstrap fuer den `graphviz`-apt-Layer im `toolchain`-Stage einbauen.
 7. `.github/workflows/test.yml`, `.github/workflows/build.yml` und `.github/workflows/release.yml` so anpassen, dass das Python-Fallback-Smoke vor `ctest` verfuegbar ist; falls es externe Python-Abhaengigkeiten benoetigt, werden diese ueber `pip install --require-hashes -r tests/requirements-dot-validator.txt` installiert.
 8. Manifest `tests/e2e/testdata/m5/dot-reports/manifest.txt` anlegen, in Tranche A noch ohne vollstaendige CLI-Goldens.
 9. `docs/quality.md` um die neuen DOT-Syntax-Gates und die Bootstrap-Matrix ergaenzen.
 
-Abnahme Tranche A: alle Docker-Gates gruen; Escape-/Attributlexik-Tests pruefen Leerzeichen, Anfuehrungszeichen, Backslashes und plattformtypische Pfadtrenner; das Graphviz-Gate failt nachweislich bei kuenstlich kaputtem DOT, das Fallback-Smoke failt bei demselben kaputten DOT mit konkreter Fehlermeldung.
+Abnahme Tranche A: alle Docker-Gates gruen; Escape-/Attributlexik-Tests pruefen Leerzeichen, Anfuehrungszeichen, Backslashes und plattformtypische Pfadtrenner; `dot_graphviz_validation` failt in Docker nachweislich bei kuenstlich kaputtem DOT, `dot_python_validation` failt in nativer CI bei demselben kaputten DOT mit konkreter Fehlermeldung.
 
 ### Tranche B - Adapter, Wiring, CLI-Freischaltung
 
