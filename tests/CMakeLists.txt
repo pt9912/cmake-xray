@@ -113,6 +113,7 @@ if(DOT_PROGRAM AND BASH_PROGRAM)
                 ${DOT_PROGRAM}
                 ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/dot-reports
                 ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/dot-reports/manifest.txt
+                svg
     )
 
     add_test(
@@ -120,4 +121,27 @@ if(DOT_PROGRAM AND BASH_PROGRAM)
         COMMAND ${DOT_PROGRAM} -Tsvg ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/dot_broken_sample.dot
     )
     set_tests_properties(dot_report_graphviz_validation_rejects_broken_dot PROPERTIES WILL_FAIL TRUE)
+
+    # AP M5-1.3 Tranche D: parallel format gates make sure goldens stay
+    # parseable across the alternate Graphviz output formats users typically
+    # pipe DOT through. -Tplain exercises the canonical text emitter
+    # (different parser path from -Tsvg) and -Tjson exercises the structured
+    # JSON emitter; both fail loud if a golden uses an attribute/value the
+    # respective output backend cannot encode.
+    add_test(
+        NAME dot_report_graphviz_validation_plain
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/validate_dot_via_graphviz.sh
+                ${DOT_PROGRAM}
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/dot-reports
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/dot-reports/manifest.txt
+                plain
+    )
+    add_test(
+        NAME dot_report_graphviz_validation_json
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/validate_dot_via_graphviz.sh
+                ${DOT_PROGRAM}
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/dot-reports
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/dot-reports/manifest.txt
+                json
+    )
 endif()

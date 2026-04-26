@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 # Graphviz-backed DOT syntax gate for cmake-xray (AP M5-1.3 Tranche A).
 #
-# Iterates the M5 DOT manifest and runs `dot -Tsvg` against every listed
-# golden. The SVG output is discarded; the test only checks that Graphviz
-# parses each golden without errors. Used by Docker stages where graphviz
-# is installed via apt; native CI uses tests/validate_dot_reports.py
-# instead.
+# Iterates the M5 DOT manifest and runs `dot -T<format>` against every listed
+# golden. Output is discarded; the test only checks that Graphviz parses each
+# golden without errors. Used by Docker stages where graphviz is installed
+# via apt; native CI uses tests/validate_dot_reports.py instead.
+#
+# Tranche D extends the gate so the same harness can validate alternate
+# Graphviz output formats — pass the format as an optional 4th argument
+# (default: svg). Multiple format gates can register against the same
+# manifest by passing different formats.
 #
 # Usage:
-#   validate_dot_via_graphviz.sh <dot-binary> <reports-dir> <manifest>
+#   validate_dot_via_graphviz.sh <dot-binary> <reports-dir> <manifest> [format]
 
 set -euo pipefail
 
@@ -26,14 +30,15 @@ native_path() {
     fi
 }
 
-if [ "$#" -ne 3 ]; then
-    echo "usage: $0 <dot-binary> <reports-dir> <manifest>" >&2
+if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then
+    echo "usage: $0 <dot-binary> <reports-dir> <manifest> [format]" >&2
     exit 2
 fi
 
 DOT_BIN="$(native_path "$1")"
 REPORTS_DIR="$(native_path "$2")"
 MANIFEST="$(native_path "$3")"
+FORMAT="${4:-svg}"
 
 if [ ! -x "$DOT_BIN" ] && ! command -v "$DOT_BIN" >/dev/null 2>&1; then
     echo "error: dot binary not executable: $DOT_BIN" >&2
@@ -62,14 +67,14 @@ while IFS= read -r raw_line; do
         failures=$((failures + 1))
         continue
     fi
-    if ! "$DOT_BIN" -Tsvg "$target" > /dev/null; then
-        echo "error: graphviz rejected $target" >&2
+    if ! "$DOT_BIN" "-T$FORMAT" "$target" > /dev/null; then
+        echo "error: graphviz ($FORMAT) rejected $target" >&2
         failures=$((failures + 1))
     fi
 done < "$MANIFEST"
 
 if [ "$failures" -gt 0 ]; then
-    echo "$failures DOT golden(s) failed Graphviz validation" >&2
+    echo "$failures DOT golden(s) failed Graphviz $FORMAT validation" >&2
     exit 1
 fi
 exit 0

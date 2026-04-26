@@ -1,6 +1,8 @@
 #include <doctest/doctest.h>
 
+#include <array>
 #include <cstddef>
+#include <cstdio>
 #include <optional>
 #include <string>
 
@@ -773,4 +775,157 @@ TEST_CASE("DOT analyze graph attributes follow the documented order") {
     CHECK(pos_version < pos_node);
     CHECK(pos_node < pos_edge);
     CHECK(pos_edge < pos_truncated);
+}
+
+// ---- AP M5-1.3 Tranche D: hardening edge cases ---------------------------
+
+TEST_CASE("DOT label peels Windows drive paths down to the basename") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.translation_units = {
+        ranked_tu("C:\\Windows\\System32\\foo.cpp", "build", "C:\\Windows|build")};
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 1);
+    CHECK(report.find("label=\"foo.cpp\"") != std::string::npos);
+    // Backslashes in path/directory/unique_key remain DOT-escaped.
+    CHECK(report.find("path=\"C:\\\\Windows\\\\System32\\\\foo.cpp\"") !=
+          std::string::npos);
+}
+
+TEST_CASE("DOT label peels UNC paths down to the basename") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.translation_units = {
+        ranked_tu("\\\\server\\share\\dir\\foo.cpp", "build",
+                  "\\\\server\\share|build")};
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 1);
+    CHECK(report.find("label=\"foo.cpp\"") != std::string::npos);
+    CHECK(report.find(
+              "path=\"\\\\\\\\server\\\\share\\\\dir\\\\foo.cpp\"") !=
+          std::string::npos);
+}
+
+TEST_CASE("DOT label peels Windows extended-length paths down to the basename") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.translation_units = {
+        ranked_tu("\\\\?\\C:\\very\\long\\path\\foo.cpp", "build",
+                  "\\\\?\\C:\\very\\long|build")};
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 1);
+    CHECK(report.find("label=\"foo.cpp\"") != std::string::npos);
+    CHECK(report.find("\\\\?\\\\C:") != std::string::npos);
+}
+
+TEST_CASE("DOT label leaves a bare drive letter untouched") {
+    AnalysisResult result = make_minimal_analysis_result();
+    // No path separator — label_from_path falls back to truncate_label on the
+    // whole string.
+    result.translation_units = {ranked_tu("C:", "build", "C:|build")};
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 1);
+    CHECK(report.find("label=\"C:\"") != std::string::npos);
+}
+
+TEST_CASE("DOT label drops a trailing Windows separator") {
+    AnalysisResult result = make_minimal_analysis_result();
+    // Trailing separator: the basename component is empty, so label_from_path
+    // falls back to truncate_label on the whole path (mirrors the trailing-
+    // forward-slash test above).
+    result.translation_units = {
+        ranked_tu("C:\\dir\\", "build", "C:\\dir\\|build")};
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 1);
+    CHECK(report.find("label=\"C:\\\\dir\\\\\"") != std::string::npos);
+}
+
+TEST_CASE("DOT escape covers every ASCII control byte in 0x00..0x1F") {
+    // Build a path containing every byte in 0x00..0x1F that is not already
+    // expressed as a named escape (\t, \n, \r). Each byte must surface as
+    // \xNN in the rendered DOT and never as a raw control byte.
+    // std::string is size-tracked, so an embedded NUL flows through the
+    // adapter and through std::string::find without truncation; the loop
+    // therefore includes 0x00.
+    std::string control_path;
+    for (int code = 0x00; code < 0x20; ++code) {
+        const auto ch = static_cast<unsigned char>(code);
+        if (ch == '\t' || ch == '\n' || ch == '\r') continue;
+        control_path.push_back(static_cast<char>(ch));
+    }
+    AnalysisResult result = make_minimal_analysis_result();
+    result.translation_units = {ranked_tu(control_path + ".cpp", "build",
+                                          "control|build")};
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 1);
+    for (int code = 0x00; code < 0x20; ++code) {
+        const auto ch = static_cast<unsigned char>(code);
+        if (ch == '\t' || ch == '\n' || ch == '\r') continue;
+        std::array<char, 5> needle{};
+        std::snprintf(needle.data(), needle.size(), "\\x%02X",
+                      static_cast<unsigned>(ch));
+        CHECK(report.find(needle.data()) != std::string::npos);
+        CHECK(report.find(static_cast<char>(ch)) == std::string::npos);
+    }
+}
+
+TEST_CASE("DOT escape uses named escape for tab, newline and carriage return") {
+    AnalysisResult result = make_minimal_analysis_result();
+    // tab/newline/CR get the named escape, not \xNN. Concatenation prevents
+    // adjacent characters from extending hypothetical escape sequences.
+    result.translation_units = {
+        ranked_tu(std::string{"a\tb\nc\rd"} + ".cpp", "build", "named|build")};
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 1);
+    CHECK(report.find("a\\tb\\nc\\rd.cpp") != std::string::npos);
+    // The \xNN form must NOT be used for these named-escape bytes.
+    CHECK(report.find("\\x09") == std::string::npos);
+    CHECK(report.find("\\x0A") == std::string::npos);
+    CHECK(report.find("\\x0D") == std::string::npos);
+}
+
+TEST_CASE("DOT escape passes printable ASCII specials through unchanged") {
+    // The DOT contract only escapes \\ and \" inside quoted strings; HTML-style
+    // specials like <, >, & and ' carry no special meaning to Graphviz and must
+    // pass through verbatim. Pinning this avoids accidental over-escaping.
+    AnalysisResult result = make_minimal_analysis_result();
+    result.translation_units = {
+        ranked_tu("a<b>&'c.cpp", "build", "specials|build")};
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 1);
+    CHECK(report.find("path=\"a<b>&'c.cpp\"") != std::string::npos);
+}
+
+TEST_CASE("DOT escape passes DEL (0x7F) through as a raw byte") {
+    // Graphviz accepts raw 0x7F inside quoted attribute strings; the adapter
+    // therefore lets it through and only escapes ASCII < 0x20. This test
+    // pins the observed behaviour so any future broadening of the escape
+    // range is intentional.
+    AnalysisResult result = make_minimal_analysis_result();
+    const std::string path = std::string{"a\x7F"} + "b.cpp";
+    result.translation_units = {ranked_tu(path, "build", "del|build")};
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 1);
+    // Raw 0x7F survives, no \x7F escape is emitted.
+    CHECK(report.find('\x7F') != std::string::npos);
+    CHECK(report.find("\\x7F") == std::string::npos);
+}
+
+TEST_CASE("compute_analyze_budget pins budgets at every documented threshold") {
+    // top_limit=0 is unreachable from the CLI (CLI::PositiveNumber rejects 0
+    // before the binding hits compute_analyze_budget). This row is an
+    // internal contract pin: it covers the floor branch of the max(25,…)
+    // and max(40,…) formulas where the linear term is below the floor.
+    CHECK(compute_analyze_budget(0).context_limit == 0);
+    CHECK(compute_analyze_budget(0).node_limit == 25);
+    CHECK(compute_analyze_budget(0).edge_limit == 40);
+    // Crossover into the linear regime: node_limit = 4*top+10 strictly above
+    // 25 first at top=4 -> 26; edge_limit = 6*top+20 strictly above 40 first
+    // at top=4 -> 44.
+    CHECK(compute_analyze_budget(3).node_limit == 25);
+    CHECK(compute_analyze_budget(4).node_limit == 26);
+    CHECK(compute_analyze_budget(3).edge_limit == 40);
+    CHECK(compute_analyze_budget(4).edge_limit == 44);
+    // context_limit caps at 5; top=5 is the last value that also equals
+    // top_limit, top=6 already returns the cap.
+    CHECK(compute_analyze_budget(4).context_limit == 4);
+    CHECK(compute_analyze_budget(5).context_limit == 5);
+    CHECK(compute_analyze_budget(6).context_limit == 5);
 }
