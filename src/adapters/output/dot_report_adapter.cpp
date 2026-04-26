@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <optional>
 #include <sstream>
@@ -629,7 +630,10 @@ bool try_add_impact_node(ImpactGraph& graph, std::size_t node_limit,
 struct ImpactTuNodeSpec {
     std::string_view id_prefix;
     ImpactKind kind;
-    std::map<std::string, std::string>* id_lookup;
+    // reference_wrapper instead of a raw pointer makes lifetime explicit and
+    // prevents accidental null-deref under future edits; aggregate
+    // initialization stays just as terse as the pointer form.
+    std::reference_wrapper<std::map<std::string, std::string>> id_lookup;
 };
 
 void build_impact_tu_nodes(ImpactContext& ctx,
@@ -642,7 +646,7 @@ void build_impact_tu_nodes(ImpactContext& ctx,
         node.id = std::string{spec.id_prefix} + std::to_string(index++);
         node.reference = tu.reference;
         node.kind = spec.kind;
-        spec.id_lookup->emplace(tu.reference.unique_key, node.id);
+        spec.id_lookup.get().emplace(tu.reference.unique_key, node.id);
         ctx.graph.tu_nodes.push_back(std::move(node));
     }
 }
@@ -658,16 +662,17 @@ void build_impact_nodes(ImpactContext& ctx, const ImpactResult& result) {
     filter_and_sort_impacted_tus_in_place(direct, result.affected_translation_units,
                                             ImpactKind::direct);
     build_impact_tu_nodes(ctx, direct,
-                           {"direct_tu_", ImpactKind::direct, &ctx.direct_tu_id_by_key},
+                           {"direct_tu_", ImpactKind::direct,
+                            std::ref(ctx.direct_tu_id_by_key)},
                            &node_count);
     if (ctx.graph.truncated) return;
     std::vector<ImpactedTranslationUnit> heuristic;
     filter_and_sort_impacted_tus_in_place(heuristic, result.affected_translation_units,
                                             ImpactKind::heuristic);
-    build_impact_tu_nodes(
-        ctx, heuristic,
-        {"heuristic_tu_", ImpactKind::heuristic, &ctx.heuristic_tu_id_by_key},
-        &node_count);
+    build_impact_tu_nodes(ctx, heuristic,
+                           {"heuristic_tu_", ImpactKind::heuristic,
+                            std::ref(ctx.heuristic_tu_id_by_key)},
+                           &node_count);
     if (ctx.graph.truncated) return;
     std::vector<ImpactTargetNode> targets;
     collect_impact_targets_in_place(targets, result.affected_targets);

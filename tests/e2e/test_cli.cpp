@@ -544,6 +544,56 @@ TEST_CASE_FIXTURE(CliFixture, "dot impact format is implemented and emits DOT") 
     CHECK(out.str().find("xray_report_type=\"impact\"") != std::string::npos);
 }
 
+TEST_CASE("dot impact refuses to render when changed_file_source is unresolved_file_api_source_root") {
+    // Build an ImpactResult that mimics the unresolved-file-api state and run
+    // the CLI through the stub-port pipeline so the dot path is reached.
+    ImpactResult unresolved_result{};
+    unresolved_result.application = xray::hexagon::model::application_info();
+    unresolved_result.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    unresolved_result.inputs.changed_file = std::string{"src/missing.cpp"};
+    unresolved_result.inputs.changed_file_source =
+        xray::hexagon::model::ChangedFileSource::unresolved_file_api_source_root;
+
+    class FixedImpactPort final : public xray::hexagon::ports::driving::AnalyzeImpactPort {
+    public:
+        explicit FixedImpactPort(ImpactResult result) : result_(std::move(result)) {}
+        ImpactResult analyze_impact(
+            xray::hexagon::ports::driving::AnalyzeImpactRequest /*request*/) const override {
+            return result_;
+        }
+
+    private:
+        ImpactResult result_;
+    };
+
+    const StubAnalyzeProjectPort analyze_project_port{AnalysisResult{}};
+    const FixedImpactPort impact_port{unresolved_result};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",     "impact", "--cmake-file-api",
+                          "/tmp/empty",     "--changed-file", "src/missing.cpp",
+                          "--format",       "dot"};
+
+    const int exit_code = cli.run(8, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("file-api source root is unresolved") != std::string::npos);
+    // No DOT graph should leak into stderr either.
+    CHECK(err.str().find("digraph cmake_xray_impact") == std::string::npos);
+}
+
 TEST_CASE_FIXTURE(CliFixture, "dot analyze --output writes the file with empty streams") {
     const TemporaryDirectory temp_dir;
     const auto target = temp_dir.path() / "report.dot";

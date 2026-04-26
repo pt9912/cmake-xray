@@ -10,6 +10,7 @@
 
 #include "adapters/cli/exit_codes.h"
 #include "hexagon/model/compile_database_result.h"
+#include "hexagon/model/report_inputs.h"
 
 namespace xray::adapters::cli {
 
@@ -230,10 +231,25 @@ int handle_analysis_result(const xray::hexagon::model::AnalysisResult& result,
 
 int handle_impact_result(const xray::hexagon::model::ImpactResult& result,
                          const xray::hexagon::ports::driving::GenerateReportPort& report_port,
-                         const CliOptions& options, CliOutputStreams streams) {
+                         ReportFormat format, const CliOptions& options,
+                         CliOutputStreams streams) {
     if (!result.compile_database.is_success()) {
         format_error(streams.err, result.compile_database);
         return map_error_to_exit_code(result.compile_database.error());
+    }
+    // docs/report-dot.md / docs/plan-M5-1-3.md: an ImpactResult whose
+    // changed_file_source is unresolved_file_api_source_root is a file-api
+    // error path. DOT must not render a graph for this case; the CLI emits
+    // a text error and returns non-zero. Other formats (JSON / Markdown /
+    // Console) continue to render so the caller can see the diagnostics.
+    if (format == ReportFormat::dot && result.inputs.changed_file_source.has_value() &&
+        *result.inputs.changed_file_source ==
+            xray::hexagon::model::ChangedFileSource::unresolved_file_api_source_root) {
+        streams.err << "error: cannot render --format dot when the file-api source "
+                       "root is unresolved\n";
+        streams.err << "hint: provide --compile-commands or a fully resolvable "
+                       "--cmake-file-api path\n";
+        return ExitCode::input_invalid;
     }
     const ImpactCliReportRenderer renderer{report_port, result};
     return run_emit_for_renderer(renderer, options, streams);
@@ -384,7 +400,7 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
     if (impact_cmd->parsed()) {
         const auto result = analyze_impact_port_.analyze_impact(
             build_impact_request(options, report_display_base));
-        return handle_impact_result(result, report_port, options, streams);
+        return handle_impact_result(result, report_port, report_format, options, streams);
     }
 
     const auto result = analyze_project_port_.analyze_project(

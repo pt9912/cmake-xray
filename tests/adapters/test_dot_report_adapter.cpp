@@ -718,6 +718,42 @@ TEST_CASE("DOT impact omits the changed_file node when changed_file is unset") {
     CHECK(report.find("changed_file -> ") == std::string::npos);
 }
 
+TEST_CASE("DOT impact emits no edges when changed_file is missing even with affected TUs") {
+    // The contract makes changed_file the source of every impact edge kind.
+    // When it is absent, build_impact_edges must emit no edges at all -
+    // even if the result still carries affected_translation_units. Nodes for
+    // those TUs may appear (they are still meaningful data) but no edge of
+    // any kind is in the rendered graph.
+    auto result = make_minimal_impact_result();
+    result.affected_translation_units = {
+        ImpactedTranslationUnit{
+            reference("src/d.cpp", "build", "src/d.cpp|build"),
+            ImpactKind::direct,
+            {TargetInfo{"app", "EXECUTABLE", "app::EXE"}},
+        },
+        ImpactedTranslationUnit{
+            reference("src/h.cpp", "build", "src/h.cpp|build"),
+            ImpactKind::heuristic,
+            {},
+        },
+    };
+    result.affected_targets = {
+        ImpactedTarget{TargetInfo{"app", "EXECUTABLE", "app::EXE"},
+                       TargetImpactClassification::direct},
+    };
+
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("changed_file [") == std::string::npos);
+    CHECK(report.find(" -> ") == std::string::npos);
+    // Without changed_file there are no edges of any kind, regardless of
+    // edge style or source/target label.
+    CHECK(report.find("kind=\"changed_file_direct_tu\"") == std::string::npos);
+    CHECK(report.find("kind=\"changed_file_heuristic_tu\"") == std::string::npos);
+    CHECK(report.find("kind=\"direct_tu_target\"") == std::string::npos);
+    CHECK(report.find("kind=\"heuristic_tu_target\"") == std::string::npos);
+}
+
 TEST_CASE("DOT analyze graph attributes follow the documented order") {
     const DotReportAdapter adapter;
     const auto report = adapter.write_analysis_report(make_minimal_analysis_result(), 5);
