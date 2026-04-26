@@ -109,23 +109,29 @@ cd "$REPO_ROOT"
 # if the validator script or python3 is unavailable so the bash smoke does
 # not fail on minimal hosts; CTest itself already enforces the schema gate
 # via the report_json_schema_validation entry.
-validator_script="$REPO_ROOT/tests/validate_json_schema.py"
-schema_path="$REPO_ROOT/docs/report-json.schema.json"
+#
+# Paths go through native_path so MSYS Bash's POSIX-style /d/a/... is
+# converted to D:\a\... before being handed to a non-MSYS Python on Windows.
+validator_script="$(native_path "$REPO_ROOT/tests/validate_json_schema.py")"
+schema_path="$(native_path "$REPO_ROOT/docs/report-json.schema.json")"
 assert_schema_validates() {
     local description="$1" json_file="$2"
     if ! command -v python3 >/dev/null 2>&1; then
         echo "SKIP: $description (python3 not available)"
         return
     fi
-    if ! [ -f "$validator_script" ] || ! [ -f "$schema_path" ]; then
+    if ! [ -f "$REPO_ROOT/tests/validate_json_schema.py" ] || \
+       ! [ -f "$REPO_ROOT/docs/report-json.schema.json" ]; then
         echo "SKIP: $description (validator or schema missing)"
         return
     fi
-    if python3 "$validator_script" --schema "$schema_path" --validate-file "$json_file" >/dev/null 2>&1; then
+    local json_file_native
+    json_file_native="$(native_path "$json_file")"
+    if python3 "$validator_script" --schema "$schema_path" --validate-file "$json_file_native" >/dev/null 2>&1; then
         echo "PASS: $description"
     else
         echo "FAIL: $description — produced JSON did not satisfy report-json.schema.json" >&2
-        python3 "$validator_script" --schema "$schema_path" --validate-file "$json_file" >&2 || true
+        python3 "$validator_script" --schema "$schema_path" --validate-file "$json_file_native" >&2 || true
         failures=$((failures + 1))
     fi
 }
