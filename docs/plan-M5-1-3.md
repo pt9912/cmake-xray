@@ -181,7 +181,7 @@ Ein Analyze-DOT-Graph enthaelt nur Knoten aus vorhandenen `AnalysisResult`-Daten
 
 - Translation Units aus der Top-N-Ranking-Sicht.
 - Include-Hotspots beziehungsweise Include-Dateien aus der Top-N-Hotspot-Sicht.
-- Target-Knoten aus vorhandenen M4-Target-Zuordnungen.
+- Target-Knoten aus vorhandenen M4-Target-Zuordnungen primaerer Top-Ranking-Translation-Units.
 - begrenzte Kontext-Translation-Units fuer ausgegebene Include-Hotspots.
 
 Pflichtattribute fuer Translation-Unit-Knoten:
@@ -219,7 +219,7 @@ Pflichtattribute fuer Target-Knoten:
 Analyze-DOT erzeugt nur folgende Kantenarten:
 
 - Translation Unit zu Include-Hotspot, wenn der Hotspot-Kontext aus `IncludeHotspot` ableitbar ist.
-- Translation Unit zu Target, wenn eine Target-Zuordnung vorhanden ist.
+- primaere Top-Ranking-Translation Unit zu Target, wenn fuer diese Translation Unit eine Target-Zuordnung vorhanden ist.
 
 Pflichtattribute fuer Kanten:
 
@@ -229,6 +229,7 @@ Regeln:
 
 - Analyze-Kanten tragen kein `style`-Attribut.
 - Analyze-Kanten tragen kein `label`-Attribut.
+- `context_only`-Translation-Units erzeugen keine `tu_target`-Kanten und keine Target-Knoten. Sie werden ausschliesslich als begrenzter Hotspot-Kontext modelliert, weil `IncludeHotspot` nur `TranslationUnitReference` traegt und Target-Zuordnungen separat ueber Ranking-/Assignment-Daten laufen.
 - Kanten werden nur ausgegeben, wenn beide Endknoten im finalen Graph enthalten sind.
 - Es werden keine Include-zu-Include-Kanten erzeugt.
 - Es werden keine Target-zu-Target-Kanten erzeugt.
@@ -247,7 +248,7 @@ edge_limit = max(40, 6 * top_limit + 20)
 Regeln:
 
 - Ohne explizites `--top` wird der wirksame Standard-Top-Wert der CLI verwendet.
-- `top_limit=0` ist ein gueltiger Edge-Case: `context_limit=0`, `node_limit=25` und `edge_limit=40`; es werden keine primaeren Ranking- oder Hotspot-Knoten aufgenommen. Das Auslassen fachlicher Daten durch `top_limit=0` ist keine DOT-Budget-Kuerzung und setzt fuer sich allein nicht `graph_truncated=true`.
+- `top_limit` ist im M5-CLI-Vertrag positiv. AP 1.3 behaelt den bestehenden `--top`-Validator bei, der `0` ablehnt; `top_limit=0` ist kein produktiver DOT-Vertrag und wird nicht ueber CLI-, Adapter- oder Golden-Tests gefordert.
 - `context_limit` gilt pro ausgegebenem Hotspot, erzeugt aber keinen unbegrenzten Gesamtgraphen, weil zusaetzlich `node_limit` und `edge_limit` gelten.
 - Top-Ranking- und Top-Hotspot-Listen folgen derselben `--top`-Begrenzung wie Markdown, HTML und JSON.
 - Der DOT-Adapter kuerzt nur die Graphsicht, nicht das zugrunde liegende `AnalysisResult`.
@@ -258,7 +259,7 @@ Knotenkandidaten werden deterministisch in dieser Reihenfolge aufgenommen:
 
 1. primaere Top-Ranking-Translation-Units.
 2. Top-Hotspot-Knoten.
-3. Target-Knoten fuer Translation Units aus der Kandidatenmenge.
+3. Target-Knoten fuer primaere Top-Ranking-Translation-Units.
 4. Hotspot-Kontext-Translation-Units, sortiert nach `source_path`, `directory` und `unique_key`.
 
 Tie-Breaker:
@@ -279,8 +280,9 @@ Zaehlregeln:
 - `context_total_count` zaehlt pro Hotspot die eindeutigen betroffenen Translation Units vor `context_limit` und vor globalem Graph-Budget.
 - `context_returned_count` zaehlt pro Hotspot die eindeutigen Kontext-Translation-Units, die nach `context_limit`, `node_limit` und `edge_limit` tatsaechlich als Knoten im finalen Graph enthalten und durch eine Kontextkante mit diesem Hotspot verbunden sind.
 - Wenn dieselbe Kontext-Translation-Unit mehreren Hotspots zugeordnet ist, wird sie pro Hotspot in dessen `context_*`-Werten gezaehlt, aber als Graphknoten nur einmal gegen das globale `node_limit`.
+- Kontext-Translation-Units bleiben `context_only`, sofern sie nicht zugleich primaere Top-Ranking-Knoten sind; fuer reine Kontext-Translation-Units werden keine Target-Kandidaten gebildet.
 - `context_truncated=true`, wenn `context_total_count > context_returned_count`.
-- Nach Anwendung des `edge_limit` werden reine Kontext-Translation-Unit-Knoten ohne verbleibende Kontextkante entfernt, sofern sie nicht zugleich primaere Ranking-Knoten oder Target-Kontextknoten sind.
+- Nach Anwendung des `edge_limit` werden reine Kontext-Translation-Unit-Knoten ohne verbleibende Kontextkante entfernt, sofern sie nicht zugleich primaere Ranking-Knoten sind.
 - `graph_node_limit`, `graph_truncated` und `context_returned_count` beziehen sich auf diesen finalen Graphzustand.
 
 ### Analyze-Kantenprioritaet
@@ -608,6 +610,7 @@ Adaptertests:
 - Tests pruefen die Pflichtattribute `type` und `unique_key` fuer Target-Knoten.
 - Tests pruefen die exakten Impact-Style-Werte `style="solid"` fuer direkte Kanten und `style="dashed"` fuer heuristische Kanten.
 - Tests pruefen, dass Analyze-Kanten kein `style`-Attribut tragen und keine Kanten ein `label`-Attribut traegt.
+- Tests pruefen, dass reine `context_only`-Translation-Units keine Target-Knoten und keine `tu_target`-Kanten erzeugen.
 - Tests pruefen, dass `changed_file_source=unresolved_file_api_source_root` fuer DOT als Textfehler ohne DOT-Graph behandelt wird.
 - Tests pruefen leere Analyze- und Impact-Ergebnisse als gueltigen DOT-Graph.
 
@@ -616,7 +619,7 @@ Budget- und Truncation-Tests:
 - Analyze-Tests pruefen `context_limit = min(top_limit, 5)`.
 - Analyze-Tests pruefen `node_limit = max(25, 4 * top_limit + 10)`.
 - Analyze-Tests pruefen `edge_limit = max(40, 6 * top_limit + 20)`.
-- Analyze-Tests pruefen den Edge-Case `top_limit=0` mit `context_limit=0`, `node_limit=25`, `edge_limit=40` und ohne primaere Ranking-/Hotspot-Knoten.
+- CLI-Tests pruefen, dass `--top 0` auch fuer `--format dot` abgelehnt wird und kein DOT-Graph entsteht.
 - Impact-Tests pruefen `node_limit = 100` und `edge_limit = 200`.
 - Tests pruefen `graph_truncated=false` im ungekuerzten Fall.
 - Tests pruefen `graph_truncated=true`, wenn Knoten oder Kanten wegen Budget fehlen.
