@@ -520,7 +520,7 @@ Pro CI-Umgebung ist genau ein DOT-Syntax-CTest-Target aktiv:
 
 - Das CTest-Target `dot_python_validation` ruft `tests/validate_dot_reports.py` auf. Das Skript ist repository-lokal und validiert DOT-Quelltext parser- und attributbasiert (balancierte Graphstruktur, quoted-String-Escaping, Attributlisten, Edge-/Node-Statements, Pflichtattribute).
 - Der Skriptpfad und Eingabedateipfade werden in Bash-Aufrufen ueber den vorhandenen `native_path`-Helper geroutet, damit MSYS-Bash-POSIX-Pfade auf Windows-Python korrekt aufgeloest werden (siehe AP-1.2-Lehre).
-- Der Fallback nutzt nur die Standardbibliothek; falls dennoch externe Python-Abhaengigkeiten noetig werden, werden sie ueber `tests/requirements-dot-validator.in` und ein per `pip-compile --generate-hashes` erzeugtes Lockfile `tests/requirements-dot-validator.txt` hash-gepinnt installiert. Der Workflow-Schritt ruft `pip install --require-hashes` auf.
+- Der Fallback nutzt ausschliesslich die Python-Standardbibliothek. AP 1.3 fuehrt keine `tests/requirements-dot-validator.*`-Dateien und keinen `pip install`-Bootstrap fuer den DOT-Validator ein.
 - Der Fallback darf nicht still skippen; fehlende Validator-Voraussetzungen liefern eine konkrete Installationsanweisung und nonzero Exit.
 - Der Fallback verarbeitet dieselben Goldens und dieselben Escape-Erwartungen wie der Graphviz-Pfad.
 
@@ -529,7 +529,7 @@ Pro CI-Umgebung ist genau ein DOT-Syntax-CTest-Target aktiv:
 | Umgebung | Pfad | Installation |
 |---|---|---|
 | Docker (`test`, `coverage`, `coverage-check`) | `dot_graphviz_validation` | apt im `toolchain`-Stage |
-| Native CI Linux/macOS/Windows (`build.yml`, `release.yml`) | `dot_python_validation` | reine Standardbibliothek; bei Bedarf hash-gepinnte `pip install --require-hashes` |
+| Native CI Linux/macOS/Windows (`build.yml`, `release.yml`) | `dot_python_validation` | reine Standardbibliothek, kein `pip install` |
 | Lokale Entwicklung | bevorzugt Graphviz, sonst Python-Fallback | Graphviz via System-Paketmanager oder ohne Install fuer den Fallback |
 
 `docs/quality.md` dokumentiert die aktive Pfadwahl pro CI-Lauf.
@@ -550,11 +550,11 @@ Kein produktiver CLI-Adapter; Vertrag, Hilfsfunktionen und Testskelett.
 4. Budgetberechnung fuer Analyze und Impact als klein testbare Funktionen implementieren.
 5. CTest-Gates fuer DOT-Goldens einhaengen, aber exklusiv pro Umgebung registrieren: Docker registriert nur `dot_graphviz_validation`, native CI registriert nur `dot_python_validation`. Beide Gates teilen das Manifest; der Python-Pfad nutzt native_path-Konvertierung in Bash-Aufrufen.
 6. `Dockerfile`-Bootstrap fuer den `graphviz`-apt-Layer im `toolchain`-Stage einbauen.
-7. `.github/workflows/test.yml`, `.github/workflows/build.yml` und `.github/workflows/release.yml` so anpassen, dass das Python-Fallback-Smoke vor `ctest` verfuegbar ist; falls es externe Python-Abhaengigkeiten benoetigt, werden diese ueber `pip install --require-hashes -r tests/requirements-dot-validator.txt` installiert.
+7. `.github/workflows/test.yml`, `.github/workflows/build.yml` und `.github/workflows/release.yml` so anpassen, dass `dot_python_validation` in nativen CTest-Laeufen verfuegbar ist; der Validator nutzt nur die Python-Standardbibliothek und benoetigt keinen Dependency-Install.
 8. Manifest `tests/e2e/testdata/m5/dot-reports/manifest.txt` anlegen, in Tranche A noch ohne vollstaendige CLI-Goldens.
 9. `docs/quality.md` um die neuen DOT-Syntax-Gates und die Bootstrap-Matrix ergaenzen.
 
-Abnahme Tranche A: alle Docker-Gates gruen; Escape-/Attributlexik-Tests pruefen Leerzeichen, Anfuehrungszeichen, Backslashes und plattformtypische Pfadtrenner; `dot_graphviz_validation` failt in Docker nachweislich bei kuenstlich kaputtem DOT, `dot_python_validation` failt in nativer CI bei demselben kaputten DOT mit konkreter Fehlermeldung.
+Abnahme Tranche A: alle Docker-Gates aus `README.md` und `docs/quality.md` gruen; Escape-/Attributlexik-Tests pruefen Leerzeichen, Anfuehrungszeichen, Backslashes und plattformtypische Pfadtrenner; `dot_graphviz_validation` failt in Docker nachweislich bei kuenstlich kaputtem DOT, `dot_python_validation` failt in nativer CI bei demselben kaputten DOT mit konkreter Fehlermeldung. Release- oder native CTest-Laeufe, die fuer AP 1.3 keinen CTest-Validator ausfuehren, muessen in `docs/quality.md` explizit als nicht massgeblicher DOT-Syntax-Gate-Pfad dokumentiert sein.
 
 ### Tranche B - Adapter, Wiring, CLI-Freischaltung
 
@@ -589,6 +589,7 @@ Echte Binary-Verifikation und Vertragsfestschreibung der CLI-Ausgaben.
 2. Impact-Goldens erzeugen. Abgedeckt sind mindestens:
    - Compile-Database-only mit relativem `--changed-file`.
    - File-API-only mit relativem `--changed-file`.
+   - mindestens ein absolutes `--changed-file`, damit Quoting, Pfadnormalisierung und Labelbildung fuer absolute Pfade regressionsgeschuetzt sind.
    - Mixed-Input.
    - direkte und heuristische Translation Units mit unterscheidbarem Style.
    - Target-Zuordnungen fuer direkte und heuristische Betroffenheit.
@@ -609,7 +610,7 @@ Echte Binary-Verifikation und Vertragsfestschreibung der CLI-Ausgaben.
 9. `docs/quality.md` um die in Tranche C neu hinzukommenden DOT-Golden-, Syntax- und E2E-Gates ergaenzen.
 10. Coverage-, Lizard- und Clang-Tidy-Gates muessen nach AP 1.3 weiterhin gruen sein; neue Befunde aus dem DOT-Adapter werden in Tranche C behoben und nicht auf Tranche D verschoben.
 
-Abnahme Tranche C: alle Docker-Gates gruen; `e2e_binary` gruen; alle DOT-Goldens sind syntaktisch gueltig; Budget-, Truncation-, Kontext- und Escaping-Vertraege sind durch Goldens und Adaptertests abgedeckt; globale Abnahmekriterien dieses Plans erfuellt.
+Abnahme Tranche C: alle Docker-Gates aus `README.md` und `docs/quality.md` gruen; `e2e_binary` gruen; alle DOT-Goldens sind im jeweils aktiven DOT-Syntax-Gate syntaktisch gueltig; Budget-, Truncation-, Kontext- und Escaping-Vertraege sind durch Goldens und Adaptertests abgedeckt; globale Abnahmekriterien dieses Plans erfuellt.
 
 ### Tranche D - Optionale Haertung
 
@@ -633,7 +634,7 @@ Diese Entscheidungen sind vor Umsetzungsbeginn getroffen und in die Tranchen ein
 - Target-zu-Target-Kanten bleiben verboten. Begruendung: Diese Kanten waeren eine neue Target-Graph-Analyse und gehoeren zu M6 beziehungsweise `F-18`.
 - Diagnostics werden nicht als Pflichtknoten modelliert. Begruendung: AP 1.3 braucht einen stabilen Graphvertrag fuer fachliche Ergebnisbeziehungen; Diagnostic-Visualisierung waere ein eigener Vertrag.
 - Bootstrap-Pfadwahl: Docker-Stages installieren Graphviz via apt im `toolchain`-Layer; native CI-Matrizen nutzen `tests/validate_dot_reports.py` als Fallback. Begruendung: Graphviz auf Windows-Runnern via Chocolatey ist plattformspezifisch fummelig, ein reines Python-Skript funktioniert plattformuebergreifend ohne neue Toolchain-Abhaengigkeit. Verankert in der Bootstrap-Matrix und in Tranche A, Schritt 5-7.
-- Falls der Python-Fallback externe Abhaengigkeiten erhaelt, werden sie hash-gepinnt: `tests/requirements-dot-validator.in` als Quelle, `tests/requirements-dot-validator.txt` per `pip-compile --generate-hashes` regeneriert, Workflows installieren mit `pip install --require-hashes`. Begruendung: AP-1.2-Lehre, dass `--require-hashes` auch fuer einzelne Test-Tools die Reproduzierbarkeit der CI sichert.
+- Python-Fallback bleibt standardbibliotheks-only. Begruendung: Der DOT-Syntax-Smoke soll auf nativen Linux-/macOS-/Windows-Runnern ohne Package-Bootstrap laufen und keine zweite Dependency-Kette neben dem JSON-Schema-Validator einfuehren.
 - Native_path-Pflicht: jeder Bash-Aufruf eines Python-Skripts in `tests/e2e/run_e2e.sh` und CTest-Targets routet Skript- und Eingabepfade ueber den vorhandenen `native_path`-Helper. Begruendung: AP-1.2-Lehre nach Windows-MSYS-CI-Failure (POSIX `/d/...` aufgeloest zu `D:\d\...`); jeder neue Validator-Pfad muss diese Lektion respektieren.
 - README.md-Pflicht in Tranche C: Header, Feature-Liste und "nicht Ziel"-Liste werden gleichzeitig mit der DOT-Freischaltung aktualisiert. Begruendung: AP-1.2-Lehre, dass die README-Aktualisierung sonst als Folge-Commit nachgezogen werden muss; Tranche C bringt sie in den Hauptcommit.
 - `--top 0` bleibt durch den bestehenden `CLI::PositiveNumber`-Validator abgelehnt. Begruendung: Die Pruefung greift vor jeder Formatselektion und ist plattformunabhaengig stabil; AP 1.3 fuegt keine eigene `--top`-Validierung hinzu und braucht damit keinen DOT-spezifischen Validator-Sonderweg.
