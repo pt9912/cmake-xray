@@ -280,10 +280,11 @@ Zaehlregeln:
 - `context_total_count` zaehlt pro Hotspot die eindeutigen betroffenen Translation Units vor `context_limit` und vor globalem Graph-Budget.
 - `context_returned_count` zaehlt pro Hotspot die eindeutigen Kontext-Translation-Units, die nach `context_limit`, `node_limit` und `edge_limit` tatsaechlich als Knoten im finalen Graph enthalten und durch eine Kontextkante mit diesem Hotspot verbunden sind.
 - Wenn dieselbe Kontext-Translation-Unit mehreren Hotspots zugeordnet ist, wird sie pro Hotspot in dessen `context_*`-Werten gezaehlt, aber als Graphknoten nur einmal gegen das globale `node_limit`.
+- Wenn eine Translation Unit sowohl primaerer Top-Ranking-Knoten als auch Hotspot-Kontext ist, wird sie in Prioritaet 1 aufgenommen und zaehlt nur dort gegen das `node_limit`; in Prioritaet 4 wird kein zweiter Knoten erzeugt, sondern nur die zulaessige Kontextkante gebildet.
 - Kontext-Translation-Units bleiben `context_only`, sofern sie nicht zugleich primaere Top-Ranking-Knoten sind; fuer reine Kontext-Translation-Units werden keine Target-Kandidaten gebildet.
 - `context_truncated=true`, wenn `context_total_count > context_returned_count`.
 - Nach Anwendung des `edge_limit` werden reine Kontext-Translation-Unit-Knoten ohne verbleibende Kontextkante entfernt, sofern sie nicht zugleich primaere Ranking-Knoten sind.
-- `graph_node_limit`, `graph_truncated` und `context_returned_count` beziehen sich auf diesen finalen Graphzustand.
+- `graph_truncated` und `context_returned_count` beziehen sich auf diesen finalen Graphzustand; `graph_node_limit` bleibt der unveraenderte Budgetwert und ist kein Ist-Zaehler.
 
 ### Analyze-Kantenprioritaet
 
@@ -291,6 +292,11 @@ Kantenkandidaten werden nur fuer vorhandene Endknoten gebildet und deterministis
 
 1. Translation-Unit-zu-Include-Hotspot-Kanten.
 2. Translation-Unit-zu-Target-Kanten.
+
+Kantenrichtung:
+
+- `tu_include_hotspot`: Quelle ist die Translation Unit, Ziel ist der Include-Hotspot.
+- `tu_target`: Quelle ist die primaere Top-Ranking-Translation-Unit, Ziel ist das Target.
 
 Innerhalb einer Prioritaetsgruppe erfolgt der Tie-Breaker lexikografisch nach stabiler Quell-ID, Ziel-ID und Kantenart.
 
@@ -401,6 +407,13 @@ Kantenkandidaten werden nur fuer vorhandene Endknoten gebildet und deterministis
 3. direkt-betroffene-Translation-Unit-zu-Target-Kanten.
 4. heuristisch-betroffene-Translation-Unit-zu-Target-Kanten.
 
+Kantenrichtung:
+
+- `changed_file_direct_tu`: Quelle ist die geaenderte Datei, Ziel ist die direkt betroffene Translation Unit.
+- `changed_file_heuristic_tu`: Quelle ist die geaenderte Datei, Ziel ist die heuristisch betroffene Translation Unit.
+- `direct_tu_target`: Quelle ist die direkt betroffene Translation Unit, Ziel ist das Target.
+- `heuristic_tu_target`: Quelle ist die heuristisch betroffene Translation Unit, Ziel ist das Target.
+
 Innerhalb einer Prioritaetsgruppe erfolgt der Tie-Breaker lexikografisch nach stabiler Quell-ID, Ziel-ID und Kantenart.
 
 Wenn `edge_limit` erreicht ist, werden spaetere Kandidaten nicht aufgenommen und `graph_truncated=true` gesetzt.
@@ -412,6 +425,9 @@ Wenn `edge_limit` erreicht ist, werden spaetere Kandidaten nicht aufgenommen und
 Regeln:
 
 - Der Adapter bekommt keinen CLI-Kontext.
+- `DotReportAdapter` implementiert `xray::hexagon::ports::driven::ReportWriterPort`.
+- Im Produktivpfad wird `DotReportAdapter` ueber `ReportGenerator` als `xray::hexagon::ports::driving::GenerateReportPort` an die CLI verdrahtet.
+- `ReportPorts` in `src/adapters/cli/cli_adapter.h` erhaelt ein explizites `dot`-Feld oder eine gleichwertig typisierte Formatzuordnung, die auf den DOT-`ReportGenerator` zeigt.
 - Der Adapter verwendet `ReportInputs` als Eingabeprovenienz, wo Provenienz fuer DOT-Attribute benoetigt wird.
 - Der Adapter nutzt nicht die Legacy-Presentation-Felder fuer Console/Markdown als kanonische Quelle fuer M5-Provenienz.
 - Fuer Analyze darf der bestehende Renderparameter `top_limit` beziehungsweise `write_analysis_report(result, top_limit)` genutzt werden, solange er nur die Berichtssicht begrenzt. Gemeint ist der von der CLI bereits validierte und wirksame Top-Wert.
@@ -422,7 +438,7 @@ Regeln:
 
 Hilfsfunktionen:
 
-- Gemeinsame DOT-Escaping-Hilfen bleiben lokal im DOT-Adapter oder in einer kleinen output-internen Utility, falls spaeter HTML/JSON nicht davon profitieren.
+- DOT-Escaping-, Label- und Sortierhilfen bleiben in AP 1.3 file-local im `DotReportAdapter`, zum Beispiel im anonymen Namespace der `.cpp`-Datei.
 - Gemeinsame Sortier- oder Label-Hilfen duerfen nur extrahiert werden, wenn sie bereits von mehreren Adaptern genutzt werden oder echte Dopplung reduzieren.
 - Neue Hilfsfunktionen duerfen keine Prozess-CWD-, Host- oder CLI-Zustaende lesen.
 
@@ -508,7 +524,7 @@ Kein produktiver CLI-Adapter; Vertrag, Hilfsfunktionen und Testskelett.
 
 1. DOT-Vertrag in `docs/report-dot.md` festlegen, einschliesslich Graphnamen, `format_version`, Attributlexik, Label-Kuerzungsalgorithmus, Statement-/Attribut-Reihenfolge, Escaping, Node-/Edge-Kinds, Budgets, Sortier-Tie-Breakern und Weglassregeln.
 2. `tests/adapters/test_dot_report_adapter.cpp` mit ersten Escape-, ID- und Attributlexik-Tests anlegen.
-3. DOT-Escaping- und Label-Hilfen im Adapter oder einer output-internen Utility implementieren.
+3. DOT-Escaping- und Label-Hilfen file-local im Adapter implementieren; Extraktion in eine output-interne Utility ist in AP 1.3 nicht vorgesehen.
 4. Budgetberechnung fuer Analyze und Impact als klein testbare Funktionen implementieren.
 5. CTest-Gate fuer DOT-Goldens vorbereiten: Graphviz `dot -Tsvg` oder dokumentierter Fallback-Syntax-Smoke.
 6. Manifest `tests/e2e/testdata/m5/dot-reports/manifest.txt` anlegen, in Tranche A noch ohne vollstaendige CLI-Goldens.
@@ -527,8 +543,9 @@ Der Adapter funktioniert; E2E-Goldens folgen erst in Tranche C.
 5. Composition Root in `src/main.cpp` und Reportports um den DOT-Port erweitern; `ReportPorts` in `src/adapters/cli/cli_adapter.h` erhaelt ein explizites `dot`-Feld oder eine gleichwertig typisierte Formatzuordnung.
 6. CLI-Adapter `src/adapters/cli/cli_adapter.{h,cpp}` so anpassen, dass `--format dot` als implementiert gilt, an den DOT-Port verdrahtet wird und mit `--output` ueber den AP-1.1-Atomic-Writer schreibt.
 7. AP-1.1-Sperre fuer `--format dot` entfernen; noch nicht umgesetzte Formate bleiben weiter abgewiesen.
-8. `tests/adapters/test_port_wiring.cpp` so erweitern, dass `--format dot` an den `DotReportAdapter` verdrahtet ist und nicht in den Console-Fallback faellt.
-9. Regressionscheck, dass bestehende Console-/Markdown-/JSON-Goldens unveraendert bleiben.
+8. Formatverfuegbarkeits- und Usage-Hinweise in `src/adapters/cli/cli_adapter.cpp` aktualisieren, sodass `dot` bei verfuegbaren Formaten genannt wird und keine veraltete `console, markdown, and json`-Meldung uebrig bleibt.
+9. `tests/adapters/test_port_wiring.cpp` so erweitern, dass `--format dot` an den `DotReportAdapter` verdrahtet ist und nicht in den Console-Fallback faellt; bestehende `ReportPorts`-Testfixtures erhalten das neue `dot`-Feld beziehungsweise die neue Formatzuordnung.
+10. Regressionscheck, dass bestehende Console-/Markdown-/JSON-Goldens unveraendert bleiben.
 
 Abnahme Tranche B: alle Docker-Gates gruen; `--format dot` produziert syntaktisch gueltigen DOT-Quelltext; `recognized but not implemented` nicht mehr fuer `dot`; Console-, Markdown- und JSON-Goldens byte-stabil.
 
@@ -540,6 +557,7 @@ Echte Binary-Verifikation und Vertragsfestschreibung der CLI-Ausgaben.
    - Compile-Database-only.
    - File-API-only mit Target-Zuordnungen.
    - Mixed-Input.
+   - Lauf ohne explizites `--top`, damit der CLI-Default-Top-Wert im DOT-Pfad abgedeckt ist.
    - `--top`-Fall ohne Kuerzung (`graph_truncated=false`).
    - `--top`-Fall mit `context_limit`-Kuerzung.
    - Fall mit gleichzeitig wirksamem `context_limit`, `node_limit` und `edge_limit`.
@@ -572,7 +590,7 @@ Abnahme Tranche C: alle Docker-Gates gruen; `e2e_binary` gruen; alle DOT-Goldens
 Ohne diese Tranche gilt AP 1.3 als abgenommen, sobald Tranche C gruen ist.
 
 - Zusaetzliche plattformspezifische Pfad-Edge-Cases, etwa Windows-Drives und UNC-aehnliche Strings.
-- UTF-8-/Escape-Edge-Cases, etwa Unicode-Pfade und Steuerzeichen in Diagnostics, sofern das Projekt Unicode-Goldens in M5 bewusst freigibt.
+- Weitere ASCII-Escaping-Edge-Cases. Unicode-Goldens sind nicht Teil von AP 1.3 und werden erst mit einem separaten, formatuebergreifenden M5-Vertrag freigegeben.
 - Graphviz-Smokes fuer mehrere Ausgabeformate, zum Beispiel `dot -Tsvg` und `dot -Tplain`.
 - Zusaetzliche gezielte Regressionstests fuer Grenzfaelle, die ueber die verpflichtenden Coverage-, Lizard- und Clang-Tidy-Gates aus Tranche C hinausgehen.
 
@@ -583,6 +601,7 @@ Diese Entscheidungen sind vor Umsetzungsbeginn getroffen und in die Tranchen ein
 - DOT ist Graphviz-Quelltext, kein gerendertes Bild. Begruendung: Graphviz-Ausgaben sollen in CI und Dokumentation flexibel weiterverarbeitet werden; Rendering ist Tooling des Nutzers.
 - Node-IDs sind adaptergenerierte ASCII-IDs statt roher Pfade. Begruendung: Pfade enthalten Sonderzeichen und Plattformtrenner; Attribute transportieren die fachliche Identitaet stabiler und testbarer.
 - Budgets sind fuer M5 fest und nicht konfigurierbar. Begruendung: DOT soll grobe Visualisierung liefern, ohne neue CLI-Komplexitaet oder unbegrenzte Graphen einzufuehren.
+- `DotReportAdapter` bleibt ein `ReportWriterPort` und wird ueber `ReportGenerator` als `GenerateReportPort` verdrahtet. Begruendung: Das folgt dem bestehenden Console-/Markdown-/JSON-Pfad und vermeidet einen Sonderweg in der CLI.
 - Analyze nutzt `top_limit` als Renderparameter. Begruendung: Das entspricht dem etablierten `GenerateReportPort::generate_analysis_report(result, top_limit)`-Vertrag und vermeidet CLI-Kontext im Adapter.
 - Impact erhaelt kein `--top`. Begruendung: M5 begrenzt nur die DOT-Graphsicht; fachliche Impact-Ergebnislisten bleiben vollstaendig.
 - Target-zu-Target-Kanten bleiben verboten. Begruendung: Diese Kanten waeren eine neue Target-Graph-Analyse und gehoeren zu M6 beziehungsweise `F-18`.
@@ -611,6 +630,7 @@ Adaptertests:
 - Tests pruefen die exakten Impact-Style-Werte `style="solid"` fuer direkte Kanten und `style="dashed"` fuer heuristische Kanten.
 - Tests pruefen, dass Analyze-Kanten kein `style`-Attribut tragen und keine Kanten ein `label`-Attribut traegt.
 - Tests pruefen, dass reine `context_only`-Translation-Units keine Target-Knoten und keine `tu_target`-Kanten erzeugen.
+- Tests pruefen, dass eine Translation Unit, die zugleich Top-Ranking-Knoten und Hotspot-Kontext ist, nur einmal als Knoten gegen das `node_limit` zaehlt und trotzdem die Kontextkante erhaelt.
 - Tests pruefen, dass `changed_file_source=unresolved_file_api_source_root` fuer DOT als Textfehler ohne DOT-Graph behandelt wird.
 - Tests pruefen leere Analyze- und Impact-Ergebnisse als gueltigen DOT-Graph.
 
@@ -639,6 +659,7 @@ E2E-Golden-Tests:
 - Die erzeugten DOT-Reports werden byte-stabil gegen Golden-Dateien verglichen.
 - Dieselben erzeugten Reports werden durch Graphviz `dot -Tsvg` oder den dokumentierten Syntax-Smoke validiert.
 - Reine Adaptertests reichen nicht aus.
+- Mindestens ein Analyze-Golden laeuft ohne explizites `--top` und deckt den CLI-Default-Top-Wert ab.
 - DOT-Goldens decken Compile-Database-only-, File-API-only- und Mixed-Input-Laeufe bei `analyze` ab.
 - DOT-Goldens decken Compile-Database-only-, File-API-only- und Mixed-Input-Laeufe bei `impact` ab.
 - Analyze-Goldens pruefen Top-Ranking-, Hotspot-, Target- und Kontextknoten.
@@ -671,7 +692,8 @@ Fehlerpfad-Tests:
 Atomic-Writer-Tests:
 
 - DOT-`--output` nutzt den gemeinsamen M5-konformen Atomic-Writer aus AP 1.1.
-- Tests pruefen mindestens, dass ein simulierter Schreib-/Replace-Fehler eine bestehende DOT-Zieldatei unveraendert laesst.
+- AP 1.3 dupliziert keine reinen Atomic-Replace-Unit-Tests aus AP 1.1.
+- DOT-spezifisch erforderlich ist ein CLI-/Wiring-Smoke, der nachweist, dass `--format dot --output <path>` den gemeinsamen Atomic-Writer-Pfad nutzt, stdout und stderr leer laesst und den Report nicht zusaetzlich auf stdout dupliziert.
 
 Rueckwaertskompatibilitaets-Tests:
 
@@ -692,7 +714,7 @@ AP 1.3 ist abnahmefaehig, wenn:
 - Impact-DOT die Knotenarten geaenderte Datei, direkt betroffene Translation Unit, heuristisch betroffene Translation Unit und Target abbildet, sofern diese Daten vorhanden sind.
 - Keine Target-zu-Target-Kanten erzeugt werden.
 - Alle DOT-Reports die Graph-Attribute `graph_node_limit`, `graph_edge_limit` und `graph_truncated` enthalten.
-- Alle DOT-Reports das Graph-Attribut `format_version=1` enthalten.
+- Alle DOT-Reports das Graph-Attribut `format_version` mit dem Wert von `xray::hexagon::model::kReportFormatVersion` enthalten.
 - Statement- und Attribut-Reihenfolge byte-stabil und dokumentiert sind.
 - Label-Kuerzung byte-stabil nach dem dokumentierten 48-Zeichen-Middle-Truncation-Algorithmus erfolgt.
 - Analyze-Hotspot-Knoten die Attribute `context_total_count`, `context_returned_count` und `context_truncated` enthalten.
@@ -700,6 +722,7 @@ AP 1.3 ist abnahmefaehig, wenn:
 - Analyze-DOT die festen M5-Formeln fuer `context_limit`, `node_limit` und `edge_limit` verwendet.
 - Impact-DOT die festen M5-Budgets `node_limit = 100` und `edge_limit = 200` verwendet.
 - Knoten- und Kantenkuerzung deterministisch ist und `graph_truncated` korrekt setzt.
+- Kantenrichtungen fuer alle `kind`-Werte dokumentiert, golden-getestet und stabil sind.
 - DOT-IDs, Labels und Attributwerte deterministisch und korrekt escaped sind.
 - Translation Units nach `TranslationUnitReference::unique_key` und Targets nach `TargetInfo::unique_key` dedupliziert werden, ohne gleichnamige Modellobjekte zusammenzuklappen.
 - Translation-Unit-Knoten `directory` und `unique_key` ausgeben.
