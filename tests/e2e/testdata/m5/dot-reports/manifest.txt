@@ -6,7 +6,13 @@
 # parity.
 #
 # Tranche A creates this manifest empty; Tranche C adds the analyze and
-# impact goldens that lock the DOT contract in place.
+# impact goldens that lock the DOT contract in place. Per-platform variants
+# (*_windows.dot) cover host-divergent path semantics — see comments in
+# tests/e2e/run_e2e.sh for which case selects each branch. Goldens whose
+# fixtures rely on on-disk source files (truncating_compile_db,
+# impact_truncating_compile_db, m2/basic_project, m4/with_targets) embed
+# "HOSTPATH" instead of TU unique_keys and are compared via
+# assert_dot_stdout_equals_file in run_e2e.sh.
 
 # Analyze goldens
 analyze_compile_db_only.dot
@@ -16,9 +22,16 @@ analyze_default_top.dot
 analyze_top_truncated.dot
 analyze_budget_truncated.dot
 analyze_escaping.dot
+analyze_escaping_windows.dot
 
 # Impact goldens
 impact_compile_db_direct.dot
 impact_file_api_only.dot
+impact_file_api_only_windows.dot
 impact_mixed_input.dot
 impact_budget_untruncated.dot
+impact_heuristic_edges.dot
+impact_heuristic_targets.dot
+impact_truncated.dot
+impact_absolute.dot
+impact_absolute_windows.dot

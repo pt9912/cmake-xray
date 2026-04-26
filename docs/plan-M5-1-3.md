@@ -585,7 +585,7 @@ Echte Binary-Verifikation und Vertragsfestschreibung der CLI-Ausgaben.
    - `--top`-Fall ohne Kuerzung (`graph_truncated=false`).
    - `--top`-Fall mit `context_limit`-Kuerzung.
    - Fall mit gleichzeitig wirksamem `context_limit`, `node_limit` und `edge_limit`.
-   - "leeres" Ergebnis: ein Compile-Database- oder File-API-Fixture, das nach Analyse zu `translation_units=[]`, `include_hotspots=[]` und `target_assignments=[]` fuehrt; der erzeugte DOT-Graph enthaelt nur die Pflicht-Graph-Attribute, keinen Node und keine Edge, und setzt `graph_truncated=false`.
+   - "leeres" Ergebnis: ein Compile-Database- oder File-API-Fixture, das nach Analyse zu `translation_units=[]`, `include_hotspots=[]` und `target_assignments=[]` fuehrt; der erzeugte DOT-Graph enthaelt nur die Pflicht-Graph-Attribute, keinen Node und keine Edge, und setzt `graph_truncated=false`. Hinweis: Die CLI weist leere Compile-Databases mit Exit-Code 4 ab, sodass dieser Fall nicht ueber ein E2E-Golden, sondern ueber `tests/adapters/test_dot_report_adapter.cpp` abgedeckt wird; die dortigen `make_minimal_analysis_result`/`make_minimal_impact_result`-Tests verifizieren das Pflichtattributformat fuer leere Ergebnisse.
 2. Impact-Goldens erzeugen. Abgedeckt sind mindestens:
    - Compile-Database-only mit relativem `--changed-file`.
    - File-API-only mit relativem `--changed-file`.

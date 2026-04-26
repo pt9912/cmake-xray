@@ -1,0 +1,1102 @@
+[
+  {
+    "directory": "build",
+    "file": "../src/tu_000.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_000.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_001.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_001.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_002.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_002.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_003.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_003.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_004.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_004.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_005.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_005.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_006.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_006.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_007.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_007.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_008.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_008.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_009.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_009.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_010.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_010.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_011.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_011.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_012.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_012.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_013.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_013.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_014.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_014.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_015.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_015.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_016.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_016.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_017.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_017.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_018.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_018.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_019.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_019.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_020.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_020.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_021.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_021.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_022.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_022.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_023.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_023.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_024.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_024.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_025.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_025.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_026.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_026.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_027.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_027.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_028.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_028.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_029.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_029.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_030.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_030.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_031.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_031.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_032.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_032.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_033.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_033.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_034.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_034.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_035.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_035.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_036.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_036.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_037.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_037.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_038.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_038.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_039.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_039.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_040.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_040.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_041.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_041.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_042.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_042.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_043.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_043.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_044.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_044.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_045.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_045.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_046.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_046.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_047.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_047.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_048.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_048.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_049.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_049.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_050.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_050.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_051.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_051.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_052.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_052.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_053.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_053.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_054.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_054.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_055.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_055.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_056.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_056.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_057.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_057.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_058.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_058.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_059.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_059.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_060.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_060.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_061.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_061.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_062.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_062.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_063.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_063.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_064.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_064.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_065.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_065.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_066.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_066.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_067.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_067.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_068.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_068.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_069.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_069.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_070.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_070.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_071.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_071.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_072.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_072.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_073.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_073.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_074.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_074.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_075.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_075.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_076.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_076.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_077.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_077.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_078.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_078.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_079.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_079.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_080.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_080.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_081.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_081.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_082.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_082.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_083.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_083.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_084.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_084.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_085.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_085.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_086.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_086.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_087.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_087.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_088.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_088.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_089.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_089.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_090.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_090.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_091.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_091.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_092.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_092.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_093.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_093.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_094.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_094.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_095.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_095.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_096.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_096.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_097.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_097.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_098.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_098.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_099.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_099.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_100.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_100.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_101.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_101.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_102.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_102.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_103.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_103.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_104.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_104.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_105.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_105.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_106.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_106.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_107.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_107.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_108.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_108.cpp"
+    ]
+  },
+  {
+    "directory": "build",
+    "file": "../src/tu_109.cpp",
+    "arguments": [
+      "c++",
+      "-I../include",
+      "-c",
+      "../src/tu_109.cpp"
+    ]
+  }
+]

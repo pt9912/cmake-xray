@@ -27,6 +27,16 @@ normalize_line_endings() {
     tr -d '\r' < "$1"
 }
 
+# Replace TU-style unique_key values (which embed absolute on-disk paths and
+# therefore vary by host/checkout layout) with the literal "HOSTPATH" so DOT
+# goldens for fixtures with on-disk source files stay byte-stable across
+# Linux, macOS, Windows and Docker matrix runners. Target unique_keys
+# ("name::TYPE", no `|`) are left intact so display-name and type regressions
+# stay visible.
+normalize_dot_unique_keys() {
+    sed -E 's@unique_key="[^"]*\|[^"]*"@unique_key="HOSTPATH"@g' "$1"
+}
+
 assert_stdout_equals_file() {
     local description="$1" expected_file="$2"
     shift 2
@@ -36,6 +46,32 @@ assert_stdout_equals_file() {
     expected_clean="$(mktemp)"
     "$@" >"$actual_file" 2>/dev/null || true
     normalize_line_endings "$actual_file" > "$actual_clean"
+    normalize_line_endings "$expected_file" > "$expected_clean"
+    if cmp -s "$actual_clean" "$expected_clean"; then
+        echo "PASS: $description"
+    else
+        echo "FAIL: $description — stdout differed from $expected_file" >&2
+        diff -u "$expected_clean" "$actual_clean" >&2 || true
+        failures=$((failures + 1))
+    fi
+    rm -f "$actual_file" "$actual_clean" "$expected_clean"
+}
+
+# DOT-aware variant of assert_stdout_equals_file that strips host-dependent
+# absolute paths from TU-style unique_key attributes before the byte compare.
+# Use only for goldens whose backing fixture relies on on-disk source files
+# and therefore produces unique_keys containing the resolved working
+# directory; goldens for synthetic /project/... fixtures keep using the
+# stricter assert_stdout_equals_file.
+assert_dot_stdout_equals_file() {
+    local description="$1" expected_file="$2"
+    shift 2
+    local actual_file actual_clean expected_clean
+    actual_file="$(mktemp)"
+    actual_clean="$(mktemp)"
+    expected_clean="$(mktemp)"
+    "$@" >"$actual_file" 2>/dev/null || true
+    normalize_dot_unique_keys "$actual_file" | tr -d '\r' > "$actual_clean"
     normalize_line_endings "$expected_file" > "$expected_clean"
     if cmp -s "$actual_clean" "$expected_clean"; then
         echo "PASS: $description"
@@ -396,16 +432,38 @@ assert_exit "M5 dot analyze default top exits 0" 0 "$BINARY" analyze --compile-c
 assert_stdout_equals_file "M5 dot analyze default top matches golden" tests/e2e/testdata/m5/dot-reports/analyze_default_top.dot \
     "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --format dot
 
-assert_exit "M5 dot analyze top-truncated exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --format dot --top 1
-assert_stdout_equals_file "M5 dot analyze top-truncated matches golden" tests/e2e/testdata/m5/dot-reports/analyze_top_truncated.dot \
-    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --format dot --top 1
+# truncating_compile_db wires up real on-disk source files so the include
+# resolver actually produces hotspots; that lets these cases exercise
+# context_limit truncation end-to-end. Unique_keys embed the resolved
+# working-directory path and are normalized to "HOSTPATH" via
+# assert_dot_stdout_equals_file. Simultaneous binding of node_limit and
+# edge_limit is covered by tests/adapters/test_dot_report_adapter.cpp; the
+# e2e goldens here label both budgets but only context_limit is binding.
+assert_exit "M5 dot analyze top-truncated exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format dot --top 1
+assert_dot_stdout_equals_file "M5 dot analyze top-truncated matches golden" tests/e2e/testdata/m5/dot-reports/analyze_top_truncated.dot \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format dot --top 1
 
-assert_exit "M5 dot analyze budget-truncated exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/many_tu_compile_db/compile_commands.json --format dot --top 5
-assert_stdout_equals_file "M5 dot analyze budget-truncated matches golden" tests/e2e/testdata/m5/dot-reports/analyze_budget_truncated.dot \
-    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/many_tu_compile_db/compile_commands.json --format dot --top 5
+assert_exit "M5 dot analyze budget-truncated exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format dot --top 6
+assert_dot_stdout_equals_file "M5 dot analyze budget-truncated matches golden" tests/e2e/testdata/m5/dot-reports/analyze_budget_truncated.dot \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format dot --top 6
 
+# Backslash-as-path-separator behaviour is platform-dependent: on POSIX, a
+# literal backslash is part of the source filename and ends up DOT-escaped as
+# `back\\slash.cpp`; on Windows the path resolver normalizes \ → / before
+# reaching the DOT adapter, so the rendered path becomes `back/slash.cpp`.
+# Per-platform golden keeps both branches host-stable; backslash escaping is
+# additionally exercised in tests/adapters/test_dot_report_adapter.cpp via a
+# unit-test-controlled string.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        analyze_escaping_golden="tests/e2e/testdata/m5/dot-reports/analyze_escaping_windows.dot"
+        ;;
+    *)
+        analyze_escaping_golden="tests/e2e/testdata/m5/dot-reports/analyze_escaping.dot"
+        ;;
+esac
 assert_exit "M5 dot analyze escaping exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/escape_paths/compile_commands.json --format dot --top 5
-assert_stdout_equals_file "M5 dot analyze escaping matches golden" tests/e2e/testdata/m5/dot-reports/analyze_escaping.dot \
+assert_stdout_equals_file "M5 dot analyze escaping matches golden" "$analyze_escaping_golden" \
     "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/escape_paths/compile_commands.json --format dot --top 5
 
 # M5 DOT goldens (impact)
@@ -415,8 +473,20 @@ assert_stdout_equals_file "M5 dot impact compile-db direct matches golden" tests
 assert_dot_stdout_validates "M5 dot impact compile-db direct validates against syntax gate" \
     "$BINARY" impact --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --changed-file /project/src/app.cpp --format dot
 
+# The file API-only impact case differs by platform because /project/...
+# is absolute on POSIX (kept verbatim) but treated as relative to the file
+# API source root on Windows (where it resolves to "src/main.cpp"). Two
+# goldens keep both branches byte-stable.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        impact_file_api_only_golden="tests/e2e/testdata/m5/dot-reports/impact_file_api_only_windows.dot"
+        ;;
+    *)
+        impact_file_api_only_golden="tests/e2e/testdata/m5/dot-reports/impact_file_api_only.dot"
+        ;;
+esac
 assert_exit "M5 dot impact file-api-only exits 0" 0 "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file /project/src/main.cpp --format dot
-assert_stdout_equals_file "M5 dot impact file-api-only matches golden" tests/e2e/testdata/m5/dot-reports/impact_file_api_only.dot \
+assert_stdout_equals_file "M5 dot impact file-api-only matches golden" "$impact_file_api_only_golden" \
     "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file /project/src/main.cpp --format dot
 
 assert_exit "M5 dot impact mixed-input exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file /project/src/main.cpp --format dot
@@ -426,6 +496,50 @@ assert_stdout_equals_file "M5 dot impact mixed-input matches golden" tests/e2e/t
 assert_exit "M5 dot impact budget untruncated exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m5/dot-fixtures/many_tu_compile_db/compile_commands.json --changed-file /project/src/file_00.cpp --format dot
 assert_stdout_equals_file "M5 dot impact budget untruncated matches golden" tests/e2e/testdata/m5/dot-reports/impact_budget_untruncated.dot \
     "$BINARY" impact --compile-commands tests/e2e/testdata/m5/dot-fixtures/many_tu_compile_db/compile_commands.json --changed-file /project/src/file_00.cpp --format dot
+
+# Heuristic-edge style coverage: m2/basic_project transitively includes
+# common/shared.h via common/config.h, so impact reports it as 3 heuristic
+# TUs and the changed_file→TU edges carry style="dashed".
+assert_exit "M5 dot impact heuristic edges exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --format dot
+assert_dot_stdout_equals_file "M5 dot impact heuristic edges matches golden" tests/e2e/testdata/m5/dot-reports/impact_heuristic_edges.dot \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --format dot
+assert_dot_stdout_validates "M5 dot impact heuristic edges validates against syntax gate" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --format dot
+
+# Heuristic-edge variant with File API targets exercises both
+# changed_file→heuristic_tu and heuristic_tu→target dashed edges plus the
+# target node impact="heuristic" attribute.
+assert_exit "M5 dot impact heuristic targets exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --changed-file include/common/shared.h --format dot
+assert_dot_stdout_equals_file "M5 dot impact heuristic targets matches golden" tests/e2e/testdata/m5/dot-reports/impact_heuristic_targets.dot \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --changed-file include/common/shared.h --format dot
+
+# Real impact node_limit truncation: 110 source files all #include common.h,
+# so impact --changed-file include/common.h yields 110 heuristic TUs and
+# changed_file + 99 TUs hit node_limit=100 (1 changed_file + 100 TU caps the
+# graph, the 100th onwards drop and graph_truncated=true).
+assert_exit "M5 dot impact truncated exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m5/dot-fixtures/impact_truncating_compile_db/compile_commands.json --changed-file include/common.h --format dot
+assert_dot_stdout_equals_file "M5 dot impact truncated matches golden" tests/e2e/testdata/m5/dot-reports/impact_truncated.dot \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m5/dot-fixtures/impact_truncating_compile_db/compile_commands.json --changed-file include/common.h --format dot
+assert_dot_stdout_validates "M5 dot impact truncated validates against syntax gate" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m5/dot-fixtures/impact_truncating_compile_db/compile_commands.json --changed-file include/common.h --format dot
+
+# cli_absolute provenance for --changed-file --format dot: m2/basic_project
+# does not match the absolute path, so the graph contains only the
+# changed_file node. Mirrors the JSON impact_absolute / impact_absolute_windows
+# split — Linux passes /project/..., Windows requires C:/project/... .
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        dot_impact_absolute_arg="C:/project/src/app/main.cpp"
+        dot_impact_absolute_golden="tests/e2e/testdata/m5/dot-reports/impact_absolute_windows.dot"
+        ;;
+    *)
+        dot_impact_absolute_arg="/project/src/app/main.cpp"
+        dot_impact_absolute_golden="tests/e2e/testdata/m5/dot-reports/impact_absolute.dot"
+        ;;
+esac
+assert_exit "M5 dot impact absolute changed-file exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file "$dot_impact_absolute_arg" --format dot
+assert_stdout_equals_file "M5 dot impact absolute changed-file matches golden" "$dot_impact_absolute_golden" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file "$dot_impact_absolute_arg" --format dot
 
 # Markdown file output
 report_dir="$(native_path "$(mktemp -d)")"
