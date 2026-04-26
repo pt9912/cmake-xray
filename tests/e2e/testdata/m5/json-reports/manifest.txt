@@ -7,3 +7,17 @@
 #
 # Tranche A creates this manifest empty; Tranche C adds the analyze and
 # impact goldens that lock the JSON contract in place.
+
+# Analyze goldens
+analyze_compile_db_only.json
+analyze_file_api_build_dir.json
+analyze_file_api_reply_dir.json
+analyze_mixed_input.json
+analyze_ranking_truncated.json
+analyze_hotspot_truncated.json
+
+# Impact goldens
+impact_compile_db_relative.json
+impact_file_api_relative.json
+impact_mixed_input_relative.json
+impact_absolute.json

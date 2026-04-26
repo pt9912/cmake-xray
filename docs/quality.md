@@ -123,8 +123,11 @@ Der maschinenlesbare JSON-Reportvertrag ist in [docs/report-json.md](./report-js
 
 - **Schema-Wohlgeformtheit und Manifest-Paritaet** ueber `tests/validate_json_schema.py`. Der CTest-Eintrag heisst `report_json_schema_validation`. Er prueft die Schema-Datei gegen das Draft-2020-12-Meta-Schema, gleicht das Manifest unter `tests/e2e/testdata/m5/json-reports/manifest.txt` mit dem Verzeichnis ab und validiert jedes gelistete Golden gegen das Schema.
 - **Formatversionskonsistenz** im Test `report-json schema format_version const matches kReportFormatVersion` in `xray_tests`. Er parst das Schema und prueft den `$defs/FormatVersion/const`-Wert gegen die C++-Konstante `xray::hexagon::model::kReportFormatVersion` in `src/hexagon/model/report_format_version.h`.
+- **JSON-Adapter-Vertrag** in `xray_tests` ueber `tests/adapters/test_json_report_adapter.cpp`. Pflichtfelder, Typen, Enums, Nullability, Sortier-Tie-Breaker, `include_analysis_heuristic`-Beide-Werte und der Schema-Fail-Fall fuer `unresolved_file_api_source_root` sind dort verbindlich abgesichert.
+- **JSON-Wiring** in `xray_tests` ueber `tests/adapters/test_port_wiring.cpp`. Tests stellen sicher, dass `--format json` ueber Composition Root und CLI bis zum `JsonReportAdapter` durchverdrahtet ist und nicht in den Console-Fallback faellt.
+- **Binary-E2E-Goldens** ueber das CTest-Ziel `e2e_binary` und `tests/e2e/run_e2e.sh`. Die echte `cmake-xray`-Binary erzeugt JSON-Berichte fuer Compile-Database-only-, File-API-only- (Build-Dir und Reply-Dir), Mixed-Input-, Truncated- und Hotspot-Truncated-Faelle bei `analyze`, sowie fuer `compile_database_directory`-, `file_api_source_root`-, Mixed-Prioritaet- und `cli_absolute`-Faelle bei `impact`. Die Ausgaben werden byte-stabil gegen die Goldens unter `tests/e2e/testdata/m5/json-reports/` verglichen.
 
-Beide Gates sind verpflichtend und werden ueber alle in diesem Dokument aufgefuehrten Docker-Pfade sowie ueber die nativen Build-Matrizen in `.github/workflows/build.yml` und `.github/workflows/release.yml` ausgefuehrt.
+Diese Gates sind verpflichtend und werden ueber alle in diesem Dokument aufgefuehrten Docker-Pfade sowie ueber die nativen Build-Matrizen in `.github/workflows/build.yml` und `.github/workflows/release.yml` ausgefuehrt.
 
 ### Validator-Abhaengigkeit
 

@@ -1,0 +1,48 @@
+{
+  "format": "cmake-xray.impact",
+  "format_version": 1,
+  "report_type": "impact",
+  "inputs": {
+    "compile_database_path": null,
+    "compile_database_source": null,
+    "cmake_file_api_path": "tests/e2e/testdata/m4/file_api_only/build",
+    "cmake_file_api_resolved_path": "tests/e2e/testdata/m4/file_api_only/build/.cmake/api/v1/reply",
+    "cmake_file_api_source": "cli",
+    "changed_file": "src/main.cpp",
+    "changed_file_source": "file_api_source_root"
+  },
+  "summary": {
+    "affected_translation_unit_count": 1,
+    "direct_translation_unit_count": 1,
+    "heuristic_translation_unit_count": 0,
+    "classification": "direct",
+    "observation_source": "derived",
+    "target_metadata": "loaded",
+    "affected_target_count": 1,
+    "direct_target_count": 1,
+    "heuristic_target_count": 0
+  },
+  "directly_affected_translation_units": [
+    {
+      "reference": {
+        "source_path": "src/main.cpp",
+        "directory": "build"
+      },
+      "targets": [
+        {
+          "display_name": "app",
+          "type": "EXECUTABLE"
+        }
+      ]
+    }
+  ],
+  "heuristically_affected_translation_units": [],
+  "directly_affected_targets": [
+    {
+      "display_name": "app",
+      "type": "EXECUTABLE"
+    }
+  ],
+  "heuristically_affected_targets": [],
+  "diagnostics": []
+}

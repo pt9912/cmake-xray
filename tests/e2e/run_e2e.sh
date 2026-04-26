@@ -215,6 +215,48 @@ assert_exit "M4 mixed-path direct impact markdown exits 0" 0 "$BINARY" impact --
 assert_stdout_equals_file "M4 mixed-path direct impact markdown matches golden" tests/e2e/testdata/m4/partial_targets/impact-direct-markdown.md \
     "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file /project/src/main.cpp --format markdown
 
+# M5 JSON goldens (analyze)
+assert_exit "M5 json analyze compile-db-only exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format json
+assert_stdout_equals_file "M5 json analyze compile-db-only matches golden" tests/e2e/testdata/m5/json-reports/analyze_compile_db_only.json \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format json
+
+assert_exit "M5 json analyze file-api build-dir exits 0" 0 "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --format json
+assert_stdout_equals_file "M5 json analyze file-api build-dir matches golden" tests/e2e/testdata/m5/json-reports/analyze_file_api_build_dir.json \
+    "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --format json
+
+assert_exit "M5 json analyze file-api reply-dir exits 0" 0 "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/file_api_only/build/.cmake/api/v1/reply --format json
+assert_stdout_equals_file "M5 json analyze file-api reply-dir matches golden" tests/e2e/testdata/m5/json-reports/analyze_file_api_reply_dir.json \
+    "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/file_api_only/build/.cmake/api/v1/reply --format json
+
+assert_exit "M5 json analyze mixed-input exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --format json
+assert_stdout_equals_file "M5 json analyze mixed-input matches golden" tests/e2e/testdata/m5/json-reports/analyze_mixed_input.json \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --format json
+
+assert_exit "M5 json analyze ranking truncated exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format json --top 2
+assert_stdout_equals_file "M5 json analyze ranking truncated matches golden" tests/e2e/testdata/m5/json-reports/analyze_ranking_truncated.json \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format json --top 2
+
+assert_exit "M5 json analyze hotspot truncated exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format json --top 1
+assert_stdout_equals_file "M5 json analyze hotspot truncated matches golden" tests/e2e/testdata/m5/json-reports/analyze_hotspot_truncated.json \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format json --top 1
+
+# M5 JSON goldens (impact)
+assert_exit "M5 json impact compile-db relative exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --format json
+assert_stdout_equals_file "M5 json impact compile-db relative matches golden" tests/e2e/testdata/m5/json-reports/impact_compile_db_relative.json \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --format json
+
+assert_exit "M5 json impact file-api relative exits 0" 0 "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file src/main.cpp --format json
+assert_stdout_equals_file "M5 json impact file-api relative matches golden" tests/e2e/testdata/m5/json-reports/impact_file_api_relative.json \
+    "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file src/main.cpp --format json
+
+assert_exit "M5 json impact mixed-input relative exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --changed-file include/common/shared.h --format json
+assert_stdout_equals_file "M5 json impact mixed-input relative matches golden" tests/e2e/testdata/m5/json-reports/impact_mixed_input_relative.json \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --changed-file include/common/shared.h --format json
+
+assert_exit "M5 json impact absolute changed-file exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file /project/src/app/main.cpp --format json
+assert_stdout_equals_file "M5 json impact absolute changed-file matches golden" tests/e2e/testdata/m5/json-reports/impact_absolute.json \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file /project/src/app/main.cpp --format json
+
 # Markdown file output
 report_dir="$(native_path "$(mktemp -d)")"
 report_file="$report_dir/analyze.md"

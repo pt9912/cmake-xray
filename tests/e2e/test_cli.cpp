@@ -442,6 +442,69 @@ TEST_CASE_FIXTURE(CliFixture, "json analyze format is implemented and emits JSON
     CHECK(out.str().find("recognized but not implemented") == std::string::npos);
 }
 
+TEST_CASE_FIXTURE(CliFixture, "json impact format is implemented and emits JSON") {
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--format", "json"}) ==
+            ExitCode::success);
+    CHECK(err.str().empty());
+    CHECK(out.str().find("\"format\": \"cmake-xray.impact\"") != std::string::npos);
+    CHECK(out.str().find("\"changed_file_source\": \"compile_database_directory\"") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "json analyze --output writes the file with empty streams") {
+    const TemporaryDirectory temp_dir;
+    const auto target = temp_dir.path() / "report.json";
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+                 "json", "--output", target.string().c_str()}) == ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().empty());
+    REQUIRE(std::filesystem::is_regular_file(target));
+    const auto contents = read_text_file(target);
+    CHECK(contents.find("\"format\": \"cmake-xray.analysis\"") != std::string::npos);
+    CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
+}
+
+TEST_CASE_FIXTURE(CliFixture, "json impact --output writes the file with empty streams") {
+    const TemporaryDirectory temp_dir;
+    const auto target = temp_dir.path() / "impact.json";
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--format", "json", "--output",
+                 target.string().c_str()}) == ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().empty());
+    REQUIRE(std::filesystem::is_regular_file(target));
+    const auto contents = read_text_file(target);
+    CHECK(contents.find("\"format\": \"cmake-xray.impact\"") != std::string::npos);
+    CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
+}
+
+TEST_CASE_FIXTURE(CliFixture, "json analyze with non-existent compile-commands emits text error") {
+    const TemporaryDirectory temp_dir;
+    const auto missing = (temp_dir.path() / "no-such.json").string();
+    CHECK(run({"analyze", "--compile-commands", missing.c_str(), "--format", "json"}) !=
+          ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    // Errors stay text-on-stderr in JSON v1; no JSON error object is emitted.
+    CHECK(err.str().find("\"format\":") == std::string::npos);
+    CHECK(err.str().find("\"error\":") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "json analyze with invalid file api reply emits text error") {
+    const TemporaryDirectory temp_dir;
+    const auto bad = (temp_dir.path() / "no-reply").string();
+    CHECK(run({"analyze", "--cmake-file-api", bad.c_str(), "--format", "json"}) !=
+          ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    CHECK(err.str().find("\"format\":") == std::string::npos);
+    CHECK(err.str().find("\"error\":") == std::string::npos);
+}
+
 TEST_CASE_FIXTURE(CliFixture, "dot format is recognized but not implemented") {
     CHECK(run({"analyze", "--compile-commands",
                fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",

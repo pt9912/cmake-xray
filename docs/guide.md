@@ -200,6 +200,32 @@ cmake-xray analyze \
   --top 20
 ```
 
+JSON-Ausgabe fuer Tooling und CI:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --format json \
+  --top 20
+```
+
+JSON ist der maschinenlesbare Reportvertrag von `cmake-xray`. Format,
+Pflichtfelder, Enum-Werte und Sortierregeln sind in
+[docs/report-json.md](./report-json.md) verbindlich dokumentiert; das JSON
+Schema in [docs/report-json.schema.json](./report-json.schema.json)
+unterstuetzt automatisierte Validierung. Erfolgreiche `--format json`-Aufrufe
+schreiben ausschliesslich gueltiges JSON nach `stdout`; Fehler bleiben
+Textmeldungen auf `stderr`. Mit `--output <path>` schreibt der Adapter den
+Bericht atomar in eine Datei und laesst `stdout` und `stderr` leer:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --format json \
+  --output build/reports/analyze.json \
+  --top 20
+```
+
 ## Impact-Analyse
 
 Die Impact-Analyse schaetzt ab, welche Translation Units von einer geaenderten
@@ -223,6 +249,22 @@ cmake-xray impact \
   --format markdown \
   --output build/reports/impact.md
 ```
+
+JSON-Ausgabe fuer Tooling und CI:
+
+```bash
+cmake-xray impact \
+  --compile-commands build/compile_commands.json \
+  --changed-file include/common/config.h \
+  --format json \
+  --output build/reports/impact.json
+```
+
+Der Impact-JSON-Bericht enthaelt zusaetzlich `inputs.changed_file` und
+`inputs.changed_file_source`. Erlaubte Werte fuer `changed_file_source` sind
+`compile_database_directory`, `file_api_source_root` und `cli_absolute`. Der
+M5-Vertrag begrenzt Impact-Listen nicht ueber `--top`; alle betroffenen
+Translation Units und Targets aus dem Modell werden ausgegeben.
 
 ## Reports lesen
 

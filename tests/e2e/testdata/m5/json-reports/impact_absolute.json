@@ -1,0 +1,43 @@
+{
+  "format": "cmake-xray.impact",
+  "format_version": 1,
+  "report_type": "impact",
+  "inputs": {
+    "compile_database_path": "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+    "compile_database_source": "cli",
+    "cmake_file_api_path": null,
+    "cmake_file_api_resolved_path": null,
+    "cmake_file_api_source": null,
+    "changed_file": "/project/src/app/main.cpp",
+    "changed_file_source": "cli_absolute"
+  },
+  "summary": {
+    "affected_translation_unit_count": 0,
+    "direct_translation_unit_count": 0,
+    "heuristic_translation_unit_count": 0,
+    "classification": "uncertain",
+    "observation_source": "exact",
+    "target_metadata": "not_loaded",
+    "affected_target_count": 0,
+    "direct_target_count": 0,
+    "heuristic_target_count": 0
+  },
+  "directly_affected_translation_units": [],
+  "heuristically_affected_translation_units": [],
+  "directly_affected_targets": [],
+  "heuristically_affected_targets": [],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "message": "could not resolve include \"generated/version.h\" from src/app/main.cpp"
+    },
+    {
+      "severity": "note",
+      "message": "conditional or generated includes may be missing from this result"
+    },
+    {
+      "severity": "note",
+      "message": "the file was not present in the loaded compile database or resolved include graph"
+    }
+  ]
+}
