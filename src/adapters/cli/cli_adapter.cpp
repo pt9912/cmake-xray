@@ -60,7 +60,7 @@ ReportFormat parse_report_format(std::string_view value) {
 
 bool format_is_implemented(ReportFormat format) {
     return format == ReportFormat::console || format == ReportFormat::markdown ||
-           format == ReportFormat::json;
+           format == ReportFormat::json || format == ReportFormat::dot;
 }
 
 constexpr std::size_t max_displayed_entry_errors = 20;
@@ -69,7 +69,7 @@ void configure_report_options(CLI::App& command, CliOptions& options) {
     command
         .add_option("--format", options.report_format,
                     "Output format: console, markdown, html, json, or dot. "
-                    "html and dot are recognized but not implemented in this build. "
+                    "html is recognized but not implemented in this build. "
                     "markdown without --output is written to stdout")
         ->default_val(options.report_format)
         ->check(CLI::IsMember({"console", "markdown", "html", "json", "dot"}));
@@ -180,8 +180,8 @@ std::optional<int> validate_format_availability(const CliOptions& options, std::
     if (format_is_implemented(format)) return std::nullopt;
     err << "error: --format " << options.report_format
         << " is recognized but not implemented in this build\n";
-    err << "hint: --format console, --format markdown, and --format json are "
-           "available in this build\n";
+    err << "hint: --format console, --format markdown, --format json, and "
+           "--format dot are available in this build\n";
     return ExitCode::cli_usage_error;
 }
 
@@ -190,8 +190,8 @@ std::optional<int> validate_report_options(const CliOptions& options, std::ostre
         return std::nullopt;
     }
     err << "error: --output is not supported with --format console\n";
-    err << "hint: use an artifact-oriented format such as --format markdown or "
-           "--format json when writing a report file\n";
+    err << "hint: use an artifact-oriented format such as --format markdown, "
+           "--format json or --format dot when writing a report file\n";
     return ExitCode::cli_usage_error;
 }
 
@@ -206,6 +206,7 @@ const xray::hexagon::ports::driving::GenerateReportPort& select_report_port(
     ReportFormat format, const ReportPorts& report_ports) {
     if (format == ReportFormat::markdown) return report_ports.markdown;
     if (format == ReportFormat::json) return report_ports.json;
+    if (format == ReportFormat::dot) return report_ports.dot;
     return report_ports.console;
 }
 

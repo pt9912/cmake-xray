@@ -5,6 +5,7 @@
 #include "adapters/input/compile_commands_json_adapter.h"
 #include "adapters/input/source_parsing_include_adapter.h"
 #include "adapters/output/console_report_adapter.h"
+#include "adapters/output/dot_report_adapter.h"
 #include "adapters/output/json_report_adapter.h"
 #include "adapters/output/markdown_report_adapter.h"
 #include "hexagon/services/impact_analyzer.h"
@@ -18,6 +19,7 @@ int main(int argc, char* argv[]) {
     const xray::adapters::output::ConsoleReportAdapter console_report_adapter;
     const xray::adapters::output::MarkdownReportAdapter markdown_report_adapter;
     const xray::adapters::output::JsonReportAdapter json_report_adapter;
+    const xray::adapters::output::DotReportAdapter dot_report_adapter;
     const xray::hexagon::services::ProjectAnalyzer project_analyzer{
         compile_database_adapter, include_resolver_adapter, file_api_adapter};
     const xray::hexagon::services::ImpactAnalyzer impact_analyzer{
@@ -28,9 +30,12 @@ int main(int argc, char* argv[]) {
         markdown_report_adapter};
     const xray::hexagon::services::ReportGenerator json_report_generator{
         json_report_adapter};
+    const xray::hexagon::services::ReportGenerator dot_report_generator{
+        dot_report_adapter};
     const xray::adapters::cli::ReportPorts report_ports{console_report_generator,
                                                         markdown_report_generator,
-                                                        json_report_generator};
+                                                        json_report_generator,
+                                                        dot_report_generator};
     const xray::adapters::cli::CliAdapter cli_adapter{
         project_analyzer, impact_analyzer, report_ports};
 
