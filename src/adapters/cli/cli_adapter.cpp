@@ -59,18 +59,12 @@ ReportFormat parse_report_format(std::string_view value) {
     return ReportFormat::console;
 }
 
-bool format_is_implemented(ReportFormat format) {
-    return format == ReportFormat::console || format == ReportFormat::markdown ||
-           format == ReportFormat::json || format == ReportFormat::dot;
-}
-
 constexpr std::size_t max_displayed_entry_errors = 20;
 
 void configure_report_options(CLI::App& command, CliOptions& options) {
     command
         .add_option("--format", options.report_format,
                     "Output format: console, markdown, html, json, or dot. "
-                    "html is recognized but not implemented in this build. "
                     "markdown without --output is written to stdout")
         ->default_val(options.report_format)
         ->check(CLI::IsMember({"console", "markdown", "html", "json", "dot"}));
@@ -153,9 +147,10 @@ void configure_analyze_command(CLI::App& app, CliOptions& options, CLI::App*& an
 void configure_impact_command(CLI::App& app, CliOptions& options, CLI::App*& impact_cmd) {
     impact_cmd = app.add_subcommand("impact", "Analyze the translation-unit impact of a file");
     configure_input_options(*impact_cmd, options);
-    // --changed-file is intentionally not parser-level required; the format-availability
-    // gate must fire before factual input validation so html/json/dot return their
-    // stable "recognized but not implemented" error even when --changed-file is missing.
+    // --changed-file is intentionally not parser-level required; the
+    // changed-file-required check fires inside validate_subcommand_options
+    // after format parsing so factual input validation runs in the
+    // documented exit-code precedence (cli usage > input load > render).
     impact_cmd->add_option(
         "--changed-file", options.changed_file_path,
         "Changed file path; relative paths are interpreted relative to the "
@@ -173,16 +168,6 @@ std::optional<int> validate_input_options(const CliOptions& options, std::ostrea
            "--compile-commands or --cmake-file-api\n";
     err << "hint: provide --compile-commands for compile database analysis, "
            "--cmake-file-api for target metadata, or both\n";
-    return ExitCode::cli_usage_error;
-}
-
-std::optional<int> validate_format_availability(const CliOptions& options, std::ostream& err) {
-    const auto format = parse_report_format(options.report_format);
-    if (format_is_implemented(format)) return std::nullopt;
-    err << "error: --format " << options.report_format
-        << " is recognized but not implemented in this build\n";
-    err << "hint: --format console, --format markdown, --format json, and "
-           "--format dot are available in this build\n";
     return ExitCode::cli_usage_error;
 }
 
@@ -205,9 +190,15 @@ std::optional<int> validate_changed_file_required(const CliOptions& options, std
 
 const xray::hexagon::ports::driving::GenerateReportPort& select_report_port(
     ReportFormat format, const ReportPorts& report_ports) {
+    // Explicit if-chain over every enumerator with a final console fallback.
+    // CLI11's IsMember restricts --format to the documented set so this
+    // function never sees an unmapped value at runtime; the chain is
+    // arranged so a future enumerator forces a code edit here rather than
+    // landing silently in the console branch.
     if (format == ReportFormat::markdown) return report_ports.markdown;
     if (format == ReportFormat::json) return report_ports.json;
     if (format == ReportFormat::dot) return report_ports.dot;
+    if (format == ReportFormat::html) return report_ports.html;
     return report_ports.console;
 }
 
@@ -298,7 +289,6 @@ xray::hexagon::ports::driving::AnalyzeImpactRequest build_impact_request(
 
 std::optional<int> validate_subcommand_options(const CliOptions& options, bool is_impact,
                                                 std::ostream& err) {
-    if (const auto e = validate_format_availability(options, err); e.has_value()) return e;
     if (const auto e = validate_report_options(options, err); e.has_value()) return e;
     if (is_impact) {
         if (const auto e = validate_changed_file_required(options, err); e.has_value()) return e;

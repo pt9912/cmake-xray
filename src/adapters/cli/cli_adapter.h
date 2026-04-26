@@ -17,6 +17,7 @@ struct ReportPorts {
     const xray::hexagon::ports::driving::GenerateReportPort& markdown;
     const xray::hexagon::ports::driving::GenerateReportPort& json;
     const xray::hexagon::ports::driving::GenerateReportPort& dot;
+    const xray::hexagon::ports::driving::GenerateReportPort& html;
 };
 
 struct CliOutputStreams {
