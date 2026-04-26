@@ -154,6 +154,12 @@ def parse_args() -> argparse.Namespace:
                         help="Manifest file listing each golden by name.")
     parser.add_argument("--syntax-only", action="store_true",
                         help="Validate the schema only; skip goldens and manifest.")
+    parser.add_argument("--validate-file", type=Path, action="append",
+                        default=[],
+                        help="Validate a single JSON file against the schema "
+                             "and exit. Repeatable. Used by run_e2e.sh to "
+                             "schema-check the binary's actually produced "
+                             "JSON output.")
     return parser.parse_args()
 
 
@@ -169,9 +175,18 @@ def main() -> int:
     if args.syntax_only:
         return EXIT_OK
 
+    if args.validate_file:
+        validator = draft_validator_cls(schema)
+        final_status = EXIT_OK
+        for path in args.validate_file:
+            status = validate_report(validator, path, validation_error_cls)
+            if status != EXIT_OK:
+                final_status = status
+        return final_status
+
     if args.reports_dir is None or args.manifest is None:
         sys.stderr.write("error: --reports-dir and --manifest are required unless "
-                         "--syntax-only is set\n")
+                         "--syntax-only or --validate-file is set\n")
         return EXIT_ENVIRONMENT_ERROR
 
     manifest_entries = parse_manifest(args.manifest)

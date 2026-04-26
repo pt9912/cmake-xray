@@ -1,0 +1,4 @@
+# Source for tests/requirements-json-schema.txt.
+# Run pip-compile --generate-hashes against this file to regenerate the
+# hash-pinned lockfile.
+jsonschema>=4.10,<5

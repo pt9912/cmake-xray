@@ -1,6 +1,6 @@
 # cmake-xray
 
-`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Der aktuelle Stand `v1.1.0` liest `compile_commands.json` und optional CMake-File-API-Reply-Daten, rankt auffaellige Translation Units, leitet heuristische Include-Hotspots ab, analysiert Datei-Impact und zeigt betroffene Targets an. Ergebnisse werden als Konsolen- oder Markdown-Report ausgegeben.
+`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Der aktuelle Stand `v1.1.0` liest `compile_commands.json` und optional CMake-File-API-Reply-Daten, rankt auffaellige Translation Units, leitet heuristische Include-Hotspots ab, analysiert Datei-Impact und zeigt betroffene Targets an. Ergebnisse werden als Konsolen-, Markdown- oder JSON-Report ausgegeben; der JSON-Report folgt dem versionierten Vertrag in [docs/report-json.md](./docs/report-json.md).
 
 ## Status
 
@@ -14,8 +14,9 @@ Der Funktionsumfang umfasst:
 - Target-Zuordnung: Translation Units werden ihren CMake-Targets zugeordnet (`[targets: app, core]`)
 - targetbezogene Impact-Ausgabe mit `direct` und `heuristic` Evidenzklassen
 - Analyse auch ohne `compile_commands.json`, wenn File-API-Daten ausreichen
-- Report-Ausgabe als `console` oder `markdown`
-- atomisches Schreiben von Markdown-Reports via `--output`
+- Report-Ausgabe als `console`, `markdown` oder `json`
+- atomisches Schreiben von Markdown- und JSON-Reports via `--output`
+- versionierter, schemavalidierter JSON-Reportvertrag fuer Tooling und CI
 - versionierte Golden-Files, Referenzdaten und Performance-Baselines
 - Docker-basierte Test-, Coverage- und Quality-Gates
 
@@ -25,7 +26,7 @@ Nicht Ziel des aktuellen Stands sind insbesondere:
 - vollstaendige CMake-Interpretation
 - transitive Target-Graph-Analyse
 - IDE-Integration
-- HTML-, JSON- oder DOT-Export
+- HTML- und DOT-Export
 
 ## Voraussetzungen
 
