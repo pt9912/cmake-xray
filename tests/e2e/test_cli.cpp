@@ -505,6 +505,19 @@ TEST_CASE_FIXTURE(CliFixture, "json analyze with invalid file api reply emits te
     CHECK(err.str().find("\"error\":") == std::string::npos);
 }
 
+TEST_CASE_FIXTURE(CliFixture,
+                  "json analyze with invalid compile-commands JSON emits text error") {
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("invalid_syntax/compile_commands.json").c_str(), "--format",
+               "json"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    // No JSON error object: stderr stays plain text with no JSON-shaped fields.
+    CHECK(err.str().find("\"format\":") == std::string::npos);
+    CHECK(err.str().find("\"error\":") == std::string::npos);
+    CHECK(err.str().find("\"format_version\":") == std::string::npos);
+}
+
 TEST_CASE_FIXTURE(CliFixture, "dot format is recognized but not implemented") {
     CHECK(run({"analyze", "--compile-commands",
                fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
@@ -957,6 +970,52 @@ TEST_CASE("emit_rendered_report writes nothing to stdout when the renderer repor
     CHECK(exit_code == ExitCode::unexpected_error);
     CHECK(out.str().empty());
     CHECK(err.str().find("render error path") != std::string::npos);
+}
+
+TEST_CASE("json --output keeps the existing target file when the JSON renderer throws") {
+    // Plan AP 1.2 Tranche C step 4: a CliReportRenderer doppelgaenger drives
+    // the JSON write path; the existing target file must stay untouched, no
+    // partial JSON appears on stdout, and the CLI exits with a non-zero code
+    // and a text error on stderr.
+    AnalysisResult success_result;
+    success_result.application = xray::hexagon::model::application_info();
+    success_result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    const StubAnalyzeProjectPort analyze_project_port{success_result};
+    const StubAnalyzeImpactPort analyze_impact_port;
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const ThrowingGenerateReportPort json_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port};
+    const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
+
+    const TemporaryDirectory temp_dir;
+    const auto target = temp_dir.path() / "report.json";
+    {
+        std::ofstream existing(target);
+        existing << "{\"untouched\": true}";
+    }
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const auto target_path = target.string();
+    const char* argv[] = {"cmake-xray",
+                          "analyze",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--format",
+                          "json",
+                          "--output",
+                          target_path.c_str()};
+    const int exit_code = cli.run(8, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("cannot render report") != std::string::npos);
+    CHECK(err.str().find("analysis report exception") != std::string::npos);
+    CHECK(read_text_file(target) == "{\"untouched\": true}");
+    CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
 }
 
 TEST_CASE("emit_rendered_report streams content to stdout when output_path is empty") {

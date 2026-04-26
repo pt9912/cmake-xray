@@ -253,9 +253,24 @@ assert_exit "M5 json impact mixed-input relative exits 0" 0 "$BINARY" impact --c
 assert_stdout_equals_file "M5 json impact mixed-input relative matches golden" tests/e2e/testdata/m5/json-reports/impact_mixed_input_relative.json \
     "$BINARY" impact --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --changed-file include/common/shared.h --format json
 
-assert_exit "M5 json impact absolute changed-file exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file /project/src/app/main.cpp --format json
-assert_stdout_equals_file "M5 json impact absolute changed-file matches golden" tests/e2e/testdata/m5/json-reports/impact_absolute.json \
-    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file /project/src/app/main.cpp --format json
+# cli_absolute provenance requires --changed-file to be absolute. POSIX
+# accepts /project/... as absolute; Windows requires a drive letter
+# (C:/project/...). Use a per-platform argument and a per-platform golden so
+# both hosts exercise the cli_absolute branch byte-stably; the goldens differ
+# only in the changed_file string under inputs.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        impact_absolute_arg="C:/project/src/app/main.cpp"
+        impact_absolute_golden="tests/e2e/testdata/m5/json-reports/impact_absolute_windows.json"
+        ;;
+    *)
+        impact_absolute_arg="/project/src/app/main.cpp"
+        impact_absolute_golden="tests/e2e/testdata/m5/json-reports/impact_absolute.json"
+        ;;
+esac
+assert_exit "M5 json impact absolute changed-file exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file "$impact_absolute_arg" --format json
+assert_stdout_equals_file "M5 json impact absolute changed-file matches golden" "$impact_absolute_golden" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file "$impact_absolute_arg" --format json
 
 # Markdown file output
 report_dir="$(native_path "$(mktemp -d)")"

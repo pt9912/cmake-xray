@@ -21,3 +21,4 @@ impact_compile_db_relative.json
 impact_file_api_relative.json
 impact_mixed_input_relative.json
 impact_absolute.json
+impact_absolute_windows.json
