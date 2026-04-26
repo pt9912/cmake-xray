@@ -548,7 +548,7 @@ Kein produktiver CLI-Adapter; Vertrag, Hilfsfunktionen und Testskelett.
 2. `tests/adapters/test_dot_report_adapter.cpp` mit ersten Escape-, ID- und Attributlexik-Tests anlegen.
 3. DOT-Escaping- und Label-Hilfen file-local im Adapter implementieren; Extraktion in eine output-interne Utility ist in AP 1.3 nicht vorgesehen.
 4. Budgetberechnung fuer Analyze und Impact als klein testbare Funktionen implementieren.
-5. CTest-Gates fuer DOT-Goldens einhaengen, aber exklusiv pro Umgebung registrieren: Docker registriert nur `dot_graphviz_validation`, native CI registriert nur `dot_python_validation`. Beide Gates teilen das Manifest; der Python-Pfad nutzt native_path-Konvertierung in Bash-Aufrufen.
+5. CTest-Gates fuer DOT-Goldens einhaengen. Beide Gates teilen das Manifest; der Python-Pfad nutzt native_path-Konvertierung in Bash-Aufrufen. `dot_report_python_validation` ist immer registriert (nur Standardbibliothek noetig), `dot_report_graphviz_validation` zusaetzlich, sobald `dot` zur Build-Zeit auffindbar ist. Im Docker-Stage laufen beide Gates komplementaer (belt + suspenders); native CI ohne installierten Graphviz fuehrt nur den Python-Pfad aus. Die urspruengliche "exklusiv pro Umgebung"-Idee wurde zugunsten dieser robusteren Variante verworfen.
 6. `Dockerfile`-Bootstrap fuer den `graphviz`-apt-Layer im `toolchain`-Stage einbauen.
 7. `.github/workflows/test.yml`, `.github/workflows/build.yml` und `.github/workflows/release.yml` so anpassen, dass `dot_python_validation` in nativen CTest-Laeufen verfuegbar ist; der Validator nutzt nur die Python-Standardbibliothek und benoetigt keinen Dependency-Install.
 8. Manifest `tests/e2e/testdata/m5/dot-reports/manifest.txt` anlegen, in Tranche A noch ohne vollstaendige CLI-Goldens.

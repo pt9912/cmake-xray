@@ -1,6 +1,6 @@
 # DOT Report Contract
 
-> **Implementierungsstand:** AP M5-1.3 Tranche A liefert Vertrag, Helfer und Syntax-Gates plus minimales Knoten-Rendering (Graph-Header, Translation-Unit-Knoten in `analyze`, Changed-File-Knoten in `impact`). Hotspots, Targets, Kanten, Kontext-Expansion und Budget-Enforcement folgen in Tranche B; produktive CLI-Verdrahtung von `--format dot` ebenfalls in Tranche B. Bis dahin lehnt die CLI `--format dot` weiterhin als `recognized but not implemented in this build` ab.
+> **Implementierungsstand:** AP M5-1.3 ist abgeschlossen. Tranche A (Vertrag, Helfer, Syntax-Gates), Tranche B (Adapter, Wiring, produktive CLI-Freischaltung von `--format dot`), Tranche C (E2E-Goldens, CLI-/Stream-/Fehler-Tests, Nutzerdoku) und die optionale Tranche D (Plattformpfad-, ASCII-Escape-, Multi-Format-Graphviz- und Budget-Boundary-Haertung) sind gemerged und durch die Docker-Gates (`test`, `coverage-check`, `quality-check`, `runtime`) abgesichert. `cmake-xray analyze --format dot` und `cmake-xray impact --format dot` sind produktiv nutzbar; die CLI lehnt `--format dot` nicht mehr als `recognized but not implemented` ab.
 
 ## Zweck
 

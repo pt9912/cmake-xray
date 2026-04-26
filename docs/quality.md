@@ -141,22 +141,23 @@ CTest schlaegt mit konkreter Installationsanweisung fehl, wenn das Paket nicht i
 
 ## DOT-Reportvertrag
 
-Der visualisierungsorientierte DOT-Reportvertrag ist in [docs/report-dot.md](./report-dot.md) dokumentiert. Drei CTest-Gates sichern den Vertrag:
+Der visualisierungsorientierte DOT-Reportvertrag ist in [docs/report-dot.md](./report-dot.md) dokumentiert. Folgende CTest-Gates sichern den Vertrag:
 
 - **DOT-Python-Syntax-Gate** ueber `tests/validate_dot_reports.py`. Der CTest-Eintrag heisst `dot_report_python_validation`. Er prueft Pflichtattribute (`xray_report_type`, `format_version`, `graph_node_limit`, `graph_edge_limit`, `graph_truncated`), digraph-Namensvertrag, balancierte Klammern und Quoted-String-Escape-Regeln. Der Validator nutzt nur die Python-Standardbibliothek und laeuft auf jedem Host mit `python3` auf dem PATH.
 - **DOT-Graphviz-Syntax-Gate** ueber `dot -Tsvg`. Der CTest-Eintrag heisst `dot_report_graphviz_validation` und ist nur registriert, wenn `dot` zur Build-Zeit auffindbar ist. Im Docker-Stage ist `graphviz` per apt installiert; native CI-Matrizen ohne Graphviz fuehren nur den Python-Pfad aus.
+- **DOT-Graphviz-Format-Gates (Tranche D)** ueber `dot -Tplain` und `dot -Tjson`. Die CTest-Eintraege heissen `dot_report_graphviz_validation_plain` und `dot_report_graphviz_validation_json`. Sie nutzen denselben Wrapper und dasselbe Manifest wie das `-Tsvg`-Gate und stellen sicher, dass die Goldens in mehreren Graphviz-Output-Backends parseable bleiben.
 - **Negativtests** `dot_report_python_validation_rejects_broken_dot` und `dot_report_graphviz_validation_rejects_broken_dot` (Letzterer nur mit Graphviz vorhanden) verifizieren via `WILL_FAIL`, dass beide Gates ein bewusst kaputtes DOT-Fixture unter `tests/adapters/fixtures/dot_broken_sample.dot` ablehnen. So bleibt nachweisbar, dass die Gates echte Verstoesse erkennen und nicht still passen.
-- **DOT-Adapter-Vertrag** in `xray_tests` ueber `tests/adapters/test_dot_report_adapter.cpp`. Pflichtattribute, Statement-/Attribut-Reihenfolge, Escape-Regeln, Label-Truncation (48 Zeichen, Middle-Truncation), Tie-Breaker, Budget-Truncation und der Direct-vs-Heuristic-Style-Vertrag sind dort verbindlich abgesichert.
+- **DOT-Adapter-Vertrag** in `xray_tests` ueber `tests/adapters/test_dot_report_adapter.cpp`. Pflichtattribute, Statement-/Attribut-Reihenfolge, Escape-Regeln (inkl. ASCII-Control-Bytes 0x00..0x1F, DEL und Pfadtrenner-Sonderfaelle wie Windows-Drives und UNC), Label-Truncation (48 Zeichen, Middle-Truncation), Tie-Breaker, Budget-Truncation, Budget-Boundary-Werte (`compute_analyze_budget` an top=0/3/4/5/6) und der Direct-vs-Heuristic-Style-Vertrag sind dort verbindlich abgesichert.
 - **DOT-Wiring** in `xray_tests` ueber `tests/adapters/test_port_wiring.cpp`. Tests stellen sicher, dass `--format dot` ueber Composition Root und CLI bis zum `DotReportAdapter` durchverdrahtet ist und nicht in den Console-Fallback faellt.
-- **Binary-E2E-Goldens** ueber das CTest-Ziel `e2e_binary` und `tests/e2e/run_e2e.sh`. Die echte `cmake-xray`-Binary erzeugt DOT-Berichte fuer Compile-Database-only-, File-API-only-, Mixed-Input-, Default-Top-, Top-Truncated-, Budget-Truncated- und Escaping-Faelle bei `analyze`, sowie fuer Compile-Database-, File-API-, Mixed-Input- und Budget-Faelle bei `impact`. Die Ausgaben werden byte-stabil gegen die Goldens unter `tests/e2e/testdata/m5/dot-reports/` verglichen und zusaetzlich live ueber `tests/validate_dot_reports.py` validiert.
+- **Binary-E2E-Goldens** ueber das CTest-Ziel `e2e_binary` und `tests/e2e/run_e2e.sh`. Die echte `cmake-xray`-Binary erzeugt DOT-Berichte fuer Compile-Database-only-, File-API-only-, Mixed-Input-, Default-Top-, Top-Truncated-, Budget-Truncated- und Escaping-Faelle bei `analyze`, sowie fuer Compile-Database-, File-API-, Mixed-Input-, Budget-Untruncated-, Heuristic-Edge-, Heuristic-Target-, Truncated- und Absolute-changed-file-Faelle bei `impact`. Jede dieser DOT-Ausgaben wird byte-stabil gegen ein Golden unter `tests/e2e/testdata/m5/dot-reports/` verglichen und zusaetzlich live ueber `tests/validate_dot_reports.py` validiert; per-Plattform-Goldens (`*_windows.dot`) decken host-divergente Pfadsemantik ab.
 
 ### Bootstrap-Matrix
 
 | Umgebung | Aktiver Pfad | Installation |
 |---|---|---|
-| Docker (`test`, `coverage`, `coverage-check`) | beide Gates | `graphviz` und `python3-jsonschema` via apt im `toolchain`-Stage |
-| Native CI Linux/macOS/Windows (`build.yml`, `release.yml`) | Python-Fallback | reine Standardbibliothek; `python3` durch `setup-python` |
-| Lokale Entwicklung | beide Gates, falls Graphviz installiert | Graphviz via System-Paketmanager |
+| Docker (`test`, `coverage`, `coverage-check`) | Python-Gate plus alle Graphviz-Format-Gates (`-Tsvg`, `-Tplain`, `-Tjson`) | `graphviz` und `python3-jsonschema` via apt im `toolchain`-Stage |
+| Native CI Linux/macOS/Windows (`build.yml`, `release.yml`) | Python-Gate (Graphviz-Gates nur bei lokal installiertem `dot`) | reine Standardbibliothek; `python3` durch `setup-python` |
+| Lokale Entwicklung | Python-Gate plus Graphviz-Format-Gates, falls `dot` installiert | Graphviz via System-Paketmanager |
 
 CTest selbst installiert keine Systempakete und greift nicht auf das Netzwerk zu. Installation von Graphviz oder Python-Abhaengigkeiten erfolgt ausschliesslich im Bootstrap-Schritt der jeweiligen Umgebung.
 

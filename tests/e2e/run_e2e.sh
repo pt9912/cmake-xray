@@ -431,6 +431,8 @@ assert_dot_stdout_validates "M5 dot analyze mixed-input validates against syntax
 assert_exit "M5 dot analyze default top exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --format dot
 assert_stdout_equals_file "M5 dot analyze default top matches golden" tests/e2e/testdata/m5/dot-reports/analyze_default_top.dot \
     "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --format dot
+assert_dot_stdout_validates "M5 dot analyze default top validates against syntax gate" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --format dot
 
 # truncating_compile_db wires up real on-disk source files so the include
 # resolver actually produces hotspots; that lets these cases exercise
@@ -442,9 +444,13 @@ assert_stdout_equals_file "M5 dot analyze default top matches golden" tests/e2e/
 assert_exit "M5 dot analyze top-truncated exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format dot --top 1
 assert_dot_stdout_equals_file "M5 dot analyze top-truncated matches golden" tests/e2e/testdata/m5/dot-reports/analyze_top_truncated.dot \
     "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format dot --top 1
+assert_dot_stdout_validates "M5 dot analyze top-truncated validates against syntax gate" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format dot --top 1
 
 assert_exit "M5 dot analyze budget-truncated exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format dot --top 6
 assert_dot_stdout_equals_file "M5 dot analyze budget-truncated matches golden" tests/e2e/testdata/m5/dot-reports/analyze_budget_truncated.dot \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format dot --top 6
+assert_dot_stdout_validates "M5 dot analyze budget-truncated validates against syntax gate" \
     "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format dot --top 6
 
 # Backslash-as-path-separator behaviour is platform-dependent: on POSIX, a
@@ -464,6 +470,8 @@ case "$(uname -s)" in
 esac
 assert_exit "M5 dot analyze escaping exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/escape_paths/compile_commands.json --format dot --top 5
 assert_stdout_equals_file "M5 dot analyze escaping matches golden" "$analyze_escaping_golden" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/escape_paths/compile_commands.json --format dot --top 5
+assert_dot_stdout_validates "M5 dot analyze escaping validates against syntax gate" \
     "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/escape_paths/compile_commands.json --format dot --top 5
 
 # M5 DOT goldens (impact)
@@ -488,13 +496,19 @@ esac
 assert_exit "M5 dot impact file-api-only exits 0" 0 "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file /project/src/main.cpp --format dot
 assert_stdout_equals_file "M5 dot impact file-api-only matches golden" "$impact_file_api_only_golden" \
     "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file /project/src/main.cpp --format dot
+assert_dot_stdout_validates "M5 dot impact file-api-only validates against syntax gate" \
+    "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file /project/src/main.cpp --format dot
 
 assert_exit "M5 dot impact mixed-input exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file /project/src/main.cpp --format dot
 assert_stdout_equals_file "M5 dot impact mixed-input matches golden" tests/e2e/testdata/m5/dot-reports/impact_mixed_input.dot \
     "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file /project/src/main.cpp --format dot
+assert_dot_stdout_validates "M5 dot impact mixed-input validates against syntax gate" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m4/partial_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/partial_targets/build --changed-file /project/src/main.cpp --format dot
 
 assert_exit "M5 dot impact budget untruncated exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m5/dot-fixtures/many_tu_compile_db/compile_commands.json --changed-file /project/src/file_00.cpp --format dot
 assert_stdout_equals_file "M5 dot impact budget untruncated matches golden" tests/e2e/testdata/m5/dot-reports/impact_budget_untruncated.dot \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m5/dot-fixtures/many_tu_compile_db/compile_commands.json --changed-file /project/src/file_00.cpp --format dot
+assert_dot_stdout_validates "M5 dot impact budget untruncated validates against syntax gate" \
     "$BINARY" impact --compile-commands tests/e2e/testdata/m5/dot-fixtures/many_tu_compile_db/compile_commands.json --changed-file /project/src/file_00.cpp --format dot
 
 # Heuristic-edge style coverage: m2/basic_project transitively includes
@@ -511,6 +525,8 @@ assert_dot_stdout_validates "M5 dot impact heuristic edges validates against syn
 # target node impact="heuristic" attribute.
 assert_exit "M5 dot impact heuristic targets exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --changed-file include/common/shared.h --format dot
 assert_dot_stdout_equals_file "M5 dot impact heuristic targets matches golden" tests/e2e/testdata/m5/dot-reports/impact_heuristic_targets.dot \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --changed-file include/common/shared.h --format dot
+assert_dot_stdout_validates "M5 dot impact heuristic targets validates against syntax gate" \
     "$BINARY" impact --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --changed-file include/common/shared.h --format dot
 
 # Real impact node_limit truncation: 110 source files all #include common.h,
@@ -539,6 +555,8 @@ case "$(uname -s)" in
 esac
 assert_exit "M5 dot impact absolute changed-file exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file "$dot_impact_absolute_arg" --format dot
 assert_stdout_equals_file "M5 dot impact absolute changed-file matches golden" "$dot_impact_absolute_golden" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file "$dot_impact_absolute_arg" --format dot
+assert_dot_stdout_validates "M5 dot impact absolute changed-file validates against syntax gate" \
     "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file "$dot_impact_absolute_arg" --format dot
 
 # Markdown file output
