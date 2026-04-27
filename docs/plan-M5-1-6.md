@@ -132,6 +132,9 @@ Top-Level-Verhalten:
 - Versioniertes Tagging mit der veroeffentlichten Version.
 - Fuer regelmaessige Releases zusaetzlich ein `latest`-Tag.
 - `latest` ist fuer Vorabversionen nicht zulässig.
+- `latest` wird erst nach erfolgreichem Push und Manifest-Check des versionierten Tags aktualisiert.
+- Re-Runs muessen idempotent sein: Wenn der versionierte Tag bereits existiert, muss dessen Digest mit dem neu gebauten Image uebereinstimmen; bei Abweichung bricht der Workflow vor `latest` und vor oeffentlicher Release-Publikation ab.
+- Ein bestehendes `latest` darf nur auf den Digest des validierten regulaeren Versions-Tags zeigen. Eine Abweichung muss als auditierbarer Update von altem Digest auf neuen Digest protokolliert werden; fuer denselben Release-Tag darf `latest` nicht auf einen anderen Digest umgeschrieben werden.
 - Runtime-Container muss mindestens `cmake-xray --help` ohne externe Toolchain ausfuehren koennen.
 - Image-Publish nur nach erfolgreicher Artefakt- und Smoke-Validierung.
 
@@ -159,6 +162,9 @@ Top-Level-Verhalten:
 - Bei Fehlschlag nach teils erfolgtem Publish:
   - GHCR-Tag-/Digest-Cleanup ist dokumentiert.
   - Retag-/Nachpublish-Verhalten ist definiert.
+  - GitHub-Release-Cleanup ist dokumentiert, inklusive Ruecknahme eines oeffentlichen Releases in einen nicht oeffentlichen Zustand, Loeschung oder Korrektur bereits hochgeladener Assets, Pruefsummen und Release Notes.
+  - Wenn der Fehler nach `release_published` auftritt, muss der Runbook-Pfad explizit festlegen, ob der Release geloescht, als fehlerhaft markiert oder durch einen Nachpublish korrigiert wird; die Entscheidung und die betroffenen Asset-/Digest-IDs muessen auditierbar bleiben.
+  - Automatische Recovery darf keine neuen Assets oder Tags veroeffentlichen, bevor sie den aktuellen GitHub-Release-Zustand und die GHCR-Digests erneut gelesen und gegen die erwartete Publish-Sequenz validiert hat.
 
 ## Release-Dry-Run-Vertrag
 
