@@ -118,13 +118,18 @@ Top-Level-Verhalten:
   - Lizenz-/Hinweisdatei(en),
   - kurze Nutzungshinweise.
 - SHA-256-Checksumme ist Teil des Releasepakets.
+- SHA-256 wird vor jedem Publish als Gate verifiziert: Archiv entpacken, erwartete Datei pruefen, Checksumme gegen das erzeugte Archiv und die enthaltene Binary beziehungsweise die dokumentierte Binary-Checksumme abgleichen.
 - Artefakte duerfen nicht an lokale Build-Pfade koppeln.
+- Das Archiv muss reproduzierbar gebaut werden: feste Dateireihenfolge, stabile Pfadnamen ohne lokale Workspace-Praefixe, numerische Owner-/Group-Werte, stabile Dateimodi und ein einheitlicher Zeitstempel aus dem Release-Kontext, zum Beispiel `SOURCE_DATE_EPOCH`.
+- Ein Release-Smoke baut das Linux-Archiv zweimal aus gleichem Commit und gleicher Version und vergleicht mindestens Archiv-Checksumme, entpackte Dateiliste, Dateimodi und Binary-Checksumme.
 
 ### Veroeffentlichungskette
 
 - Build- und Verify-Jobs duerfen `release`-Artefakte erzeugen und smoke testen.
 - Veroeffentlichen in Registry oder GitHub Release darf nur im finalen Release-Job nach allen Gates erfolgen.
 - Kein vorzeitiges GHCR-Push aus Verify/Pre-Release-Schritten.
+- Der finale Release-Job darf nur die offiziell freigegebenen Artefakte publishen: Linux-Archiv, zugehoerige Checksums und OCI-Image. macOS-/Windows-Preview-Artefakte duerfen nicht als normale GitHub-Release-Assets hochgeladen und nicht in GHCR-Tags oder OCI-Manifeste aufgenommen werden.
+- Falls Preview-Artefakte fuer macOS/Windows explizit erlaubt werden, brauchen sie ein eigenes Preview-Gate, eigene Asset-Namen mit `preview`-Marker und eine Release-Notes-Markierung; ohne dieses Gate bricht der Upload ab.
 
 ### OCI-Image-Vertrag
 
@@ -144,6 +149,8 @@ Top-Level-Verhalten:
   - deaktiviert, oder
   - als experimentelle Preview-Artefakte benannt.
 - Wenn ausgegeben, muessen sie in Release Notes und Doku klar als nicht vollstaendig freigegeben stehen.
+- Deaktivierte oder nicht explizit preview-freigegebene macOS-/Windows-Jobs duerfen keine GitHub-Release-Assets, keine Checksums und keine OCI-Beitraege erzeugen.
+- Preview-Artefakte duerfen nur nach erfolgreichem Preview-Gate als separat markierte Assets erscheinen und bleiben ausserhalb des offiziellen M5-Releaseumfangs.
 
 ## Draft-/Release-Reihenfolge
 
@@ -162,14 +169,16 @@ Top-Level-Verhalten:
 - Bei Fehlschlag nach teils erfolgtem Publish:
   - GHCR-Tag-/Digest-Cleanup ist dokumentiert.
   - Retag-/Nachpublish-Verhalten ist definiert.
-  - GitHub-Release-Cleanup ist dokumentiert, inklusive Ruecknahme eines oeffentlichen Releases in einen nicht oeffentlichen Zustand, Loeschung oder Korrektur bereits hochgeladener Assets, Pruefsummen und Release Notes.
-  - Wenn der Fehler nach `release_published` auftritt, muss der Runbook-Pfad explizit festlegen, ob der Release geloescht, als fehlerhaft markiert oder durch einen Nachpublish korrigiert wird; die Entscheidung und die betroffenen Asset-/Digest-IDs muessen auditierbar bleiben.
+  - GitHub-Release-Cleanup ist dokumentiert, inklusive Assets, Pruefsummen und Release Notes.
+  - Ein bereits oeffentlicher GitHub Release wird nicht abstrakt "nicht oeffentlich" gemacht. Der Runbook-Pfad muss einen konkreten API-Pfad waehlen: entweder oeffentlichen Release inklusive Assets loeschen und aus validierten Artefakten neu erstellen, oder Release sichtbar als fehlerhaft markieren und einen dokumentierten Nachpublish mit korrigierten Assets ausfuehren.
+  - Wenn der Fehler nach `release_published` auftritt, muss der Runbook-Pfad explizit festlegen, ob geloescht und neu veroeffentlicht oder sichtbar nachpubliziert wird; die Entscheidung und die betroffenen Release-, Asset- und Digest-IDs muessen auditierbar bleiben.
   - Automatische Recovery darf keine neuen Assets oder Tags veroeffentlichen, bevor sie den aktuellen GitHub-Release-Zustand und die GHCR-Digests erneut gelesen und gegen die erwartete Publish-Sequenz validiert hat.
 
 ## Release-Dry-Run-Vertrag
 
 - `scripts/release-dry-run.sh` ruft Publish-Operationen auf Fake-Publisher.
 - Testziel ist lokal (keine externen Plattformen notwendig).
+- Dry-Run setzt explizit eine `DRY_RUN`-/`FAKE_PUBLISHER`-Betriebsart und verweigert echte GitHub- oder Registry-Endpunkte. Fehlende Fake-Endpunkte, echte GHCR-/GitHub-URLs oder echte Publish-Tokens fuehren zum Abbruch.
 - Assertions sind explizit:
   - `draft_release_created`
   - danach `oci_image_published`
@@ -180,6 +189,8 @@ Top-Level-Verhalten:
 ## Smoke- und Validierungstests
 
 - Smoke der entpackten Linux-Archive (Vollstaendigkeit/Startfaehigkeit).
+- Reproduzierbarkeits-Smoke fuer Linux-Archiv mit zwei Builds aus gleichem Commit und gleicher Version.
+- Checksum-Gate vor Publish: SHA-256-Dateien muessen zu den erzeugten Artefakten passen und der entpackte Binary-Smoke muss aus genau diesem geprueften Archiv laufen.
 - Smoke der OCI-Ausfuehrung (`cmake-xray --help`, `--version`).
 - Tag-Validierung gegen erlaubte Muster und Regressionsfaelle.
 - Versionskonsistenz-Check zwischen:
