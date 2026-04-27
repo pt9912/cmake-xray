@@ -13,24 +13,51 @@ permissions:
   contents: read
 
 jobs:
+  # The three Docker pipelines run as parallel matrix jobs instead of three
+  # sequential `docker build` invocations in one job. Each job derives
+  # everything it needs from the shared `toolchain` stage; docker/build-push-
+  # action keeps that layer in the GitHub-Actions cache (scope=cmake-xray-
+  # toolchain), so subsequent pipelines reuse the apt-install cost. Total
+  # wall-clock time drops from sum(test, coverage, quality) to max of the
+  # three after the first cached run.
   docker-test:
-    name: Docker Tests
+    name: Docker ${{ matrix.label }}
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Test
+            target: test
+          - label: Coverage
+            target: coverage-check
+          - label: Quality
+            target: quality-check
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Build test image
-        run: docker build --target test -t cmake-xray:test .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
+      # Coverage matrix entry: build the coverage report stage first so the
+      # extraction below has access to gcovr's output, then derive the
+      # threshold check from the cached coverage layer.
       - name: Build coverage report image
-        run: docker build --target coverage -t cmake-xray:coverage .
-
-      - name: Build quality report image
-        run: docker build --target quality -t cmake-xray:quality .
+        if: matrix.target == 'coverage-check'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: coverage
+          tags: cmake-xray:coverage
+          load: true
+          cache-from: type=gha,scope=cmake-xray-toolchain
+          cache-to: type=gha,scope=cmake-xray-toolchain,mode=max
 
       - name: Extract coverage reports
+        if: matrix.target == 'coverage-check'
         run: |
           mkdir -p artifacts/coverage
           container_id=$(docker create cmake-xray:coverage)
@@ -39,15 +66,31 @@ jobs:
           docker rm "$container_id"
 
       - name: Show coverage summary
+        if: matrix.target == 'coverage-check'
         run: cat artifacts/coverage/summary.txt
 
       - name: Upload coverage artifacts
+        if: matrix.target == 'coverage-check'
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: artifacts/coverage
 
+      # Quality matrix entry: build the quality report stage first, extract
+      # the four report files, then derive the threshold check.
+      - name: Build quality report image
+        if: matrix.target == 'quality-check'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: quality
+          tags: cmake-xray:quality
+          load: true
+          cache-from: type=gha,scope=cmake-xray-toolchain
+          cache-to: type=gha,scope=cmake-xray-toolchain,mode=max
+
       - name: Extract quality reports
+        if: matrix.target == 'quality-check'
         run: |
           mkdir -p artifacts/quality
           container_id=$(docker create cmake-xray:quality)
@@ -58,16 +101,27 @@ jobs:
           docker rm "$container_id"
 
       - name: Show quality summary
+        if: matrix.target == 'quality-check'
         run: cat artifacts/quality/summary.txt
 
       - name: Upload quality artifacts
+        if: matrix.target == 'quality-check'
         uses: actions/upload-artifact@v7
         with:
           name: quality-report
           path: artifacts/quality
 
-      - name: Enforce coverage threshold
-        run: docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
-
-      - name: Enforce quality thresholds
-        run: docker build --target quality-check -t cmake-xray:quality-check .
+      # Final gate per matrix entry. test runs ctest; coverage-check enforces
+      # the 100% line coverage threshold; quality-check enforces clang-tidy 0
+      # / lizard 0. All three reuse the cached toolchain layer.
+      - name: Build ${{ matrix.target }} gate
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          tags: cmake-xray:${{ matrix.target }}
+          load: true
+          build-args: |
+            ${{ matrix.target == 'coverage-check' && 'XRAY_COVERAGE_THRESHOLD=100' || '' }}
+          cache-from: type=gha,scope=cmake-xray-toolchain
+          cache-to: type=gha,scope=cmake-xray-toolchain,mode=max

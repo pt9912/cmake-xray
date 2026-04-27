@@ -20,7 +20,13 @@ cmake -S "${workspace}" -B "${build_dir}" \
 find "${workspace}/src" -type f -name '*.cpp' | sort > "${report_dir}/clang-tidy-inputs.txt"
 
 if [ -s "${report_dir}/clang-tidy-inputs.txt" ]; then
-    xargs -r -a "${report_dir}/clang-tidy-inputs.txt" \
+    # Parallelise clang-tidy across every src/ .cpp file: one invocation per
+    # file, up to nproc in flight. The summary-counting grep below relies on
+    # `:line:col: (warning|error):` which is robust to xargs' inter-process
+    # output interleaving, so we do not need GNU parallel or run-clang-tidy
+    # for stable counting.
+    parallel_jobs="$(nproc 2>/dev/null || echo 1)"
+    xargs -r -P "${parallel_jobs}" -n 1 -a "${report_dir}/clang-tidy-inputs.txt" \
         clang-tidy \
         -p "${build_dir}" \
         --config-file="${workspace}/.clang-tidy" \

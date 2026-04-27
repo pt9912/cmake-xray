@@ -2,25 +2,38 @@ FROM ubuntu:24.04 AS toolchain
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# python3 + python3-jsonschema satisfy the AP M5-1.2 Tranche A validator gate
-# (tests/validate_json_schema.py). graphviz satisfies the AP M5-1.3 Tranche
-# A DOT syntax gate (`dot -Tsvg`); the Python fallback in
-# tests/validate_dot_reports.py uses only stdlib and runs alongside the
-# Graphviz path. The test and coverage stages run ctest, which invokes both
-# validators; the toolchain layer keeps the dependencies centrally installed
-# for every derived stage that runs ctest. The runtime stage uses a separate
-# base image and is not affected.
+# Single consolidated apt-install for every CI tool the derived stages need:
+#   - build-essential / cmake: build all three pipelines (test, coverage,
+#     quality) on the same toolchain layer.
+#   - graphviz / python3-jsonschema: AP M5-1.2 / 1.3 / 1.4 validator gates
+#     (validate_json_schema.py, validate_dot_reports.py via dot -Tsvg/-Tplain
+#     /-Tjson, validate_html_reports.py).
+#   - gcovr: AP M5 coverage gate. Previously installed only in the coverage
+#     stage; consolidating here lets every derived stage hit the same cached
+#     toolchain layer.
+#   - clang / clang-tidy / python3-pip + lizard: AP M5 quality gate.
+#     Previously installed in quality-base; same caching argument applies.
+# pip-installed lizard pin matches the previous quality-base contract; the
+# --break-system-packages flag is required on Ubuntu 24.04 because system
+# Python is marked PEP 668 externally-managed.
+# The runtime stage uses a separate base image and is not affected by any
+# of these tools.
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         build-essential \
         ca-certificates \
+        clang \
+        clang-tidy \
         cmake \
+        gcovr \
         git \
         graphviz \
         libcap-dev \
         python3 \
         python3-jsonschema \
+        python3-pip \
         time \
+    && python3 -m pip install --no-cache-dir --break-system-packages lizard==1.22.0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
@@ -29,25 +42,24 @@ FROM toolchain AS build
 
 COPY . .
 
+# Parallel cmake build keeps the build stage from serialising compilation;
+# previously each stage spent ~2 min on sequential cc1plus invocations.
 RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
-    && cmake --build build
+    && cmake --build build --parallel
 
 FROM build AS test
 
-RUN cd build && ctest --output-on-failure
+# CTest runs the doctest suite plus the validator gates; -j parallelises the
+# entries so e2e_binary (~3 s) overlaps with the Python validators.
+RUN cd build && ctest --output-on-failure --parallel
 
 FROM toolchain AS coverage
-
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends \
-        gcovr \
-    && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 
 RUN cmake -B build-coverage -DCMAKE_BUILD_TYPE=Debug -DXRAY_ENABLE_COVERAGE=ON \
-    && cmake --build build-coverage \
-    && ctest --test-dir build-coverage --output-on-failure \
+    && cmake --build build-coverage --parallel \
+    && ctest --test-dir build-coverage --output-on-failure --parallel \
     && mkdir -p build-coverage/coverage \
     && gcovr \
         --root /workspace \
@@ -88,15 +100,6 @@ ARG XRAY_CLANG_TIDY_MAX_FINDINGS=0
 ARG XRAY_LIZARD_MAX_CCN=10
 ARG XRAY_LIZARD_MAX_LENGTH=50
 ARG XRAY_LIZARD_MAX_PARAMETERS=5
-
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends \
-        clang \
-        clang-tidy \
-        python3 \
-        python3-pip \
-    && python3 -m pip install --no-cache-dir --break-system-packages lizard==1.22.0 \
-    && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 
