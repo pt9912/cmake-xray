@@ -1,0 +1,45 @@
+# Manifest of cmake-xray Console Quiet/Verbose goldens (AP M5-1.5).
+#
+# Each non-comment, non-blank line names exactly one .txt golden file in
+# this directory. Tranche B.1 adds the Quiet goldens; Tranche B.2 will add
+# the Verbose goldens (analyze-verbose, impact-verbose plus targets/file-
+# api-only/empty variants). tests/validate_verbosity_reports.py checks
+# that the manifest and the directory contents stay in lockstep.
+#
+# Coverage of the B.1 Console-Vertrag (plan ~213-237):
+#   Quiet Analyze pflichtzeilen + optional `target metadata` line
+#                            -> console-analyze-quiet-targets.txt
+#                               (m4/with_targets, --top 2: ranking truncated,
+#                                 hotspot list complete, target_metadata=loaded,
+#                                 has-warnings)
+#   Quiet Analyze with `target metadata` line omitted
+#                            -> console-analyze-quiet.txt
+#                               (m3/report_project, --top 2, no targets)
+#   Quiet Analyze "lean" run (target_metadata omitted, hotspots empty)
+#                            -> console-analyze-quiet-empty.txt
+#                               (m5/dot-fixtures/multi_tu_compile_db, default
+#                                 --top, 0 hotspots; covers the optional
+#                                 `target metadata` omission together with the
+#                                 zero-hotspot ranking)
+#   Quiet Impact pflichtzeilen + heuristic + no targets
+#                            -> console-impact-quiet.txt
+#                               (m3/report_impact_header + include/common/config.h)
+#   Quiet Impact + heuristic + populated targets
+#                            -> console-impact-quiet-targets.txt
+#                               (m4/with_targets + include/common/shared.h)
+#   Quiet Impact "empty" run (zero affected TUs and zero affected targets)
+#                            -> console-impact-quiet-empty.txt
+#                               (m4/file_api_only + include/common/shared.h)
+#
+# Optional-line omission for `warnings: present` is covered by the
+# adapter unit test (tests/adapters/test_cli_console_renderers.cpp) using
+# synthetic Result objects, because include-resolver warnings make a
+# warning-free run hard to reproduce from existing fixtures.
+
+# Quiet goldens
+console-analyze-quiet.txt
+console-analyze-quiet-targets.txt
+console-analyze-quiet-empty.txt
+console-impact-quiet.txt
+console-impact-quiet-targets.txt
+console-impact-quiet-empty.txt

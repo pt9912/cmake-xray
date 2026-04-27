@@ -1,0 +1,8 @@
+impact: ok
+changed file: include/common/shared.h
+affected translation units: 0
+classification: heuristic
+affected targets: 0
+diagnostics: 4
+target metadata: loaded
+warnings: present

@@ -5,6 +5,7 @@ add_executable(
     hexagon/test_project_analyzer.cpp
     hexagon/test_impact_analyzer.cpp
     adapters/test_atomic_report_writer.cpp
+    adapters/test_cli_console_renderers.cpp
     adapters/test_port_wiring.cpp
     adapters/test_cmake_file_api_adapter.cpp
     adapters/test_compile_commands_json.cpp
@@ -170,3 +171,23 @@ add_test(
             --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/html_broken_sample.html
 )
 set_tests_properties(html_structure_validation_rejects_broken_html PROPERTIES WILL_FAIL TRUE)
+
+# AP M5-1.5 Tranche B.1: verbosity manifest/parity gate. Stdlib-only Python
+# validator covering the same manifest+content invariants the JSON/DOT/HTML
+# gates already enforce: every Quiet/Verbose golden begins with a documented
+# anchor line, ends with a single newline, and contains no doubled newlines.
+add_test(
+    NAME verbosity_manifest_validation
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_verbosity_reports.py
+            --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/verbosity
+            --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/verbosity/manifest.txt
+)
+
+add_test(
+    NAME verbosity_manifest_validation_rejects_broken_sample
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_verbosity_reports.py
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/console_quiet_broken_sample.txt
+)
+set_tests_properties(verbosity_manifest_validation_rejects_broken_sample PROPERTIES WILL_FAIL TRUE)

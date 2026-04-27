@@ -1,0 +1,6 @@
+analysis: ok
+translation units: 4
+ranking entries shown: 4 of 4
+include hotspots shown: 0 of 0
+diagnostics: 1
+warnings: present

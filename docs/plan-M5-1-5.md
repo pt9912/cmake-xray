@@ -560,17 +560,17 @@ Sub-Risiken B.1:
 
 Definition of Done Sub-Tranche B.1:
 
-- [ ] `cli_console_renderers.{h,cpp}` exportiert `render_console_quiet_analyze` und `render_console_quiet_impact`.
-- [ ] Console Quiet Analyze erzeugt nur die dokumentierten Pflicht- und Optionalzeilen.
-- [ ] Console Quiet Impact erzeugt nur die dokumentierten Pflicht- und Optionalzeilen.
-- [ ] Quiet beachtet `top_limit` ausschliesslich fuer die `shown`-Zaehler.
-- [ ] Quiet-Goldens decken Targets-aktiv, Targets-leer, Hotspots-aktiv und Hotspots-leer ab.
-- [ ] Console-Quiet-Render-Preconditions lehnen `inputs.changed_file == std::nullopt` und `inputs.changed_file_source == unresolved_file_api_source_root` mit Textfehler auf `stderr` und nonzero Exit ab.
-- [ ] `--quiet --format console --output <path>` liefert weiterhin den zweizeiligen Console-Usage-Fehler aus Tranche A, unveraendert.
-- [ ] Stdout endet mit genau einem Newline, kein Doppel-Newline.
-- [ ] Manifest-/Verzeichnis-Paritaet ist durch einen stdlib-only Validator (Negativtest inklusive) abgesichert.
-- [ ] Bestehende Console-Normalmodus-Goldens bleiben unveraendert.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `cli_console_renderers.{h,cpp}` exportiert `render_console_quiet_analyze` und `render_console_quiet_impact`.
+- [x] Console Quiet Analyze erzeugt nur die dokumentierten Pflicht- und Optionalzeilen.
+- [x] Console Quiet Impact erzeugt nur die dokumentierten Pflicht- und Optionalzeilen.
+- [x] Quiet beachtet `top_limit` ausschliesslich fuer die `shown`-Zaehler.
+- [x] Quiet-Goldens decken Targets-aktiv, Targets-leer, Hotspots-aktiv und Hotspots-leer ab.
+- [x] Console-Quiet-Render-Preconditions lehnen `inputs.changed_file == std::nullopt` und `inputs.changed_file_source == unresolved_file_api_source_root` mit Textfehler auf `stderr` und nonzero Exit ab.
+- [x] `--quiet --format console --output <path>` liefert weiterhin den zweizeiligen Console-Usage-Fehler aus Tranche A, unveraendert.
+- [x] Stdout endet mit genau einem Newline, kein Doppel-Newline.
+- [x] Manifest-/Verzeichnis-Paritaet ist durch einen stdlib-only Validator (Negativtest inklusive) abgesichert.
+- [x] Bestehende Console-Normalmodus-Goldens bleiben unveraendert.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 #### Sub-Tranche B.2 - Console Verbose fuer Analyze und Impact
 

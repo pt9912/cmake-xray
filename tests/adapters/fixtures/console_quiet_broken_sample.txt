@@ -1,0 +1,4 @@
+unknown anchor line that no documented Quiet/Verbose emitter would produce
+
+translation units: 99
+ranking entries shown: 5 of 99

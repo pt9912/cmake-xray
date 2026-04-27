@@ -2054,3 +2054,241 @@ TEST_CASE_FIXTURE(CliFixture,
     CHECK(err.str().empty());
     CHECK(read_text_file(std::filesystem::path{verbose_target}) == baseline);
 }
+
+// ---- AP M5-1.5 Tranche B.1: Console Quiet end-to-end --------------------
+//
+// The Quiet renderer's textual contract is locked down by adapter unit tests
+// in tests/adapters/test_cli_console_renderers.cpp; the CLI-level tests below
+// verify that --format console --quiet wires through the cli_adapter dispatch
+// and matches the byte-stable goldens under
+// tests/e2e/testdata/m5/verbosity/. e2e_binary smokes for the same goldens
+// land in Tranche C.2.
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --quiet --format console matches console-analyze-quiet golden") {
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m3/report_project/compile_commands.json").c_str(), "--quiet",
+                 "--format", "console", "--top", "2"}) == ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-analyze-quiet.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --quiet console with targets matches console-analyze-quiet-targets golden") {
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m4/with_targets/compile_commands.json").c_str(),
+                 "--cmake-file-api", fixture_path("m4/with_targets/build").c_str(),
+                 "--quiet", "--format", "console", "--top", "2"}) == ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-analyze-quiet-targets.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --quiet console for the lean fixture matches console-analyze-quiet-empty golden") {
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m5/dot-fixtures/multi_tu_compile_db/compile_commands.json")
+                     .c_str(),
+                 "--quiet", "--format", "console"}) == ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-analyze-quiet-empty.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --quiet --format console matches console-impact-quiet golden") {
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m3/report_impact_header/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/config.h", "--quiet", "--format",
+                 "console"}) == ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-impact-quiet.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --quiet console with targets matches console-impact-quiet-targets golden") {
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m4/with_targets/compile_commands.json").c_str(),
+                 "--cmake-file-api", fixture_path("m4/with_targets/build").c_str(),
+                 "--changed-file", "include/common/shared.h", "--quiet", "--format",
+                 "console"}) == ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-impact-quiet-targets.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --quiet console with no affected TUs matches console-impact-quiet-empty golden") {
+    REQUIRE(run({"impact", "--cmake-file-api",
+                 fixture_path("m4/file_api_only/build").c_str(), "--changed-file",
+                 "include/common/shared.h", "--quiet", "--format", "console"}) ==
+            ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-impact-quiet-empty.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+// AP M5-1.5 Tranche B.1: render preconditions for Console Quiet impact mirror
+// the HTML pathway from AP 1.4. A stub ImpactPort returns a result with
+// inputs.changed_file == std::nullopt or inputs.changed_file_source ==
+// unresolved_file_api_source_root; the CLI must reject before the Quiet
+// renderer runs so no partial console output appears on stdout.
+
+TEST_CASE("console --quiet impact rejects when changed_file_source is unresolved_file_api_source_root") {
+    ImpactResult unresolved_result{};
+    unresolved_result.application = xray::hexagon::model::application_info();
+    unresolved_result.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    unresolved_result.inputs.changed_file = std::string{"src/missing.cpp"};
+    unresolved_result.inputs.changed_file_source =
+        xray::hexagon::model::ChangedFileSource::unresolved_file_api_source_root;
+
+    class FixedImpactPort final : public xray::hexagon::ports::driving::AnalyzeImpactPort {
+    public:
+        explicit FixedImpactPort(ImpactResult result) : result_(std::move(result)) {}
+        ImpactResult analyze_impact(
+            xray::hexagon::ports::driving::AnalyzeImpactRequest /*request*/) const override {
+            return result_;
+        }
+
+    private:
+        ImpactResult result_;
+    };
+
+    const StubAnalyzeProjectPort analyze_project_port{AnalysisResult{}};
+    const FixedImpactPort impact_port{unresolved_result};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray", "impact",         "--cmake-file-api",
+                          "/tmp/empty", "--changed-file", "src/missing.cpp",
+                          "--quiet"};
+
+    const int exit_code = cli.run(7, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("file-api source root is unresolved") != std::string::npos);
+    CHECK(err.str().find("--format console --quiet") != std::string::npos);
+    // No partial console-quiet output must reach stderr either.
+    CHECK(err.str().find("impact: ok") == std::string::npos);
+}
+
+TEST_CASE("console --verbose impact rejects when changed_file_source is unresolved_file_api_source_root") {
+    // The precondition predicate covers Quiet AND Verbose console; Tranche B.1
+    // wires the test for Verbose now so the precondition branch stays covered
+    // even though the Verbose renderer itself only lands in B.2.
+    ImpactResult unresolved_result{};
+    unresolved_result.application = xray::hexagon::model::application_info();
+    unresolved_result.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    unresolved_result.inputs.changed_file = std::string{"src/missing.cpp"};
+    unresolved_result.inputs.changed_file_source =
+        xray::hexagon::model::ChangedFileSource::unresolved_file_api_source_root;
+
+    class FixedImpactPort final : public xray::hexagon::ports::driving::AnalyzeImpactPort {
+    public:
+        explicit FixedImpactPort(ImpactResult result) : result_(std::move(result)) {}
+        ImpactResult analyze_impact(
+            xray::hexagon::ports::driving::AnalyzeImpactRequest /*request*/) const override {
+            return result_;
+        }
+
+    private:
+        ImpactResult result_;
+    };
+
+    const StubAnalyzeProjectPort analyze_project_port{AnalysisResult{}};
+    const FixedImpactPort impact_port{unresolved_result};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray", "impact",         "--cmake-file-api",
+                          "/tmp/empty", "--changed-file", "src/missing.cpp",
+                          "--verbose"};
+
+    const int exit_code = cli.run(7, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("file-api source root is unresolved") != std::string::npos);
+    CHECK(err.str().find("--format console --verbose") != std::string::npos);
+}
+
+TEST_CASE("console --quiet impact rejects when changed_file is std::nullopt") {
+    ImpactResult unset_result{};
+    unset_result.application = xray::hexagon::model::application_info();
+    unset_result.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    // inputs.changed_file stays std::nullopt deliberately.
+
+    class FixedImpactPort final : public xray::hexagon::ports::driving::AnalyzeImpactPort {
+    public:
+        explicit FixedImpactPort(ImpactResult result) : result_(std::move(result)) {}
+        ImpactResult analyze_impact(
+            xray::hexagon::ports::driving::AnalyzeImpactRequest /*request*/) const override {
+            return result_;
+        }
+
+    private:
+        ImpactResult result_;
+    };
+
+    const StubAnalyzeProjectPort analyze_project_port{AnalysisResult{}};
+    const FixedImpactPort impact_port{unset_result};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray", "impact",         "--cmake-file-api",
+                          "/tmp/empty", "--changed-file", "src/whatever.cpp",
+                          "--quiet"};
+
+    const int exit_code = cli.run(7, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("changed_file is missing") != std::string::npos);
+    CHECK(err.str().find("--format console --quiet") != std::string::npos);
+    CHECK(err.str().find("impact: ok") == std::string::npos);
+}

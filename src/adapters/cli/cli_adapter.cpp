@@ -8,6 +8,7 @@
 
 #include <CLI/CLI.hpp>
 
+#include "adapters/cli/cli_console_renderers.h"
 #include "adapters/cli/exit_codes.h"
 #include "adapters/cli/output_verbosity.h"
 #include "hexagon/model/compile_database_result.h"
@@ -262,13 +263,72 @@ int run_emit_for_renderer(const CliReportRenderer& renderer, const CliOptions& o
 
 int handle_analysis_result(const xray::hexagon::model::AnalysisResult& result,
                            const xray::hexagon::ports::driving::GenerateReportPort& report_port,
-                           const CliOptions& options, CliOutputStreams streams) {
+                           ReportFormat format, const CliOptions& options,
+                           CliOutputStreams streams) {
     if (!result.compile_database.is_success()) {
         format_error(streams.err, result.compile_database);
         return map_error_to_exit_code(result.compile_database.error());
     }
+    if (format == ReportFormat::console && options.verbosity == OutputVerbosity::quiet) {
+        const auto top_limit = options.top_limit;
+        const StringFunctionCliReportRenderer renderer{
+            [&result, top_limit] { return render_console_quiet_analyze(result, top_limit); }};
+        return run_emit_for_renderer(renderer, options, streams);
+    }
     const AnalysisCliReportRenderer renderer{report_port, result, options.top_limit};
     return run_emit_for_renderer(renderer, options, streams);
+}
+
+// AP M5-1.5 Tranche B: factored render-precondition helper. The HTML adapter
+// from AP 1.4 already rejected nullopt and unresolved_file_api_source_root,
+// the DOT adapter from AP 1.3 rejected unresolved-only. Quiet/Verbose console
+// shares the same render contract, so the predicate set is centralised here.
+// Markdown and JSON keep rendering through to surface diagnostics.
+std::string format_label_for_render_error(ReportFormat format, OutputVerbosity verbosity) {
+    // Only called from within validate_impact_render_preconditions, which
+    // gates entry on format_rejects_*; the predicates restrict the format/
+    // verbosity combinations to (html), (dot) and (console + non-normal).
+    // Markdown, JSON and console + normal-verbosity never reach this helper.
+    if (format == ReportFormat::html) return "html";
+    if (format == ReportFormat::dot) return "dot";
+    if (verbosity == OutputVerbosity::quiet) return "console --quiet";
+    return "console --verbose";
+}
+
+bool format_rejects_unresolved_file_api(ReportFormat format, OutputVerbosity verbosity) {
+    if (format == ReportFormat::dot || format == ReportFormat::html) return true;
+    return format == ReportFormat::console && verbosity != OutputVerbosity::normal;
+}
+
+bool format_rejects_missing_changed_file(ReportFormat format, OutputVerbosity verbosity) {
+    if (format == ReportFormat::html) return true;
+    return format == ReportFormat::console && verbosity != OutputVerbosity::normal;
+}
+
+std::optional<int> validate_impact_render_preconditions(
+    const xray::hexagon::model::ImpactResult& result, ReportFormat format,
+    OutputVerbosity verbosity, std::ostream& err) {
+    const bool unresolved_source = result.inputs.changed_file_source.has_value() &&
+                                   *result.inputs.changed_file_source ==
+                                       xray::hexagon::model::ChangedFileSource::
+                                           unresolved_file_api_source_root;
+    if (format_rejects_unresolved_file_api(format, verbosity) && unresolved_source) {
+        err << "error: cannot render --format "
+            << format_label_for_render_error(format, verbosity)
+            << " when the file-api source root is unresolved\n";
+        err << "hint: provide --compile-commands or a fully resolvable "
+               "--cmake-file-api path\n";
+        return ExitCode::input_invalid;
+    }
+    if (format_rejects_missing_changed_file(format, verbosity) &&
+        !result.inputs.changed_file.has_value()) {
+        err << "error: cannot render --format "
+            << format_label_for_render_error(format, verbosity)
+            << " when changed_file is missing from the impact result\n";
+        err << "hint: rerun impact with --changed-file pointing at a concrete file\n";
+        return ExitCode::input_invalid;
+    }
+    return std::nullopt;
 }
 
 int handle_impact_result(const xray::hexagon::model::ImpactResult& result,
@@ -279,35 +339,15 @@ int handle_impact_result(const xray::hexagon::model::ImpactResult& result,
         format_error(streams.err, result.compile_database);
         return map_error_to_exit_code(result.compile_database.error());
     }
-    // docs/report-dot.md / docs/plan-M5-1-3.md and docs/plan-M5-1-4.md
-    // Impact-Negativfall-Matrix: an ImpactResult whose changed_file_source is
-    // unresolved_file_api_source_root is a file-api error path. DOT and HTML
-    // must not render a graph/document for this case; the CLI emits a text
-    // error and returns non-zero. Other formats (JSON / Markdown / Console)
-    // continue to render so the caller can see the diagnostics.
-    if ((format == ReportFormat::dot || format == ReportFormat::html) &&
-        result.inputs.changed_file_source.has_value() &&
-        *result.inputs.changed_file_source ==
-            xray::hexagon::model::ChangedFileSource::unresolved_file_api_source_root) {
-        const auto* format_name = format == ReportFormat::html ? "html" : "dot";
-        streams.err << "error: cannot render --format " << format_name
-                    << " when the file-api source root is unresolved\n";
-        streams.err << "hint: provide --compile-commands or a fully resolvable "
-                       "--cmake-file-api path\n";
-        return ExitCode::input_invalid;
+    if (const auto e = validate_impact_render_preconditions(result, format, options.verbosity,
+                                                             streams.err);
+        e.has_value()) {
+        return *e;
     }
-    // docs/plan-M5-1-4.md Impact-Negativfall-Matrix: an HTML render also
-    // requires a resolved changed_file value. The CLI usage validator already
-    // rejects `impact` calls that arrive without --changed-file, but a stub
-    // ImpactPort or an internal future code path could still surface a result
-    // with the optional unset; the precondition keeps that case from emitting
-    // a partial HTML document with a "not provided" placeholder.
-    if (format == ReportFormat::html && !result.inputs.changed_file.has_value()) {
-        streams.err << "error: cannot render --format html when changed_file is "
-                       "missing from the impact result\n";
-        streams.err << "hint: rerun impact with --changed-file pointing at a "
-                       "concrete file\n";
-        return ExitCode::input_invalid;
+    if (format == ReportFormat::console && options.verbosity == OutputVerbosity::quiet) {
+        const StringFunctionCliReportRenderer renderer{
+            [&result] { return render_console_quiet_impact(result); }};
+        return run_emit_for_renderer(renderer, options, streams);
     }
     const ImpactCliReportRenderer renderer{report_port, result};
     return run_emit_for_renderer(renderer, options, streams);
@@ -464,7 +504,7 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
 
     const auto result = analyze_project_port_.analyze_project(
         build_project_request(options, report_display_base));
-    return handle_analysis_result(result, report_port, options, streams);
+    return handle_analysis_result(result, report_port, report_format, options, streams);
 }
 
 }  // namespace xray::adapters::cli

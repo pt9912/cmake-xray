@@ -1,0 +1,7 @@
+impact: ok
+changed file: include/common/config.h
+affected translation units: 3
+classification: heuristic
+affected targets: 0
+diagnostics: 2
+warnings: present

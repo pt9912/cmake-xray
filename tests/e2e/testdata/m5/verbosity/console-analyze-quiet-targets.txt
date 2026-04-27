@@ -1,0 +1,7 @@
+analysis: ok
+translation units: 3
+ranking entries shown: 2 of 3
+include hotspots shown: 2 of 2
+diagnostics: 1
+target metadata: loaded
+warnings: present
