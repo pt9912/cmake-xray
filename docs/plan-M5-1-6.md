@@ -51,8 +51,8 @@ Voraussichtlich zu aendern:
 
 - `.github/workflows/release.yml`
 - `scripts/release-dry-run.sh`
-- `src/adapters/cli/application_info.{h,cpp}`
 - `src/adapters/cli/cli_adapter.{h,cpp}`
+- `src/hexagon/model/application_info.h`
 - `Dockerfile`
 - `docs/releasing.md`
 - `README.md`
@@ -72,18 +72,28 @@ Neue Dateien, falls noch nicht vorhanden:
 - Erlaubte Muster:
   - `vMAJOR.MINOR.PATCH` fuer reguläre Releases
   - `vMAJOR.MINOR.PATCH-PRERELEASE` fuer Vorabversionen
+- Die harte Validierung nutzt diese Regex:
+  - `^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(\.((0|[1-9][0-9]*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?$`
 - Unerlaubt und hart fehlerhaft:
   - `vfoo`
   - unvollstaendige Versionen
   - Build-Metadaten ohne freigegebene Semantik
 
-Regel: Die Tag-Pruefung muss vor Build/Publish laufen und den Workflow mit nonzero Ergebnis beenden.
+Regeln:
+
+- Die Tag-Pruefung muss vor Build/Publish laufen und den Workflow mit nonzero Ergebnis beenden.
+- Build-Metadaten mit `+...` sind in M5 nicht erlaubt.
+- Prerelease-Identifier sind nicht leer; numerische Identifier duerfen keine fuehrenden Nullen enthalten.
+- Die normalisierte App-Version ist exakt der Tag ohne fuehrendes `v`.
 
 ### Projekt- und App-Version
 
 - Die `project(... VERSION ...)` in der Root-`CMakeLists.txt` bleibt numerisch (`MAJOR.MINOR.PATCH`).
 - Veroeffentliche Version fuer App/CLI/Release darf Prerelease-Suffixe enthalten.
-- `XRAY_APP_VERSION` oder `XRAY_VERSION_SUFFIX` ist die Quelle fuer die ausgegebene CLI-/Release-Version.
+- Release-Builds verwenden genau `XRAY_APP_VERSION` als kanonische Quelle fuer die ausgegebene CLI-/Release-Version; der Wert wird aus dem validierten Tag ohne fuehrendes `v` gebildet.
+- `XRAY_VERSION_SUFFIX` ist nur fuer lokale oder nicht veroeffentlichende Builds zulaessig, wenn `XRAY_APP_VERSION` nicht gesetzt ist; dann wird die App-Version aus numerischer CMake-Projektversion plus Suffix gebildet.
+- Wenn `XRAY_APP_VERSION` und `XRAY_VERSION_SUFFIX` gleichzeitig gesetzt sind, muss die Konfiguration fail-fast abbrechen, damit keine konkurrierenden Versionsquellen entstehen.
+- Release-Gates pruefen, dass `XRAY_APP_VERSION`, `cmake-xray --version`, Paketmetadaten und Release-Tag dieselbe Version ohne fuehrendes `v` ergeben.
 - `v1.2.0-rc.1` auf Tag-Ebene entspricht ausgegebener App-Version `1.2.0-rc.1`; interne Projektversion bleibt `1.2.0`.
 
 ## `cmake-xray --version` Vertrag
@@ -91,6 +101,7 @@ Regel: Die Tag-Pruefung muss vor Build/Publish laufen und den Workflow mit nonze
 Top-Level-Verhalten:
 
 - `cmake-xray --version` ist direkt auf der Root-CLI ausfuehrbar.
+- Die Option ist ein globales CLI-Flag und kein Subcommand-Alias.
 - Ausgabe auf `stdout`: die veroeffentlichte App-Version ohne fuehrendes `v`.
 - Keine Initialisierung der Analyse-Pipeline.
 - Ausgabe enthaelt keine Analyseartefakte oder Host-/Build-Kontext.
