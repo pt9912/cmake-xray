@@ -5,4 +5,50 @@
 # analyze and impact goldens that lock the HTML contract in place. Per-
 # platform variants (*_windows.html) cover host-divergent path semantics
 # for absolute --changed-file inputs — see comments in tests/e2e/run_e2e.sh
-# for the case "$(uname -s)" branching.
+# for the case "$(uname -s)" branching. The Windows golden is hand-derived
+# from its POSIX twin via path substitution because Linux treats
+# C:/project/... as relative; on a real Windows host the binary produces
+# byte-identical output, and any divergence indicates a path-handling bug
+# (Sub-Risiko C.1, plan section 698).
+#
+# Coverage of the eight Tranche-C-listed analyze cases (plan ~673-681):
+#   1 Compile-DB-only            -> analyze_compile_db_only.html
+#   2 File-API-only with targets -> analyze_file_api_only.html
+#   3 Mixed-Input                -> analyze_mixed_input.html
+#   4 default --top              -> analyze_default_top.html (no flag, 3
+#                                   leersaetze: no hotspots, no target
+#                                   metadata, no diagnostics)
+#   5 --top untruncated          -> analyze_top_untruncated.html
+#   6 --top ranking+hotspot trun.-> analyze_top_truncated.html
+#   7 hotspot-context truncation -> analyze_hotspot_context_truncated.html
+#   8 leeres Ergebnis mit        -> spans analyze_default_top.html (3
+#     Leersaetzen                   leersaetze) + analyze_directory_contexts
+#                                   .html (same-source-path contract plus
+#                                   "No include hotspots" leersatz). No
+#                                   single golden covers "No translation
+#                                   units to report." because a valid
+#                                   compile_commands.json must hold at
+#                                   least one entry.
+#   + escaping golden            -> analyze_escaping.html (covers <, >, &,
+#                                   ", ', backslash, newline,
+#                                   <script>-strings per plan ~691)
+
+# Analyze goldens
+analyze_compile_db_only.html
+analyze_file_api_only.html
+analyze_mixed_input.html
+analyze_default_top.html
+analyze_top_untruncated.html
+analyze_top_truncated.html
+analyze_hotspot_context_truncated.html
+analyze_directory_contexts.html
+analyze_escaping.html
+
+# Impact goldens
+impact_compile_db_relative.html
+impact_file_api_relative.html
+impact_mixed_input.html
+impact_direct_targets.html
+impact_no_affected_targets.html
+impact_absolute.html
+impact_absolute_windows.html

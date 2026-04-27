@@ -249,6 +249,35 @@ cmake-xray analyze \
   --top 20
 ```
 
+HTML-Ausgabe fuer Reviews und CI-Artefakte:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --format html \
+  --top 20
+```
+
+HTML ist ein eigenstaendiges HTML5-Dokument mit inline CSS, ohne externe
+Ressourcen, ohne JavaScript und ohne HTML-Kommentare. Format, Dokumentstruktur,
+Pflichtsektionen, CSS-Regeln und Escape-Vertrag sind in
+[docs/report-html.md](./report-html.md) verbindlich dokumentiert.
+Erfolgreiche `--format html`-Aufrufe schreiben ausschliesslich gueltiges HTML
+nach `stdout`; Fehler bleiben Textmeldungen auf `stderr` ohne HTML-Fehlerdokument.
+Mit `--output <path>` schreibt der Adapter den Bericht atomar in eine Datei und
+laesst `stdout` und `stderr` leer:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --format html \
+  --output build/reports/analyze.html \
+  --top 20
+```
+
+Die erzeugte Datei kann ohne weitere Build- oder Asset-Schritte direkt im
+Browser geoeffnet oder als CI-Artefakt veroeffentlicht werden.
+
 ## Impact-Analyse
 
 Die Impact-Analyse schaetzt ab, welche Translation Units von einer geaenderten
@@ -298,6 +327,24 @@ Direkte Impact-Kanten erscheinen mit `style="solid"`, heuristische mit
 `style="dashed"`, sodass Direktheit und Heuristik im gerenderten Bild
 visuell unterscheidbar bleiben.
 
+HTML-Ausgabe fuer Reviews und CI-Artefakte:
+
+```bash
+cmake-xray impact \
+  --compile-commands build/compile_commands.json \
+  --changed-file include/common/config.h \
+  --format html \
+  --output build/reports/impact.html
+```
+
+Der HTML-Impact-Bericht enthaelt getrennte Sektionen fuer direkt und
+heuristisch betroffene Translation Units sowie Targets mit sichtbaren
+`direct`/`heuristic`-Badges, sodass Direktheit und Heuristik auch ohne
+Farbinformation unterscheidbar bleiben. Wird `--changed-file` weggelassen
+oder als nicht aufloesbarer File-API-Quellpfad uebergeben, lehnt der HTML-Pfad
+das Rendern als Textfehler auf `stderr` mit Exit-Code ungleich `0` ab und
+erzeugt kein HTML-Fehlerdokument.
+
 Der Impact-JSON-Bericht enthaelt zusaetzlich `inputs.changed_file` und
 `inputs.changed_file_source`. Erlaubte Werte fuer `changed_file_source` sind
 `compile_database_directory`, `file_api_source_root` und `cli_absolute`. Der
@@ -326,15 +373,19 @@ Ohne Target-Sicht (nur `compile_commands.json`):
 
 - [docs/examples/analyze-console.txt](./examples/analyze-console.txt)
 - [docs/examples/analyze-report.md](./examples/analyze-report.md)
+- [docs/examples/analyze-report.html](./examples/analyze-report.html)
 - [docs/examples/impact-console.txt](./examples/impact-console.txt)
 - [docs/examples/impact-report.md](./examples/impact-report.md)
+- [docs/examples/impact-report.html](./examples/impact-report.html)
 
 Mit Target-Sicht (File API):
 
 - [docs/examples/analyze-console-targets.txt](./examples/analyze-console-targets.txt)
 - [docs/examples/analyze-report-targets.md](./examples/analyze-report-targets.md)
+- [docs/examples/analyze-report-targets.html](./examples/analyze-report-targets.html)
 - [docs/examples/impact-console-targets.txt](./examples/impact-console-targets.txt)
 - [docs/examples/impact-report-targets.md](./examples/impact-report-targets.md)
+- [docs/examples/impact-report-targets.html](./examples/impact-report-targets.html)
 
 ## Heuristiken einordnen
 

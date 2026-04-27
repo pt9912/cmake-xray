@@ -1,0 +1,22 @@
+[
+  {
+    "directory": "/project/build/Tom & Jerry",
+    "file": "/project/src/<script>alert(1)</script>.cpp",
+    "arguments": ["c++", "-I/project/include", "-DKEY=\"a&b\"", "-c", "/project/src/<script>alert(1)</script>.cpp"]
+  },
+  {
+    "directory": "/project/build/it's <quoted>",
+    "file": "/project/src/it's \"quoted\".cpp",
+    "arguments": ["c++", "-I/project/include", "-c", "/project/src/it's \"quoted\".cpp"]
+  },
+  {
+    "directory": "/project/build/multi\nline",
+    "file": "/project/src/multi\nline.cpp",
+    "arguments": ["c++", "-I/project/include", "-c", "/project/src/multi\nline.cpp"]
+  },
+  {
+    "directory": "/project/build/win\\style",
+    "file": "/project/src/back\\slash.cpp",
+    "arguments": ["c++", "-I/project/include", "-c", "/project/src/back\\slash.cpp"]
+  }
+]

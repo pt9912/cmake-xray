@@ -559,6 +559,106 @@ assert_stdout_equals_file "M5 dot impact absolute changed-file matches golden" "
 assert_dot_stdout_validates "M5 dot impact absolute changed-file validates against syntax gate" \
     "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file "$dot_impact_absolute_arg" --format dot
 
+# M5 HTML goldens (analyze) — byte-stable diff against golden per
+# docs/plan-M5-1-4.md Tranche C.1. AP M5-1.4 ships no separate HTML structure
+# validator script (the contract is locked in via tests/adapters/test_html_report_adapter.cpp
+# and the byte-stable goldens here); a future Tranche D may add an optional
+# tests/validate_html_reports.py if a structure smoke is needed beyond pure
+# golden diffs.
+assert_exit "M5 html analyze compile-db-only exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format html --top 2
+assert_stdout_equals_file "M5 html analyze compile-db-only matches golden" tests/e2e/testdata/m5/html-reports/analyze_compile_db_only.html \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format html --top 2
+
+assert_exit "M5 html analyze file-api-only exits 0" 0 "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --format html --top 2
+assert_stdout_equals_file "M5 html analyze file-api-only matches golden" tests/e2e/testdata/m5/html-reports/analyze_file_api_only.html \
+    "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --format html --top 2
+
+assert_exit "M5 html analyze mixed-input exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --format html --top 2
+assert_stdout_equals_file "M5 html analyze mixed-input matches golden" tests/e2e/testdata/m5/html-reports/analyze_mixed_input.html \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --format html --top 2
+
+# Default --top (no flag) exercises the CLI's effective top value (10) in the
+# HTML pipeline so the golden locks in the default-top contract.
+assert_exit "M5 html analyze default top exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --format html
+assert_stdout_equals_file "M5 html analyze default top matches golden" tests/e2e/testdata/m5/html-reports/analyze_default_top.html \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --format html
+
+assert_exit "M5 html analyze top untruncated exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format html --top 10
+assert_stdout_equals_file "M5 html analyze top untruncated matches golden" tests/e2e/testdata/m5/html-reports/analyze_top_untruncated.html \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format html --top 10
+
+# truncating_compile_db has 30 TUs and 6 hotspots with 6 affected TUs each.
+# --top 1 truncates ranking (1 of 30), hotspot list (1 of 6) and per-hotspot
+# context (1 of 6); --top 3 keeps ranking and hotspot truncation but emphasises
+# per-hotspot context truncation (3 of 6 per hotspot).
+assert_exit "M5 html analyze top truncated exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format html --top 1
+assert_stdout_equals_file "M5 html analyze top truncated matches golden" tests/e2e/testdata/m5/html-reports/analyze_top_truncated.html \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format html --top 1
+
+assert_exit "M5 html analyze hotspot context truncated exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format html --top 3
+assert_stdout_equals_file "M5 html analyze hotspot context truncated matches golden" tests/e2e/testdata/m5/html-reports/analyze_hotspot_context_truncated.html \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/compile_commands.json --format html --top 3
+
+# directory_contexts exercises the contract requirement that translation units
+# with identical source_path stay distinguishable through the Directory
+# column, plus the "No include hotspots to report." leersatz. Together with
+# analyze_default_top (3 leersaetze on multi_tu_compile_db) this discharges
+# plan list item "leeres Ergebnis mit dokumentierten Leersaetzen" — see the
+# manifest header for the full mapping.
+assert_exit "M5 html analyze directory contexts exits 0" 0 "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/directory_contexts/build --format html --top 5
+assert_stdout_equals_file "M5 html analyze directory contexts matches golden" tests/e2e/testdata/m5/html-reports/analyze_directory_contexts.html \
+    "$BINARY" analyze --cmake-file-api tests/e2e/testdata/m4/directory_contexts/build --format html --top 5
+
+# m5/html-fixtures/escape_paths is HTML-specific; it embeds <, >, &, ", ',
+# backslash, newline and <script>-style strings so the golden locks in the
+# documented escape rules from docs/report-html.md.
+assert_exit "M5 html analyze escaping exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/html-fixtures/escape_paths/compile_commands.json --format html --top 5
+assert_stdout_equals_file "M5 html analyze escaping matches golden" tests/e2e/testdata/m5/html-reports/analyze_escaping.html \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/html-fixtures/escape_paths/compile_commands.json --format html --top 5
+
+# M5 HTML goldens (impact)
+assert_exit "M5 html impact compile-db relative exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --format html
+assert_stdout_equals_file "M5 html impact compile-db relative matches golden" tests/e2e/testdata/m5/html-reports/impact_compile_db_relative.html \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --format html
+
+assert_exit "M5 html impact file-api relative exits 0" 0 "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file src/main.cpp --format html
+assert_stdout_equals_file "M5 html impact file-api relative matches golden" tests/e2e/testdata/m5/html-reports/impact_file_api_relative.html \
+    "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file src/main.cpp --format html
+
+assert_exit "M5 html impact mixed-input exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --changed-file include/common/shared.h --format html
+assert_stdout_equals_file "M5 html impact mixed-input matches golden" tests/e2e/testdata/m5/html-reports/impact_mixed_input.html \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --changed-file include/common/shared.h --format html
+
+# Direct TUs + direct targets path; this case has no diagnostics so it covers
+# the "No diagnostics." leersatz alongside the direct kind sections.
+assert_exit "M5 html impact direct targets exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --changed-file src/app/main.cpp --format html
+assert_stdout_equals_file "M5 html impact direct targets matches golden" tests/e2e/testdata/m5/html-reports/impact_direct_targets.html \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m4/with_targets/compile_commands.json --cmake-file-api tests/e2e/testdata/m4/with_targets/build --changed-file src/app/main.cpp --format html
+
+# No matching translation units → all four affected sections render their
+# leersaetze (no directly/heuristically affected TUs/targets).
+assert_exit "M5 html impact no affected targets exits 0" 0 "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file include/common/shared.h --format html
+assert_stdout_equals_file "M5 html impact no affected targets matches golden" tests/e2e/testdata/m5/html-reports/impact_no_affected_targets.html \
+    "$BINARY" impact --cmake-file-api tests/e2e/testdata/m4/file_api_only/build --changed-file include/common/shared.h --format html
+
+# cli_absolute provenance for HTML mirrors the JSON/DOT split: POSIX accepts
+# /project/... as absolute, Windows requires C:/project/.... Same fixture,
+# per-platform argument and per-platform golden so both hosts exercise the
+# cli_absolute branch byte-stably; the goldens differ only in changed_file.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        html_impact_absolute_arg="C:/project/src/app/main.cpp"
+        html_impact_absolute_golden="tests/e2e/testdata/m5/html-reports/impact_absolute_windows.html"
+        ;;
+    *)
+        html_impact_absolute_arg="/project/src/app/main.cpp"
+        html_impact_absolute_golden="tests/e2e/testdata/m5/html-reports/impact_absolute.html"
+        ;;
+esac
+assert_exit "M5 html impact absolute changed-file exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file "$html_impact_absolute_arg" --format html
+assert_stdout_equals_file "M5 html impact absolute changed-file matches golden" "$html_impact_absolute_golden" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file "$html_impact_absolute_arg" --format html
+
 # Markdown file output
 report_dir="$(native_path "$(mktemp -d)")"
 report_file="$report_dir/analyze.md"

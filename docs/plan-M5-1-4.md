@@ -540,16 +540,16 @@ Nicht wiederherstellbare Eingabefehler:
 
 Impact-Negativfall-Matrix:
 
-| Fall | Zeitpunkt | Ergebnis |
-|---|---|---|
-| `impact --format html` ohne `--changed-file` | CLI-Usage-Validierung vor Analyse | Textfehler auf `stderr`, nonzero Exit, kein HTML |
-| `impact --format html --top N` | CLI-Usage-Validierung vor Analyse | Textfehler auf `stderr`, nonzero Exit, kein HTML |
-| `impact --format html --changed-file ""` | CLI-Usage- oder Pfadvalidierung vor Analyse, falls leerer Wert erzeugbar ist | Textfehler auf `stderr`, nonzero Exit, kein HTML |
-| nicht vorhandene Compile-Database oder File-API-Eingabe | Eingabeladen vor Reporterzeugung | Textfehler auf `stderr`, nonzero Exit, kein HTML |
-| ungueltige Compile-Database oder File-API-Reply-Daten | Eingabeladen vor Reporterzeugung | Textfehler auf `stderr`, nonzero Exit, kein HTML |
-| `ReportInputs.changed_file == std::nullopt` in einem sonst erzeugten `ImpactResult` | HTML-Render-Precondition | Render-Fehler als Text auf `stderr`, nonzero Exit, kein HTML |
-| `ReportInputs.changed_file_source == unresolved_file_api_source_root` | HTML-Render-Precondition | Textfehler auf `stderr`, nonzero Exit, kein HTML |
-| erfolgreiches `ImpactResult` mit Diagnostics | normale Reporterzeugung | HTML-Report mit Diagnostics-Section, Exit `0` |
+| Fall                                                                                | Zeitpunkt                                                                    | Ergebnis                                                     |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `impact --format html` ohne `--changed-file`                                        | CLI-Usage-Validierung vor Analyse                                            | Textfehler auf `stderr`, nonzero Exit, kein HTML             |
+| `impact --format html --top N`                                                      | CLI-Usage-Validierung vor Analyse                                            | Textfehler auf `stderr`, nonzero Exit, kein HTML             |
+| `impact --format html --changed-file ""`                                            | CLI-Usage- oder Pfadvalidierung vor Analyse, falls leerer Wert erzeugbar ist | Textfehler auf `stderr`, nonzero Exit, kein HTML             |
+| nicht vorhandene Compile-Database oder File-API-Eingabe                             | Eingabeladen vor Reporterzeugung                                             | Textfehler auf `stderr`, nonzero Exit, kein HTML             |
+| ungueltige Compile-Database oder File-API-Reply-Daten                               | Eingabeladen vor Reporterzeugung                                             | Textfehler auf `stderr`, nonzero Exit, kein HTML             |
+| `ReportInputs.changed_file == std::nullopt` in einem sonst erzeugten `ImpactResult` | HTML-Render-Precondition                                                     | Render-Fehler als Text auf `stderr`, nonzero Exit, kein HTML |
+| `ReportInputs.changed_file_source == unresolved_file_api_source_root`               | HTML-Render-Precondition                                                     | Textfehler auf `stderr`, nonzero Exit, kein HTML             |
+| erfolgreiches `ImpactResult` mit Diagnostics                                        | normale Reporterzeugung                                                      | HTML-Report mit Diagnostics-Section, Exit `0`                |
 
 Praezedenz:
 
@@ -600,6 +600,13 @@ Goldens:
 
 Die Umsetzung erfolgt in drei verbindlichen Tranchen plus einer optionalen Haertungstranche. Jede Tranche endet mit einem vollstaendigen Lauf der Docker-Gates aus `README.md` ("Tests und Quality Gates") und `docs/quality.md`. Die globalen Abnahmekriterien dieses Plans gelten zusaetzlich am Ende von Tranche C.
 
+DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert eine in einem konkreten Commit ausgelieferte Anforderung, `[ ]` markiert eine offene Anforderung. Liefer-Stand zum Zeitpunkt der Tranche-C-Vorbereitung:
+
+- Tranche A ausgeliefert in commit `8369e77` ("feat: lock in M5 AP 1.4 HTML contract and Tranche A skeleton").
+- Tranche B ausgeliefert in commit `5d878a7` ("feat: implement M5 AP 1.4 HTML adapter and CLI freischaltung (Tranche B)").
+- Tranche C ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; AP 1.4 ist damit nach Tranche-C-Definition abnahmefaehig).
+- Tranche D optional und offen.
+
 ### Tranche A - Vertrag, Escaping, CSS und Testskelett
 
 Kein produktiver CLI-Adapter; Vertrag, Hilfsfunktionen und Testskelett.
@@ -614,14 +621,14 @@ Kein produktiver CLI-Adapter; Vertrag, Hilfsfunktionen und Testskelett.
 
 Abnahme Tranche A: alle Docker-Gates gruen; Escape-Tests pruefen `<`, `>`, `&`, Anfuehrungszeichen, Apostroph, Backslash, Newline und `<script>`-artige Eingaben; CSS-Tests pruefen keine externen Ressourcen und kein JavaScript.
 
-Definition of Done Tranche A:
+Definition of Done Tranche A (ausgeliefert in commit `8369e77`):
 
-- [ ] `docs/report-html.md` dokumentiert den HTML-Vertrag.
-- [ ] erste Adaptertests fuer Struktur, Escaping, CSS und Leersaetze existieren.
-- [ ] CSS ist statisch, inline-faehig und frei von externen Ressourcen.
-- [ ] Manifest fuer HTML-Goldens existiert.
-- [ ] `docs/quality.md` beschreibt den HTML-Testumfang.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `docs/report-html.md` dokumentiert den HTML-Vertrag.
+- [x] erste Adaptertests fuer Struktur, Escaping, CSS und Leersaetze existieren.
+- [x] CSS ist statisch, inline-faehig und frei von externen Ressourcen.
+- [x] Manifest fuer HTML-Goldens existiert.
+- [x] `docs/quality.md` beschreibt den HTML-Testumfang.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 ### Tranche B - Adapter, Wiring, CLI-Freischaltung
 
@@ -640,16 +647,16 @@ Der Adapter funktioniert; E2E-Goldens folgen erst in Tranche C.
 
 Abnahme Tranche B: alle Docker-Gates gruen; `--format html` produziert vollstaendiges HTML; `recognized but not implemented` nicht mehr fuer `html`; Console-, Markdown-, JSON- und DOT-Goldens byte-stabil.
 
-Definition of Done Tranche B:
+Definition of Done Tranche B (ausgeliefert in commit `5d878a7`):
 
-- [ ] `HtmlReportAdapter` rendert Analyze und Impact aus Ergebnisobjekten.
-- [ ] `ReportPorts` und `src/main.cpp` verdrahten HTML ueber `ReportGenerator`.
-- [ ] `--format html` ist fuer `analyze` und `impact` lauffaehig.
-- [ ] `--format html --output <path>` nutzt den gemeinsamen Atomic-Writer-Pfad.
-- [ ] stdout/stderr-Vertrag fuer erfolgreiche stdout- und Dateiausgabe ist getestet.
-- [ ] Formatverfuegbarkeitsmeldungen enthalten keine HTML-Not-Implemented-Reste.
-- [ ] bestehende Console-/Markdown-/JSON-/DOT-Goldens bleiben unveraendert.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `HtmlReportAdapter` rendert Analyze und Impact aus Ergebnisobjekten.
+- [x] `ReportPorts` und `src/main.cpp` verdrahten HTML ueber `ReportGenerator`.
+- [x] `--format html` ist fuer `analyze` und `impact` lauffaehig.
+- [x] `--format html --output <path>` nutzt den gemeinsamen Atomic-Writer-Pfad.
+- [x] stdout/stderr-Vertrag fuer erfolgreiche stdout- und Dateiausgabe ist getestet.
+- [x] Formatverfuegbarkeitsmeldungen enthalten keine HTML-Not-Implemented-Reste.
+- [x] bestehende Console-/Markdown-/JSON-/DOT-Goldens bleiben unveraendert.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 ### Tranche C - E2E-Goldens, CLI-/Stream-/Fehler-Tests, Beispiele und Nutzerdoku
 
@@ -692,23 +699,33 @@ Sub-Risiken C.1:
 
 Definition of Done Sub-Tranche C.1:
 
-- [ ] Analyze-Goldens decken die acht in Tranche C gelisteten Faelle ab.
-- [ ] Impact-Goldens decken die sieben in Tranche C gelisteten Faelle ab, inklusive `*_windows.html`-Varianten fuer absolute `--changed-file`-Pfade.
-- [ ] Escaping-Goldens decken die geforderten Sonderzeichen und Whitespace-Faelle ab.
-- [ ] `manifest.txt` listet alle Goldens; das Manifest gleicht Verzeichnis und Eintraege beidseitig ab.
-- [ ] `tests/e2e/run_e2e.sh` und `e2e_binary` fuehren mindestens einen Analyze- und einen Impact-HTML-Smoke aus.
-- [ ] Bestehende Console-/Markdown-/JSON-/DOT-Goldens bleiben unveraendert.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] Analyze-Goldens decken die acht in Tranche C gelisteten Faelle ab.
+- [x] Impact-Goldens decken die acht in Tranche C gelisteten Faelle ab, inklusive `*_windows.html`-Varianten fuer absolute `--changed-file`-Pfade.
+- [x] Escaping-Goldens decken die geforderten Sonderzeichen und Whitespace-Faelle ab.
+- [x] `manifest.txt` listet alle Goldens; das Manifest gleicht Verzeichnis und Eintraege beidseitig ab.
+- [x] `tests/e2e/run_e2e.sh` und `e2e_binary` fuehren mindestens einen Analyze- und einen Impact-HTML-Smoke aus.
+- [x] Bestehende Console-/Markdown-/JSON-/DOT-Goldens bleiben unveraendert.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 #### Sub-Tranche C.2 - CLI-/Stream-/Fehler-Tests
 
 Vertragsfestschreibung der CLI-stdout-/stderr-/Output-/Fehlerpfade fuer `--format html`. Keine neuen Goldens; reine Testarbeit in `tests/e2e/test_cli.cpp`.
 
+Fixture-Wiederverwendung: C.2 fuehrt keine neuen Fehler-Fixturepfade ein. Die Fehlerpfad-Tests nutzen genau die Fixtures, die JSON- und DOT-CLI-Tests bereits einsetzen:
+
+- ungueltiges `compile_commands.json`: `tests/e2e/testdata/invalid_syntax/compile_commands.json`.
+- ungueltige File-API-Reply-Daten (Mixed-Path und File-API-only): `tests/e2e/testdata/m4/invalid_file_api/{compile_commands.json,build}`.
+- nicht vorhandene Eingaben: Inline-Pfade wie `/nonexistent/compile_commands.json` und `/nonexistent/reply`, analog zu den bestehenden Negativtests in `tests/e2e/test_cli.cpp`.
+- Schreibfehler: bestehender Test-Hilfspfad ueber ein nicht existierendes Zwischen-Verzeichnis im `temp_dir`, analog zum Markdown-/JSON-/DOT-Pfad.
+- HTML-Render-Fehler: injizierter `CliReportRenderer`-Doppelgaenger, kein Fixture.
+
+Falls ein Fall ohne wiederverwendbare Fixture aufkommt, wird C.2 statt einer neuen `tests/e2e/testdata/.../`-Hierarchie zuerst geprueft, ob ein bestehender Pfad ausreicht; ein neuer Fixturepfad braucht eine explizite Begruendung im Commit.
+
 1. `tests/e2e/test_cli.cpp` erweitern um:
    - HTML-stdout-Vertrag: vollstaendiges HTML auf stdout, leeres stderr, kein Console-Fallback.
    - `--format html --output <path>`: Datei geschrieben, stdout und stderr leer, atomar; Reportinhalt nicht auf stdout dupliziert.
    - HTML-Render-Fehler ueber injizierten `CliReportRenderer`-Doppelgaenger: nonzero Exit, Text auf stderr, leeres stdout, bei `--output` bestehende Zieldatei unveraendert, kein partielles HTML.
-   - Fehlerpfade: `impact --format html` ohne `--changed-file`, nicht vorhandene Eingaben, ungueltiges `compile_commands.json`, ungueltige File-API-Reply-Daten, Schreibfehler. Alle als Text auf stderr, nonzero Exit, kein HTML-Fehlerdokument.
+   - Fehlerpfade: `impact --format html` ohne `--changed-file`, nicht vorhandene Eingaben, ungueltiges `compile_commands.json`, ungueltige File-API-Reply-Daten, Schreibfehler. Alle als Text auf stderr, nonzero Exit, kein HTML-Fehlerdokument. Fixturepfade werden aus der oben genannten Wiederverwendungsliste bezogen.
    - Negativtest, dass `impact` keine `--top`-Option akzeptiert, auch nicht zusammen mit `--format html`.
    - Negativtest, dass `--top 0 --format html` abgelehnt wird und kein HTML entsteht.
 
@@ -719,12 +736,12 @@ Sub-Risiken C.2:
 
 Definition of Done Sub-Tranche C.2:
 
-- [ ] HTML-stdout-Vertrag durch CLI-Test abgedeckt.
-- [ ] `--format html --output <path>`-Vertrag durch CLI-Test abgedeckt.
-- [ ] Render-Fehler-Doppelgaenger-Test deckt nonzero Exit, leeres stdout und unveraenderte Zieldatei ab.
-- [ ] Alle in der Impact-Negativfall-Matrix gelisteten Fehlerpfade sind als CLI-Test vorhanden.
-- [ ] `impact --top` und `--top 0 --format html` werden durch Negativtests abgelehnt.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] HTML-stdout-Vertrag durch CLI-Test abgedeckt.
+- [x] `--format html --output <path>`-Vertrag durch CLI-Test abgedeckt.
+- [x] Render-Fehler-Doppelgaenger-Test deckt nonzero Exit, leeres stdout und unveraenderte Zieldatei ab.
+- [x] Alle in der Impact-Negativfall-Matrix gelisteten Fehlerpfade sind als CLI-Test vorhanden.
+- [x] `impact --top` und `--top 0 --format html` werden durch Negativtests abgelehnt.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 #### Sub-Tranche C.3 - Beispielberichte, Nutzerdoku und Quality-Gates-Finalcheck
 
@@ -744,12 +761,12 @@ Sub-Risiken C.3:
 
 Definition of Done Sub-Tranche C.3:
 
-- [ ] `docs/examples/analyze.html` und `docs/examples/impact.html` existieren als stabile Beispielartefakte.
-- [ ] `README.md` listet HTML in Formatliste und Beispielen, ohne HTML weiterhin als "nicht Ziel" zu fuehren.
-- [ ] `docs/guide.md` dokumentiert produktive Nutzung von `--format html` und `--format html --output`.
-- [ ] `docs/quality.md` listet die neuen HTML-Gates aus Tranche C.
-- [ ] Coverage-, Lizard- und Clang-Tidy-Gates sind gruen, ohne neue HTML-Befunde nach Tranche D zu verschieben.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `docs/examples/analyze.html` und `docs/examples/impact.html` existieren als stabile Beispielartefakte.
+- [x] `README.md` listet HTML in Formatliste und Beispielen, ohne HTML weiterhin als "nicht Ziel" zu fuehren.
+- [x] `docs/guide.md` dokumentiert produktive Nutzung von `--format html` und `--format html --output`.
+- [x] `docs/quality.md` listet die neuen HTML-Gates aus Tranche C.
+- [x] Coverage-, Lizard- und Clang-Tidy-Gates sind gruen, ohne neue HTML-Befunde nach Tranche D zu verschieben.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 #### Abnahme und Definition of Done Tranche C
 
@@ -759,30 +776,30 @@ Abnahme Tranche C: alle Docker-Gates aus `README.md` und `docs/quality.md` gruen
 
 Definition of Done Tranche C:
 
-- [ ] Analyze- und Impact-HTML-Goldens decken die in Tranche C gelisteten Faelle ab.
-- [ ] Escaping-Goldens decken HTML-Sonderzeichen und Whitespace-Normalisierung ab.
-- [ ] leere Sections zeigen dokumentierte Leersaetze.
-- [ ] `--output` schreibt nur in die Datei; stdout und stderr bleiben bei Erfolg leer.
-- [ ] Fehlerpfade erzeugen Textfehler und kein HTML-Fehlerdokument.
-- [ ] `e2e_binary` deckt `analyze --format html` und `impact --format html` ab.
-- [ ] `docs/examples/` enthaelt stabile Analyze- und Impact-Beispielberichte.
-- [ ] `README.md`, `docs/guide.md` und `docs/quality.md` sind aktualisiert.
-- [ ] Coverage-, Lizard- und Clang-Tidy-Gates sind gruen.
+- [x] Analyze- und Impact-HTML-Goldens decken die in Tranche C gelisteten Faelle ab.
+- [x] Escaping-Goldens decken HTML-Sonderzeichen und Whitespace-Normalisierung ab.
+- [x] leere Sections zeigen dokumentierte Leersaetze.
+- [x] `--output` schreibt nur in die Datei; stdout und stderr bleiben bei Erfolg leer.
+- [x] Fehlerpfade erzeugen Textfehler und kein HTML-Fehlerdokument.
+- [x] `e2e_binary` deckt `analyze --format html` und `impact --format html` ab.
+- [x] `docs/examples/` enthaelt stabile Analyze- und Impact-Beispielberichte.
+- [x] `README.md`, `docs/guide.md` und `docs/quality.md` sind aktualisiert.
+- [x] Coverage-, Lizard- und Clang-Tidy-Gates sind gruen.
 
-### Tranche D - Optionale Haertung
+### Tranche D - Haertung
 
 Ohne diese Tranche gilt AP 1.4 als abgenommen, sobald Tranche C gruen ist.
 
 - Zusaetzliche plattformspezifische Pfad-Edge-Cases, etwa Windows-Drives und UNC-aehnliche Strings.
 - Weitere ASCII-Escaping-Edge-Cases.
 - Druckdarstellung weiter verbessern, solange Goldens deterministisch bleiben.
-- Optionaler HTML-Struktur-Smoke, falls er in Tranche C noch nicht noetig war.
+- HTML-Struktur-Smoke, falls er in Tranche C noch nicht noetig war.
 - Zusaetzliche gezielte Regressionstests fuer Grenzfaelle, die ueber die verpflichtenden Coverage-, Lizard- und Clang-Tidy-Gates aus Tranche C hinausgehen.
 
 Definition of Done Tranche D:
 
 - [ ] Jede zusaetzliche Haertung ist durch einen fokussierten Test oder ein Golden abgesichert.
-- [ ] Keine optionale Haertung veraendert den dokumentierten AP-1.4-Vertrag ohne Update von `docs/report-html.md`.
+- [ ] Keine Haertung veraendert den dokumentierten AP-1.4-Vertrag ohne Update von `docs/report-html.md`.
 - [ ] Docker-Gates aus `README.md` und `docs/quality.md` bleiben gruen.
 
 ## Entscheidungen

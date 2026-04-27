@@ -116,27 +116,29 @@ std::string_view html_report_css() {
     // Static, byte-stable CSS per docs/report-html.md "CSS-Vertrag".
     // Identical for analyze and impact. No @import / url(...) / external
     // fonts / animations / random values. System fontstacks only.
+    // Layout: leading newline puts <style> on its own line, one CSS rule
+    // per line keeps goldens diff-friendly.
     static constexpr std::string_view kCss =
+        "\n"
         "body{margin:0;padding:1.5rem;background:#ffffff;color:#1a1a1a;"
         "font-family:system-ui,-apple-system,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif;"
-        "line-height:1.5;}"
-        "main.report{max-width:80rem;margin:0 auto;}"
-        "h1{font-size:1.75rem;margin:0 0 1rem 0;}"
-        "h2{font-size:1.25rem;margin:1.5rem 0 0.75rem 0;}"
-        "h3{font-size:1.0rem;margin:1rem 0 0.5rem 0;}"
-        "section{margin-bottom:1.5rem;}"
-        "table{border-collapse:collapse;width:100%;}"
-        "th,td{border:1px solid #d0d0d0;padding:0.5rem;text-align:left;vertical-align:top;}"
-        "th{background:#f3f3f3;font-weight:600;}"
-        ".table-wrap{overflow-x:auto;}"
+        "line-height:1.5;}\n"
+        "main.report{max-width:80rem;margin:0 auto;}\n"
+        "h1{font-size:1.75rem;margin:0 0 1rem 0;}\n"
+        "h2{font-size:1.25rem;margin:1.5rem 0 0.75rem 0;}\n"
+        "h3{font-size:1.0rem;margin:1rem 0 0.5rem 0;}\n"
+        "section{margin-bottom:1.5rem;}\n"
+        "table{border-collapse:collapse;width:100%;}\n"
+        "th,td{border:1px solid #d0d0d0;padding:0.5rem;text-align:left;vertical-align:top;}\n"
+        "th{background:#f3f3f3;font-weight:600;}\n"
+        ".table-wrap{overflow-x:auto;}\n"
         ".badge{display:inline-block;padding:0.1rem 0.5rem;border:1px solid #1a1a1a;"
-        "border-radius:0.25rem;background:#f0f0f0;color:#1a1a1a;font-size:0.875rem;}"
-        ".badge-direct{background:#1a1a1a;color:#ffffff;}"
-        ".badge-heuristic{background:#ffffff;color:#1a1a1a;}"
-        ".empty{color:#404040;font-style:italic;}"
-        "code,pre{font-family:ui-monospace,\"SFMono-Regular\",\"Menlo\",\"Consolas\",monospace;}"
-        "@media print{body{background:#ffffff;color:#000000;}"
-        "th{background:#ffffff;}}";
+        "border-radius:0.25rem;background:#f0f0f0;color:#1a1a1a;font-size:0.875rem;}\n"
+        ".badge-direct{background:#1a1a1a;color:#ffffff;}\n"
+        ".badge-heuristic{background:#ffffff;color:#1a1a1a;}\n"
+        ".empty{color:#404040;font-style:italic;}\n"
+        "code,pre{font-family:ui-monospace,\"SFMono-Regular\",\"Menlo\",\"Consolas\",monospace;}\n"
+        "@media print{body{background:#ffffff;color:#000000;}th{background:#ffffff;}}\n";
     return kCss;
 }
 
@@ -281,39 +283,39 @@ void emit_diagnostics_section(std::ostringstream& out,
         out << "<p class=\"empty\">No diagnostics.</p></section>";
         return;
     }
-    out << "<ul>";
+    out << "\n<ul>\n";
     for (const auto& diag : diagnostics) {
         out << "<li><span class=\"badge\">" << severity_text(diag.severity)
-            << "</span> " << render_text(diag.message) << "</li>";
+            << "</span> " << render_text(diag.message) << "</li>\n";
     }
     out << "</ul></section>";
 }
 
 void emit_inputs_section(std::ostringstream& out, const ReportInputs& inputs,
                           bool include_changed_file) {
-    out << "<section class=\"inputs\"><h2>Inputs</h2>"
-        << "<dl>"
+    out << "<section class=\"inputs\"><h2>Inputs</h2>\n"
+        << "<dl>\n"
         << "<dt>compile_database_path</dt><dd>"
-        << render_text(optional_or_not_provided(inputs.compile_database_path)) << "</dd>"
+        << render_text(optional_or_not_provided(inputs.compile_database_path)) << "</dd>\n"
         << "<dt>compile_database_source</dt><dd>"
-        << render_text(source_text(inputs.compile_database_source)) << "</dd>"
+        << render_text(source_text(inputs.compile_database_source)) << "</dd>\n"
         << "<dt>cmake_file_api_path</dt><dd>"
-        << render_text(optional_or_not_provided(inputs.cmake_file_api_path)) << "</dd>"
+        << render_text(optional_or_not_provided(inputs.cmake_file_api_path)) << "</dd>\n"
         << "<dt>cmake_file_api_resolved_path</dt><dd>"
         << render_text(optional_or_not_provided(inputs.cmake_file_api_resolved_path))
-        << "</dd>"
+        << "</dd>\n"
         << "<dt>cmake_file_api_source</dt><dd>"
-        << render_text(source_text(inputs.cmake_file_api_source)) << "</dd>";
+        << render_text(source_text(inputs.cmake_file_api_source)) << "</dd>\n";
     if (include_changed_file) {
         out << "<dt>changed_file</dt><dd>"
-            << render_text(optional_or_not_provided(inputs.changed_file)) << "</dd>"
+            << render_text(optional_or_not_provided(inputs.changed_file)) << "</dd>\n"
             << "<dt>changed_file_source</dt><dd>";
         if (inputs.changed_file_source.has_value()) {
             out << render_text(changed_file_source_text(*inputs.changed_file_source));
         } else {
             out << "not provided";
         }
-        out << "</dd>";
+        out << "</dd>\n";
     }
     out << "</dl></section>";
 }
@@ -329,19 +331,19 @@ void emit_analyze_summary(std::ostringstream& out, const AnalysisResult& result,
                            std::size_t top_limit, const AnalyzeSectionCounts& counts) {
     const auto version = std::to_string(
         static_cast<std::size_t>(xray::hexagon::model::kReportFormatVersion));
-    out << "<header class=\"summary\">"
-        << "<h1>cmake-xray analyze report</h1>"
-        << "<dl>"
-        << "<dt>report_type</dt><dd>analyze</dd>"
-        << "<dt>format_version</dt><dd>" << version << "</dd>"
-        << "<dt>translation_units</dt><dd>" << result.translation_units.size() << "</dd>"
+    out << "<header class=\"summary\">\n"
+        << "<h1>cmake-xray analyze report</h1>\n"
+        << "<dl>\n"
+        << "<dt>report_type</dt><dd>analyze</dd>\n"
+        << "<dt>format_version</dt><dd>" << version << "</dd>\n"
+        << "<dt>translation_units</dt><dd>" << result.translation_units.size() << "</dd>\n"
         << "<dt>ranking_entries</dt><dd>" << counts.ranking_count << " of "
-        << result.translation_units.size() << "</dd>"
-        << "<dt>top_limit</dt><dd>" << top_limit << "</dd>"
+        << result.translation_units.size() << "</dd>\n"
+        << "<dt>top_limit</dt><dd>" << top_limit << "</dd>\n"
         << "<dt>observation_source</dt><dd>"
-        << render_text(observation_source_text(result.observation_source)) << "</dd>"
+        << render_text(observation_source_text(result.observation_source)) << "</dd>\n"
         << "<dt>target_metadata</dt><dd>"
-        << render_text(target_metadata_text(result.target_metadata)) << "</dd>"
+        << render_text(target_metadata_text(result.target_metadata)) << "</dd>\n"
         << "</dl></header>";
 }
 
@@ -356,7 +358,7 @@ void emit_ranking_row(std::ostringstream& out, const RankedTranslationUnit& tu) 
         << "<td>" << tu.define_count << "</td>";
     emit_targets_cell(out, tu.targets);
     emit_diagnostics_cell(out, tu.diagnostics);
-    out << "</tr>";
+    out << "</tr>\n";
 }
 
 struct RankingContext {
@@ -366,16 +368,17 @@ struct RankingContext {
 
 void emit_ranking_section(std::ostringstream& out, const AnalysisResult& result,
                            const RankingContext& ctx) {
-    out << "<section class=\"ranking\"><h2>Translation Unit Ranking</h2>";
+    out << "<section class=\"ranking\"><h2>Translation Unit Ranking</h2>\n";
     if (result.translation_units.empty()) {
         out << "<p class=\"empty\">No translation units to report.</p></section>";
         return;
     }
     if (result.translation_units.size() > ctx.top_limit) {
         out << "<p>Showing " << ctx.ranking_count << " of "
-            << result.translation_units.size() << " entries.</p>";
+            << result.translation_units.size() << " entries.</p>\n";
     }
-    out << "<div class=\"table-wrap\"><table><thead><tr>"
+    out << "<div class=\"table-wrap\"><table>\n"
+        << "<thead><tr>"
         << "<th scope=\"col\">Rank</th>"
         << "<th scope=\"col\">Source path</th>"
         << "<th scope=\"col\">Directory</th>"
@@ -385,11 +388,11 @@ void emit_ranking_section(std::ostringstream& out, const AnalysisResult& result,
         << "<th scope=\"col\">Defines</th>"
         << "<th scope=\"col\">Targets</th>"
         << "<th scope=\"col\">Diagnostics</th>"
-        << "</tr></thead><tbody>";
+        << "</tr></thead>\n<tbody>\n";
     for (std::size_t index = 0; index < ctx.ranking_count; ++index) {
         emit_ranking_row(out, result.translation_units[index]);
     }
-    out << "</tbody></table></div></section>";
+    out << "</tbody>\n</table></div></section>";
 }
 
 void emit_hotspot_context_cell(
@@ -428,42 +431,43 @@ struct HotspotContext {
 };
 
 void emit_hotspots_section(std::ostringstream& out, const HotspotContext& ctx) {
-    out << "<section class=\"hotspots\"><h2>Include Hotspots</h2>";
+    out << "<section class=\"hotspots\"><h2>Include Hotspots</h2>\n";
     if (ctx.result.include_hotspots.empty()) {
         out << "<p class=\"empty\">No include hotspots to report.</p></section>";
         return;
     }
     if (ctx.result.include_hotspots.size() > ctx.top_limit) {
         out << "<p>Showing " << ctx.hotspot_count << " of "
-            << ctx.result.include_hotspots.size() << " entries.</p>";
+            << ctx.result.include_hotspots.size() << " entries.</p>\n";
     }
-    out << "<div class=\"table-wrap\"><table><thead><tr>"
+    out << "<div class=\"table-wrap\"><table>\n"
+        << "<thead><tr>"
         << "<th scope=\"col\">Header</th>"
         << "<th scope=\"col\">Affected translation units</th>"
         << "<th scope=\"col\">Translation unit context</th>"
-        << "</tr></thead><tbody>";
+        << "</tr></thead>\n<tbody>\n";
     for (std::size_t index = 0; index < ctx.hotspot_count; ++index) {
         const auto& hotspot = ctx.result.include_hotspots[index];
         out << "<tr>"
             << "<td>" << render_text(hotspot.header_path) << "</td>"
             << "<td>" << hotspot.affected_translation_units.size() << "</td>";
         emit_hotspot_context_cell(out, hotspot, ctx.top_limit, ctx.targets_by_key);
-        out << "</tr>";
+        out << "</tr>\n";
     }
-    out << "</tbody></table></div></section>";
+    out << "</tbody>\n</table></div></section>";
 }
 
 void emit_target_metadata_section(std::ostringstream& out, const AnalysisResult& result) {
-    out << "<section class=\"target-metadata\"><h2>Target Metadata</h2>";
-    out << "<dl>"
+    out << "<section class=\"target-metadata\"><h2>Target Metadata</h2>\n";
+    out << "<dl>\n"
         << "<dt>observation_source</dt><dd>"
-        << render_text(observation_source_text(result.observation_source)) << "</dd>"
+        << render_text(observation_source_text(result.observation_source)) << "</dd>\n"
         << "<dt>target_metadata</dt><dd>"
-        << render_text(target_metadata_text(result.target_metadata)) << "</dd>"
+        << render_text(target_metadata_text(result.target_metadata)) << "</dd>\n"
         << "<dt>translation_units_with_targets</dt><dd>"
         << count_mapped_translation_units(result.translation_units) << " of "
-        << result.translation_units.size() << "</dd>"
-        << "</dl>";
+        << result.translation_units.size() << "</dd>\n"
+        << "</dl>\n";
     if (result.target_metadata == TargetMetadataStatus::not_loaded) {
         out << "<p class=\"empty\">No target metadata loaded.</p></section>";
         return;
@@ -482,16 +486,17 @@ void emit_target_metadata_section(std::ostringstream& out, const AnalysisResult&
     targets.reserve(by_key.size());
     for (auto& [_, target] : by_key) targets.push_back(std::move(target));
     targets = sorted_targets(targets);
-    out << "<div class=\"table-wrap\"><table><thead><tr>"
+    out << "<div class=\"table-wrap\"><table>\n"
+        << "<thead><tr>"
         << "<th scope=\"col\">Display name</th>"
         << "<th scope=\"col\">Type</th>"
-        << "</tr></thead><tbody>";
+        << "</tr></thead>\n<tbody>\n";
     for (const auto& target : targets) {
         out << "<tr>"
             << "<td>" << render_text(target_label(target)) << "</td>"
-            << "<td>" << render_text(target.type) << "</td></tr>";
+            << "<td>" << render_text(target.type) << "</td></tr>\n";
     }
-    out << "</tbody></table></div></section>";
+    out << "</tbody>\n</table></div></section>";
 }
 
 // ---- Impact sections ----------------------------------------------------
@@ -499,21 +504,21 @@ void emit_target_metadata_section(std::ostringstream& out, const AnalysisResult&
 void emit_impact_summary(std::ostringstream& out, const ImpactResult& result) {
     const auto version = std::to_string(
         static_cast<std::size_t>(xray::hexagon::model::kReportFormatVersion));
-    out << "<header class=\"summary\">"
-        << "<h1>cmake-xray impact report</h1>"
-        << "<dl>"
-        << "<dt>report_type</dt><dd>impact</dd>"
-        << "<dt>format_version</dt><dd>" << version << "</dd>"
+    out << "<header class=\"summary\">\n"
+        << "<h1>cmake-xray impact report</h1>\n"
+        << "<dl>\n"
+        << "<dt>report_type</dt><dd>impact</dd>\n"
+        << "<dt>format_version</dt><dd>" << version << "</dd>\n"
         << "<dt>changed_file</dt><dd>"
-        << render_text(optional_or_not_provided(result.inputs.changed_file)) << "</dd>"
+        << render_text(optional_or_not_provided(result.inputs.changed_file)) << "</dd>\n"
         << "<dt>affected_translation_units</dt><dd>"
-        << result.affected_translation_units.size() << "</dd>"
+        << result.affected_translation_units.size() << "</dd>\n"
         << "<dt>classification</dt><dd>"
-        << render_text(impact_classification(result)) << "</dd>"
+        << render_text(impact_classification(result)) << "</dd>\n"
         << "<dt>observation_source</dt><dd>"
-        << render_text(observation_source_text(result.observation_source)) << "</dd>"
+        << render_text(observation_source_text(result.observation_source)) << "</dd>\n"
         << "<dt>target_metadata</dt><dd>"
-        << render_text(target_metadata_text(result.target_metadata)) << "</dd>"
+        << render_text(target_metadata_text(result.target_metadata)) << "</dd>\n"
         << "</dl></header>";
 }
 
@@ -522,7 +527,7 @@ void emit_impacted_tu_row(std::ostringstream& out, const ImpactedTranslationUnit
         << "<td>" << render_text(tu.reference.source_path) << "</td>"
         << "<td>" << render_text(tu.reference.directory) << "</td>";
     emit_targets_cell(out, tu.targets);
-    out << "</tr>";
+    out << "</tr>\n";
 }
 
 struct ImpactedTuSection {
@@ -535,7 +540,7 @@ struct ImpactedTuSection {
 void emit_impacted_tu_section(std::ostringstream& out, const ImpactResult& result,
                                const ImpactedTuSection& spec) {
     out << "<section class=\"" << spec.section_class << "\"><h2>" << spec.title
-        << "</h2>";
+        << "</h2>\n";
     bool any = false;
     for (const auto& tu : result.affected_translation_units) {
         if (tu.kind == spec.kind) {
@@ -547,16 +552,17 @@ void emit_impacted_tu_section(std::ostringstream& out, const ImpactResult& resul
         out << "<p class=\"empty\">" << spec.empty_text << "</p></section>";
         return;
     }
-    out << "<div class=\"table-wrap\"><table><thead><tr>"
+    out << "<div class=\"table-wrap\"><table>\n"
+        << "<thead><tr>"
         << "<th scope=\"col\">Source path</th>"
         << "<th scope=\"col\">Directory</th>"
         << "<th scope=\"col\">Targets</th>"
-        << "</tr></thead><tbody>";
+        << "</tr></thead>\n<tbody>\n";
     for (const auto& tu : result.affected_translation_units) {
         if (tu.kind != spec.kind) continue;
         emit_impacted_tu_row(out, tu);
     }
-    out << "</tbody></table></div></section>";
+    out << "</tbody>\n</table></div></section>";
 }
 
 struct ImpactedTargetSection {
@@ -570,7 +576,7 @@ struct ImpactedTargetSection {
 void emit_impacted_target_section(std::ostringstream& out, const ImpactResult& result,
                                    const ImpactedTargetSection& spec) {
     out << "<section class=\"" << spec.section_class << "\"><h2>" << spec.title
-        << "</h2>";
+        << "</h2>\n";
     std::vector<TargetInfo> matches;
     for (const auto& impacted : result.affected_targets) {
         if (impacted.classification == spec.classification) {
@@ -582,17 +588,18 @@ void emit_impacted_target_section(std::ostringstream& out, const ImpactResult& r
         return;
     }
     matches = sorted_targets(matches);
-    out << "<div class=\"table-wrap\"><table><thead><tr>"
+    out << "<div class=\"table-wrap\"><table>\n"
+        << "<thead><tr>"
         << "<th scope=\"col\">Display name</th>"
         << "<th scope=\"col\">Type</th>"
-        << "</tr></thead><tbody>";
+        << "</tr></thead>\n<tbody>\n";
     for (const auto& target : matches) {
         out << "<tr>"
             << "<td><span class=\"badge " << spec.badge_class << "\">"
             << render_text(target_label(target)) << "</span></td>"
-            << "<td>" << render_text(target.type) << "</td></tr>";
+            << "<td>" << render_text(target.type) << "</td></tr>\n";
     }
-    out << "</tbody></table></div></section>";
+    out << "</tbody>\n</table></div></section>";
 }
 
 // ---- Document scaffolding ----------------------------------------------
@@ -637,11 +644,16 @@ std::string render_analyze(const AnalysisResult& result, std::size_t top_limit) 
     std::ostringstream out;
     emit_doc_open(out, "analyze", "cmake-xray analyze report");
     emit_analyze_summary(out, result, top_limit, counts);
+    out << "\n";
     emit_inputs_section(out, result.inputs, /*include_changed_file=*/false);
+    out << "\n";
     emit_ranking_section(out, result, RankingContext{top_limit, counts.ranking_count});
+    out << "\n";
     emit_hotspots_section(out, HotspotContext{result, top_limit, counts.hotspot_count,
                                                 targets_by_key});
+    out << "\n";
     emit_target_metadata_section(out, result);
+    out << "\n";
     emit_diagnostics_section(out, result.diagnostics);
     emit_doc_close(out);
     return out.str();
@@ -651,29 +663,35 @@ std::string render_impact(const ImpactResult& result) {
     std::ostringstream out;
     emit_doc_open(out, "impact", "cmake-xray impact report");
     emit_impact_summary(out, result);
+    out << "\n";
     emit_inputs_section(out, result.inputs, /*include_changed_file=*/true);
+    out << "\n";
     emit_impacted_tu_section(out, result,
                               ImpactedTuSection{"impact-direct-tus",
                                                 "Directly Affected Translation Units",
                                                 "No directly affected translation units.",
                                                 ImpactKind::direct});
+    out << "\n";
     emit_impacted_tu_section(out, result,
                               ImpactedTuSection{"impact-heuristic-tus",
                                                 "Heuristically Affected Translation Units",
                                                 "No heuristically affected translation units.",
                                                 ImpactKind::heuristic});
+    out << "\n";
     emit_impacted_target_section(out, result,
                                   ImpactedTargetSection{"impact-direct-targets",
                                                          "Directly Affected Targets",
                                                          "No directly affected targets.",
                                                          TargetImpactClassification::direct,
                                                          "badge-direct"});
+    out << "\n";
     emit_impacted_target_section(out, result,
                                   ImpactedTargetSection{"impact-heuristic-targets",
                                                          "Heuristically Affected Targets",
                                                          "No heuristically affected targets.",
                                                          TargetImpactClassification::heuristic,
                                                          "badge-heuristic"});
+    out << "\n";
     emit_diagnostics_section(out, result.diagnostics);
     emit_doc_close(out);
     return out.str();

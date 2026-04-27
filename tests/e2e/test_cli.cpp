@@ -610,6 +610,118 @@ TEST_CASE("dot impact refuses to render when changed_file_source is unresolved_f
     CHECK(err.str().find("digraph cmake_xray_impact") == std::string::npos);
 }
 
+// AP M5-1.4 Tranche C.2 Impact-Negativfall-Matrix line 551:
+// changed_file_source=unresolved_file_api_source_root must surface as a text
+// error on stderr with a non-zero exit and no HTML document. Mirrors the DOT
+// equivalent above so HTML respects the same render-precondition contract.
+TEST_CASE("html impact refuses to render when changed_file_source is unresolved_file_api_source_root") {
+    ImpactResult unresolved_result{};
+    unresolved_result.application = xray::hexagon::model::application_info();
+    unresolved_result.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    unresolved_result.inputs.changed_file = std::string{"src/missing.cpp"};
+    unresolved_result.inputs.changed_file_source =
+        xray::hexagon::model::ChangedFileSource::unresolved_file_api_source_root;
+
+    class FixedImpactPort final : public xray::hexagon::ports::driving::AnalyzeImpactPort {
+    public:
+        explicit FixedImpactPort(ImpactResult result) : result_(std::move(result)) {}
+        ImpactResult analyze_impact(
+            xray::hexagon::ports::driving::AnalyzeImpactRequest /*request*/) const override {
+            return result_;
+        }
+
+    private:
+        ImpactResult result_;
+    };
+
+    const StubAnalyzeProjectPort analyze_project_port{AnalysisResult{}};
+    const FixedImpactPort impact_port{unresolved_result};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",     "impact",         "--cmake-file-api",
+                          "/tmp/empty",     "--changed-file", "src/missing.cpp",
+                          "--format",       "html"};
+
+    const int exit_code = cli.run(8, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("file-api source root is unresolved") != std::string::npos);
+    CHECK(err.str().find("--format html") != std::string::npos);
+    // No HTML document should leak into stderr either.
+    CHECK(err.str().find("<!doctype html>") == std::string::npos);
+    CHECK(err.str().find("<html") == std::string::npos);
+}
+
+// AP M5-1.4 Tranche C.2 Impact-Negativfall-Matrix line 550: an ImpactResult
+// whose changed_file is std::nullopt must not produce HTML. The CLI usage
+// validator rejects --changed-file=missing before analysis, so this exercises
+// the post-analysis precondition path via a stub ImpactPort that returns the
+// unset optional. Without the precondition the HTML adapter would emit "not
+// provided" placeholders; the precondition keeps that document from leaving
+// the binary.
+TEST_CASE("html impact refuses to render when changed_file is std::nullopt") {
+    ImpactResult unset_result{};
+    unset_result.application = xray::hexagon::model::application_info();
+    unset_result.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    // Leave inputs.changed_file as std::nullopt deliberately.
+
+    class FixedImpactPort final : public xray::hexagon::ports::driving::AnalyzeImpactPort {
+    public:
+        explicit FixedImpactPort(ImpactResult result) : result_(std::move(result)) {}
+        ImpactResult analyze_impact(
+            xray::hexagon::ports::driving::AnalyzeImpactRequest /*request*/) const override {
+            return result_;
+        }
+
+    private:
+        ImpactResult result_;
+    };
+
+    const StubAnalyzeProjectPort analyze_project_port{AnalysisResult{}};
+    const FixedImpactPort impact_port{unset_result};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray", "impact",         "--cmake-file-api",
+                          "/tmp/empty", "--changed-file", "src/whatever.cpp",
+                          "--format",   "html"};
+
+    const int exit_code = cli.run(8, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("changed_file is missing") != std::string::npos);
+    // No partial HTML document with "not provided" placeholders must leak.
+    CHECK(err.str().find("<!doctype html>") == std::string::npos);
+    CHECK(err.str().find("not provided") == std::string::npos);
+}
+
 TEST_CASE_FIXTURE(CliFixture, "dot impact analyze emits valid DOT and empty stderr") {
     REQUIRE(run({"impact", "--compile-commands",
                  fixture_path("m2/basic_project/compile_commands.json").c_str(),
@@ -710,6 +822,132 @@ TEST_CASE_FIXTURE(CliFixture, "html --output writes to the file and leaves stdou
                         std::istreambuf_iterator<char>());
     CHECK(content.find("<!doctype html>") != std::string::npos);
     CHECK(content.find("data-report-type=\"analyze\"") != std::string::npos);
+    CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
+}
+
+// AP M5-1.4 Tranche C.2: lock the html impact --output stdout/stderr/atomic
+// contract in a CLI test so the impact path matches the analyze path covered
+// above. Mirrors json impact --output and dot impact --output.
+TEST_CASE_FIXTURE(CliFixture, "html impact --output writes the file with empty streams") {
+    const TemporaryDirectory temp_dir;
+    const auto target = temp_dir.path() / "impact.html";
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--format", "html", "--output",
+                 target.string().c_str()}) == ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().empty());
+    REQUIRE(std::filesystem::is_regular_file(target));
+    const auto contents = read_text_file(target);
+    CHECK(contents.find("<!doctype html>") != std::string::npos);
+    CHECK(contents.find("data-report-type=\"impact\"") != std::string::npos);
+    CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
+}
+
+// AP M5-1.4 Tranche C.2 Impact-Negativfall-Matrix: missing compile-commands
+// reaches the HTML pipeline only as a text error on stderr. No HTML error
+// document is emitted, stdout stays empty, and the binary exits non-zero.
+TEST_CASE_FIXTURE(CliFixture,
+                  "html analyze with non-existent compile-commands emits text error") {
+    const TemporaryDirectory temp_dir;
+    const auto missing = (temp_dir.path() / "no-such.json").string();
+    CHECK(run({"analyze", "--compile-commands", missing.c_str(), "--format", "html"}) !=
+          ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    // No HTML document leaks into either stream.
+    CHECK(err.str().find("<!doctype html>") == std::string::npos);
+    CHECK(err.str().find("<html") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "html impact with non-existent compile-commands emits text error") {
+    const TemporaryDirectory temp_dir;
+    const auto missing = (temp_dir.path() / "no-such.json").string();
+    CHECK(run({"impact", "--compile-commands", missing.c_str(), "--changed-file",
+               "include/common/shared.h", "--format", "html"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    CHECK(err.str().find("<!doctype html>") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "html analyze with invalid compile-commands JSON emits text error") {
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("invalid_syntax/compile_commands.json").c_str(), "--format",
+               "html"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    CHECK(err.str().find("<!doctype html>") == std::string::npos);
+    CHECK(err.str().find("<html") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "html analyze with invalid file api reply emits text error") {
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m4/invalid_file_api/compile_commands.json").c_str(),
+               "--cmake-file-api", fixture_path("m4/invalid_file_api/build").c_str(),
+               "--format", "html"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    CHECK(err.str().find("<!doctype html>") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "html analyze with non-existent file api reply emits text error") {
+    const TemporaryDirectory temp_dir;
+    const auto bad = (temp_dir.path() / "no-reply").string();
+    CHECK(run({"analyze", "--cmake-file-api", bad.c_str(), "--format", "html"}) !=
+          ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    CHECK(err.str().find("<!doctype html>") == std::string::npos);
+}
+
+// --top 0 must be rejected by the existing PositiveNumber CLI validator before
+// the HTML pipeline ever runs; nothing HTML-shaped must appear on stdout or
+// stderr. Mirrors dot/markdown coverage for the same rule.
+TEST_CASE_FIXTURE(CliFixture,
+                  "html analyze with --top 0 is rejected and emits no HTML") {
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+               "html", "--top", "0"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    CHECK(err.str().find("<!doctype html>") == std::string::npos);
+    CHECK(err.str().find("<html") == std::string::npos);
+}
+
+// AP M5-1.4 leaves `impact --top` outside the M5 contract. The CLI usage
+// validator must keep rejecting --top for impact even when --format html is
+// requested; no HTML output must reach stdout.
+TEST_CASE_FIXTURE(CliFixture,
+                  "html impact rejects --top because impact has no top semantics") {
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(),
+               "--changed-file", "include/common/shared.h", "--format", "html", "--top",
+               "5"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    CHECK(err.str().find("<!doctype html>") == std::string::npos);
+}
+
+// Write fault: the atomic writer surfaces a non-existent intermediate
+// directory as an unexpected_error with a clear hint. Mirrors the markdown
+// write fault test; ensures HTML respects the same atomic-writer contract.
+TEST_CASE_FIXTURE(CliFixture,
+                  "html analyze --output write failures return exit 1 without leaving temp files") {
+    const TemporaryDirectory temp_dir;
+    const auto missing_target = (temp_dir.path() / "missing-dir" / "report.html").string();
+
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+               "html", "--output", missing_target.c_str(), "--top", "2"}) ==
+          ExitCode::unexpected_error);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    CHECK(err.str().find("cannot write report") != std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(missing_target));
     CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
 }
 
@@ -1186,6 +1424,128 @@ TEST_CASE("json --output keeps the existing target file when the JSON renderer t
     CHECK(err.str().find("cannot render report") != std::string::npos);
     CHECK(err.str().find("analysis report exception") != std::string::npos);
     CHECK(read_text_file(target) == "{\"untouched\": true}");
+    CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
+}
+
+// AP M5-1.4 Tranche C.2: HTML render-error doppelgaenger for analyze. Drives
+// the HTML --output path through a throwing GenerateReportPort so the CLI
+// must surface a non-zero exit, a text error on stderr, no partial HTML on
+// stdout, and an unchanged target file. Mirrors the json/dot doppelgaenger
+// tests above.
+TEST_CASE("html analyze --output keeps the existing target file when the HTML renderer throws") {
+    AnalysisResult success_result;
+    success_result.application = xray::hexagon::model::application_info();
+    success_result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    const StubAnalyzeProjectPort analyze_project_port{success_result};
+    const StubAnalyzeImpactPort analyze_impact_port;
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const ThrowingGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
+
+    const TemporaryDirectory temp_dir;
+    const auto target = temp_dir.path() / "report.html";
+    {
+        std::ofstream existing(target);
+        existing << "<!doctype html><html>untouched</html>";
+    }
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const auto target_path = target.string();
+    const char* argv[] = {"cmake-xray",
+                          "analyze",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--format",
+                          "html",
+                          "--output",
+                          target_path.c_str()};
+    const int exit_code = cli.run(8, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("cannot render report") != std::string::npos);
+    CHECK(err.str().find("analysis report exception") != std::string::npos);
+    CHECK(read_text_file(target) == "<!doctype html><html>untouched</html>");
+    CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
+}
+
+// AP M5-1.4 Tranche C.2: HTML render-error doppelgaenger for impact. The
+// impact-renderer path must respect the same render-error contract as the
+// analyze path: non-zero exit, text error on stderr, no HTML on stdout,
+// existing target file unchanged.
+TEST_CASE("html impact --output keeps the existing target file when the HTML renderer throws") {
+    AnalysisResult unused_analysis;
+    unused_analysis.application = xray::hexagon::model::application_info();
+    unused_analysis.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    ImpactResult impact_result;
+    impact_result.application = xray::hexagon::model::application_info();
+    impact_result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    impact_result.inputs.changed_file = std::string{"src/app/main.cpp"};
+    impact_result.inputs.changed_file_source =
+        xray::hexagon::model::ChangedFileSource::compile_database_directory;
+
+    class FixedImpactPort final : public xray::hexagon::ports::driving::AnalyzeImpactPort {
+    public:
+        explicit FixedImpactPort(ImpactResult result) : result_(std::move(result)) {}
+        ImpactResult analyze_impact(
+            xray::hexagon::ports::driving::AnalyzeImpactRequest /*request*/) const override {
+            return result_;
+        }
+
+    private:
+        ImpactResult result_;
+    };
+
+    const StubAnalyzeProjectPort analyze_project_port{unused_analysis};
+    const FixedImpactPort impact_port{impact_result};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const ThrowingGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    const TemporaryDirectory temp_dir;
+    const auto target = temp_dir.path() / "impact.html";
+    {
+        std::ofstream existing(target);
+        existing << "<!doctype html><html>impact untouched</html>";
+    }
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const auto target_path = target.string();
+    const char* argv[] = {"cmake-xray",
+                          "impact",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--changed-file",
+                          "src/app/main.cpp",
+                          "--format",
+                          "html",
+                          "--output",
+                          target_path.c_str()};
+    const int exit_code = cli.run(10, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("cannot render report") != std::string::npos);
+    CHECK(err.str().find("impact report exception") != std::string::npos);
+    CHECK(read_text_file(target) == "<!doctype html><html>impact untouched</html>");
     CHECK_FALSE(contains_temporary_report_file(temp_dir.path()));
 }
 

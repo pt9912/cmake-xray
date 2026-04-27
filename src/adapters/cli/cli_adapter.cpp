@@ -228,18 +228,34 @@ int handle_impact_result(const xray::hexagon::model::ImpactResult& result,
         format_error(streams.err, result.compile_database);
         return map_error_to_exit_code(result.compile_database.error());
     }
-    // docs/report-dot.md / docs/plan-M5-1-3.md: an ImpactResult whose
-    // changed_file_source is unresolved_file_api_source_root is a file-api
-    // error path. DOT must not render a graph for this case; the CLI emits
-    // a text error and returns non-zero. Other formats (JSON / Markdown /
-    // Console) continue to render so the caller can see the diagnostics.
-    if (format == ReportFormat::dot && result.inputs.changed_file_source.has_value() &&
+    // docs/report-dot.md / docs/plan-M5-1-3.md and docs/plan-M5-1-4.md
+    // Impact-Negativfall-Matrix: an ImpactResult whose changed_file_source is
+    // unresolved_file_api_source_root is a file-api error path. DOT and HTML
+    // must not render a graph/document for this case; the CLI emits a text
+    // error and returns non-zero. Other formats (JSON / Markdown / Console)
+    // continue to render so the caller can see the diagnostics.
+    if ((format == ReportFormat::dot || format == ReportFormat::html) &&
+        result.inputs.changed_file_source.has_value() &&
         *result.inputs.changed_file_source ==
             xray::hexagon::model::ChangedFileSource::unresolved_file_api_source_root) {
-        streams.err << "error: cannot render --format dot when the file-api source "
-                       "root is unresolved\n";
+        const auto* format_name = format == ReportFormat::html ? "html" : "dot";
+        streams.err << "error: cannot render --format " << format_name
+                    << " when the file-api source root is unresolved\n";
         streams.err << "hint: provide --compile-commands or a fully resolvable "
                        "--cmake-file-api path\n";
+        return ExitCode::input_invalid;
+    }
+    // docs/plan-M5-1-4.md Impact-Negativfall-Matrix: an HTML render also
+    // requires a resolved changed_file value. The CLI usage validator already
+    // rejects `impact` calls that arrive without --changed-file, but a stub
+    // ImpactPort or an internal future code path could still surface a result
+    // with the optional unset; the precondition keeps that case from emitting
+    // a partial HTML document with a "not provided" placeholder.
+    if (format == ReportFormat::html && !result.inputs.changed_file.has_value()) {
+        streams.err << "error: cannot render --format html when changed_file is "
+                       "missing from the impact result\n";
+        streams.err << "hint: rerun impact with --changed-file pointing at a "
+                       "concrete file\n";
         return ExitCode::input_invalid;
     }
     const ImpactCliReportRenderer renderer{report_port, result};

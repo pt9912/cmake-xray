@@ -14,10 +14,11 @@ Der Funktionsumfang umfasst:
 - Target-Zuordnung: Translation Units werden ihren CMake-Targets zugeordnet (`[targets: app, core]`)
 - targetbezogene Impact-Ausgabe mit `direct` und `heuristic` Evidenzklassen
 - Analyse auch ohne `compile_commands.json`, wenn File-API-Daten ausreichen
-- Report-Ausgabe als `console`, `markdown`, `json` oder `dot`
-- atomisches Schreiben von Markdown-, JSON- und DOT-Reports via `--output`
+- Report-Ausgabe als `console`, `markdown`, `json`, `dot` oder `html`
+- atomisches Schreiben von Markdown-, JSON-, DOT- und HTML-Reports via `--output`
 - versionierter, schemavalidierter JSON-Reportvertrag fuer Tooling und CI
 - Graphviz-DOT-Visualisierung von Top-Ranking, Include-Hotspots, Targets und Impact-Beziehungen
+- portabler, eigenstaendiger HTML5-Bericht mit inline CSS, ohne externe Ressourcen oder JavaScript
 - versionierte Golden-Files, Referenzdaten und Performance-Baselines
 - Docker-basierte Test-, Coverage- und Quality-Gates
 
@@ -27,7 +28,6 @@ Nicht Ziel des aktuellen Stands sind insbesondere:
 - vollstaendige CMake-Interpretation
 - transitive Target-Graph-Analyse
 - IDE-Integration
-- HTML-Export
 
 ## Voraussetzungen
 
@@ -121,6 +121,18 @@ cmake-xray analyze \
   --top 10
 ```
 
+### Projektanalyse als HTML-Datei
+
+```bash
+cmake-xray analyze \
+  --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json \
+  --format html \
+  --output build/reports/analyze.html \
+  --top 10
+```
+
+Die HTML-Ausgabe ist ein eigenstaendiges HTML5-Dokument mit inline CSS und ohne externe Ressourcen; es eignet sich als CI-Artefakt oder fuer Reviews ohne Browser-Plugins. Wird `--output` weggelassen, schreibt `cmake-xray` das Dokument vollstaendig auf `stdout`.
+
 ### Impact-Analyse
 
 ```bash
@@ -184,15 +196,19 @@ Ohne Target-Sicht (nur `compile_commands.json`):
 
 - [docs/examples/analyze-console.txt](./docs/examples/analyze-console.txt)
 - [docs/examples/analyze-report.md](./docs/examples/analyze-report.md)
+- [docs/examples/analyze-report.html](./docs/examples/analyze-report.html)
 - [docs/examples/impact-console.txt](./docs/examples/impact-console.txt)
 - [docs/examples/impact-report.md](./docs/examples/impact-report.md)
+- [docs/examples/impact-report.html](./docs/examples/impact-report.html)
 
 Mit Target-Sicht (File API):
 
 - [docs/examples/analyze-console-targets.txt](./docs/examples/analyze-console-targets.txt)
 - [docs/examples/analyze-report-targets.md](./docs/examples/analyze-report-targets.md)
+- [docs/examples/analyze-report-targets.html](./docs/examples/analyze-report-targets.html)
 - [docs/examples/impact-console-targets.txt](./docs/examples/impact-console-targets.txt)
 - [docs/examples/impact-report-targets.md](./docs/examples/impact-report-targets.md)
+- [docs/examples/impact-report-targets.html](./docs/examples/impact-report-targets.html)
 
 ## Exit-Codes
 
