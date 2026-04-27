@@ -611,9 +611,23 @@ assert_stdout_equals_file "M5 html analyze directory contexts matches golden" te
 
 # m5/html-fixtures/escape_paths is HTML-specific; it embeds <, >, &, ", ',
 # backslash, newline and <script>-style strings so the golden locks in the
-# documented escape rules from docs/report-html.md.
+# documented escape rules from docs/report-html.md. Backslash-as-path-separator
+# behaviour is platform-dependent: on POSIX, a literal backslash is part of
+# the source filename and renders as `back\slash.cpp`; on Windows the path
+# resolver normalises \ -> / before reaching the HTML adapter, so the rendered
+# path becomes `back/slash.cpp`. The split mirrors the DOT escaping golden
+# pair (analyze_escaping[_windows].dot) - any divergence beyond the path
+# separator points at an HTML-adapter escape bug, not a fixture issue.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        html_escaping_golden="tests/e2e/testdata/m5/html-reports/analyze_escaping_windows.html"
+        ;;
+    *)
+        html_escaping_golden="tests/e2e/testdata/m5/html-reports/analyze_escaping.html"
+        ;;
+esac
 assert_exit "M5 html analyze escaping exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/html-fixtures/escape_paths/compile_commands.json --format html --top 5
-assert_stdout_equals_file "M5 html analyze escaping matches golden" tests/e2e/testdata/m5/html-reports/analyze_escaping.html \
+assert_stdout_equals_file "M5 html analyze escaping matches golden" "$html_escaping_golden" \
     "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/html-fixtures/escape_paths/compile_commands.json --format html --top 5
 
 # M5 HTML goldens (impact)

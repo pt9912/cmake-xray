@@ -64,8 +64,10 @@ Regeln:
 - System-Fontstack erlaubt: `system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif` fuer Body, `ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace` fuer Codeartiges.
 - Hintergrundfarbe Body `#ffffff`, Vordergrundfarbe `#1a1a1a`. Kontrastverhaeltnis &ge; 4.5:1 (WCAG AA fuer Fliesstext).
 - Status-Badges nutzen Hintergrund + Text in Kombination, nie nur Farbe; sichtbarer Text wie `direct`, `heuristic`, `loaded`, `partial`, `not_loaded`, `warning`, `note` bleibt erhalten.
-- Tabellen sind horizontal scrollbar (`overflow-x: auto`), ohne dass das Seitenlayout bricht.
+- Tabellen sind auf dem Bildschirm horizontal scrollbar (`overflow-x: auto`), ohne dass das Seitenlayout bricht. Im Drucklayout setzt der Adapter `.table-wrap { overflow-x: visible }`, damit gedruckte Tabellen nicht abgeschnitten werden.
 - Drucklayout (`@media print`) entfernt Hintergrundfarben und reduziert Schriftfarbkontrast nicht unter Lesbarkeit.
+- Eine `@page { margin: 1.5cm }`-Regel setzt deterministische Druckraender; weitere Druckregeln sind ausschliesslich im Adapter-CSS hinterlegt und enthalten keine zufaelligen oder dynamischen Werte.
+- Im Drucklayout gilt `thead { display: table-header-group }` (Tabellenkopf wiederholt sich auf jeder gedruckten Seite) sowie `tr { break-inside: avoid; page-break-inside: avoid }` (Tabellenzeilen werden nicht ueber Seitenwechsel zerschnitten). Beide Regeln sind reine Render-Hints; Tabellenstruktur, Spalten- und Zeilenreihenfolge bleiben unveraendert und byte-stabil.
 
 CSS-Klassen stammen ausschliesslich aus festen Adapter-Literalen. Nutzergelieferte Inhalte erscheinen nie in `id`-Attributen, Klassennamen oder Inline-`style`-Attributen.
 

@@ -146,3 +146,27 @@ if(DOT_PROGRAM AND BASH_PROGRAM)
                 json
     )
 endif()
+
+# AP M5-1.4 Tranche D: optional HTML structure smoke. Pure-stdlib Python
+# validator that mirrors the DOT manifest+content gate and locks the static
+# HTML contract from docs/report-html.md (single h1/main, no script, no
+# external resources, no inline event handlers, no HTML comments). Runs in
+# every environment with python3 on PATH; no pip dependency.
+add_test(
+    NAME html_structure_validation
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_html_reports.py
+            --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/html-reports
+            --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/html-reports/manifest.txt
+)
+
+# Negative gate: a deliberately broken HTML fixture must fail validation so
+# we have evidence the smoke actually rejects violations rather than silently
+# passing. WILL_FAIL inverts the test outcome.
+add_test(
+    NAME html_structure_validation_rejects_broken_html
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_html_reports.py
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/html_broken_sample.html
+)
+set_tests_properties(html_structure_validation_rejects_broken_html PROPERTIES WILL_FAIL TRUE)

@@ -779,3 +779,231 @@ TEST_CASE("HTML target metadata section reports loaded-but-empty discovery") {
     const auto report = adapter.write_analysis_report(result, 3);
     CHECK(report.find("No targets discovered.") != std::string::npos);
 }
+
+// ---- Tranche D: platform path edge cases --------------------------------
+//
+// AP M5-1.4 Tranche D (plan ~793) hardens the adapter against host-divergent
+// path strings the e2e fixtures cannot easily exercise without per-platform
+// goldens. Adapter tests use synthetic strings so they stay stable on every
+// host; the e2e_binary path-resolver behaviour for backslash and absolute
+// drive prefixes is covered separately by analyze_escaping[_windows].html
+// and impact_absolute[_windows].html.
+
+TEST_CASE("HTML render_text passes Windows drive paths through verbatim") {
+    // Forward-slash drive paths are common in CMake-generated compile_commands;
+    // backslash drive paths can appear when the resolver is bypassed. Neither
+    // form contains HTML specials, so render_text should leave them untouched
+    // beyond the slash they already carry.
+    CHECK(render_text("C:/project/src/main.cpp") == "C:/project/src/main.cpp");
+    CHECK(render_text("D:/build/lib/core.cpp") == "D:/build/lib/core.cpp");
+    CHECK(render_text("C:\\project\\src\\main.cpp") ==
+          "C:\\project\\src\\main.cpp");
+    // Drive root and bare drive letter must not gain extra characters either.
+    CHECK(render_text("C:/") == "C:/");
+    CHECK(render_text("C:\\") == "C:\\");
+}
+
+TEST_CASE("HTML render_attribute escapes Windows drive paths in attributes") {
+    // Attribute values do not escape backslash, but they do escape double
+    // quotes; a path like `C:\\"weird"\\file.cpp` must come out fully
+    // attribute-safe.
+    CHECK(render_attribute("C:/project/src/main.cpp") ==
+          "C:/project/src/main.cpp");
+    CHECK(render_attribute("C:\\project\\src\\main.cpp") ==
+          "C:\\project\\src\\main.cpp");
+    CHECK(render_attribute("C:/path/with \"quote\".cpp") ==
+          "C:/path/with &quot;quote&quot;.cpp");
+}
+
+TEST_CASE("HTML render_text passes UNC paths through verbatim") {
+    // UNC paths use leading backslashes which neither HTML escaping nor
+    // whitespace normalisation should touch. The slash-style equivalent
+    // (//server/share) is also part of the wild and must survive intact.
+    CHECK(render_text("\\\\server\\share\\folder\\file.cpp") ==
+          "\\\\server\\share\\folder\\file.cpp");
+    CHECK(render_text("//server/share/folder/file.cpp") ==
+          "//server/share/folder/file.cpp");
+    // UNC with HTML specials in the share name still escapes the specials
+    // while preserving the leading backslashes.
+    CHECK(render_text("\\\\srv\\<share>\\file.cpp") ==
+          "\\\\srv\\&lt;share&gt;\\file.cpp");
+}
+
+TEST_CASE("HTML render_text handles mixed-slash paths without collapsing them") {
+    CHECK(render_text("C:/project\\src/main.cpp") ==
+          "C:/project\\src/main.cpp");
+    CHECK(render_text("\\\\server/share\\folder/file.cpp") ==
+          "\\\\server/share\\folder/file.cpp");
+}
+
+// ---- Tranche D: ASCII escaping edge cases -------------------------------
+
+TEST_CASE("normalize_html_whitespace turns every ASCII control byte 0x00..0x1F into a space") {
+    // \t, \n, \r have dedicated rules (single space, " / ", " / ") that earlier
+    // tests already pin down. The remaining control bytes must collapse to a
+    // single space so they cannot leak as raw control characters into the
+    // rendered document. Cover the edges (NUL, BEL, BS, FF, ESC, US) plus a
+    // representative middle to keep the loop coverage explicit.
+    for (int byte : {0x00, 0x01, 0x07, 0x08, 0x0B, 0x0C, 0x0E, 0x10,
+                     0x11, 0x1A, 0x1B, 0x1F}) {
+        std::string input;
+        input.push_back('a');
+        input.push_back(static_cast<char>(byte));
+        input.push_back('b');
+        const auto out = normalize_html_whitespace(input);
+        CHECK_MESSAGE(out == "a b",
+                      "byte " << byte << " produced " << out);
+    }
+}
+
+TEST_CASE("normalize_html_whitespace keeps DEL (0x7F) as itself per the documented contract") {
+    // The contract bound is `< 0x20`, so DEL (0x7F) and the rest of printable
+    // ASCII must pass through unchanged. The HTML escape stage neither adds
+    // nor removes meaning to those bytes either, so render_text must mirror.
+    std::string input;
+    input.push_back('a');
+    input.push_back(static_cast<char>(0x7F));
+    input.push_back('b');
+    CHECK(normalize_html_whitespace(input) == input);
+    CHECK(render_text(input) == input);
+}
+
+TEST_CASE("normalize_html_whitespace collapses sequential and mixed newlines deterministically") {
+    // Three explicit newlines produce three " / " separators concatenated.
+    // The renderer must not deduplicate them - sequential blank "lines" in
+    // user-facing diagnostics would otherwise lose their structure. Each
+    // " / " carries leading and trailing spaces, so adjacent separators show
+    // a double space between the slashes.
+    CHECK(normalize_html_whitespace("a\n\n\nb") == "a /  /  / b");
+    // Mixed CRLF/LF/CR collapse into one separator each so the displayed
+    // separator count matches the logical line count. \r\n is consumed as a
+    // single \n; lone \r and \n each produce one separator.
+    CHECK(normalize_html_whitespace("a\r\nb\nc\rd") == "a / b / c / d");
+}
+
+TEST_CASE("normalize_html_whitespace collapses tabs and control bytes adjacent to newlines without doubling separators") {
+    // \t between two LFs must NOT introduce a phantom separator; each LF
+    // becomes " / " and the tab becomes a single space, so the output is
+    // " /  / " with one space between (tab) and not three separators.
+    CHECK(normalize_html_whitespace("a\n\tb") == "a /  b");
+    CHECK(normalize_html_whitespace("a\r\n\r\nb") == "a /  / b");
+}
+
+TEST_CASE("html_escape_text leaves UTF-8 high bytes and DEL unchanged") {
+    // Bytes >= 0x7F are passed through so multi-byte UTF-8 characters
+    // (Cyrillic, CJK, emoji surrogates) survive. Earlier tests already cover
+    // the printable ASCII passthrough; this case nails the boundary.
+    const std::string ru = "\xD1\x82\xD0\xB5\xD1\x81\xD1\x82";  // "тест"
+    CHECK(html_escape_text(ru) == ru);
+    std::string with_del = "a";
+    with_del.push_back(static_cast<char>(0x7F));
+    with_del.push_back('b');
+    CHECK(html_escape_text(with_del) == with_del);
+}
+
+// ---- Tranche D: boundary regression tests -------------------------------
+
+TEST_CASE("HTML target label falls back to unique_key when display_name is empty") {
+    // target_label() prefers display_name, then unique_key, then type. An
+    // empty display_name with a populated unique_key must therefore render
+    // as the unique_key in the target metadata table.
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_metadata = TargetMetadataStatus::loaded;
+    result.target_assignments = {
+        TargetAssignment{"src/a.cpp|build",
+                         {TargetInfo{"", "EXECUTABLE", "fallback-key::EXECUTABLE"}}},
+    };
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+    CHECK(report.find("fallback-key::EXECUTABLE") != std::string::npos);
+}
+
+TEST_CASE("HTML target label falls back to type when display_name and unique_key are empty") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_metadata = TargetMetadataStatus::loaded;
+    result.target_assignments = {
+        TargetAssignment{"src/a.cpp|build",
+                         {TargetInfo{"", "OBJECT_LIBRARY", ""}}},
+    };
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+    // Both the badge (type column) and the table cell label render the type
+    // string; we just assert the fallback wrote *something* visible.
+    CHECK(report.find("OBJECT_LIBRARY") != std::string::npos);
+}
+
+TEST_CASE("HTML analyze report keeps targets sorted by display_name then type then unique_key") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_metadata = TargetMetadataStatus::loaded;
+    // Same display_name "core" with different types must stay distinguishable
+    // and sort by type as the tie-breaker (EXECUTABLE before STATIC_LIBRARY
+    // alphabetically). unique_key is the final tie-breaker.
+    result.target_assignments = {
+        TargetAssignment{"src/a.cpp|build",
+                         {TargetInfo{"core", "STATIC_LIBRARY", "core::STATIC"},
+                          TargetInfo{"core", "EXECUTABLE", "core::EXEC"},
+                          TargetInfo{"app", "EXECUTABLE", "app::EXEC"}}},
+    };
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+    const auto pos_app = report.find(">app<");
+    const auto pos_core_first = report.find(">core<");
+    REQUIRE(pos_app != std::string::npos);
+    REQUIRE(pos_core_first != std::string::npos);
+    // app sorts first (display_name app < core).
+    CHECK(pos_app < pos_core_first);
+    // Among the two "core" rows, EXECUTABLE comes before STATIC_LIBRARY in
+    // the table because type is the secondary sort key.
+    const auto pos_core_exec = report.find(">EXECUTABLE</td></tr>", pos_core_first);
+    const auto pos_core_static = report.find(">STATIC_LIBRARY</td></tr>",
+                                              pos_core_first);
+    REQUIRE(pos_core_exec != std::string::npos);
+    REQUIRE(pos_core_static != std::string::npos);
+    CHECK(pos_core_exec < pos_core_static);
+}
+
+TEST_CASE("HTML impact report renders both direct and heuristic sections in fixed order") {
+    // Same ImpactResult populating direct and heuristic translation units;
+    // the document must keep the documented section order even when both
+    // sides have content. This pins down the regression the C-review flagged
+    // (no single golden carries direct + heuristic together).
+    ImpactResult result = make_minimal_impact_result();
+    result.inputs.changed_file = std::string{"include/common/config.h"};
+    result.inputs.changed_file_source =
+        ChangedFileSource::compile_database_directory;
+    result.affected_translation_units = {
+        ImpactedTranslationUnit{
+            reference("src/direct.cpp", "build/direct", "src/direct.cpp|build/direct"),
+            ImpactKind::direct, {}},
+        ImpactedTranslationUnit{
+            reference("src/heuristic.cpp", "build/heuristic",
+                      "src/heuristic.cpp|build/heuristic"),
+            ImpactKind::heuristic, {}},
+    };
+    result.affected_targets = {
+        ImpactedTarget{TargetInfo{"app-direct", "EXECUTABLE", "app-direct::EXEC"},
+                       TargetImpactClassification::direct},
+        ImpactedTarget{TargetInfo{"app-heuristic", "EXECUTABLE",
+                                   "app-heuristic::EXEC"},
+                       TargetImpactClassification::heuristic},
+    };
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    const auto pos_direct_tus = report.find("class=\"impact-direct-tus\"");
+    const auto pos_heuristic_tus = report.find("class=\"impact-heuristic-tus\"");
+    const auto pos_direct_tgts = report.find("class=\"impact-direct-targets\"");
+    const auto pos_heuristic_tgts =
+        report.find("class=\"impact-heuristic-targets\"");
+    REQUIRE(pos_direct_tus != std::string::npos);
+    REQUIRE(pos_heuristic_tus != std::string::npos);
+    REQUIRE(pos_direct_tgts != std::string::npos);
+    REQUIRE(pos_heuristic_tgts != std::string::npos);
+    CHECK(pos_direct_tus < pos_heuristic_tus);
+    CHECK(pos_heuristic_tus < pos_direct_tgts);
+    CHECK(pos_direct_tgts < pos_heuristic_tgts);
+    // Both kinds populate their sections, no leersaetze for these.
+    CHECK(report.find("src/direct.cpp") != std::string::npos);
+    CHECK(report.find("src/heuristic.cpp") != std::string::npos);
+    CHECK(report.find("badge-direct") != std::string::npos);
+    CHECK(report.find("badge-heuristic") != std::string::npos);
+}

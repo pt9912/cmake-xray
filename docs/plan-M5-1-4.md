@@ -604,8 +604,8 @@ DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert 
 
 - Tranche A ausgeliefert in commit `8369e77` ("feat: lock in M5 AP 1.4 HTML contract and Tranche A skeleton").
 - Tranche B ausgeliefert in commit `5d878a7` ("feat: implement M5 AP 1.4 HTML adapter and CLI freischaltung (Tranche B)").
-- Tranche C ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; AP 1.4 ist damit nach Tranche-C-Definition abnahmefaehig).
-- Tranche D optional und offen.
+- Tranche C ausgeliefert in commit `299c364` ("feat: deliver M5 AP 1.4 HTML adapter Tranche C").
+- Tranche D ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; AP 1.4 ist damit auch ueber die optionale Haertung hinweg abgeschlossen).
 
 ### Tranche A - Vertrag, Escaping, CSS und Testskelett
 
@@ -798,9 +798,9 @@ Ohne diese Tranche gilt AP 1.4 als abgenommen, sobald Tranche C gruen ist.
 
 Definition of Done Tranche D:
 
-- [ ] Jede zusaetzliche Haertung ist durch einen fokussierten Test oder ein Golden abgesichert.
-- [ ] Keine Haertung veraendert den dokumentierten AP-1.4-Vertrag ohne Update von `docs/report-html.md`.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` bleiben gruen.
+- [x] Jede zusaetzliche Haertung ist durch einen fokussierten Test oder ein Golden abgesichert.
+- [x] Keine Haertung veraendert den dokumentierten AP-1.4-Vertrag ohne Update von `docs/report-html.md`.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` bleiben gruen.
 
 ## Entscheidungen
 

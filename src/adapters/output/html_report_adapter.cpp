@@ -138,7 +138,12 @@ std::string_view html_report_css() {
         ".badge-heuristic{background:#ffffff;color:#1a1a1a;}\n"
         ".empty{color:#404040;font-style:italic;}\n"
         "code,pre{font-family:ui-monospace,\"SFMono-Regular\",\"Menlo\",\"Consolas\",monospace;}\n"
-        "@media print{body{background:#ffffff;color:#000000;}th{background:#ffffff;}}\n";
+        "@page{margin:1.5cm;}\n"
+        "@media print{body{background:#ffffff;color:#000000;}"
+        "th{background:#ffffff;}"
+        "thead{display:table-header-group;}"
+        "tr{break-inside:avoid;page-break-inside:avoid;}"
+        ".table-wrap{overflow-x:visible;}}\n";
     return kCss;
 }
 

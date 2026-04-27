@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>broken sample for validate_html_reports.py</title>
+<style>@import url("https://example.com/external.css");</style>
+</head>
+<body>
+<main class="report" data-report-type="analyze" data-format-version="1">
+<h1>first heading</h1>
+<h1>duplicate h1 (forbidden by contract)</h1>
+<script>alert("forbidden inline script")</script>
+<p onclick="alert(1)">forbidden inline handler</p>
+<!-- forbidden HTML comment -->
+</main>
+</body>
+</html>

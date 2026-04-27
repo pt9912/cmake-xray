@@ -21,7 +21,8 @@ th{background:#f3f3f3;font-weight:600;}
 .badge-heuristic{background:#ffffff;color:#1a1a1a;}
 .empty{color:#404040;font-style:italic;}
 code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;}
-@media print{body{background:#ffffff;color:#000000;}th{background:#ffffff;}}
+@page{margin:1.5cm;}
+@media print{body{background:#ffffff;color:#000000;}th{background:#ffffff;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}.table-wrap{overflow-x:visible;}}
 </style>
 </head>
 <body>

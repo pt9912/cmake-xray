@@ -3,13 +3,22 @@
 # Each non-comment, non-blank line names exactly one .html golden file in
 # this directory. Tranche A creates this manifest empty; Tranche C adds the
 # analyze and impact goldens that lock the HTML contract in place. Per-
-# platform variants (*_windows.html) cover host-divergent path semantics
-# for absolute --changed-file inputs — see comments in tests/e2e/run_e2e.sh
-# for the case "$(uname -s)" branching. The Windows golden is hand-derived
-# from its POSIX twin via path substitution because Linux treats
-# C:/project/... as relative; on a real Windows host the binary produces
-# byte-identical output, and any divergence indicates a path-handling bug
-# (Sub-Risiko C.1, plan section 698).
+# platform variants (*_windows.html) cover host-divergent path semantics:
+#
+#   - impact_absolute_windows.html   -> Windows treats C:/project/... as
+#                                       absolute; POSIX treats it as relative.
+#                                       The Windows golden is hand-derived
+#                                       from its POSIX twin via path
+#                                       substitution (Sub-Risiko C.1, plan
+#                                       section 698).
+#   - analyze_escaping_windows.html  -> Windows path resolver normalises
+#                                       backslash to forward slash before
+#                                       the HTML adapter sees it; POSIX keeps
+#                                       backslash as part of the filename.
+#
+# tests/e2e/run_e2e.sh selects the right variant via case "$(uname -s)".
+# Any divergence beyond the documented path-separator/path-prefix substitutions
+# indicates an HTML-adapter or path-resolver bug, not a fixture issue.
 #
 # Coverage of the eight Tranche-C-listed analyze cases (plan ~673-681):
 #   1 Compile-DB-only            -> analyze_compile_db_only.html
@@ -43,6 +52,7 @@ analyze_top_truncated.html
 analyze_hotspot_context_truncated.html
 analyze_directory_contexts.html
 analyze_escaping.html
+analyze_escaping_windows.html
 
 # Impact goldens
 impact_compile_db_relative.html
