@@ -176,6 +176,17 @@ Der menschenlesbare HTML-Reportvertrag ist in [docs/report-html.md](./report-htm
 
 CTest selbst installiert keine Systempakete und greift nicht auf das Netzwerk zu. AP 1.4 fuehrt keine neuen pip-Dependencies ein; falls eine spaetere HTML-Vertragsversion das doch tut, ist Hash-Pinning ueber `pip-compile --generate-hashes` Pflicht.
 
+## CLI-Verbosity (`--quiet` / `--verbose`)
+
+Der command-lokale Verbosity-Vertrag ist in [docs/plan-M5-1-5.md](./plan-M5-1-5.md) dokumentiert. AP M5-1.5 fuehrt `--quiet` und `--verbose` in drei verbindlichen Tranchen plus optionaler Tranche D ein. Tranche A ist abgeschlossen und sichert folgende Gates:
+
+- **CLI-Modell und Architektur-Tabu** in `xray_tests` ueber `tests/adapters/test_port_wiring.cpp`. `static_assert`-basierte Architektur-Pruefungen stellen sicher, dass `ConsoleReportAdapter`, `MarkdownReportAdapter`, `JsonReportAdapter`, `DotReportAdapter` und `HtmlReportAdapter` weiterhin default-konstruierbar sind und `GenerateReportPort::generate_analysis_report` und `generate_impact_report` ihre dokumentierten Signaturen behalten. Eine zukuenftige Erweiterung um einen `OutputVerbosity`-Parameter wuerde die `static_assert`-Sequenz brechen.
+- **Mutual-Exclusion und command-lokale Position** in `xray_tests` ueber `tests/e2e/test_cli.cpp`. Tests pruefen, dass `--quiet` und `--verbose` an beiden Subcommands akzeptiert werden, gemeinsam zu einem Usage-Fehler fuehren, und globale Positionen vor dem Subcommand mit nonzero Exit abgelehnt werden.
+- **Fehlervertrag-Praezedenz** in `xray_tests` ueber `tests/e2e/test_cli.cpp`. `impact --verbose` ohne `--changed-file` liefert die Pflichtoptionen-Usage-Meldung ohne `verbose:`-Block (Verbose-Kontext wird erst in Tranche C aktiv); `--quiet/--verbose --format console --output <path>` liefert weiterhin die exakte zweizeilige `--output is not supported with --format console`-Sequenz.
+- **Artefakt-Byte-Stabilitaet** in `xray_tests` ueber `tests/e2e/test_cli.cpp`. Pro `(Subcommand, Format, Modus)`-Kombination ueber Markdown, JSON, DOT und HTML pruefen Tests, dass `--quiet` und `--verbose` stdout-byte-identisch zum Normalmodus sind und `--output`-Dateien byte-identisch geschrieben werden; stderr bleibt im Tranche-A-Erfolgsfall leer.
+
+Tranche B fuehrt CLI-eigene Console-Quiet-/Verbose-Renderer mit Goldens unter `tests/e2e/testdata/m5/verbosity/` ein, Tranche C aktiviert den Verbose-Fehlerkontext und die Verbose-Artefakt-stderr-Sequenz; siehe [docs/plan-M5-1-5.md](./plan-M5-1-5.md) fuer den vollstaendigen Vertrag.
+
 ## Zusammenhang mit Releasing
 
 Fuer M3 und spaetere Releases sind mindestens diese Docker-Pfade massgeblich:

@@ -1683,3 +1683,374 @@ TEST_CASE("file api invalid maps to exit code 4 with file api hint") {
     CHECK(err.str().find("hint:") != std::string::npos);
     CHECK(err.str().find("reply data") != std::string::npos);
 }
+
+// ---- AP M5-1.5 Tranche A: --quiet / --verbose parser contract ----------
+//
+// The parser-contract tests below pin the command-local registration, the
+// mutual-exclusion rule and the precedence interactions with --output,
+// --changed-file and --format console. Tranche A delivers no functional
+// emission change yet: --quiet and --verbose are accepted, mutually
+// exclusive, and reportinhaltlich a noop for every artifact format. Console
+// quiet/verbose renderers and verbose stderr context land in Tranche B/C.
+
+TEST_CASE_FIXTURE(CliFixture, "analyze --quiet is accepted as a command-local flag") {
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--quiet",
+                 "--top", "2"}) == ExitCode::success);
+    CHECK_FALSE(out.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "analyze --verbose is accepted as a command-local flag") {
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+                 "--top", "2"}) == ExitCode::success);
+    CHECK_FALSE(out.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "impact --quiet is accepted as a command-local flag") {
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--quiet"}) ==
+            ExitCode::success);
+    CHECK_FALSE(out.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "impact --verbose is accepted as a command-local flag") {
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--verbose"}) ==
+            ExitCode::success);
+    CHECK_FALSE(out.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --quiet --verbose is rejected as mutual-exclusion error") {
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--quiet",
+               "--verbose"}) == ExitCode::cli_usage_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("--quiet and --verbose are mutually exclusive") != std::string::npos);
+    CHECK(err.str().find("hint:") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --quiet --verbose is rejected as mutual-exclusion error") {
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(),
+               "--changed-file", "include/common/shared.h", "--quiet", "--verbose"}) ==
+          ExitCode::cli_usage_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("--quiet and --verbose are mutually exclusive") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "global --quiet position before subcommand is rejected with nonzero exit") {
+    // Plan: AP 1.5 documents only nonzero exit and non-empty stderr for the
+    // global position; the exact CLI11 wording is not part of the contract.
+    CHECK(run({"--quiet", "analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str()}) !=
+          ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "global --verbose position before subcommand is rejected with nonzero exit") {
+    CHECK(run({"--verbose", "impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(),
+               "--changed-file", "include/common/shared.h"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose without --changed-file returns Usage-Fehler ohne verbose-Block") {
+    // Pflichtoptionen-Pruefung (Praezedenzstufe 4) greift vor jedem
+    // Verbose-Kontext aus Tranche C. stderr enthaelt nur die normale Usage-
+    // Fehlermeldung; kein verbose:-Praefix darf hier auftauchen.
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose"}) ==
+          ExitCode::cli_usage_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("impact requires --changed-file") != std::string::npos);
+    CHECK(err.str().find("verbose:") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --quiet --format console --output rejects with the documented two-line error") {
+    const TemporaryDirectory temp_dir;
+    const auto target = (temp_dir.path() / "report.txt").string();
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--quiet",
+               "--format", "console", "--output", target.c_str()}) ==
+          ExitCode::cli_usage_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("error: --output is not supported with --format console") !=
+          std::string::npos);
+    CHECK(err.str().find("hint: use an artifact-oriented format") != std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(target));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose --format console --output rejects with the documented two-line error") {
+    const TemporaryDirectory temp_dir;
+    const auto target = (temp_dir.path() / "report.txt").string();
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(),
+               "--changed-file", "include/common/shared.h", "--verbose", "--format", "console",
+               "--output", target.c_str()}) == ExitCode::cli_usage_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("error: --output is not supported with --format console") !=
+          std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(target));
+}
+
+// ---- AP M5-1.5 Tranche A: artifact noop policy --------------------------
+//
+// Quiet and Verbose must not change report content for any artifact format.
+// stdout (without --output) is byte-identical to the normal-mode run; the
+// file written via --output is byte-identical and stdout/stderr stay empty
+// in Tranche A. Verbose stderr context lights up only in Tranche C.
+
+namespace {
+
+std::string run_normal_mode_stdout(CliFixture& fixture,
+                                    std::initializer_list<const char*> args) {
+    fixture.run(args);
+    return fixture.out.str();
+}
+
+}  // namespace
+
+TEST_CASE_FIXTURE(CliFixture, "analyze --quiet --format markdown stdout matches normal mode") {
+    const auto baseline = run_normal_mode_stdout(
+        *this, {"analyze", "--compile-commands",
+                "tests/e2e/testdata/m2/basic_project/compile_commands.json", "--format",
+                "markdown", "--top", "2"});
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--quiet",
+                 "--format", "markdown", "--top", "2"}) == ExitCode::success);
+    CHECK(out.str() == baseline);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "analyze --verbose --format markdown stdout matches normal mode") {
+    const auto baseline = run_normal_mode_stdout(
+        *this, {"analyze", "--compile-commands",
+                "tests/e2e/testdata/m2/basic_project/compile_commands.json", "--format",
+                "markdown", "--top", "2"});
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+                 "--format", "markdown", "--top", "2"}) == ExitCode::success);
+    CHECK(out.str() == baseline);
+    // Tranche A: verbose stderr is silent for the success path; Tranche C
+    // activates the documented verbose: stderr block.
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "analyze --quiet --format json stdout matches normal mode") {
+    const auto baseline = run_normal_mode_stdout(
+        *this, {"analyze", "--compile-commands",
+                "tests/e2e/testdata/m2/basic_project/compile_commands.json", "--format",
+                "json", "--top", "2"});
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--quiet",
+                 "--format", "json", "--top", "2"}) == ExitCode::success);
+    CHECK(out.str() == baseline);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "analyze --verbose --format json stdout matches normal mode") {
+    const auto baseline = run_normal_mode_stdout(
+        *this, {"analyze", "--compile-commands",
+                "tests/e2e/testdata/m2/basic_project/compile_commands.json", "--format",
+                "json", "--top", "2"});
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+                 "--format", "json", "--top", "2"}) == ExitCode::success);
+    CHECK(out.str() == baseline);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "analyze --quiet --format dot stdout matches normal mode") {
+    const auto baseline = run_normal_mode_stdout(
+        *this, {"analyze", "--compile-commands",
+                "tests/e2e/testdata/m2/basic_project/compile_commands.json", "--format",
+                "dot", "--top", "2"});
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--quiet",
+                 "--format", "dot", "--top", "2"}) == ExitCode::success);
+    CHECK(out.str() == baseline);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "analyze --verbose --format dot stdout matches normal mode") {
+    const auto baseline = run_normal_mode_stdout(
+        *this, {"analyze", "--compile-commands",
+                "tests/e2e/testdata/m2/basic_project/compile_commands.json", "--format",
+                "dot", "--top", "2"});
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+                 "--format", "dot", "--top", "2"}) == ExitCode::success);
+    CHECK(out.str() == baseline);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "analyze --quiet --format html stdout matches normal mode") {
+    const auto baseline = run_normal_mode_stdout(
+        *this, {"analyze", "--compile-commands",
+                "tests/e2e/testdata/m2/basic_project/compile_commands.json", "--format",
+                "html", "--top", "2"});
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--quiet",
+                 "--format", "html", "--top", "2"}) == ExitCode::success);
+    CHECK(out.str() == baseline);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "analyze --verbose --format html stdout matches normal mode") {
+    const auto baseline = run_normal_mode_stdout(
+        *this, {"analyze", "--compile-commands",
+                "tests/e2e/testdata/m2/basic_project/compile_commands.json", "--format",
+                "html", "--top", "2"});
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+                 "--format", "html", "--top", "2"}) == ExitCode::success);
+    CHECK(out.str() == baseline);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "impact --quiet --format markdown stdout matches normal mode") {
+    const auto baseline = run_normal_mode_stdout(
+        *this, {"impact", "--compile-commands",
+                "tests/e2e/testdata/m2/basic_project/compile_commands.json", "--changed-file",
+                "include/common/shared.h", "--format", "markdown"});
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--quiet", "--format",
+                 "markdown"}) == ExitCode::success);
+    CHECK(out.str() == baseline);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "impact --verbose --format json stdout matches normal mode") {
+    const auto baseline = run_normal_mode_stdout(
+        *this, {"impact", "--compile-commands",
+                "tests/e2e/testdata/m2/basic_project/compile_commands.json", "--changed-file",
+                "include/common/shared.h", "--format", "json"});
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--verbose", "--format",
+                 "json"}) == ExitCode::success);
+    CHECK(out.str() == baseline);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "impact --quiet --format dot stdout matches normal mode") {
+    const auto baseline = run_normal_mode_stdout(
+        *this, {"impact", "--compile-commands",
+                "tests/e2e/testdata/m2/basic_project/compile_commands.json", "--changed-file",
+                "include/common/shared.h", "--format", "dot"});
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--quiet", "--format",
+                 "dot"}) == ExitCode::success);
+    CHECK(out.str() == baseline);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "impact --verbose --format html stdout matches normal mode") {
+    const auto baseline = run_normal_mode_stdout(
+        *this, {"impact", "--compile-commands",
+                "tests/e2e/testdata/m2/basic_project/compile_commands.json", "--changed-file",
+                "include/common/shared.h", "--format", "html"});
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--verbose", "--format",
+                 "html"}) == ExitCode::success);
+    CHECK(out.str() == baseline);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --quiet --format json --output writes byte-identical file with empty streams") {
+    const TemporaryDirectory temp_dir;
+    const auto baseline_target = (temp_dir.path() / "baseline.json").string();
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+                 "json", "--output", baseline_target.c_str(), "--top", "2"}) ==
+            ExitCode::success);
+    const auto baseline = read_text_file(std::filesystem::path{baseline_target});
+
+    const auto quiet_target = (temp_dir.path() / "quiet.json").string();
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--quiet",
+                 "--format", "json", "--output", quiet_target.c_str(), "--top", "2"}) ==
+            ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().empty());
+    CHECK(read_text_file(std::filesystem::path{quiet_target}) == baseline);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --verbose --format json --output writes byte-identical file with empty streams in Tranche A") {
+    const TemporaryDirectory temp_dir;
+    const auto baseline_target = (temp_dir.path() / "baseline.json").string();
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+                 "json", "--output", baseline_target.c_str(), "--top", "2"}) ==
+            ExitCode::success);
+    const auto baseline = read_text_file(std::filesystem::path{baseline_target});
+
+    const auto verbose_target = (temp_dir.path() / "verbose.json").string();
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+                 "--format", "json", "--output", verbose_target.c_str(), "--top", "2"}) ==
+            ExitCode::success);
+    CHECK(out.str().empty());
+    // Tranche A: verbose stderr stays empty for successful artifact runs;
+    // Tranche C activates the documented verbose: stderr block. Tighten this
+    // assertion to the exact verbose: sequence once Tranche C lands.
+    CHECK(err.str().empty());
+    CHECK(read_text_file(std::filesystem::path{verbose_target}) == baseline);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --quiet --format html --output writes byte-identical file with empty streams") {
+    const TemporaryDirectory temp_dir;
+    const auto baseline_target = (temp_dir.path() / "baseline.html").string();
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--format", "html", "--output",
+                 baseline_target.c_str()}) == ExitCode::success);
+    const auto baseline = read_text_file(std::filesystem::path{baseline_target});
+
+    const auto quiet_target = (temp_dir.path() / "quiet.html").string();
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--quiet", "--format", "html",
+                 "--output", quiet_target.c_str()}) == ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().empty());
+    CHECK(read_text_file(std::filesystem::path{quiet_target}) == baseline);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose --format dot --output writes byte-identical file with empty streams in Tranche A") {
+    const TemporaryDirectory temp_dir;
+    const auto baseline_target = (temp_dir.path() / "baseline.dot").string();
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--format", "dot", "--output",
+                 baseline_target.c_str()}) == ExitCode::success);
+    const auto baseline = read_text_file(std::filesystem::path{baseline_target});
+
+    const auto verbose_target = (temp_dir.path() / "verbose.dot").string();
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--verbose", "--format", "dot",
+                 "--output", verbose_target.c_str()}) == ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().empty());
+    CHECK(read_text_file(std::filesystem::path{verbose_target}) == baseline);
+}

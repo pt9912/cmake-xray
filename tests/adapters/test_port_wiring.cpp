@@ -1,10 +1,14 @@
 #include <doctest/doctest.h>
 
+#include <cstddef>
 #include <sstream>
+#include <string>
 #include <string_view>
+#include <type_traits>
 
 #include "adapters/cli/cli_adapter.h"
 #include "adapters/cli/exit_codes.h"
+#include "adapters/cli/output_verbosity.h"
 #include "adapters/input/cmake_file_api_adapter.h"
 #include "adapters/input/compile_commands_json_adapter.h"
 #include "adapters/input/source_parsing_include_adapter.h"
@@ -13,6 +17,9 @@
 #include "adapters/output/html_report_adapter.h"
 #include "adapters/output/json_report_adapter.h"
 #include "adapters/output/markdown_report_adapter.h"
+#include "hexagon/model/analysis_result.h"
+#include "hexagon/model/impact_result.h"
+#include "hexagon/ports/driving/generate_report_port.h"
 #include "hexagon/services/impact_analyzer.h"
 #include "hexagon/services/project_analyzer.h"
 #include "hexagon/services/report_generator.h"
@@ -615,4 +622,64 @@ TEST_CASE("full M5 html impact pipeline reaches the HTML adapter, not the consol
     CHECK(out.str().find("data-report-type=\"impact\"") != std::string::npos);
     CHECK(out.str().find("<h1>cmake-xray impact report</h1>") != std::string::npos);
     CHECK(out.str().find("recognized but not implemented") == std::string::npos);
+}
+
+// AP M5-1.5 Tranche A: OutputVerbosity stays a CLI emission policy and never
+// crosses into report adapters or driving ports. The plan's architectural
+// invariant (cli/output_verbosity.h, paragraph "Voraussichtlich neue Datei")
+// is checked here at compile time: every output adapter must remain default-
+// constructible, and the GenerateReportPort interface must keep the documented
+// signature without any verbosity argument. A future change that adds a
+// verbosity parameter to an adapter constructor or to the port methods will
+// break compilation of these static_asserts.
+namespace {
+
+static_assert(std::is_default_constructible_v<xray::adapters::output::ConsoleReportAdapter>,
+              "AP M5-1.5: ConsoleReportAdapter must remain default-constructible "
+              "without an OutputVerbosity argument");
+static_assert(std::is_default_constructible_v<xray::adapters::output::MarkdownReportAdapter>,
+              "AP M5-1.5: MarkdownReportAdapter must remain default-constructible "
+              "without an OutputVerbosity argument");
+static_assert(std::is_default_constructible_v<xray::adapters::output::JsonReportAdapter>,
+              "AP M5-1.5: JsonReportAdapter must remain default-constructible "
+              "without an OutputVerbosity argument");
+static_assert(std::is_default_constructible_v<xray::adapters::output::DotReportAdapter>,
+              "AP M5-1.5: DotReportAdapter must remain default-constructible "
+              "without an OutputVerbosity argument");
+static_assert(std::is_default_constructible_v<xray::adapters::output::HtmlReportAdapter>,
+              "AP M5-1.5: HtmlReportAdapter must remain default-constructible "
+              "without an OutputVerbosity argument");
+
+// generate_analysis_report and generate_impact_report must keep their
+// existing signatures. A future GenerateReportPort that adds an
+// OutputVerbosity parameter would no longer satisfy these member-function
+// type checks.
+using AnalysisSignature = std::string (xray::hexagon::ports::driving::GenerateReportPort::*)(
+    const xray::hexagon::model::AnalysisResult&, std::size_t) const;
+using ImpactSignature = std::string (xray::hexagon::ports::driving::GenerateReportPort::*)(
+    const xray::hexagon::model::ImpactResult&) const;
+static_assert(std::is_same_v<AnalysisSignature,
+                              decltype(&xray::hexagon::ports::driving::GenerateReportPort::
+                                              generate_analysis_report)>,
+              "AP M5-1.5: GenerateReportPort::generate_analysis_report must keep "
+              "its (AnalysisResult, top_limit) signature without OutputVerbosity");
+static_assert(std::is_same_v<ImpactSignature,
+                              decltype(&xray::hexagon::ports::driving::GenerateReportPort::
+                                              generate_impact_report)>,
+              "AP M5-1.5: GenerateReportPort::generate_impact_report must keep "
+              "its (ImpactResult) signature without OutputVerbosity");
+
+}  // namespace
+
+TEST_CASE("OutputVerbosity enum carries the three documented values") {
+    // The enum is exercised at compile time via the static_asserts above; the
+    // doctest assertion documents the value contract for readers and confirms
+    // the underlying integer ordering stays normal < quiet < verbose.
+    using xray::adapters::cli::OutputVerbosity;
+    constexpr auto normal = static_cast<int>(OutputVerbosity::normal);
+    constexpr auto quiet = static_cast<int>(OutputVerbosity::quiet);
+    constexpr auto verbose = static_cast<int>(OutputVerbosity::verbose);
+    CHECK(normal == 0);
+    CHECK(quiet == 1);
+    CHECK(verbose == 2);
 }

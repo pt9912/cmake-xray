@@ -9,6 +9,7 @@
 #include <CLI/CLI.hpp>
 
 #include "adapters/cli/exit_codes.h"
+#include "adapters/cli/output_verbosity.h"
 #include "hexagon/model/compile_database_result.h"
 #include "hexagon/model/report_inputs.h"
 
@@ -33,7 +34,23 @@ struct CliOptions {
     std::string output_path;
     std::string report_format{"console"};
     std::size_t top_limit{10};
+    // AP M5-1.5 Tranche A: command-local --quiet/--verbose flags. The two
+    // booleans are intermediate parser state; resolve_verbosity() collapses
+    // them into the single OutputVerbosity field after CLI11 parsing. Default
+    // OutputVerbosity::normal keeps existing call sites byte-stable.
+    bool quiet_flag{false};
+    bool verbose_flag{false};
+    OutputVerbosity verbosity{OutputVerbosity::normal};
 };
+
+OutputVerbosity resolve_verbosity(const CliOptions& options) {
+    // Mutual exclusion is enforced separately in validate_verbosity_options
+    // and runs before this function. resolve_verbosity therefore assumes at
+    // most one of the two flags is set.
+    if (options.quiet_flag) return OutputVerbosity::quiet;
+    if (options.verbose_flag) return OutputVerbosity::verbose;
+    return OutputVerbosity::normal;
+}
 
 int map_error_to_exit_code(CompileDatabaseError error) {
     switch (error) {
@@ -133,6 +150,22 @@ void configure_input_options(CLI::App& command, CliOptions& options) {
         "Provides target metadata; without --compile-commands, also serves as primary input source");
 }
 
+void configure_verbosity_options(CLI::App& command, CliOptions& options) {
+    // AP M5-1.5 Tranche A: command-local --quiet and --verbose flags. The
+    // mutual-exclusion check runs in validate_verbosity_options so the error
+    // message is part of the documented Fehlervertrag (text on stderr,
+    // ExitCode::cli_usage_error). CLI11's ->excludes() would also work, but
+    // the explicit validator keeps the error wording within our control and
+    // matches the precedence rules documented in plan-M5-1-5.md.
+    command.add_flag("--quiet", options.quiet_flag,
+                     "Reduce console output to a brief summary; reportinhaltlich a "
+                     "noop for --format markdown, json, dot and html. "
+                     "Mutually exclusive with --verbose.");
+    command.add_flag("--verbose", options.verbose_flag,
+                     "Emit additional diagnostic context for console reports and on "
+                     "stderr for artifact formats. Mutually exclusive with --quiet.");
+}
+
 void configure_analyze_command(CLI::App& app, CliOptions& options, CLI::App*& analyze_cmd) {
     analyze_cmd = app.add_subcommand("analyze", "Analyze a CMake project");
     configure_input_options(*analyze_cmd, options);
@@ -142,6 +175,7 @@ void configure_analyze_command(CLI::App& app, CliOptions& options, CLI::App*& an
         ->default_val(options.top_limit)
         ->check(CLI::PositiveNumber);
     configure_report_options(*analyze_cmd, options);
+    configure_verbosity_options(*analyze_cmd, options);
 }
 
 void configure_impact_command(CLI::App& app, CliOptions& options, CLI::App*& impact_cmd) {
@@ -157,6 +191,7 @@ void configure_impact_command(CLI::App& app, CliOptions& options, CLI::App*& imp
         "compile_commands.json directory (with --compile-commands) or the "
         "top-level source directory from the codemodel (with --cmake-file-api only)");
     configure_report_options(*impact_cmd, options);
+    configure_verbosity_options(*impact_cmd, options);
 }
 
 std::optional<int> validate_input_options(const CliOptions& options, std::ostream& err) {
@@ -175,9 +210,13 @@ std::optional<int> validate_report_options(const CliOptions& options, std::ostre
     if (options.output_path.empty() || options.report_format != "console") {
         return std::nullopt;
     }
+    // AP M5-1.5 Tranche A: the hint wording is part of the documented
+    // Fehlervertrag (plan lines 374-377). The list keeps every artifact-
+    // oriented format from AP 1.2 / 1.3 / 1.4; previous wording omitted
+    // --format html because HTML was not yet implemented in AP 1.1.
     err << "error: --output is not supported with --format console\n";
     err << "hint: use an artifact-oriented format such as --format markdown, "
-           "--format json or --format dot when writing a report file\n";
+           "--format json, --format dot or --format html when writing a report file\n";
     return ExitCode::cli_usage_error;
 }
 
@@ -185,6 +224,18 @@ std::optional<int> validate_changed_file_required(const CliOptions& options, std
     if (!options.changed_file_path.empty()) return std::nullopt;
     err << "error: impact requires --changed-file\n";
     err << "hint: provide --changed-file <path>\n";
+    return ExitCode::cli_usage_error;
+}
+
+std::optional<int> validate_verbosity_options(const CliOptions& options, std::ostream& err) {
+    // AP M5-1.5 Tranche A: --quiet and --verbose are mutually exclusive at
+    // the same subcommand. This check runs first inside
+    // validate_subcommand_options so a usage-violating combination wins
+    // before format-availability, --output, --changed-file and input
+    // validation per the Fehlervertrag precedence list.
+    if (!options.quiet_flag || !options.verbose_flag) return std::nullopt;
+    err << "error: --quiet and --verbose are mutually exclusive\n";
+    err << "hint: pass either --quiet or --verbose, not both\n";
     return ExitCode::cli_usage_error;
 }
 
@@ -305,6 +356,7 @@ xray::hexagon::ports::driving::AnalyzeImpactRequest build_impact_request(
 
 std::optional<int> validate_subcommand_options(const CliOptions& options, bool is_impact,
                                                 std::ostream& err) {
+    if (const auto e = validate_verbosity_options(options, err); e.has_value()) return e;
     if (const auto e = validate_report_options(options, err); e.has_value()) return e;
     if (is_impact) {
         if (const auto e = validate_changed_file_required(options, err); e.has_value()) return e;
@@ -397,6 +449,7 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
         validation_error.has_value()) {
         return *validation_error;
     }
+    options.verbosity = resolve_verbosity(options);
 
     const CliOutputStreams streams{out, err};
     const auto report_format = parse_report_format(options.report_format);

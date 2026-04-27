@@ -438,7 +438,7 @@ Die Umsetzung erfolgt in drei verbindlichen Tranchen plus einer optionalen Haert
 
 DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert eine in einem konkreten Commit ausgelieferte Anforderung, `[ ]` markiert eine offene Anforderung. Liefer-Stand zum Zeitpunkt der Tranche-A-Vorbereitung:
 
-- Tranche A offen.
+- Tranche A ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; CLI-Modell, Parserverflechtung und Artefakt-Noop-Policy stehen).
 - Tranche B offen.
 - Tranche C offen.
 - Tranche D optional und offen.
@@ -493,19 +493,19 @@ Sub-Risiken Tranche A:
 
 Definition of Done Tranche A:
 
-- [ ] `output_verbosity.h` existiert; `CliOptions` traegt das Feld; Default `normal`.
-- [ ] `--quiet` und `--verbose` existieren command-lokal fuer beide Subcommands.
-- [ ] gleichzeitige Nutzung liefert Usage-Fehler vor Eingabevalidierung und Reporterzeugung.
-- [ ] globale Positionen sind nicht Teil des Vertrags und liefern nonzero Usage-Fehler ohne stabile Hilfetexte.
-- [ ] Quiet veraendert Artefaktreports fuer Markdown, JSON, DOT und HTML byte-stabil nicht.
-- [ ] Verbose veraendert Artefaktreports fuer Markdown, JSON, DOT und HTML byte-stabil nicht.
-- [ ] `--output` erzeugt weder im Normal- noch im Quiet-/Verbose-Modus eine Erfolgsmeldung auf stdout.
-- [ ] `--format console --output <path>` liefert exakt die zwei dokumentierten stderr-Zeilen.
-- [ ] `impact --verbose` ohne `--changed-file` liefert Usage-Fehler ohne `verbose:`-Block.
-- [ ] `ReportWriterPort` und `GenerateReportPort` enthalten kein `OutputVerbosity`.
-- [ ] `ConsoleReportAdapter`, `MarkdownReportAdapter`, `JsonReportAdapter`, `DotReportAdapter` und `HtmlReportAdapter` haben keinen Verbosity-Parameter im Konstruktor.
-- [ ] `docs/quality.md` listet den Tranche-A-Testumfang.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `output_verbosity.h` existiert; `CliOptions` traegt das Feld; Default `normal`.
+- [x] `--quiet` und `--verbose` existieren command-lokal fuer beide Subcommands.
+- [x] gleichzeitige Nutzung liefert Usage-Fehler vor Eingabevalidierung und Reporterzeugung.
+- [x] globale Positionen sind nicht Teil des Vertrags und liefern nonzero Usage-Fehler ohne stabile Hilfetexte.
+- [x] Quiet veraendert Artefaktreports fuer Markdown, JSON, DOT und HTML byte-stabil nicht.
+- [x] Verbose veraendert Artefaktreports fuer Markdown, JSON, DOT und HTML byte-stabil nicht.
+- [x] `--output` erzeugt weder im Normal- noch im Quiet-/Verbose-Modus eine Erfolgsmeldung auf stdout.
+- [x] `--format console --output <path>` liefert exakt die zwei dokumentierten stderr-Zeilen.
+- [x] `impact --verbose` ohne `--changed-file` liefert Usage-Fehler ohne `verbose:`-Block.
+- [x] `ReportWriterPort` und `GenerateReportPort` enthalten kein `OutputVerbosity`.
+- [x] `ConsoleReportAdapter`, `MarkdownReportAdapter`, `JsonReportAdapter`, `DotReportAdapter` und `HtmlReportAdapter` haben keinen Verbosity-Parameter im Konstruktor.
+- [x] `docs/quality.md` listet den Tranche-A-Testumfang.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 ### Tranche B - Console Quiet und Console Verbose
 
