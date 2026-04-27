@@ -2493,9 +2493,17 @@ TEST_CASE_FIXTURE(CliFixture,
 
 TEST_CASE_FIXTURE(CliFixture,
                   "verbose impact stderr labels cli_absolute when --changed-file is absolute") {
+    // POSIX accepts /project/... as absolute; Windows requires a drive
+    // letter. Same per-platform split as impact_absolute(_windows) goldens
+    // in tests/e2e/run_e2e.sh.
+#ifdef _WIN32
+    const char* absolute_changed_file = "C:/project/src/app/main.cpp";
+#else
+    const char* absolute_changed_file = "/project/src/app/main.cpp";
+#endif
     REQUIRE(run({"impact", "--compile-commands",
                  fixture_path("m2/basic_project/compile_commands.json").c_str(),
-                 "--changed-file", "/project/src/app/main.cpp", "--verbose", "--format",
+                 "--changed-file", absolute_changed_file, "--verbose", "--format",
                  "json"}) == ExitCode::success);
     CHECK(err.str().find("verbose: changed_file_source=cli_absolute\n") !=
           std::string::npos);
