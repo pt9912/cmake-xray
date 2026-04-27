@@ -129,7 +129,10 @@ Top-Level-Verhalten:
 - Veroeffentlichen in Registry oder GitHub Release darf nur im finalen Release-Job nach allen Gates erfolgen.
 - Kein vorzeitiges GHCR-Push aus Verify/Pre-Release-Schritten.
 - Der finale Release-Job darf nur die offiziell freigegebenen Artefakte publishen: Linux-Archiv, zugehoerige Checksums und OCI-Image. macOS-/Windows-Preview-Artefakte duerfen nicht als normale GitHub-Release-Assets hochgeladen und nicht in GHCR-Tags oder OCI-Manifeste aufgenommen werden.
-- Falls Preview-Artefakte fuer macOS/Windows explizit erlaubt werden, brauchen sie ein eigenes Preview-Gate, eigene Asset-Namen mit `preview`-Marker und eine Release-Notes-Markierung; ohne dieses Gate bricht der Upload ab.
+- GitHub-Release-Re-Runs muessen idempotent sein: Ein existierender Draft oder oeffentlicher Release zum Tag wird zuerst gelesen und gegen erwartete Release-Metadaten, Asset-Namen, Asset-SHA-256-Werte und Checksums verglichen.
+- Existierende GitHub-Assets duerfen nicht blind ueberschrieben werden. Identische Assets werden wiederverwendet; fehlende Assets werden hochgeladen; abweichende Assets oder Checksums fuehren vor weiterer Mutation zum Abbruch.
+- Ein existierender oeffentlicher Release darf bei einem Re-Run nur bestaetigt werden, wenn Release Notes, Asset-Liste und Checksums exakt zum erwarteten Manifest passen. Jede Abweichung ist ein Recovery-Fall und kein automatischer Publish-Pfad.
+- Falls Preview-Artefakte fuer macOS/Windows explizit erlaubt werden, laufen sie ueber einen separaten Preview-Job nach den offiziellen M5-Gates und mit eigener Zielklasse, zum Beispiel Workflow-Artefakt oder separat markierter GitHub-Prerelease. Sie duerfen nicht vom finalen M5-Release-Job als normale Release-Assets hochgeladen werden.
 
 ### OCI-Image-Vertrag
 
@@ -150,7 +153,8 @@ Top-Level-Verhalten:
   - als experimentelle Preview-Artefakte benannt.
 - Wenn ausgegeben, muessen sie in Release Notes und Doku klar als nicht vollstaendig freigegeben stehen.
 - Deaktivierte oder nicht explizit preview-freigegebene macOS-/Windows-Jobs duerfen keine GitHub-Release-Assets, keine Checksums und keine OCI-Beitraege erzeugen.
-- Preview-Artefakte duerfen nur nach erfolgreichem Preview-Gate als separat markierte Assets erscheinen und bleiben ausserhalb des offiziellen M5-Releaseumfangs.
+- Preview-Artefakte duerfen nur nach erfolgreichem Preview-Gate in einem separaten Preview-Publish-Pfad erscheinen und bleiben ausserhalb des offiziellen M5-Releaseumfangs.
+- Der offizielle M5-Release-Pfad muss technisch verhindern, dass Preview-Artefakte in die normale Asset-Liste, in Checksums, in Release-Manifeste oder in GHCR/OCI-Verweise aufgenommen werden.
 
 ## Draft-/Release-Reihenfolge
 
@@ -193,6 +197,8 @@ Top-Level-Verhalten:
 - Checksum-Gate vor Publish: SHA-256-Dateien muessen zu den erzeugten Artefakten passen und der entpackte Binary-Smoke muss aus genau diesem geprueften Archiv laufen.
 - Smoke der OCI-Ausfuehrung (`cmake-xray --help`, `--version`).
 - Tag-Validierung gegen erlaubte Muster und Regressionsfaelle.
+- Tag-Validierungstests enthalten mindestens gueltige Faelle `v0.0.0`, `v1.2.3`, `v1.2.3-rc.1` und `v1.2.3-alpha.1-2`.
+- Tag-Validierungstests enthalten mindestens ungueltige Faelle `1.2.3`, `v1.2`, `v1.2.3.4`, `v01.2.3`, `v1.02.3`, `v1.2.03`, `v1.2.3-`, `v1.2.3-01`, `v1.2.3-rc..1`, `v1.2.3+build`, `vfoo` und `v1.2.x`.
 - Versionskonsistenz-Check zwischen:
   - Tag,
   - `--version`-Ausgabe,
