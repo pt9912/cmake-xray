@@ -133,6 +133,7 @@ Top-Level-Verhalten:
 - Existierende GitHub-Assets duerfen nicht blind ueberschrieben werden. Identische Assets werden wiederverwendet; fehlende Assets werden hochgeladen; abweichende Assets oder Checksums fuehren vor weiterer Mutation zum Abbruch.
 - Ein existierender oeffentlicher Release darf bei einem Re-Run nur bestaetigt werden, wenn Release Notes, Asset-Liste und Checksums exakt zum erwarteten Manifest passen. Jede Abweichung ist ein Recovery-Fall und kein automatischer Publish-Pfad.
 - Falls Preview-Artefakte fuer macOS/Windows explizit erlaubt werden, laufen sie ueber einen separaten Preview-Job nach den offiziellen M5-Gates und mit eigener Zielklasse, zum Beispiel Workflow-Artefakt oder separat markierter GitHub-Prerelease. Sie duerfen nicht vom finalen M5-Release-Job als normale Release-Assets hochgeladen werden.
+- Jeder Publish-Schritt verwendet eine explizite Allowlist fuer offizielle Asset-Namen und OCI-Tags. Dateien ausserhalb dieser Allowlist, insbesondere Preview-Artefakte, fuehren im finalen Release-Job zum Abbruch statt zu Upload oder implizitem Ignorieren.
 
 ### OCI-Image-Vertrag
 
@@ -142,7 +143,8 @@ Top-Level-Verhalten:
 - `latest` ist fuer Vorabversionen nicht zulässig.
 - `latest` wird erst nach erfolgreichem Push und Manifest-Check des versionierten Tags aktualisiert.
 - Re-Runs muessen idempotent sein: Wenn der versionierte Tag bereits existiert, muss dessen Digest mit dem neu gebauten Image uebereinstimmen; bei Abweichung bricht der Workflow vor `latest` und vor oeffentlicher Release-Publikation ab.
-- Ein bestehendes `latest` darf nur auf den Digest des validierten regulaeren Versions-Tags zeigen. Eine Abweichung muss als auditierbarer Update von altem Digest auf neuen Digest protokolliert werden; fuer denselben Release-Tag darf `latest` nicht auf einen anderen Digest umgeschrieben werden.
+- Ein bestehendes `latest` darf automatisch nur dann bestaetigt oder gesetzt werden, wenn er auf den Digest des validierten regulaeren Versions-Tags zeigt. Bei Digest-Mismatch bricht der Workflow hart ab; ein Update von `latest` auf einen anderen Digest ist ausschliesslich ein dokumentierter manueller Recovery-/Nachpublish-Schritt und kein automatischer Re-Run-Pfad.
+- Fuer denselben Release-Tag darf `latest` nie automatisch auf einen anderen Digest umgeschrieben werden.
 - Runtime-Container muss mindestens `cmake-xray --help` ohne externe Toolchain ausfuehren koennen.
 - Image-Publish nur nach erfolgreicher Artefakt- und Smoke-Validierung.
 
@@ -155,6 +157,7 @@ Top-Level-Verhalten:
 - Deaktivierte oder nicht explizit preview-freigegebene macOS-/Windows-Jobs duerfen keine GitHub-Release-Assets, keine Checksums und keine OCI-Beitraege erzeugen.
 - Preview-Artefakte duerfen nur nach erfolgreichem Preview-Gate in einem separaten Preview-Publish-Pfad erscheinen und bleiben ausserhalb des offiziellen M5-Releaseumfangs.
 - Der offizielle M5-Release-Pfad muss technisch verhindern, dass Preview-Artefakte in die normale Asset-Liste, in Checksums, in Release-Manifeste oder in GHCR/OCI-Verweise aufgenommen werden.
+- Diese Sperre ist als technische Upload-Allowlist in jedem finalen Publish-Schritt umzusetzen, nicht nur als Dokumentations- oder Namenskonvention.
 
 ## Draft-/Release-Reihenfolge
 
@@ -189,6 +192,7 @@ Top-Level-Verhalten:
   - danach `release_published`
   - oeffentlicher Release-Status zuletzt.
 - Docker-Pushes im Dry-Run gegen lokale Registry, inklusive Tag-/`latest`-Verhalten und Manifest-Check.
+- Dry-Run-Faelle muessen Release-Re-Run-Szenarien abdecken: existierender Draft mit identischen Assets wird wiederverwendet, existierender oeffentlicher Release mit identischem Manifest wird bestaetigt, abweichende Assets oder Checksums brechen vor `release_published` ab, und ein OCI-Digest-Mismatch bricht vor `latest` ab.
 
 ## Smoke- und Validierungstests
 
@@ -199,6 +203,8 @@ Top-Level-Verhalten:
 - Tag-Validierung gegen erlaubte Muster und Regressionsfaelle.
 - Tag-Validierungstests enthalten mindestens gueltige Faelle `v0.0.0`, `v1.2.3`, `v1.2.3-rc.1` und `v1.2.3-alpha.1-2`.
 - Tag-Validierungstests enthalten mindestens ungueltige Faelle `1.2.3`, `v1.2`, `v1.2.3.4`, `v01.2.3`, `v1.02.3`, `v1.2.03`, `v1.2.3-`, `v1.2.3-01`, `v1.2.3-rc..1`, `v1.2.3+build`, `vfoo` und `v1.2.x`.
+- Release-Idempotenztests enthalten mindestens: Re-Run mit vorhandenem Draft und unveraenderten Assets, Re-Run mit vorhandenem oeffentlichem Release und unveraendertem Manifest, Re-Run mit geaendertem Asset, Re-Run mit geaenderter Checksumme, Abbruch vor `release_published` bei Manifest-Mismatch und Abbruch vor `latest` bei OCI-Digest-Mismatch.
+- Preview-Sperrtests enthalten mindestens: finaler Publish-Job bricht ab, wenn ein macOS-/Windows-Preview-Artefakt in der offiziellen Asset-Allowlist fehlt, und kein Preview-Artefakt erscheint in Checksums, Release-Manifest oder GHCR/OCI-Verweisen.
 - Versionskonsistenz-Check zwischen:
   - Tag,
   - `--version`-Ausgabe,
