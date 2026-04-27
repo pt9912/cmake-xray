@@ -204,7 +204,7 @@ Top-Level-Verhalten:
 - Tag-Validierungstests enthalten mindestens gueltige Faelle `v0.0.0`, `v1.2.3`, `v1.2.3-rc.1` und `v1.2.3-alpha.1-2`.
 - Tag-Validierungstests enthalten mindestens ungueltige Faelle `1.2.3`, `v1.2`, `v1.2.3.4`, `v01.2.3`, `v1.02.3`, `v1.2.03`, `v1.2.3-`, `v1.2.3-01`, `v1.2.3-rc..1`, `v1.2.3+build`, `vfoo` und `v1.2.x`.
 - Release-Idempotenztests enthalten mindestens: Re-Run mit vorhandenem Draft und unveraenderten Assets, Re-Run mit vorhandenem oeffentlichem Release und unveraendertem Manifest, Re-Run mit geaendertem Asset, Re-Run mit geaenderter Checksumme, Abbruch vor `release_published` bei Manifest-Mismatch und Abbruch vor `latest` bei OCI-Digest-Mismatch.
-- Preview-Sperrtests enthalten mindestens: finaler Publish-Job bricht ab, wenn ein macOS-/Windows-Preview-Artefakt in der offiziellen Asset-Allowlist fehlt, und kein Preview-Artefakt erscheint in Checksums, Release-Manifest oder GHCR/OCI-Verweisen.
+- Preview-Sperrtests enthalten mindestens: finaler Publish-Job bricht ab, wenn ein macOS-/Windows-Preview-Artefakt in der offiziellen Asset-Allowlist auftaucht, und kein Preview-Artefakt erscheint in Checksums, Release-Manifest oder GHCR/OCI-Verweisen.
 - Versionskonsistenz-Check zwischen:
   - Tag,
   - `--version`-Ausgabe,
