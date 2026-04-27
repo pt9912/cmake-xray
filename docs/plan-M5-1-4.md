@@ -655,6 +655,14 @@ Definition of Done Tranche B:
 
 Echte Binary-Verifikation und Vertragsfestschreibung der CLI-Ausgaben.
 
+Tranche C ist intern in drei Sub-Tranchen C.1, C.2 und C.3 gegliedert. Die Sub-Tranchen sind ausschliesslich Implementierungsreihenfolge, kein Release-Schnitt: alle drei Sub-Tranchen landen im selben Tranche-C-Commit-Set und werden gemeinsam ueber die Docker-Gates aus `README.md` und `docs/quality.md` abgenommen. "Abnahme Tranche C" und "Definition of Done Tranche C" am Ende dieses Abschnitts gelten am Ende von C.3 fuer das gesamte Tranche-C-Set.
+
+Die AP-1.2-/1.3-Lehre `README-Pflicht in Tranche C` bleibt verbindlich: Beispielberichte unter `docs/examples/`, README-Update, `docs/guide.md`-Update und `docs/quality.md`-Update gehoeren in dasselbe Commit-Set wie die HTML-Goldens und werden nicht als separater Folge-Commit nachgezogen.
+
+#### Sub-Tranche C.1 - E2E-Goldens, Manifest und Binary-Smokes
+
+Fundament: byte-stabile Goldens, ergaenztes Manifest und `e2e_binary`-Smokes. Keine Aenderungen an Adapter, CLI oder produktivem Code.
+
 1. Analyze-Goldens unter `tests/e2e/testdata/m5/html-reports/` als statische Dateien anlegen. Abgedeckt sind mindestens:
    - Compile-Database-only.
    - File-API-only mit Target-Zuordnungen.
@@ -674,20 +682,78 @@ Echte Binary-Verifikation und Vertragsfestschreibung der CLI-Ausgaben.
    - keine betroffenen Targets.
    - keine Diagnostics.
 3. Escaping-Goldens fuer Analyze oder Impact aufnehmen, mindestens mit `<`, `>`, `&`, Anfuehrungszeichen, Apostroph, Backslash, Newline und `<script>`-artigen Strings.
-4. Manifest aktualisieren; der HTML-Golden- oder Struktur-Test gleicht Verzeichnis und Manifest beidseitig ab.
-5. `tests/e2e/test_cli.cpp` erweitern um:
-   - HTML-stdout-Vertrag, leeres stderr, vollstaendiges HTML.
-   - `--format html --output <path>`: Datei geschrieben, stdout und stderr leer, atomar.
-   - HTML-Render-Fehler ueber injizierten `CliReportRenderer`-Doppelgaenger; bestehende Zieldatei bleibt unveraendert, kein partielles HTML auf stdout.
+4. Manifest `tests/e2e/testdata/m5/html-reports/manifest.txt` aktualisieren; der HTML-Golden- oder Struktur-Test gleicht Verzeichnis und Manifest beidseitig ab.
+5. `tests/e2e/run_e2e.sh` und das CTest-Ziel `e2e_binary` um Binary-Smokes fuer `analyze --format html` und mindestens einen `impact --format html`-Fall ergaenzen, sodass die Verdrahtung inklusive `src/main.cpp` getestet ist.
+
+Sub-Risiken C.1:
+
+- Goldens muessen byte-stabil mit der bereits in Tranche B festgezurrten Adapter-Ausgabe uebereinstimmen. CSS, Reihenfolge, Whitespace-Normalisierung, Attributreihenfolge, Spaltenreihenfolge und Leersaetze haben in Tranche B den Vertrag gesetzt; jede Differenz im Golden gegenueber dem Adapter wird am Golden korrigiert, nicht am Adapter, solange der Adapter die in `docs/report-html.md` dokumentierten Regeln einhaelt.
+- Per-Plattform-Goldens (`*_windows.html`) muessen wirklich aus dem in Tranche A/B festgelegten Pfadnormalisierungspfad fallen; eine Abweichung weist auf einen Adapterfehler im Pfad-Handling hin und wird vor der Goldenaufnahme aufgeloest.
+
+Definition of Done Sub-Tranche C.1:
+
+- [ ] Analyze-Goldens decken die acht in Tranche C gelisteten Faelle ab.
+- [ ] Impact-Goldens decken die sieben in Tranche C gelisteten Faelle ab, inklusive `*_windows.html`-Varianten fuer absolute `--changed-file`-Pfade.
+- [ ] Escaping-Goldens decken die geforderten Sonderzeichen und Whitespace-Faelle ab.
+- [ ] `manifest.txt` listet alle Goldens; das Manifest gleicht Verzeichnis und Eintraege beidseitig ab.
+- [ ] `tests/e2e/run_e2e.sh` und `e2e_binary` fuehren mindestens einen Analyze- und einen Impact-HTML-Smoke aus.
+- [ ] Bestehende Console-/Markdown-/JSON-/DOT-Goldens bleiben unveraendert.
+- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+
+#### Sub-Tranche C.2 - CLI-/Stream-/Fehler-Tests
+
+Vertragsfestschreibung der CLI-stdout-/stderr-/Output-/Fehlerpfade fuer `--format html`. Keine neuen Goldens; reine Testarbeit in `tests/e2e/test_cli.cpp`.
+
+1. `tests/e2e/test_cli.cpp` erweitern um:
+   - HTML-stdout-Vertrag: vollstaendiges HTML auf stdout, leeres stderr, kein Console-Fallback.
+   - `--format html --output <path>`: Datei geschrieben, stdout und stderr leer, atomar; Reportinhalt nicht auf stdout dupliziert.
+   - HTML-Render-Fehler ueber injizierten `CliReportRenderer`-Doppelgaenger: nonzero Exit, Text auf stderr, leeres stdout, bei `--output` bestehende Zieldatei unveraendert, kein partielles HTML.
    - Fehlerpfade: `impact --format html` ohne `--changed-file`, nicht vorhandene Eingaben, ungueltiges `compile_commands.json`, ungueltige File-API-Reply-Daten, Schreibfehler. Alle als Text auf stderr, nonzero Exit, kein HTML-Fehlerdokument.
-   - Negativtest, dass `impact` keine `--top`-Option akzeptiert.
+   - Negativtest, dass `impact` keine `--top`-Option akzeptiert, auch nicht zusammen mit `--format html`.
    - Negativtest, dass `--top 0 --format html` abgelehnt wird und kein HTML entsteht.
-6. `tests/e2e/run_e2e.sh` und das CTest-Ziel `e2e_binary` um Binary-Smokes fuer `analyze --format html` und mindestens einen `impact --format html`-Fall ergaenzen, sodass die Verdrahtung inklusive `src/main.cpp` getestet ist.
-7. Beispielberichte unter `docs/examples/` erzeugen oder als stabile Fixtures ablegen, mindestens `analyze.html` und `impact.html`.
-8. `README.md` um HTML in Formatliste und Beispiele ergaenzen — als Pflichtbestandteil des Tranche-C-Commits, nicht als separater Folge-Commit (AP-1.2-/1.3-Lehre).
-9. `docs/guide.md` um produktive Nutzung von `--format html` und `--format html --output` ergaenzen.
-10. `docs/quality.md` um die in Tranche C neu hinzukommenden HTML-Golden-, Struktur- und E2E-Gates ergaenzen.
-11. Coverage-, Lizard- und Clang-Tidy-Gates muessen nach AP 1.4 weiterhin gruen sein; neue Befunde aus dem HTML-Adapter werden in Tranche C behoben und nicht auf Tranche D verschoben.
+
+Sub-Risiken C.2:
+
+- Der `CliReportRenderer`-Doppelgaenger muss vor Emission werfen, damit nachweisbar ist, dass die CLI HTML erst nach erfolgreichem Vollrendern an stdout oder den Atomic-Writer uebergibt. Ein Doppelgaenger, der erst nach Teilausgabe wirft, falsifiziert das nicht und ist daher nicht zulaessig.
+- `--top 0`-Negativtests muessen den HTML-Pfad explizit treffen, weil `--top 0` von der bestehenden CLI-Validierung schon vor der Format-Auswahl abgelehnt werden kann; der Test stellt sicher, dass auch fuer `--format html` kein HTML entsteht und keine Sonderbehandlung den Pfad umgeht.
+
+Definition of Done Sub-Tranche C.2:
+
+- [ ] HTML-stdout-Vertrag durch CLI-Test abgedeckt.
+- [ ] `--format html --output <path>`-Vertrag durch CLI-Test abgedeckt.
+- [ ] Render-Fehler-Doppelgaenger-Test deckt nonzero Exit, leeres stdout und unveraenderte Zieldatei ab.
+- [ ] Alle in der Impact-Negativfall-Matrix gelisteten Fehlerpfade sind als CLI-Test vorhanden.
+- [ ] `impact --top` und `--top 0 --format html` werden durch Negativtests abgelehnt.
+- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+
+#### Sub-Tranche C.3 - Beispielberichte, Nutzerdoku und Quality-Gates-Finalcheck
+
+Doku-Sweep, Beispielartefakte und finaler Coverage-/Lizard-/Clang-Tidy-Check. C.3 schliesst Tranche C ab.
+
+1. Beispielberichte unter `docs/examples/` erzeugen oder als stabile Fixtures ablegen, mindestens `analyze.html` und `impact.html`.
+2. `README.md` um HTML in Formatliste und Beispiele ergaenzen; HTML aus der "nicht Ziel"-Liste entfernen, da `--format html` nach AP 1.4 produktiv ist.
+3. `docs/guide.md` um produktive Nutzung von `--format html` und `--format html --output` ergaenzen.
+4. `docs/quality.md` um die in Tranche C neu hinzukommenden HTML-Golden-, Struktur- und E2E-Gates ergaenzen.
+5. Coverage-, Lizard- und Clang-Tidy-Gates fuer den HTML-Adapter abschliessen; neue Befunde aus Tranche A/B/C.1/C.2 werden in C.3 behoben und nicht auf Tranche D verschoben.
+
+Sub-Risiken C.3:
+
+- README- und `docs/quality.md`-Aktualisierung muessen mit demselben Commit-Set wie die Goldens und Beispielberichte landen, sonst greift die AP-1.2-/1.3-Lehre und die Doku-Aktualisierung muss als separater Folge-Commit nachgezogen werden.
+- Coverage-100%-Gate fuer `src/` kann durch HTML-Adapter-Pfade kippen, die nur ueber bestimmte Eingabekombinationen erreichbar sind; C.3 schliesst diese Luecken zwingend, bevor Tranche C abgenommen wird.
+- Lizard-CCN-/Funktionslaengen-Grenzen koennen durch grosse Render-Funktionen im Adapter knapp werden; falls Refactoring noetig wird, bleibt der HTML-Vertrag aus `docs/report-html.md` unveraendert und Goldens aus C.1 bleiben byte-stabil.
+
+Definition of Done Sub-Tranche C.3:
+
+- [ ] `docs/examples/analyze.html` und `docs/examples/impact.html` existieren als stabile Beispielartefakte.
+- [ ] `README.md` listet HTML in Formatliste und Beispielen, ohne HTML weiterhin als "nicht Ziel" zu fuehren.
+- [ ] `docs/guide.md` dokumentiert produktive Nutzung von `--format html` und `--format html --output`.
+- [ ] `docs/quality.md` listet die neuen HTML-Gates aus Tranche C.
+- [ ] Coverage-, Lizard- und Clang-Tidy-Gates sind gruen, ohne neue HTML-Befunde nach Tranche D zu verschieben.
+- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+
+#### Abnahme und Definition of Done Tranche C
+
+Die Sub-Tranchen C.1, C.2 und C.3 werden gemeinsam abgenommen. Die folgenden Kriterien gelten am Ende von C.3 fuer das gesamte Tranche-C-Set.
 
 Abnahme Tranche C: alle Docker-Gates aus `README.md` und `docs/quality.md` gruen; `e2e_binary` gruen; alle HTML-Goldens sind byte-stabil; Escaping-, Struktur-, Accessibility-Basis-, Top-Limit- und Leersatzvertraege sind durch Goldens und Adaptertests abgedeckt; globale Abnahmekriterien dieses Plans erfuellt.
 
