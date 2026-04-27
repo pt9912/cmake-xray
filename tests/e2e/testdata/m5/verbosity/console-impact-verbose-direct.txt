@@ -1,0 +1,36 @@
+verbose impact summary
+  report_type: impact
+  format_version: 1
+  changed_file: src/main.cpp
+  affected_translation_units: 1
+  classification: direct
+  affected_targets: 1
+  diagnostics: 0
+
+inputs
+  compile_database_path: not provided
+  compile_database_source: not_provided
+  cmake_file_api_path: tests/e2e/testdata/m4/file_api_only/build
+  cmake_file_api_resolved_path: tests/e2e/testdata/m4/file_api_only/build/.cmake/api/v1/reply
+  cmake_file_api_source: cli
+  changed_file: src/main.cpp
+  changed_file_source: file_api_source_root
+
+observation
+  observation_source: derived
+  target_metadata: loaded
+
+directly affected translation units
+  - src/main.cpp [directory: build] [targets: app (EXECUTABLE)]
+
+heuristically affected translation units
+  no heuristically affected translation units
+
+directly affected targets
+  - app [type: EXECUTABLE]
+
+heuristically affected targets
+  no heuristically affected targets
+
+diagnostics
+  no diagnostics

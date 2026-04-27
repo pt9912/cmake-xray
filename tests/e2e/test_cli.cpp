@@ -1843,9 +1843,12 @@ TEST_CASE_FIXTURE(CliFixture, "analyze --verbose --format markdown stdout matche
                  fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
                  "--format", "markdown", "--top", "2"}) == ExitCode::success);
     CHECK(out.str() == baseline);
-    // Tranche A: verbose stderr is silent for the success path; Tranche C
-    // activates the documented verbose: stderr block.
-    CHECK(err.str().empty());
+    // AP M5-1.5 Tranche B.2: verbose --format <artifact> emits the documented
+    // verbose: stderr block. Detailed line-by-line assertions live in the
+    // Tranche B.2 verbose-stderr-block test cases below; here we just confirm
+    // the block is wired up.
+    CHECK(err.str().find("verbose: report_type=analyze\n") != std::string::npos);
+    CHECK(err.str().find("verbose: format=markdown\n") != std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture, "analyze --quiet --format json stdout matches normal mode") {
@@ -1869,7 +1872,8 @@ TEST_CASE_FIXTURE(CliFixture, "analyze --verbose --format json stdout matches no
                  fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
                  "--format", "json", "--top", "2"}) == ExitCode::success);
     CHECK(out.str() == baseline);
-    CHECK(err.str().empty());
+    CHECK(err.str().find("verbose: report_type=analyze\n") != std::string::npos);
+    CHECK(err.str().find("verbose: format=json\n") != std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture, "analyze --quiet --format dot stdout matches normal mode") {
@@ -1893,7 +1897,8 @@ TEST_CASE_FIXTURE(CliFixture, "analyze --verbose --format dot stdout matches nor
                  fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
                  "--format", "dot", "--top", "2"}) == ExitCode::success);
     CHECK(out.str() == baseline);
-    CHECK(err.str().empty());
+    CHECK(err.str().find("verbose: report_type=analyze\n") != std::string::npos);
+    CHECK(err.str().find("verbose: format=dot\n") != std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture, "analyze --quiet --format html stdout matches normal mode") {
@@ -1917,7 +1922,8 @@ TEST_CASE_FIXTURE(CliFixture, "analyze --verbose --format html stdout matches no
                  fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
                  "--format", "html", "--top", "2"}) == ExitCode::success);
     CHECK(out.str() == baseline);
-    CHECK(err.str().empty());
+    CHECK(err.str().find("verbose: report_type=analyze\n") != std::string::npos);
+    CHECK(err.str().find("verbose: format=html\n") != std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture, "impact --quiet --format markdown stdout matches normal mode") {
@@ -1943,7 +1949,9 @@ TEST_CASE_FIXTURE(CliFixture, "impact --verbose --format json stdout matches nor
                  "--changed-file", "include/common/shared.h", "--verbose", "--format",
                  "json"}) == ExitCode::success);
     CHECK(out.str() == baseline);
-    CHECK(err.str().empty());
+    CHECK(err.str().find("verbose: report_type=impact\n") != std::string::npos);
+    CHECK(err.str().find("verbose: format=json\n") != std::string::npos);
+    CHECK(err.str().find("verbose: changed_file_source=") != std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture, "impact --quiet --format dot stdout matches normal mode") {
@@ -1969,7 +1977,9 @@ TEST_CASE_FIXTURE(CliFixture, "impact --verbose --format html stdout matches nor
                  "--changed-file", "include/common/shared.h", "--verbose", "--format",
                  "html"}) == ExitCode::success);
     CHECK(out.str() == baseline);
-    CHECK(err.str().empty());
+    CHECK(err.str().find("verbose: report_type=impact\n") != std::string::npos);
+    CHECK(err.str().find("verbose: format=html\n") != std::string::npos);
+    CHECK(err.str().find("verbose: changed_file_source=") != std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture,
@@ -2008,10 +2018,11 @@ TEST_CASE_FIXTURE(CliFixture,
                  "--format", "json", "--output", verbose_target.c_str(), "--top", "2"}) ==
             ExitCode::success);
     CHECK(out.str().empty());
-    // Tranche A: verbose stderr stays empty for successful artifact runs;
-    // Tranche C activates the documented verbose: stderr block. Tighten this
-    // assertion to the exact verbose: sequence once Tranche C lands.
-    CHECK(err.str().empty());
+    // AP M5-1.5 Tranche B.2: verbose --format <artifact> --output emits the
+    // documented verbose: stderr block; output=file confirms the --output
+    // dispatch took effect.
+    CHECK(err.str().find("verbose: format=json\n") != std::string::npos);
+    CHECK(err.str().find("verbose: output=file\n") != std::string::npos);
     CHECK(read_text_file(std::filesystem::path{verbose_target}) == baseline);
 }
 
@@ -2051,7 +2062,10 @@ TEST_CASE_FIXTURE(CliFixture,
                  "--changed-file", "include/common/shared.h", "--verbose", "--format", "dot",
                  "--output", verbose_target.c_str()}) == ExitCode::success);
     CHECK(out.str().empty());
-    CHECK(err.str().empty());
+    CHECK(err.str().find("verbose: report_type=impact\n") != std::string::npos);
+    CHECK(err.str().find("verbose: format=dot\n") != std::string::npos);
+    CHECK(err.str().find("verbose: output=file\n") != std::string::npos);
+    CHECK(err.str().find("verbose: changed_file_source=") != std::string::npos);
     CHECK(read_text_file(std::filesystem::path{verbose_target}) == baseline);
 }
 
@@ -2291,4 +2305,308 @@ TEST_CASE("console --quiet impact rejects when changed_file is std::nullopt") {
     CHECK(err.str().find("changed_file is missing") != std::string::npos);
     CHECK(err.str().find("--format console --quiet") != std::string::npos);
     CHECK(err.str().find("impact: ok") == std::string::npos);
+}
+
+// ---- AP M5-1.5 Tranche B.2: Console Verbose end-to-end ------------------
+//
+// CLI-level smokes that route --format console --verbose through the
+// dispatch in cli_adapter.cpp and match each documented case against its
+// byte-stable golden under tests/e2e/testdata/m5/verbosity/. e2e_binary
+// smokes for the same goldens land in Tranche C.2.
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --verbose --format console matches console-analyze-verbose golden") {
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m3/report_project/compile_commands.json").c_str(), "--verbose",
+                 "--format", "console", "--top", "2"}) == ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-analyze-verbose.txt"));
+    CHECK(out.str() == golden);
+    // Tranche B.2 keeps console verbose stderr empty for the success path;
+    // verbose stderr is documented for artifact formats only.
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --verbose console with targets matches console-analyze-verbose-targets golden") {
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m4/with_targets/compile_commands.json").c_str(),
+                 "--cmake-file-api", fixture_path("m4/with_targets/build").c_str(),
+                 "--verbose", "--format", "console", "--top", "2"}) == ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-analyze-verbose-targets.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --verbose console for file-api-only matches console-analyze-verbose-file-api-only golden") {
+    REQUIRE(run({"analyze", "--cmake-file-api",
+                 fixture_path("m4/file_api_only/build").c_str(), "--verbose", "--format",
+                 "console", "--top", "5"}) == ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-analyze-verbose-file-api-only.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --verbose console for the lean fixture matches console-analyze-verbose-empty golden") {
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m5/dot-fixtures/multi_tu_compile_db/compile_commands.json")
+                     .c_str(),
+                 "--verbose", "--format", "console"}) == ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-analyze-verbose-empty.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose --format console matches console-impact-verbose golden") {
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m3/report_impact_header/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/config.h", "--verbose", "--format",
+                 "console"}) == ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-impact-verbose.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose console for direct match matches console-impact-verbose-direct golden") {
+    REQUIRE(run({"impact", "--cmake-file-api",
+                 fixture_path("m4/file_api_only/build").c_str(), "--changed-file",
+                 "src/main.cpp", "--verbose", "--format", "console"}) ==
+            ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-impact-verbose-direct.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose console with targets matches console-impact-verbose-targets golden") {
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m4/with_targets/compile_commands.json").c_str(),
+                 "--cmake-file-api", fixture_path("m4/with_targets/build").c_str(),
+                 "--changed-file", "include/common/shared.h", "--verbose", "--format",
+                 "console"}) == ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-impact-verbose-targets.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose console with no affected TUs matches console-impact-verbose-empty golden") {
+    REQUIRE(run({"impact", "--cmake-file-api",
+                 fixture_path("m4/file_api_only/build").c_str(), "--changed-file",
+                 "include/common/shared.h", "--verbose", "--format", "console"}) ==
+            ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-impact-verbose-empty.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+// ---- AP M5-1.5 Tranche B.2: Verbose-Artefakt-stderr exact-line tests ----
+//
+// The verbose stderr block is contractually 7 lines for analyze and 8 lines
+// for impact, in the documented order, with no top_limit entry. These tests
+// pin the exact byte-sequence; the broader Tranche A artifact-noop tests
+// already verify substring presence per format/subcommand.
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --verbose --format json emits exactly the documented seven-line stderr block") {
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+                 "--format", "json", "--top", "2"}) == ExitCode::success);
+    const std::string expected =
+        "verbose: report_type=analyze\n"
+        "verbose: format=json\n"
+        "verbose: output=stdout\n"
+        "verbose: compile_database_source=cli\n"
+        "verbose: cmake_file_api_source=not_provided\n"
+        "verbose: observation_source=exact\n"
+        "verbose: target_metadata=not_loaded\n";
+    CHECK(err.str() == expected);
+    CHECK(err.str().find("top_limit") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose --format json emits exactly the documented eight-line stderr block") {
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/shared.h", "--verbose", "--format",
+                 "json"}) == ExitCode::success);
+    const std::string expected =
+        "verbose: report_type=impact\n"
+        "verbose: format=json\n"
+        "verbose: output=stdout\n"
+        "verbose: compile_database_source=cli\n"
+        "verbose: cmake_file_api_source=not_provided\n"
+        "verbose: observation_source=exact\n"
+        "verbose: target_metadata=not_loaded\n"
+        "verbose: changed_file_source=compile_database_directory\n";
+    CHECK(err.str() == expected);
+    CHECK(err.str().find("top_limit") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --verbose --format html --output emits output=file in the verbose block") {
+    const TemporaryDirectory temp_dir;
+    const auto target = (temp_dir.path() / "report.html").string();
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+                 "--format", "html", "--output", target.c_str(), "--top", "2"}) ==
+            ExitCode::success);
+    CHECK(err.str().find("verbose: output=file\n") != std::string::npos);
+    CHECK(err.str().find("verbose: format=html\n") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "console --verbose with successful render keeps stderr empty") {
+    // Console verbose stays a stdout-only emitter; the verbose: stderr block
+    // is documented for artifact formats only.
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+                 "--format", "console", "--top", "2"}) == ExitCode::success);
+    CHECK(err.str().empty());
+}
+
+// AP M5-1.5 Tranche B.2: cover every ChangedFileSource label branch in the
+// verbose-stderr emitter plus the nullopt fallback. The first three reach
+// real fixtures; cli_absolute also exercises the file API source root case
+// because m4/file_api_only resolves /project/... back to its source root.
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "verbose impact stderr labels file_api_source_root for relative changed files via file API") {
+    REQUIRE(run({"impact", "--cmake-file-api",
+                 fixture_path("m4/file_api_only/build").c_str(), "--changed-file",
+                 "src/main.cpp", "--verbose", "--format", "json"}) ==
+            ExitCode::success);
+    CHECK(err.str().find("verbose: changed_file_source=file_api_source_root\n") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "verbose impact stderr labels cli_absolute when --changed-file is absolute") {
+    REQUIRE(run({"impact", "--compile-commands",
+                 fixture_path("m2/basic_project/compile_commands.json").c_str(),
+                 "--changed-file", "/project/src/app/main.cpp", "--verbose", "--format",
+                 "json"}) == ExitCode::success);
+    CHECK(err.str().find("verbose: changed_file_source=cli_absolute\n") !=
+          std::string::npos);
+}
+
+// Synthesised stub paths: drive the changed_file_source label branches that
+// real fixtures cannot reproduce (unresolved_file_api_source_root for json
+// and the nullopt fallback). For unresolved we use a non-html format so the
+// render-precondition predicate does not reject the result before stderr
+// emission.
+
+TEST_CASE("verbose impact stderr labels unresolved_file_api_source_root for non-html artifact paths") {
+    ImpactResult unresolved_result{};
+    unresolved_result.application = xray::hexagon::model::application_info();
+    unresolved_result.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    unresolved_result.inputs.changed_file = std::string{"src/missing.cpp"};
+    unresolved_result.inputs.changed_file_source =
+        xray::hexagon::model::ChangedFileSource::unresolved_file_api_source_root;
+
+    class FixedImpactPort final : public xray::hexagon::ports::driving::AnalyzeImpactPort {
+    public:
+        explicit FixedImpactPort(ImpactResult result) : result_(std::move(result)) {}
+        ImpactResult analyze_impact(
+            xray::hexagon::ports::driving::AnalyzeImpactRequest /*request*/) const override {
+            return result_;
+        }
+
+    private:
+        ImpactResult result_;
+    };
+
+    AnalysisResult unused_analysis;
+    unused_analysis.application = xray::hexagon::model::application_info();
+    unused_analysis.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    const StubAnalyzeProjectPort analyze_project_port{unused_analysis};
+    const FixedImpactPort impact_port{unresolved_result};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",     "impact",         "--cmake-file-api",
+                          "/tmp/empty",     "--changed-file", "src/missing.cpp",
+                          "--verbose",      "--format",       "json"};
+
+    const int exit_code = cli.run(9, argv, out, err);
+    CHECK(exit_code == ExitCode::success);
+    CHECK(err.str().find("verbose: changed_file_source=unresolved_file_api_source_root\n") !=
+          std::string::npos);
+}
+
+TEST_CASE("verbose impact stderr falls back to not_provided when changed_file_source is std::nullopt") {
+    ImpactResult result{};
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    // changed_file IS set so the missing-changed-file precondition does not
+    // fire for json; changed_file_source remains std::nullopt to exercise
+    // the fallback branch in emit_artifact_verbose_stderr_impact.
+    result.inputs.changed_file = std::string{"src/whatever.cpp"};
+    // result.inputs.changed_file_source intentionally left as std::nullopt.
+
+    class FixedImpactPort final : public xray::hexagon::ports::driving::AnalyzeImpactPort {
+    public:
+        explicit FixedImpactPort(ImpactResult value) : result_(std::move(value)) {}
+        ImpactResult analyze_impact(
+            xray::hexagon::ports::driving::AnalyzeImpactRequest /*request*/) const override {
+            return result_;
+        }
+
+    private:
+        ImpactResult result_;
+    };
+
+    AnalysisResult unused_analysis;
+    unused_analysis.application = xray::hexagon::model::application_info();
+    unused_analysis.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    const StubAnalyzeProjectPort analyze_project_port{unused_analysis};
+    const FixedImpactPort impact_port{result};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",     "impact",         "--cmake-file-api",
+                          "/tmp/empty",     "--changed-file", "src/whatever.cpp",
+                          "--verbose",      "--format",       "json"};
+
+    const int exit_code = cli.run(9, argv, out, err);
+    CHECK(exit_code == ExitCode::success);
+    CHECK(err.str().find("verbose: changed_file_source=not_provided\n") !=
+          std::string::npos);
 }

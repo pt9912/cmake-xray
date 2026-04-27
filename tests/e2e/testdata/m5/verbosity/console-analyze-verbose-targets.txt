@@ -1,0 +1,47 @@
+verbose analysis summary
+  report_type: analyze
+  format_version: 1
+  translation_units: 3
+  ranking_entries: 2 of 3
+  include_hotspots: 2 of 2
+  top_limit: 2
+  diagnostics: 1
+
+inputs
+  compile_database_path: tests/e2e/testdata/m4/with_targets/compile_commands.json
+  compile_database_source: cli
+  cmake_file_api_path: tests/e2e/testdata/m4/with_targets/build
+  cmake_file_api_resolved_path: tests/e2e/testdata/m4/with_targets/build/.cmake/api/v1/reply
+  cmake_file_api_source: cli
+
+observation
+  observation_source: exact
+  target_metadata: loaded
+  include_analysis_heuristic: true
+
+translation unit ranking
+  showing 2 of 3 (top_limit=2)
+  1. src/app/main.cpp [directory: build/app] [score: 11]
+    args=8 includes=2 defines=1 [targets: app (EXECUTABLE)]
+    warning: could not resolve include "generated/version.h" from src/app/main.cpp
+  2. src/tools/tool.cpp [directory: build/tools] [score: 9]
+    args=7 includes=1 defines=1 [targets: tool (EXECUTABLE)]
+
+include hotspots
+  showing 2 of 2 (top_limit=2)
+  - include/common/config.h (affected translation units: 3)
+      src/app/main.cpp [directory: build/app]
+      src/lib/core.cpp [directory: build/lib]
+      ... 1 more not shown
+  - include/common/shared.h (affected translation units: 3)
+      src/app/main.cpp [directory: build/app]
+      src/lib/core.cpp [directory: build/lib]
+      ... 1 more not shown
+
+targets
+  - app [type: EXECUTABLE]
+  - core [type: STATIC_LIBRARY]
+  - tool [type: EXECUTABLE]
+
+diagnostics
+  note: include-based results are heuristic; conditional or generated includes may be missing

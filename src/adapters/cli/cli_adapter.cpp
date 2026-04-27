@@ -261,6 +261,105 @@ int run_emit_for_renderer(const CliReportRenderer& renderer, const CliOptions& o
     return emit_rendered_report(renderer, options.output_path, writer, streams);
 }
 
+// AP M5-1.5 Tranche B.2: helpers for the verbose: stderr block emitted after
+// a successful artifact render. Console keeps stderr silent; markdown, json,
+// dot and html each emit the documented 7-line (analyze) / 8-line (impact)
+// verbose: prefix sequence in fixed order. top_limit is intentionally
+// excluded from the artifact verbose block per plan ~362.
+std::string_view artifact_format_label(ReportFormat format) {
+    if (format == ReportFormat::markdown) return "markdown";
+    if (format == ReportFormat::json) return "json";
+    if (format == ReportFormat::dot) return "dot";
+    return "html";
+}
+
+std::string_view artifact_output_label(const CliOptions& options) {
+    return options.output_path.empty() ? "stdout" : "file";
+}
+
+std::string_view artifact_input_source_label(
+    xray::hexagon::model::ReportInputSource source) {
+    return source == xray::hexagon::model::ReportInputSource::cli ? "cli" : "not_provided";
+}
+
+std::string_view artifact_observation_source_label(
+    xray::hexagon::model::ObservationSource source) {
+    return source == xray::hexagon::model::ObservationSource::derived ? "derived" : "exact";
+}
+
+std::string_view artifact_target_metadata_label(
+    xray::hexagon::model::TargetMetadataStatus status) {
+    if (status == xray::hexagon::model::TargetMetadataStatus::loaded) return "loaded";
+    if (status == xray::hexagon::model::TargetMetadataStatus::partial) return "partial";
+    return "not_loaded";
+}
+
+std::string_view artifact_changed_file_source_label(
+    xray::hexagon::model::ChangedFileSource source) {
+    using xray::hexagon::model::ChangedFileSource;
+    if (source == ChangedFileSource::compile_database_directory) {
+        return "compile_database_directory";
+    }
+    if (source == ChangedFileSource::file_api_source_root) return "file_api_source_root";
+    if (source == ChangedFileSource::cli_absolute) return "cli_absolute";
+    return "unresolved_file_api_source_root";
+}
+
+bool should_emit_artifact_verbose_stderr(ReportFormat format, OutputVerbosity verbosity) {
+    return format != ReportFormat::console && verbosity == OutputVerbosity::verbose;
+}
+
+struct ArtifactVerboseContext {
+    std::string_view report_type;
+    ReportFormat format;
+    const CliOptions& options;
+    const xray::hexagon::model::ReportInputs& inputs;
+    xray::hexagon::model::ObservationSource observation_source;
+    xray::hexagon::model::TargetMetadataStatus target_metadata;
+};
+
+void emit_artifact_verbose_stderr_common(std::ostream& err,
+                                          const ArtifactVerboseContext& ctx) {
+    err << "verbose: report_type=" << ctx.report_type << '\n'
+        << "verbose: format=" << artifact_format_label(ctx.format) << '\n'
+        << "verbose: output=" << artifact_output_label(ctx.options) << '\n'
+        << "verbose: compile_database_source="
+        << artifact_input_source_label(ctx.inputs.compile_database_source) << '\n'
+        << "verbose: cmake_file_api_source="
+        << artifact_input_source_label(ctx.inputs.cmake_file_api_source) << '\n'
+        << "verbose: observation_source="
+        << artifact_observation_source_label(ctx.observation_source) << '\n'
+        << "verbose: target_metadata=" << artifact_target_metadata_label(ctx.target_metadata)
+        << '\n';
+}
+
+void emit_artifact_verbose_stderr_analyze(
+    std::ostream& err, ReportFormat format, const CliOptions& options,
+    const xray::hexagon::model::AnalysisResult& result) {
+    emit_artifact_verbose_stderr_common(
+        err, ArtifactVerboseContext{"analyze", format, options, result.inputs,
+                                      result.observation_source, result.target_metadata});
+}
+
+void emit_artifact_verbose_stderr_impact(
+    std::ostream& err, ReportFormat format, const CliOptions& options,
+    const xray::hexagon::model::ImpactResult& result) {
+    emit_artifact_verbose_stderr_common(
+        err, ArtifactVerboseContext{"impact", format, options, result.inputs,
+                                      result.observation_source, result.target_metadata});
+    // changed_file_source can be std::nullopt on synthetic impact results
+    // that bypass the analyzer (e.g. doppelgaenger tests for non-html
+    // artifact formats where the missing-changed-file precondition does not
+    // fire). The "not_provided" fallback keeps the verbose block valid.
+    err << "verbose: changed_file_source=";
+    if (result.inputs.changed_file_source.has_value()) {
+        err << artifact_changed_file_source_label(*result.inputs.changed_file_source);
+    } else {
+        err << "not_provided";
+    }
+    err << '\n';
+}
+
 int handle_analysis_result(const xray::hexagon::model::AnalysisResult& result,
                            const xray::hexagon::ports::driving::GenerateReportPort& report_port,
                            ReportFormat format, const CliOptions& options,
@@ -275,8 +374,19 @@ int handle_analysis_result(const xray::hexagon::model::AnalysisResult& result,
             [&result, top_limit] { return render_console_quiet_analyze(result, top_limit); }};
         return run_emit_for_renderer(renderer, options, streams);
     }
+    if (format == ReportFormat::console && options.verbosity == OutputVerbosity::verbose) {
+        const auto top_limit = options.top_limit;
+        const StringFunctionCliReportRenderer renderer{
+            [&result, top_limit] { return render_console_verbose_analyze(result, top_limit); }};
+        return run_emit_for_renderer(renderer, options, streams);
+    }
     const AnalysisCliReportRenderer renderer{report_port, result, options.top_limit};
-    return run_emit_for_renderer(renderer, options, streams);
+    const auto exit_code = run_emit_for_renderer(renderer, options, streams);
+    if (exit_code == ExitCode::success &&
+        should_emit_artifact_verbose_stderr(format, options.verbosity)) {
+        emit_artifact_verbose_stderr_analyze(streams.err, format, options, result);
+    }
+    return exit_code;
 }
 
 // AP M5-1.5 Tranche B: factored render-precondition helper. The HTML adapter
@@ -349,8 +459,18 @@ int handle_impact_result(const xray::hexagon::model::ImpactResult& result,
             [&result] { return render_console_quiet_impact(result); }};
         return run_emit_for_renderer(renderer, options, streams);
     }
+    if (format == ReportFormat::console && options.verbosity == OutputVerbosity::verbose) {
+        const StringFunctionCliReportRenderer renderer{
+            [&result] { return render_console_verbose_impact(result); }};
+        return run_emit_for_renderer(renderer, options, streams);
+    }
     const ImpactCliReportRenderer renderer{report_port, result};
-    return run_emit_for_renderer(renderer, options, streams);
+    const auto exit_code = run_emit_for_renderer(renderer, options, streams);
+    if (exit_code == ExitCode::success &&
+        should_emit_artifact_verbose_stderr(format, options.verbosity)) {
+        emit_artifact_verbose_stderr_impact(streams.err, format, options, result);
+    }
+    return exit_code;
 }
 
 xray::hexagon::ports::driving::InputPathArgument make_input_path_argument(

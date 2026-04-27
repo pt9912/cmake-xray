@@ -1,0 +1,39 @@
+verbose impact summary
+  report_type: impact
+  format_version: 1
+  changed_file: include/common/config.h
+  affected_translation_units: 3
+  classification: heuristic
+  affected_targets: 0
+  diagnostics: 2
+
+inputs
+  compile_database_path: tests/e2e/testdata/m3/report_impact_header/compile_commands.json
+  compile_database_source: cli
+  cmake_file_api_path: not provided
+  cmake_file_api_resolved_path: not provided
+  cmake_file_api_source: not_provided
+  changed_file: include/common/config.h
+  changed_file_source: compile_database_directory
+
+observation
+  observation_source: exact
+  target_metadata: not_loaded
+
+directly affected translation units
+  no directly affected translation units
+
+heuristically affected translation units
+  - src/app/main.cpp [directory: build/app]
+  - src/lib/core.cpp [directory: build/lib]
+  - src/tools/tool.cpp [directory: build/tools]
+
+directly affected targets
+  no directly affected targets
+
+heuristically affected targets
+  no heuristically affected targets
+
+diagnostics
+  warning: could not resolve include "generated/version.h" from src/app/main.cpp
+  note: conditional or generated includes may be missing from this result

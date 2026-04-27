@@ -1,0 +1,39 @@
+verbose analysis summary
+  report_type: analyze
+  format_version: 1
+  translation_units: 2
+  ranking_entries: 2 of 2
+  include_hotspots: 0 of 0
+  top_limit: 5
+  diagnostics: 1
+
+inputs
+  compile_database_path: not provided
+  compile_database_source: not_provided
+  cmake_file_api_path: tests/e2e/testdata/m4/file_api_only/build
+  cmake_file_api_resolved_path: tests/e2e/testdata/m4/file_api_only/build/.cmake/api/v1/reply
+  cmake_file_api_source: cli
+
+observation
+  observation_source: derived
+  target_metadata: loaded
+  include_analysis_heuristic: true
+
+translation unit ranking
+  showing 2 of 2 (top_limit=5)
+  1. src/main.cpp [directory: build] [score: 11]
+    args=8 includes=2 defines=1 [targets: app (EXECUTABLE)]
+    warning: cannot read source file for include analysis: src/main.cpp
+  2. src/core.cpp [directory: build] [score: 6]
+    args=5 includes=1 defines=0 [targets: core (STATIC_LIBRARY)]
+    warning: cannot read source file for include analysis: src/core.cpp
+
+include hotspots
+  no include hotspots
+
+targets
+  - app [type: EXECUTABLE]
+  - core [type: STATIC_LIBRARY]
+
+diagnostics
+  note: include-based results are heuristic; conditional or generated includes may be missing

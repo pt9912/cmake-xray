@@ -43,3 +43,13 @@ console-analyze-quiet-empty.txt
 console-impact-quiet.txt
 console-impact-quiet-targets.txt
 console-impact-quiet-empty.txt
+
+# Verbose goldens (Tranche B.2)
+console-analyze-verbose.txt
+console-analyze-verbose-targets.txt
+console-analyze-verbose-file-api-only.txt
+console-analyze-verbose-empty.txt
+console-impact-verbose.txt
+console-impact-verbose-direct.txt
+console-impact-verbose-targets.txt
+console-impact-verbose-empty.txt

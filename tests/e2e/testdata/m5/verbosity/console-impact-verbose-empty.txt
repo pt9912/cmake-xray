@@ -1,0 +1,39 @@
+verbose impact summary
+  report_type: impact
+  format_version: 1
+  changed_file: include/common/shared.h
+  affected_translation_units: 0
+  classification: heuristic
+  affected_targets: 0
+  diagnostics: 4
+
+inputs
+  compile_database_path: not provided
+  compile_database_source: not_provided
+  cmake_file_api_path: tests/e2e/testdata/m4/file_api_only/build
+  cmake_file_api_resolved_path: tests/e2e/testdata/m4/file_api_only/build/.cmake/api/v1/reply
+  cmake_file_api_source: cli
+  changed_file: include/common/shared.h
+  changed_file_source: file_api_source_root
+
+observation
+  observation_source: derived
+  target_metadata: loaded
+
+directly affected translation units
+  no directly affected translation units
+
+heuristically affected translation units
+  no heuristically affected translation units
+
+directly affected targets
+  no directly affected targets
+
+heuristically affected targets
+  no heuristically affected targets
+
+diagnostics
+  warning: cannot read source file for include analysis: src/core.cpp
+  warning: cannot read source file for include analysis: src/main.cpp
+  note: conditional or generated includes may be missing from this result
+  note: the file was not present in the loaded compile database or resolved include graph

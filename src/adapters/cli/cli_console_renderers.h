@@ -24,4 +24,9 @@ std::string render_console_quiet_analyze(const xray::hexagon::model::AnalysisRes
 
 std::string render_console_quiet_impact(const xray::hexagon::model::ImpactResult& result);
 
+std::string render_console_verbose_analyze(const xray::hexagon::model::AnalysisResult& result,
+                                            std::size_t top_limit);
+
+std::string render_console_verbose_impact(const xray::hexagon::model::ImpactResult& result);
+
 }  // namespace xray::adapters::cli

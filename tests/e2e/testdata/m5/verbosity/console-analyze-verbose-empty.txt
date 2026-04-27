@@ -1,0 +1,44 @@
+verbose analysis summary
+  report_type: analyze
+  format_version: 1
+  translation_units: 4
+  ranking_entries: 4 of 4
+  include_hotspots: 0 of 0
+  top_limit: 10
+  diagnostics: 1
+
+inputs
+  compile_database_path: tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json
+  compile_database_source: cli
+  cmake_file_api_path: not provided
+  cmake_file_api_resolved_path: not provided
+  cmake_file_api_source: not_provided
+
+observation
+  observation_source: exact
+  target_metadata: not_loaded
+  include_analysis_heuristic: true
+
+translation unit ranking
+  showing 4 of 4 (top_limit=10)
+  1. /project/src/app.cpp [directory: /project/build] [score: 9]
+    args=6 includes=2 defines=1
+    warning: cannot read source file for include analysis: /project/src/app.cpp
+  2. /project/src/tool.cpp [directory: /project/build] [score: 7]
+    args=5 includes=1 defines=1
+    warning: cannot read source file for include analysis: /project/src/tool.cpp
+  3. /project/src/core.cpp [directory: /project/build] [score: 5]
+    args=4 includes=1 defines=0
+    warning: cannot read source file for include analysis: /project/src/core.cpp
+  4. /project/src/util.cpp [directory: /project/build] [score: 5]
+    args=4 includes=1 defines=0
+    warning: cannot read source file for include analysis: /project/src/util.cpp
+
+include hotspots
+  no include hotspots
+
+targets
+  no target metadata loaded
+
+diagnostics
+  note: include-based results are heuristic; conditional or generated includes may be missing

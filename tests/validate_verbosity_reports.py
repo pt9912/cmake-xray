@@ -122,18 +122,43 @@ def validate_trailing_newline(text: str) -> tuple[int, str | None]:
     return EXIT_OK, None
 
 
-def validate_no_doubled_newlines(text: str) -> tuple[int, str | None]:
+def validate_no_doubled_newlines_for_quiet(text: str) -> tuple[int, str | None]:
+    # Quiet emitters produce exactly one newline per line, including the
+    # last. Verbose emitters use blank lines between sections, so the rule
+    # is intentionally Quiet-only. The anchor line decides the mode.
+    if not text:
+        return EXIT_OK, None
+    first_line = text.splitlines()[0]
+    if first_line not in ("analysis: ok", "impact: ok"):
+        return EXIT_OK, None  # Verbose: blank-line separators allowed.
     if "\n\n" in text:
         return EXIT_VALIDATION_FAILED, (
-            "doubled newline ('\\n\\n') found; quiet/verbose renderers must "
-            "emit exactly one newline between every line, including the last")
+            "doubled newline ('\\n\\n') found in a Quiet golden; Quiet "
+            "renderers emit exactly one newline between every line")
+    return EXIT_OK, None
+
+
+def validate_verbose_section_separators(text: str) -> tuple[int, str | None]:
+    # Verbose emitters separate sections with a single blank line. Triple
+    # newlines (\n\n\n) would surface a renderer that accidentally emits
+    # two blank lines, which would break the documented section layout.
+    if not text:
+        return EXIT_OK, None
+    first_line = text.splitlines()[0]
+    if first_line not in ("verbose analysis summary", "verbose impact summary"):
+        return EXIT_OK, None  # Quiet: separator rule does not apply.
+    if "\n\n\n" in text:
+        return EXIT_VALIDATION_FAILED, (
+            "triple newline ('\\n\\n\\n') found in a Verbose golden; "
+            "Verbose sections are separated by a single blank line only")
     return EXIT_OK, None
 
 
 CHECKS = (
     validate_anchor,
     validate_trailing_newline,
-    validate_no_doubled_newlines,
+    validate_no_doubled_newlines_for_quiet,
+    validate_verbose_section_separators,
 )
 
 

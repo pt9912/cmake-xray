@@ -438,8 +438,9 @@ Die Umsetzung erfolgt in drei verbindlichen Tranchen plus einer optionalen Haert
 
 DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert eine in einem konkreten Commit ausgelieferte Anforderung, `[ ]` markiert eine offene Anforderung. Liefer-Stand zum Zeitpunkt der Tranche-A-Vorbereitung:
 
-- Tranche A ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; CLI-Modell, Parserverflechtung und Artefakt-Noop-Policy stehen).
-- Tranche B offen.
+- Tranche A ausgeliefert in commit `cdaec1c` ("feat: deliver M5 AP 1.5 Tranche A CLI verbosity model and noop policy").
+- Tranche B.1 ausgeliefert in commit `628dca7` ("feat: deliver M5 AP 1.5 Tranche B.1 console quiet renderers").
+- Tranche B.2 ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; Console Verbose Renderer und Verbose-Artefakt-stderr-Emitter stehen).
 - Tranche C offen.
 - Tranche D optional und offen.
 
@@ -617,21 +618,21 @@ Sub-Risiken B.2:
 
 Definition of Done Sub-Tranche B.2:
 
-- [ ] `cli_console_renderers.{h,cpp}` exportiert `render_console_verbose_analyze` und `render_console_verbose_impact`; pro Pflichtsection existiert ein file-lokaler Helfer.
-- [ ] Console Verbose Analyze enthaelt alle sieben Pflichtsections in dokumentierter Reihenfolge.
-- [ ] Console Verbose Impact enthaelt alle acht Pflichtsections in dokumentierter Reihenfolge.
-- [ ] `inputs` zieht aus `ReportInputs`; fehlende Optionalwerte erscheinen als `not provided`.
-- [ ] `observation` zeigt Observation Source, Target Metadata Status und Heuristik-Marker.
-- [ ] Sortier-Tie-Breaker fuer Ranking, Hotspots, Hotspot-Kontext, Targets und Impact-Sections sind getestet.
-- [ ] Direct+heuristic-Trennung mit beiden Sections gleichzeitig populiert ist durch einen synthetischen Adaptertest abgedeckt.
-- [ ] Newlines in Diagnostic-Messages werden zu ` / ` normalisiert.
-- [ ] `top_limit` begrenzt nur Analyze-Listen; Impact bleibt unbegrenzt.
-- [ ] Verbose-Impact-Render-Preconditions lehnen `inputs.changed_file == std::nullopt` und `inputs.changed_file_source == unresolved_file_api_source_root` ab; B.1- und B.2-Pruefung teilen denselben Helfer.
-- [ ] Verbose-Artefakt-stderr-Emitter erzeugt exakt 7 Zeilen fuer `analyze` und 8 Zeilen fuer `impact` in dokumentierter Reihenfolge ohne `top_limit`-Eintrag.
-- [ ] `--verbose --format console --output <path>` liefert weiterhin den zweizeiligen Console-Usage-Fehler aus Tranche A.
-- [ ] Stdout endet mit genau einem Newline, kein Doppel-Newline.
-- [ ] Console-Normalmodus-Goldens bleiben unveraendert.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `cli_console_renderers.{h,cpp}` exportiert `render_console_verbose_analyze` und `render_console_verbose_impact`; pro Pflichtsection existiert ein file-lokaler Helfer.
+- [x] Console Verbose Analyze enthaelt alle sieben Pflichtsections in dokumentierter Reihenfolge.
+- [x] Console Verbose Impact enthaelt alle acht Pflichtsections in dokumentierter Reihenfolge.
+- [x] `inputs` zieht aus `ReportInputs`; fehlende Optionalwerte erscheinen als `not provided`.
+- [x] `observation` zeigt Observation Source, Target Metadata Status und Heuristik-Marker.
+- [x] Sortier-Tie-Breaker fuer Ranking, Hotspots, Hotspot-Kontext, Targets und Impact-Sections sind getestet.
+- [x] Direct+heuristic-Trennung mit beiden Sections gleichzeitig populiert ist durch einen synthetischen Adaptertest abgedeckt.
+- [x] Newlines in Diagnostic-Messages werden zu ` / ` normalisiert.
+- [x] `top_limit` begrenzt nur Analyze-Listen; Impact bleibt unbegrenzt.
+- [x] Verbose-Impact-Render-Preconditions lehnen `inputs.changed_file == std::nullopt` und `inputs.changed_file_source == unresolved_file_api_source_root` ab; B.1- und B.2-Pruefung teilen denselben Helfer.
+- [x] Verbose-Artefakt-stderr-Emitter erzeugt exakt 7 Zeilen fuer `analyze` und 8 Zeilen fuer `impact` in dokumentierter Reihenfolge ohne `top_limit`-Eintrag.
+- [x] `--verbose --format console --output <path>` liefert weiterhin den zweizeiligen Console-Usage-Fehler aus Tranche A.
+- [x] Stdout endet mit genau einem Newline, kein Doppel-Newline.
+- [x] Console-Normalmodus-Goldens bleiben unveraendert.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 #### Abnahme und Definition of Done Tranche B
 
@@ -641,13 +642,13 @@ Abnahme Tranche B: alle Docker-Gates gruen; Console Quiet und Verbose fuer Analy
 
 Definition of Done Tranche B:
 
-- [ ] Console Quiet Analyze und Impact erzeugen nur die dokumentierten Kurzfassungen.
-- [ ] Console Verbose Analyze enthaelt Inputs, Observation, fachliche Sections und Diagnostics in dokumentierter Reihenfolge.
-- [ ] Console Verbose Impact enthaelt Inputs, Observation, Direct-/Heuristic-TU- und -Target-Sections und Diagnostics in dokumentierter Reihenfolge.
-- [ ] Console-Normalmodus-Goldens bleiben unveraendert.
-- [ ] Keine Port- oder Adapter-Signatur enthaelt `OutputVerbosity`.
-- [ ] Manifest fuer Verbosity-Goldens listet alle Quiet-/Verbose-Goldens; Verzeichnis und Manifest gleichen sich beidseitig ab.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] Console Quiet Analyze und Impact erzeugen nur die dokumentierten Kurzfassungen.
+- [x] Console Verbose Analyze enthaelt Inputs, Observation, fachliche Sections und Diagnostics in dokumentierter Reihenfolge.
+- [x] Console Verbose Impact enthaelt Inputs, Observation, Direct-/Heuristic-TU- und -Target-Sections und Diagnostics in dokumentierter Reihenfolge.
+- [x] Console-Normalmodus-Goldens bleiben unveraendert.
+- [x] Keine Port- oder Adapter-Signatur enthaelt `OutputVerbosity`.
+- [x] Manifest fuer Verbosity-Goldens listet alle Quiet-/Verbose-Goldens; Verzeichnis und Manifest gleichen sich beidseitig ab.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 ### Tranche C - Verbose-Fehlerkontext, Binary-E2E, Dokumentation
 
