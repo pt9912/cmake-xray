@@ -288,7 +288,7 @@ Definition of Done Tranche B:
 - [x] Reproducibility-Smoke baut zweimal aus gleichem Commit; Archiv-, Inhaltsliste-, Sha256-Sidecar- und Binary-Checksumme sind byte-identisch. Smoke ist Linux-only; macOS-Hosts erhalten `SKIP`-Statement. Beide Builds teilen sich die FetchContent-Cache via `XRAY_FETCHCONTENT_BASE_DIR`, sodass die zweite Konfigurationsphase keine Drittabhaengigkeiten neu zieht.
 - [x] `Dockerfile` exponiert eine `release-archive`-Stage als `FROM toolchain`, die ueber `--build-arg XRAY_APP_VERSION=...` aufgerufen wird; ein `release-archive-entrypoint.sh`-Entrypoint kopiert das Archiv plus Sidecar in `/output` und gibt eine klare Fehlermeldung mit Hint, wenn `/output` nicht gemountet ist.
 - [x] CTest-Eintrag `release_archive_reproducibility` faehrt den Smoke; im Test-Gate sichtbar als eigener Test mit `WORKING_DIRECTORY=${PROJECT_SOURCE_DIR}`.
-- [x] Verify-Pfad pusht im Tranche-B-Stand kein Artefakt nach GHCR oder GitHub Release; das `release-archive`-Stage produziert nur einen lokalen Container-Layer.
+- [x] Verify-Job in `release.yml` baut das Archiv ueber den `release-archive`-Stage, verifiziert die `*.sha256`-Sidecar, entpackt das Archiv und smoke-testet `cmake-xray --help` und `cmake-xray --version` aus der entpackten Binary; das ausgegebene `--version` muss exakt zum Tag-ohne-`v` passen, sonst bricht der Job vor jedem Publish-Schritt ab.
 - [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 ### Tranche C - OCI-Image-Vertrag und Idempotenz

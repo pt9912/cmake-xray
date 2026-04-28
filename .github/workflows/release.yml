@@ -64,6 +64,39 @@ jobs:
             --changed-file include/common/config.h \
             --format markdown
 
+      # AP M5-1.6 Tranche B: build the reproducible Linux release archive
+      # via the release-archive Docker stage, verify the SHA-256 sidecar,
+      # extract the bundled binary and smoke-test --help / --version. The
+      # SOURCE_DATE_EPOCH is derived from the tag's commit timestamp per
+      # plan-M5-1-6.md "Entscheidungen". The verify smoke runs before any
+      # publish step so a broken archive blocks the release.
+      - name: Build and smoke test linux release archive
+        run: |
+          set -eu
+          version="${{ steps.meta.outputs.version }}"
+          tag="${{ steps.meta.outputs.tag }}"
+          source_date_epoch=$(git log -1 --pretty=%ct "$tag")
+
+          docker build --target release-archive \
+            --build-arg XRAY_APP_VERSION="$version" \
+            --build-arg SOURCE_DATE_EPOCH="$source_date_epoch" \
+            -t cmake-xray:release-archive .
+
+          mkdir -p release-archive-out
+          docker run --rm -v "$PWD/release-archive-out:/output" cmake-xray:release-archive
+
+          archive_name="cmake-xray_${version}_linux_x86_64.tar.gz"
+          ( cd release-archive-out && sha256sum -c "${archive_name}.sha256" )
+
+          mkdir -p release-archive-extracted
+          tar -xf "release-archive-out/${archive_name}" -C release-archive-extracted
+          ./release-archive-extracted/cmake-xray --help > /dev/null
+          extracted_version=$(./release-archive-extracted/cmake-xray --version)
+          if [ "$extracted_version" != "$version" ]; then
+            echo "error: extracted binary --version='${extracted_version}' does not match expected '${version}'" >&2
+            exit 1
+          fi
+
       - name: Log in to GHCR
         run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 

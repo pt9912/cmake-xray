@@ -85,8 +85,12 @@ assert_files_byte_equal "sha256 sidecar byte-equal" \
 # flag (e.g. forgetting --numeric-owner) that does not show up in the
 # raw byte-compare because the new flag still produces identical bytes
 # on this host but would diverge on a host with different /etc/passwd.
-tar -tvf "$dir1/$archive_basename" > "$dir1/members.txt"
-tar -tvf "$dir2/$archive_basename" > "$dir2/members.txt"
+# LC_ALL=C pinnt das Datumsformat in der `tar -tvf`-Ausgabe; ohne diesen
+# Lock divergieren Monatsnamen zwischen Hosts mit unterschiedlichen
+# LC_TIME-Settings (z. B. de_DE.UTF-8 vs. C) und der byte-Vergleich der
+# Listings flaggt einen Lokal-Drift als Repro-Verstoss.
+LC_ALL=C tar -tvf "$dir1/$archive_basename" > "$dir1/members.txt"
+LC_ALL=C tar -tvf "$dir2/$archive_basename" > "$dir2/members.txt"
 assert_files_byte_equal "tar member listing equal" \
     "$dir1/members.txt" "$dir2/members.txt"
 

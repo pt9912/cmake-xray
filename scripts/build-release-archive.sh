@@ -7,8 +7,10 @@
 # LICENSE and README.md as a deterministic tar.gz under <output-dir>, and
 # writes a sha256 file. The reproducibility flags follow plan-M5-1-6.md
 # Tranche B "Linux-Archiv": tar --sort=name --mtime=@SOURCE_DATE_EPOCH
-# --owner=0 --group=0 --numeric-owner --pax-option=delete=ctime,delete=atime
-# --format=ustar piped into `gzip -n` (no filename in header).
+# --owner=0 --group=0 --numeric-owner --format=ustar piped into `gzip -n`
+# (no filename in header). The plan template lists `--pax-option=delete=
+# ctime,delete=atime` which only applies to pax headers; ustar physically
+# has no ctime/atime fields, so the flag is omitted as a no-op.
 #
 # SOURCE_DATE_EPOCH must be set in CI (derived from the tag's commit
 # timestamp via `git log -1 --pretty=%ct $TAG`); local Repro-Smoke runs
