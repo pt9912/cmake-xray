@@ -291,7 +291,7 @@ jobs:
               echo "Automated release for ${{ steps.meta.outputs.tag }}."
               echo
               echo "Assets:"
-              echo "- OCI image: ${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.tag }}"
+              echo "- OCI image: ${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.version }}"
             } > "$notes_path"
           fi
 

@@ -17,8 +17,8 @@
 #              only path that may overwrite `latest`.
 #
 # The split into three commands lets Tranche E gate them with workflow
-# `if:` clauses; Tranche D's dry-run can also call them against a local
-# registry by overriding $XRAY_OCI_REGISTRY_INSECURE for plaintext HTTP.
+# `if:` clauses; Tranche D's dry-run will pass a localhost:<port> repo
+# against a local registry:2 container per plan-M5-1-6.md Entscheidungen.
 #
 # SOURCE_DATE_EPOCH may be set to control the layer mtime; not strictly
 # required for digest stability but kept for symmetry with the Linux
@@ -59,11 +59,15 @@ read_local_image_id() {
     docker image inspect --format '{{.Id}}' "$versioned_tag" 2>/dev/null
 }
 
+# Read the canonical manifest digest of a remote tag. Using
+# `--format '{{.Manifest.Digest}}'` returns the registry-canonical digest
+# (RFC 6920) directly; sha256sum'ing the --raw output would only hash the
+# manifest bytes and would diverge across buildx versions or whitespace
+# rendering. On a missing tag the inspect exits 1 and the function
+# yields an empty stdout, which the callers detect via `[ -z ... ]`.
 read_remote_digest() {
     local tag="$1"
-    docker buildx imagetools inspect "$tag" --raw 2>/dev/null \
-        | sha256sum 2>/dev/null \
-        | awk '{print "sha256:" $1}'
+    docker buildx imagetools inspect "$tag" --format '{{.Manifest.Digest}}' 2>/dev/null
 }
 
 cmd_build() {
