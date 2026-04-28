@@ -191,6 +191,72 @@ Der command-lokale Verbosity-Vertrag ist in [docs/plan-M5-1-5.md](./plan-M5-1-5.
 - **Verbose-stdout-Validity-Gates** in `e2e_binary_verbosity`. JSON-, DOT- und HTML-Verbose-stdout werden zusaetzlich zur Byte-Stabilitaet durch die jeweiligen Validatoren aus AP 1.2 / 1.3 / 1.4 (`validate_json_schema.py`, `validate_dot_reports.py`, `validate_html_reports.py`) gegen ihre Vertraege geprueft; ein versehentliches `verbose:`-Leck in stdout wuerde den Validator brechen.
 - **Binary-E2E-Smokes** in `e2e_binary_verbosity` ueber `tests/e2e/run_e2e_verbosity.sh`. Console-Quiet/Verbose-Goldens, Quiet-/Verbose-Artefakt-Byte-Stabilitaet, Verbose-stderr-Sequenzen und `--output`-Datei-Byte-Stabilitaet werden alle ueber die echte `cmake-xray`-Binary inklusive `src/main.cpp` gefahren.
 
+## Release-Pipeline-Gates (AP M5-1.6)
+
+Zusaetzlich zu den Docker-Quality-Gates oben fuehrt der Release-Pfad in
+[`.github/workflows/release.yml`](../.github/workflows/release.yml) verbindliche
+Gates aus, die jeden Tag-Push absichern. Sie sind in
+[docs/plan-M5-1-6.md](./plan-M5-1-6.md) festgeschrieben und im Dry-Run-
+Orchestrator ([`scripts/release-dry-run.sh`](../scripts/release-dry-run.sh))
+identisch verschaltet, sodass Workflow- und Dry-Run-Disposition deckungsgleich
+bleiben:
+
+- **Tag-Validator** ueber [`scripts/validate-release-tag.sh`](../scripts/validate-release-tag.sh).
+  Akzeptiert ausschliesslich `vMAJOR.MINOR.PATCH` und
+  `vMAJOR.MINOR.PATCH-PRERELEASE`. Build-Metadaten (`+...`) werden abgelehnt.
+  CTest-Anker: `release_tag_validation` ueber
+  `tests/release/test_validate_release_tag.sh` (vier positive plus zwoelf
+  negative Faelle).
+- **Reproduzierbares Linux-Archiv** ueber [`scripts/build-release-archive.sh`](../scripts/build-release-archive.sh)
+  und das `release-archive`-Stage im [Dockerfile](../Dockerfile). Tar wird
+  mit `--sort=name --mtime=@SOURCE_DATE_EPOCH --owner=0 --group=0
+  --numeric-owner --format=ustar` erzeugt und mit `gzip -n` gepackt;
+  `SOURCE_DATE_EPOCH` ist im Workflow auf den Tag-Commit-Zeitstempel
+  (`git log -1 --pretty=%ct $TAG`) gepinnt. CTest-Anker:
+  `release_archive_reproducibility` ueber
+  `tests/release/test_release_archive_repro.sh`.
+- **OCI-Idempotenz** ueber [`scripts/oci-image-publish.sh`](../scripts/oci-image-publish.sh).
+  Die Subkommandos `build`, `push` und `latest` benutzen
+  `docker buildx imagetools inspect --format '{{.Manifest.Digest}}'` als
+  kanonische Digest-Quelle (RFC 6920 / OCI Image Spec). Re-Runs ueberschreiben
+  einen vorhandenen Tag nur, wenn der lokale und der remote Digest exakt
+  uebereinstimmen; Mismatch bricht den Push ab. `:latest` wird ausschliesslich
+  fuer regulaere Releases gesetzt (Versions-String enthaelt kein `-`).
+  CTest-Anker: `oci_image_smoke` ueber `tests/release/test_oci_image_smoke.sh`.
+- **Asset-Allowlist** ueber [`scripts/release-allowlist.sh`](../scripts/release-allowlist.sh).
+  Ein bash-Array fixiert die einzigen zulaessigen Asset-Namen
+  (`cmake-xray_<version>_linux_x86_64.tar.gz` plus
+  `*.sha256`-Sidecar). Jeder Asset-Name ausserhalb der Allowlist bricht
+  den finalen Release-Job vor `release_published` ab. CTest-Anker:
+  `release_allowlist` ueber `tests/release/test_release_allowlist.sh`
+  (positiv plus fuenf Negativfaelle: Praefix-, Versions-, Plattform-,
+  Extension- und Sidecar-Drift).
+- **Drei-Wege-Versionscheck** verteilt ueber Verify- und Release-Job. Die
+  drei kanonischen Quellen sind: (1) Tag (`v$VERSION`), (2) `XRAY_APP_VERSION`
+  aus dem CMake-Build (in Linux-Archiv-Binary und OCI-Image-Binary
+  eingebrannt) und (3) Release-Asset-/OCI-Publish-Metadaten. Der
+  Verify-Job pinnt Quelle (2) gegen (1), indem er den `--version`-Output
+  des Linux-Archiv-Binarys und des lokal gebauten OCI-Images gegen den
+  Tag vergleicht. Der Release-Job pinnt zusaetzlich Tag-Gleichheit
+  (`tag == v${version}`), Asset-Namen-Suffix (`_${version}_`),
+  OCI-Tag-Erreichbarkeit ueber `imagetools inspect` und den
+  `--version`-Output am tatsaechlich publishten OCI-Image (post-Push,
+  aus Registry, nicht aus Local-Cache). Eine Drift in einer der Quellen
+  bricht vor `gh release create/edit` ab.
+- **Dry-Run-Smoke** ueber [`scripts/release-dry-run.sh`](../scripts/release-dry-run.sh)
+  und das `release-dry-run`-Stage im [Dockerfile](../Dockerfile). Nutzt
+  fake-`gh` und eine lokale `registry:2` und durchlaeuft die drei Plan-
+  Zustandsuebergaenge `draft_release_created -> oci_image_published ->
+  release_published`. Refusal-Pfade bei realen Endpunkten (`GH_TOKEN` ohne
+  Override) und Manifest-Mismatch-Erkennung sind verbindlich gepinnt.
+  CTest-Anker: `release_dry_run` ueber
+  `tests/release/test_release_dry_run.sh` (zwei Happy-Path- plus vier
+  Abort-Szenarien).
+
+Diese Gates sind verpflichtend; ein roter Pfad bricht die Veroeffentlichung
+ab, bevor irgendein extern sichtbarer Zustand (Draft, OCI-Push, Public-
+Release) entsteht.
+
 ## Zusammenhang mit Releasing
 
 Fuer M3 und spaetere Releases sind mindestens diese Docker-Pfade massgeblich:

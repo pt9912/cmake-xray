@@ -133,6 +133,63 @@ fi
 
 Falls kein Asset-Upload erforderlich ist, koennen die `./release-assets/*`-Argumente weggelassen werden.
 
+## Tag-, Versions- und `latest`-Vertrag (AP M5-1.6)
+
+Der Release-Workflow akzeptiert nur Tag-Pushes mit dem in
+[`docs/plan-M5-1-6.md`](./plan-M5-1-6.md) Sektion "SemVer-Tag-Muster"
+fixierten Muster:
+
+- `vMAJOR.MINOR.PATCH` (`v0.0.0`, `v1.2.3`).
+- `vMAJOR.MINOR.PATCH-PRERELEASE` (`v1.2.3-rc.1`, `v1.2.3-alpha.1-2`).
+- Build-Metadaten (`+...`) sind nicht erlaubt.
+
+Die Tag-Validierung laeuft als erste Stufe ueber
+`scripts/validate-release-tag.sh`; das Skript druckt die App-Version ohne
+fuehrendes `v` auf stdout. Der Release-Workflow reicht dieses
+Versions-String an alle nachgelagerten Stufen weiter (CMake-Cache-Var
+`XRAY_APP_VERSION`, OCI-Tag, Asset-Naming, `--version`-Output). Der
+Verify-Job extrahiert die Binary aus dem reproduzierbaren Linux-Archiv
+und vergleicht ihren `--version`-Output gegen die erwartete Version,
+und faehrt denselben Vergleich am lokal gebauten OCI-Image (vor Push).
+Der finale Release-Job verifiziert zusaetzlich Tag-Gleichheit, Asset-
+Namen-Suffix, OCI-Tag-Erreichbarkeit ueber `imagetools inspect` und
+`--version`-Output am tatsaechlich publishten OCI-Image. Eine Drift in
+einer dieser Quellen bricht den Workflow vor `release_published` ab.
+
+CMake-Projektversion (`project(... VERSION ...)`) bleibt numerisch:
+`MAJOR.MINOR.PATCH`. Die ausgelieferte App-Version (mit moeglichem
+Prerelease-Suffix) lebt ausschliesslich in `XRAY_APP_VERSION` und in
+`XRAY_APP_VERSION_STRING` (Compile-Time-Define). Lokale Entwicklerbuilds
+ohne Tag fallen auf `${PROJECT_VERSION}${XRAY_VERSION_SUFFIX}` zurueck;
+gleichzeitiges Setzen beider Cache-Variablen ist `FATAL_ERROR`.
+
+`latest`-Tag des OCI-Images:
+
+- nur fuer regulaere Releases (Versions-String enthaelt kein `-`).
+- nur nach erfolgreichem Push und Digest-Validierung des Versions-Tags.
+- bei Digest-Mismatch zwischen `latest` und Versions-Tag bricht der
+  Workflow hart ab; ein Update von `latest` auf einen anderen Digest
+  ist ausschliesslich ueber den dokumentierten manuellen Recovery-Pfad
+  zulaessig (siehe Recovery-Runbook unten, Fall 4).
+
+## Plattformartefakte macOS und Windows
+
+Im aktuellen M5-Stand gilt:
+
+- Linux ist die einzige offiziell freigegebene Plattform fuer
+  CLI-Artefakt und OCI-Image.
+- macOS und Windows sind aus der M5-Build-Matrix entfernt; weder ein
+  CLI-Archiv noch ein Image fuer diese Plattformen wird automatisch
+  publiziert.
+- `scripts/release-allowlist.sh` setzt diese Sperre technisch durch:
+  jeder Asset-Name, der nicht zur fixen Linux-Allowlist passt (Linux-
+  Archiv plus `*.sha256`-Sidecar), bricht den finalen Publish-Job ab.
+
+Eine spaetere Tranche kann einen separaten Preview-Job mit eigener
+Allowlist, eigener Tag-Konvention und Prerelease-Markierung anlegen,
+sobald die macOS-/Windows-Pfade einen reproduzierbaren Build-Vertrag
+haben (heute noch nicht der Fall).
+
 ## Recovery-Runbook (AP M5-1.6 Tranche D.2)
 
 Der automatisierte Release-Workflow folgt der Plan-Reihenfolge

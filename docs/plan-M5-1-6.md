@@ -204,8 +204,8 @@ DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert 
 - Tranche B ausgeliefert in commits `a6ea384` ("feat: deliver M5 AP 1.6 Tranche B reproducible Linux release archive") und `cc78152` ("docs: address Tranche B review findings — pax docstring, locale and verify smoke").
 - Tranche C ausgeliefert in commits `cfb5b4c` ("feat: deliver M5 AP 1.6 Tranche C OCI image idempotency and gated publish") und `790a120` ("docs: address Tranche C review findings — manifest digest semantics").
 - Tranche D ausgeliefert in commits `043ab68` (D.1 — fake-gh, dry-run-Orchestrator, 2 Happy-Path-Szenarien), `f21f4ea` (D.2 — 4 Abort-Szenarien, Recovery-Runbook) und `d51865a` (Review-Fixup — fake-gh asset dedupe und draft strictness).
-- Tranche E ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; Allowlist-Skript, Workflow-Refactor mit OCI-Push aktiviert, Drei-Wege-Versionskonsistenz, macOS/Windows aus M5-Build-Matrix entfernt, Dry-Run-Integration der Allowlist stehen).
-- Tranche F offen.
+- Tranche E ausgeliefert in commit `1ddd8cc` ("feat: deliver M5 AP 1.6 Tranche E platform allowlist and OCI publish enablement").
+- Tranche F.1 ausgeliefert in commit `ac05172` ("perf: speed up release_dry_run and oci_image_smoke ahead of Tranche F.2"); F.2 ausgeliefert im Folge-Commit (Doku-Sweep `releasing.md`/`README.md`/`quality.md`, Reviewer-Findings `release.yml` Windows-Dead-Code und Drei-Wege-Versionscheck am OCI-Image, Plan-DoD-Flip).
 
 ### Tranche A - Tag-/Versionsvertrag und `--version`-Flag
 
@@ -443,12 +443,12 @@ Sub-Risiken Tranche F:
 
 Definition of Done Tranche F:
 
-- [ ] `docs/releasing.md` listet Tag-Muster, Versionsregel, `latest`-Regel, macOS-/Windows-Status und Recovery-Pfad.
-- [ ] `README.md` enthaelt lokale und CI-Nutzungsbeispiele fuer CLI-Artefakt und OCI-Image.
-- [ ] `docs/quality.md` listet Release-Pipeline-Gates als verbindlich.
-- [ ] Coverage-, Lizard- und Clang-Tidy-Gates sind gruen.
-- [ ] Plan-`Liefer-Stand` reflektiert die Tranche-A-bis-F-Lieferung mit Commit-Hashes.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `docs/releasing.md` listet Tag-Muster, Versionsregel, `latest`-Regel, macOS-/Windows-Status und Recovery-Pfad. Sektionen "Tag-, Versions- und `latest`-Vertrag (AP M5-1.6)", "Plattformartefakte macOS und Windows" und "Recovery-Runbook (AP M5-1.6 Tranche D.2)" sind verbindlich.
+- [x] `README.md` enthaelt lokale und CI-Nutzungsbeispiele fuer CLI-Artefakt (`tar -xzf` plus `install -m 0755`) und OCI-Image (`docker pull`, `docker run --version`, `:latest`-Hinweis fuer regulaere Releases).
+- [x] `docs/quality.md` listet Release-Pipeline-Gates als verbindlich (Tag-Validator, Reproduzierbares Linux-Archiv, OCI-Idempotenz, Asset-Allowlist, Drei-Wege-Versionscheck, Dry-Run-Smoke; Sektion "Release-Pipeline-Gates (AP M5-1.6)").
+- [x] Coverage-, Lizard- und Clang-Tidy-Gates sind gruen (Docker-Targets `coverage-check`, `quality-check`).
+- [x] Plan-`Liefer-Stand` reflektiert die Tranche-A-bis-F-Lieferung mit Commit-Hashes.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 ### Abnahme und Definition of Done AP 1.6
 

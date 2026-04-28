@@ -216,8 +216,12 @@ jobs:
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "archive=${archive}" >> "$GITHUB_OUTPUT"
 
-      - name: Package (Unix)
-        if: runner.os != 'Windows'
+      # AP M5-1.6 Tranche F.2: nach dem Tranche-E-Refactor ist die
+      # Build-Matrix Linux-only; der frueher noetige Windows-Package-
+      # Pfad ist tot und entfernt. Ein zukuenftiger Preview-Job mit
+      # eigener Allowlist (plan-M5-1-6.md "Plattformartefakte") muesste
+      # diesen Pfad als separaten Job neu anlegen.
+      - name: Package
         run: |
           set -eu
           mkdir -p release-assets/package
@@ -227,17 +231,6 @@ jobs:
           sha256sum "release-assets/${{ steps.meta.outputs.archive }}" \
             > "release-assets/${{ steps.meta.outputs.archive }}.sha256"
           rm -rf release-assets/package
-
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path release-assets/package -Force | Out-Null
-          Copy-Item build/Release/cmake-xray.exe, LICENSE, README.md release-assets/package/
-          Compress-Archive -Path release-assets/package/* -DestinationPath "release-assets/${{ steps.meta.outputs.archive }}"
-          $hash = (Get-FileHash "release-assets/${{ steps.meta.outputs.archive }}" -Algorithm SHA256).Hash.ToLower()
-          "$hash  ${{ steps.meta.outputs.archive }}" | Out-File -Encoding ascii "release-assets/${{ steps.meta.outputs.archive }}.sha256"
-          Remove-Item -Recurse -Force release-assets/package
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -342,6 +335,21 @@ jobs:
           if ! docker buildx imagetools inspect "${image_repo}:${version}" \
                  --format '{{.Manifest.Digest}}' >/dev/null 2>&1; then
             echo "error: OCI image ${image_repo}:${version} is not reachable; verify-job push must precede the release-job" >&2
+            exit 1
+          fi
+
+          # AP M5-1.6 Tranche F.2: third leg of the version-consistency
+          # contract. Plan-Vertrag verlangt "Tag-ohne-`v`,
+          # `cmake-xray --version`-Ausgabe und Release-Publish-Metadaten"
+          # exakt gleich. Der Verify-Job pinnt das `--version` schon am
+          # Linux-Archiv-Binary (extrahiert aus dem Repro-Archiv) und am
+          # lokal gebauten OCI-Image (pre-push). Dieser Step pinnt es
+          # zusaetzlich am tatsaechlich publishten OCI-Image (post-push,
+          # aus der Registry, nicht aus Local-Cache), um Drift zwischen
+          # Pre-Push-Build und Push-Roundtrip abzufangen.
+          oci_version=$(docker run --rm "${image_repo}:${version}" --version)
+          if [ "$oci_version" != "$version" ]; then
+            echo "error: OCI image --version='${oci_version}' does not match expected '${version}'" >&2
             exit 1
           fi
 

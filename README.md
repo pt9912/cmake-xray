@@ -57,14 +57,30 @@ export PATH="$HOME/.local/bin:$PATH"
 cmake-xray --help
 ```
 
-Container-Image verwenden:
+Container-Image ziehen und verwenden:
 
 ```bash
-docker run --rm ghcr.io/pt9912/cmake-xray:vX.Y.Z --help
+docker pull ghcr.io/pt9912/cmake-xray:X.Y.Z
+docker run --rm ghcr.io/pt9912/cmake-xray:X.Y.Z --help
+docker run --rm ghcr.io/pt9912/cmake-xray:X.Y.Z --version
 ```
 
-Dabei bezeichnet `X.Y.Z` die Release-Version ohne fuehrendes `v`; Container
-werden mit dem Git-Tag wie `vX.Y.Z` markiert.
+Dabei bezeichnet `X.Y.Z` die Release-Version ohne fuehrendes `v`; der OCI-Tag
+spiegelt die App-Version, der Git-Tag den Release-Anker (`vX.Y.Z`). Beide Werte
+sind ueber `validate-release-tag.sh` gegen das gleiche SemVer-Muster gepinnt
+(siehe [docs/releasing.md](./docs/releasing.md)).
+
+Fuer regulaere Releases (kein Prerelease-Suffix) wird zusaetzlich der Tag
+`:latest` aktualisiert, sobald der versionierte Tag erfolgreich gepusht und der
+Digest validiert wurde:
+
+```bash
+docker pull ghcr.io/pt9912/cmake-xray:latest
+docker run --rm ghcr.io/pt9912/cmake-xray:latest --version
+```
+
+Vorabversionen (`-rc.N`, `-alpha.N` usw.) bleiben auf ihren Versions-Tag
+beschraenkt und aktualisieren `:latest` nicht.
 
 Lokaler Quellbuild fuer Entwicklung:
 
