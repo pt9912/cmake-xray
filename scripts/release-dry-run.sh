@@ -23,11 +23,11 @@
 #                            script skips the registry-start/stop logic
 #                            and uses this one. Tests share one registry
 #                            across scenarios via this variable. Plan-
-#                            Vertrag (Tranche H.4): only `localhost:PORT`
-#                            or `127.0.0.1:PORT` are accepted; any other
-#                            form aborts unless XRAY_DRY_RUN_ALLOW_REMOTE_REGISTRY
-#                            is set, mirroring the GH_TOKEN-override
-#                            shape.
+#                            Vertrag (Tranche H.4): only `localhost:PORT[/path]`
+#                            or `127.0.0.1:PORT[/path]` are accepted; any
+#                            other form aborts unless
+#                            XRAY_DRY_RUN_ALLOW_REMOTE_REGISTRY is set,
+#                            mirroring the GH_TOKEN-override shape.
 #   XRAY_DRY_RUN_ALLOW_REMOTE_REGISTRY
 #                            set to '1' (or any non-empty value) to
 #                            override the localhost-form check on

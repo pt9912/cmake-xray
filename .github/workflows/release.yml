@@ -9,12 +9,14 @@ permissions:
   contents: write
   packages: write
 
-# AP M5-1.6 Tranche E: OCI publish is enabled. The Tranche-C gate
-# (XRAY_OCI_PUBLISH_ENABLED) stays as a kill-switch so a future
-# regression scenario can disable the push by flipping the flag back to
-# "false" without rewriting the workflow. The `gh api` idempotency,
-# allowlist guard and three-way version-consistency check are
-# unconditional pre-flight steps.
+# AP M5-1.6 Tranche H.1: OCI publish is enabled and lives in the
+# release-job (post-Tranche-G the Tranche-C verify-job push has been
+# moved). XRAY_OCI_PUBLISH_ENABLED stays as a kill-switch so a future
+# regression scenario can disable the push by flipping the flag back
+# to "false" without rewriting the workflow; it now gates the
+# release-job Login/Push/latest steps. Allowlist guard, idempotency
+# helper, and three-way version-consistency check are unconditional
+# pre-flight steps.
 env:
   XRAY_OCI_PUBLISH_ENABLED: "true"
 

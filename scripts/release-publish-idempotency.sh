@@ -181,7 +181,7 @@ while IFS= read -r remote_name; do
         echo "error: remote release has unexpected asset '$remote_name' not in local manifest" >&2
         mismatches=$((mismatches + 1))
     fi
-done < <(jq -r '.assets[].name' <<<"$existing_meta")
+done < <(jq -r '.assets // [] | .[].name' <<<"$existing_meta")
 
 for asset in "${assets[@]}"; do
     name="$(basename "$asset")"
