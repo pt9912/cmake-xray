@@ -67,6 +67,20 @@ if(BASH_PROGRAM)
         COMMAND bash ${PROJECT_SOURCE_DIR}/tests/release/test_validate_release_tag.sh
     )
 
+    # AP M5-1.6 Tranche B: Linux release archive reproducibility smoke. Builds
+    # the archive twice via scripts/build-release-archive.sh and compares
+    # archive checksum, member listing, sidecar and embedded binary checksum
+    # byte-for-byte. Linux-only; macOS/Windows hosts get SKIP.
+    # WORKING_DIRECTORY is the project root so the smoke can locate
+    # build/_deps as the shared FetchContent cache.
+    add_test(
+        NAME release_archive_reproducibility
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/release/test_release_archive_repro.sh
+    )
+    set_tests_properties(release_archive_reproducibility PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
+
     # AP M5-1.5 Tranche D Folge-Refactor: split the monolithic run_e2e.sh
     # into focused sub-suites and register each as its own CTest entry so
     # `ctest --parallel` schedules them concurrently. run_e2e_lib.sh holds

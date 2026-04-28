@@ -133,6 +133,37 @@ RUN clang_tidy_findings="$(awk -F= '$1 == "clang_tidy_findings" { print $2 }' /w
         exit 1; \
     fi
 
+FROM toolchain AS release-archive
+
+COPY . .
+
+# AP M5-1.6 Tranche B: build the reproducible Linux release archive in a
+# controlled container so the host environment cannot leak into the
+# artifact. The stage produces the archive and its SHA-256 sidecar in
+# /workspace/release-out and exposes them via an entrypoint that copies
+# them into a host-mounted output directory:
+#   docker build --target release-archive --build-arg XRAY_APP_VERSION=1.2.3 -t cmake-xray:release-archive .
+#   mkdir -p ./release-assets
+#   docker run --rm -v "$PWD/release-assets:/output" cmake-xray:release-archive
+# Alternatively, callers can use docker create / docker cp directly if
+# they prefer not to mount /output.
+# XRAY_APP_VERSION is the published app version without leading 'v' (the
+# canonical source is scripts/validate-release-tag.sh against the release
+# tag). SOURCE_DATE_EPOCH defaults to 1 so the archive stays byte-stable
+# without a real Tag-Commit-Zeitstempel; CI overrides it to
+# `git log -1 --pretty=%ct $TAG` per plan-M5-1-6.md Entscheidungen.
+ARG XRAY_APP_VERSION
+ARG SOURCE_DATE_EPOCH=1
+RUN if [ -z "$XRAY_APP_VERSION" ]; then \
+        echo "error: --build-arg XRAY_APP_VERSION is required for release-archive stage" >&2; \
+        echo "hint: pass the canonical app version without a leading 'v', e.g. 1.2.3 or 1.2.3-rc.1" >&2; \
+        exit 2; \
+    fi \
+    && SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH" \
+       bash scripts/build-release-archive.sh "$XRAY_APP_VERSION" /workspace/release-out
+
+ENTRYPOINT ["bash", "/workspace/scripts/release-archive-entrypoint.sh"]
+
 FROM ubuntu:24.04 AS runtime
 
 RUN apt-get update \

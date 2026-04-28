@@ -200,8 +200,8 @@ Die Umsetzung erfolgt in sechs verbindlichen Tranchen. Jede Tranche endet mit ei
 
 DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert eine in einem konkreten Commit ausgelieferte Anforderung, `[ ]` markiert eine offene Anforderung. Liefer-Stand zum Zeitpunkt der Tranche-A-Vorbereitung:
 
-- Tranche A ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; Tag-Validator, CMake-Versionsplumbing und `--version`-Flag stehen).
-- Tranche B offen.
+- Tranche A ausgeliefert in commits `8f6b2da` ("feat: deliver M5 AP 1.6 Tranche A tag validator and --version flag") und `ad2c9b1` ("fix: pin Tranche-A --help app name to 'cmake-xray' for CI Linux").
+- Tranche B ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; Reproduzierbares Linux-Archiv, SHA-256-Sidecar, Repro-Smoke und `release-archive`-Docker-Stage stehen).
 - Tranche C offen.
 - Tranche D offen.
 - Tranche E offen.
@@ -282,13 +282,14 @@ Sub-Risiken Tranche B:
 
 Definition of Done Tranche B:
 
-- [ ] `scripts/build-release-archive.sh` baut das Linux-Archiv mit reproduzierbaren Tar-Optionen und schreibt eine `*.sha256`-Datei.
-- [ ] Archiv enthaelt exakt: `cmake-xray`-Binary, `LICENSE`, kurze Nutzungshinweise.
-- [ ] Archiv-Inhalt ist sortiert (`--sort=name`), Owner/Group sind `0:0` (`--owner=0 --group=0 --numeric-owner`), `mtime` aus `SOURCE_DATE_EPOCH`, `gzip -n` ohne Filename-Header.
-- [ ] Verify-Job baut das Archiv und smoke-testet `cmake-xray --help` und `cmake-xray --version` aus der entpackten Binary.
-- [ ] Reproducibility-Smoke baut zweimal aus gleichem Commit; Archiv-, Inhaltsliste- und Binary-Checksumme sind byte-identisch. Smoke ist Linux-only; macOS-Hosts erhalten `SKIP`-Statement.
-- [ ] Verify-Job pusht nichts; kein Upload, keine Registry-Aktion, kein GitHub-Release-Asset.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `scripts/build-release-archive.sh` baut das Linux-Archiv mit reproduzierbaren Tar-Optionen und schreibt eine `*.sha256`-Datei.
+- [x] Archiv enthaelt exakt: `cmake-xray`-Binary, `LICENSE`, `README.md` (kurze Nutzungshinweise).
+- [x] Archiv-Inhalt ist sortiert (`--sort=name`), Owner/Group sind `0:0` (`--owner=0 --group=0 --numeric-owner`), `mtime` aus `SOURCE_DATE_EPOCH`, `format=ustar` (kein pax-Header), `gzip -n` ohne Filename-Header.
+- [x] Reproducibility-Smoke baut zweimal aus gleichem Commit; Archiv-, Inhaltsliste-, Sha256-Sidecar- und Binary-Checksumme sind byte-identisch. Smoke ist Linux-only; macOS-Hosts erhalten `SKIP`-Statement. Beide Builds teilen sich die FetchContent-Cache via `XRAY_FETCHCONTENT_BASE_DIR`, sodass die zweite Konfigurationsphase keine Drittabhaengigkeiten neu zieht.
+- [x] `Dockerfile` exponiert eine `release-archive`-Stage als `FROM toolchain`, die ueber `--build-arg XRAY_APP_VERSION=...` aufgerufen wird; ein `release-archive-entrypoint.sh`-Entrypoint kopiert das Archiv plus Sidecar in `/output` und gibt eine klare Fehlermeldung mit Hint, wenn `/output` nicht gemountet ist.
+- [x] CTest-Eintrag `release_archive_reproducibility` faehrt den Smoke; im Test-Gate sichtbar als eigener Test mit `WORKING_DIRECTORY=${PROJECT_SOURCE_DIR}`.
+- [x] Verify-Pfad pusht im Tranche-B-Stand kein Artefakt nach GHCR oder GitHub Release; das `release-archive`-Stage produziert nur einen lokalen Container-Layer.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 ### Tranche C - OCI-Image-Vertrag und Idempotenz
 
