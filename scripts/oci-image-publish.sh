@@ -81,17 +81,60 @@ cmd_build() {
 }
 
 cmd_push() {
-    if [ -z "$(read_local_image_id)" ]; then
+    local local_image_id
+    local_image_id="$(read_local_image_id)"
+    if [ -z "$local_image_id" ]; then
         echo "error: local image $versioned_tag missing; run '$(basename "$0") $image_repo $version build' first" >&2
         exit 1
     fi
 
-    # Idempotency: if the remote tag already exists, compare the manifest
-    # digest before pushing. A matching digest means the previous push
-    # already wrote the same content — re-run is a no-op. A mismatch is
-    # a hard error because pushing would silently rewrite the tag.
+    # AP M5-1.6 Tranche I.1: pre-push idempotency check. plan-M5-1-6.md
+    # OCI-Image-Vertrag verlangt: "Wenn der versionierte Tag bereits
+    # existiert, muss dessen Digest mit dem neu gebauten Image
+    # uebereinstimmen; bei Abweichung bricht der Workflow VOR `latest`
+    # und VOR oeffentlicher Release-Publikation ab." Vor Tranche I lief
+    # `docker push` *bevor* der Mismatch erkannt wurde -- der Remote-
+    # Tag wurde stillschweigend ueberschrieben, der Abort folgte erst
+    # nach der Mutation. Jetzt verglichen wird das lokal gebaute Image
+    # gegen den Remote-Inhalt *bevor* der Push die Mutation auslost.
+    #
+    # Vergleichsbasis: Image-ID (= config digest) ist deterministisch
+    # fuer reproduzierbare Builds (SOURCE_DATE_EPOCH gesetzt) und
+    # erhaelt sich beim Pull aus der Registry. Ein abweichendes Image-
+    # ID bedeutet abweichender Inhalt; der Manifest-Digest folgt
+    # automatisch.
     local existing_digest
     existing_digest="$(read_remote_digest "$versioned_tag" || true)"
+    if [ -n "$existing_digest" ]; then
+        # Pull retagged den lokalen $versioned_tag auf den Remote-Inhalt.
+        # Damit unser lokaler Build erhalten bleibt, retaggen wir nach
+        # dem Vergleich auf $local_image_id zurueck.
+        if ! docker pull "$versioned_tag" >/dev/null 2>&1; then
+            # Restore lokal, falls der gescheiterte Pull den Tag bereits
+            # in einen Zwischenzustand gefuehrt hat.
+            docker tag "$local_image_id" "$versioned_tag" >/dev/null 2>&1 || true
+            echo "error: remote tag $versioned_tag has digest $existing_digest but cannot be pulled for pre-push comparison" >&2
+            exit 1
+        fi
+        local remote_image_id
+        remote_image_id="$(docker image inspect --format '{{.Id}}' "$versioned_tag" 2>/dev/null || true)"
+        # Restore: lokaler Tag zeigt wieder auf unseren Build,
+        # unabhaengig vom Vergleichsergebnis.
+        docker tag "$local_image_id" "$versioned_tag" >/dev/null
+        if [ -z "$remote_image_id" ]; then
+            echo "error: pulled remote $versioned_tag (digest $existing_digest) but cannot read its image ID" >&2
+            exit 1
+        fi
+        if [ "$remote_image_id" != "$local_image_id" ]; then
+            echo "error: remote tag $versioned_tag exists at digest $existing_digest" >&2
+            echo "       (image ID $remote_image_id) but the local build is image ID $local_image_id" >&2
+            echo "       refusing to push; this would silently overwrite the existing tag" >&2
+            echo "hint:  rebuild with the same SOURCE_DATE_EPOCH and XRAY_APP_VERSION as the original release commit" >&2
+            exit 1
+        fi
+        # Same content: push is idempotent. Proceed; the post-push
+        # digest readback at the end is a defensive sanity check.
+    fi
 
     docker push "$versioned_tag"
 
@@ -99,8 +142,13 @@ cmd_push() {
     pushed_digest="$(read_remote_digest "$versioned_tag")"
 
     if [ -n "$existing_digest" ] && [ "$existing_digest" != "$pushed_digest" ]; then
-        echo "error: remote tag $versioned_tag already existed with digest $existing_digest" >&2
-        echo "       the new push produced a different digest $pushed_digest" >&2
+        # Belt-and-braces: the pre-push image-ID check above should have
+        # caught any divergent content. If we still see a digest change
+        # at this point, something pushed concurrently or the registry
+        # serialised the manifest differently; either way the operator
+        # needs to know.
+        echo "error: remote tag $versioned_tag was rewritten despite the pre-push image-ID match" >&2
+        echo "       previous digest $existing_digest, new digest $pushed_digest" >&2
         echo "       this is a hard idempotency violation; aborting before any 'latest' update" >&2
         exit 1
     fi
