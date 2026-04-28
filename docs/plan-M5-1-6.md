@@ -278,7 +278,7 @@ Sub-Risiken Tranche B:
 
 - glibc/libstdc++-Versionen sind hostabhaengig. Ein Linux-Archiv, das auf Ubuntu 24.04 gebaut wird, funktioniert nicht zwingend auf aelteren Distributionen. Tranche B liefert kein statisches Linking-Gate; das Risiko bleibt im Plan dokumentiert, verschiebt sich aber nicht in eine spaetere Tranche, weil es nicht zum Release-Artefakt-Vertrag gehoert.
 - `gzip -n` ist zwingend, sonst wandert der Quelldateiname in den gzip-Header und macht das Archiv non-reproducible.
-- macOS-Tar in moeglichen Cross-Build-Umgebungen kennt einige der GNU-spezifischen Flags nicht. Tranche B baut auf Linux-Runnern; macOS-Build ist Tranche-E-Thema.
+- macOS-Tar in moeglichen Cross-Build-Umgebungen kennt einige der GNU-spezifischen Flags nicht. Tranche B baut auf Linux-Runnern; macOS-Build ist Tranche-E-Thema. Konsequenz: der Repro-Smoke aus Schritt 5 ist explizit als Linux-only markiert (`uname -s` Check am Skript-Anfang, `SKIP` auf macOS). Lokale macOS-Maintainer fahren stattdessen den Smoke ueber das `linux/amd64`-Toolchain-Container-Image.
 
 Definition of Done Tranche B:
 
@@ -286,7 +286,7 @@ Definition of Done Tranche B:
 - [ ] Archiv enthaelt exakt: `cmake-xray`-Binary, `LICENSE`, kurze Nutzungshinweise.
 - [ ] Archiv-Inhalt ist sortiert (`--sort=name`), Owner/Group sind `0:0` (`--owner=0 --group=0 --numeric-owner`), `mtime` aus `SOURCE_DATE_EPOCH`, `gzip -n` ohne Filename-Header.
 - [ ] Verify-Job baut das Archiv und smoke-testet `cmake-xray --help` und `cmake-xray --version` aus der entpackten Binary.
-- [ ] Reproducibility-Smoke baut zweimal aus gleichem Commit; Archiv-, Inhaltsliste- und Binary-Checksumme sind byte-identisch.
+- [ ] Reproducibility-Smoke baut zweimal aus gleichem Commit; Archiv-, Inhaltsliste- und Binary-Checksumme sind byte-identisch. Smoke ist Linux-only; macOS-Hosts erhalten `SKIP`-Statement.
 - [ ] Verify-Job pusht nichts; kein Upload, keine Registry-Aktion, kein GitHub-Release-Asset.
 - [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
@@ -315,15 +315,16 @@ Sub-Risiken Tranche C:
 - GHCR-Auth: erfordert `permissions: packages: write` und einen Login mit `secrets.GITHUB_TOKEN`. Falsch gesetzte Permissions sind ein Standard-Tripfall.
 - `latest`-Race: zwei parallel laufende Workflows fuer unterschiedliche Tags konkurrieren um `latest`. Plan-Regel "Update von `latest` auf einen anderen Digest ist nur dokumentierter manueller Recovery-Pfad" muss im Skript hart durchgesetzt werden, damit die zweite Workflow-Instanz nicht gewinnt.
 - Digest-Read fuer existierende Tags ist nicht atomar mit Push. Wenn zwischen Push und Digest-Read ein Drittes Re-Push kommt, ist der Read inkorrekt. In M5-Scope ist das ausgeschlossen, weil Pushes nur ueber den finalen Release-Job laufen, der serialisiert auf Tag laeuft.
+- Buildx-Cache-Korruption: ein abgestandener GHA-Build-Cache (`type=gha`) kann zwischen Re-Runs eine alte Layer-Version wiederverwenden und den Digest gegen die Erwartung verschieben. Cache-Schluessel muessen `XRAY_APP_VERSION` enthalten oder der Cache wird beim Versions-Tag-Wechsel invalidiert; Plan-Skript dokumentiert den Cache-Schluessel-Vertrag, sonst kippt die Idempotenz-Pruefung trotz korrektem Build.
 
 Definition of Done Tranche C:
 
 - [ ] `Dockerfile` Runtime-Stage baut `cmake-xray` mit `XRAY_APP_VERSION` als Build-Argument.
-- [ ] `scripts/oci-image-publish.sh` baut, pusht (im finalen Job), liest Digest und prueft Idempotenz.
+- [ ] `scripts/oci-image-publish.sh` baut, pusht (Push-Pfad selbst gegen die lokale Registry aus Tranche D testbar), liest Digest und prueft Idempotenz.
 - [ ] Re-Run mit existierendem Versions-Tag und gleichem Digest ist erfolgreich; Re-Run mit Digest-Mismatch bricht vor `latest` ab.
 - [ ] `latest`-Tag wird nur fuer Non-Prerelease gesetzt; bei Mismatch zwischen `latest` und Versions-Tag-Digest bricht der Workflow ab.
 - [ ] Container-Smoke `cmake-xray --help` und `cmake-xray --version` laeuft im gebauten Image.
-- [ ] OCI-Push passiert ausschliesslich im finalen Release-Job, nicht im Verify-Job.
+- [ ] Im Verify-Job wird das OCI-Image gebaut und Container-Smoke ausgefuehrt, ohne Push. Der Push-Step im finalen Release-Job existiert als separater Workflow-Job-Stub mit `if:`-Gate, das in Tranche E aktiviert wird.
 - [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 ### Tranche D - Release-Dry-Run und Recovery-Pfad
@@ -402,6 +403,7 @@ Definition of Done Tranche E:
 - [ ] Finaler Release-Job ruft die Allowlist als Pre-Publish-Schritt; ein injiziertes Preview-Artefakt fuehrt zum dokumentierten Abbruch.
 - [ ] Preview-Sperrtests aus dem Plan-Smoke-Vertrag laufen: kein Preview-Artefakt erscheint in Checksums, Release-Manifest oder GHCR/OCI-Verweisen.
 - [ ] Dry-Run aus Tranche D faehrt die Allowlist als Teil seiner Sequenz.
+- [ ] Drei-Wege-Versionskonsistenz-Check ist gepinnt: Tag-ohne-`v`, `cmake-xray --version`-Ausgabe und Release-Publish-Metadaten (Asset-Namen, OCI-Tag, GitHub-Release-Name) zeigen exakt dieselbe Version. Der Check laeuft im finalen Release-Job nach Allowlist und vor `release_published`.
 - [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 ### Tranche F - Dokumentation und Final-Sweep
@@ -462,6 +464,9 @@ Diese Entscheidungen sind vor Umsetzungsbeginn getroffen und in die Tranchen ein
 - Tag-Validator wird als Bash-Skript `scripts/validate-release-tag.sh` implementiert. Begruendung: konsistent mit den bestehenden `tests/validate_*`-Skripten und `tests/e2e/run_e2e_lib.sh`; portabel auf Ubuntu- und macOS-Runnern; keine zusaetzlichen Build-Time-Dependencies (Python ist im Toolchain-Image, aber Bash ist ueberall).
 - Lokale OCI-Registry fuer den Dry-Run laeuft als ad-hoc-Container `docker run --rm -d -p <port>:5000 registry:2`. Begruendung: keine zusaetzlichen Tools (Testcontainers vermieden); deterministisches Lifecycle ueber `trap`-Cleanup im Skript; Standard-`registry:2`-Image ist klein und stabil.
 - GitHub-Release-Idempotenz nutzt `gh api`-Aufrufe ueber die `gh`-CLI. Begruendung: `gh` ist im Standard-GitHub-Actions-Runner verfuegbar; identische Calls funktionieren in lokal-laufenden Dry-Runs ueber den Fake-`gh`-Wrapper aus Tranche D; kein JavaScript-`actions/github-script`-Overhead und kein Sub-Workflow-Refactor.
+- `SOURCE_DATE_EPOCH` wird im CI-Release-Job aus dem Tag-Commit-Zeitstempel abgeleitet (`git log -1 --pretty=%ct $TAG`); fuer lokale Entwickler- und Repro-Smoke-Builds ohne Tag wird ein fixer Default `1` gesetzt. Begruendung: deterministische Quelle in der CI haelt das Linux-Archiv reproduzierbar; lokaler Default deckt den Repro-Smoke ab, der zweimal aus gleichem Commit ohne Tag baut; das Skript `scripts/build-release-archive.sh` setzt den Wert ueber `export`, sodass `tar --mtime=@${SOURCE_DATE_EPOCH}` und `gzip -n` ihn beide sehen.
+- `XRAY_APP_VERSION` wird im finalen Release-Job in der Workflow-YAML gesetzt: das Validator-Skript `scripts/validate-release-tag.sh` druckt die App-Version ohne `v` auf stdout; der Job-Step capturet sie ueber `echo "XRAY_APP_VERSION=$(scripts/validate-release-tag.sh "$GITHUB_REF_NAME")" >> "$GITHUB_ENV"` und reicht sie als `-DXRAY_APP_VERSION=...` in den nachfolgenden `cmake -B build`-Schritt sowie als `--build-arg XRAY_APP_VERSION=...` in den Buildx-Schritt weiter. Begruendung: einzige autoritative Verteilungsquelle aus dem validierten Tag; `$GITHUB_ENV` haelt den Wert ueber Steps hinweg; keine Drift zwischen CMake-Cache-Var, OCI-Build-Argument und Release-Asset-Namen.
+- Allowlist-Form fuer den finalen Publish-Job ist eine Bash-Konstante (Array) in `scripts/release-allowlist.sh`. Begruendung: Allowlist ist M5-spezifisch und klein (drei bis fuenf Eintraege); externe Datei wuerde nur eine zusaetzliche Indirektion ohne Audit-Vorteil schaffen; YAML-Liste wuerde Workflow-Logik einbauen, die sich ueber Test-Stellen nicht teilen laesst. Dry-Run aus Tranche D ruft dasselbe Skript, sodass die Allowlist-Definition nirgends dupliziert wird.
 
 ## Smoke- und Validierungstests
 
