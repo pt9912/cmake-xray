@@ -21,6 +21,7 @@ Der Funktionsumfang umfasst:
 - portabler, eigenstaendiger HTML5-Bericht mit inline CSS, ohne externe Ressourcen oder JavaScript
 - versionierte Golden-Files, Referenzdaten und Performance-Baselines
 - Docker-basierte Test-, Coverage- und Quality-Gates
+- command-lokale CLI-Modi `--quiet` und `--verbose` an `analyze` und `impact`; gegenseitig exklusiv
 
 Nicht Ziel des aktuellen Stands sind insbesondere:
 
@@ -183,6 +184,24 @@ Bei geladener Target-Sicht zeigt `impact` zusaetzlich betroffene Targets mit Evi
 ### Pfadaufloesung fuer `--changed-file`
 
 Relative `--changed-file`-Pfade werden relativ zum Verzeichnis der uebergebenen `compile_commands.json` interpretiert. Im File-API-Only-Pfad (ohne `--compile-commands`) werden sie relativ zum im Codemodel angegebenen Top-Level-Source-Verzeichnis interpretiert.
+
+### CLI-Modi: `--quiet` und `--verbose`
+
+`analyze` und `impact` akzeptieren je `--quiet` und `--verbose` als command-lokale Flags. Beide sind gegenseitig exklusiv und muessen hinter dem Subcommand stehen; eine globale Position vor dem Subcommand wird abgelehnt.
+
+```bash
+cmake-xray analyze \
+  --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json \
+  --quiet --top 2
+
+cmake-xray analyze \
+  --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json \
+  --verbose --top 2
+```
+
+`--quiet` reduziert den Console-Report auf wenige Pflichtzeilen und ist fuer Markdown, JSON, DOT und HTML reportinhaltlich ein Noop: stdout bleibt byte-stabil zum Normalmodus, geschriebene `--output`-Dateien sind byte-identisch zum Normalmodus, stderr bleibt im Erfolgsfall leer. `--quiet` unterdrueckt keine Fehler und veraendert keine Exit-Codes.
+
+`--verbose` schreibt im Console-Modus zusaetzliche Diagnose-Sections nach stdout. Fuer Artefaktformate bleibt stdout byte-stabil zum Normalmodus, und ein zusaetzlicher `verbose: ...`-Block geht ausschliesslich nach stderr. Bei Fehlern ergaenzt `--verbose` die normale Fehlermeldung um vier `verbose:`-Zeilen mit `command`, `format`, `output` und `validation_stage`; Stacktraces oder C++-Typnamen werden nie ausgegeben.
 
 ## Heuristik-Hinweis
 

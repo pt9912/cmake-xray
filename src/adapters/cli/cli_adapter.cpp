@@ -254,11 +254,102 @@ const xray::hexagon::ports::driving::GenerateReportPort& select_report_port(
     return report_ports.console;
 }
 
+// AP M5-1.5 Tranche C.1: Verbose-Fehlerkontext aus der CLI-Schicht. Die
+// vier verbose:-Zeilen folgen exakt dem Fehlervertrag (plan ~407-410). stage
+// wird vom Aufrufer gesetzt, nicht aus Exception-Typen abgeleitet.
+struct VerboseErrorContext {
+    std::string_view command;
+    std::string_view format;
+    std::string_view output;
+    std::string_view stage;
+};
+
+void format_verbose_error_context(std::ostream& err, const VerboseErrorContext& ctx) {
+    err << "verbose: command=" << ctx.command << '\n'
+        << "verbose: format=" << ctx.format << '\n'
+        << "verbose: output=" << ctx.output << '\n'
+        << "verbose: validation_stage=" << ctx.stage << '\n';
+}
+
+std::string_view verbose_format_label(ReportFormat format) {
+    if (format == ReportFormat::markdown) return "markdown";
+    if (format == ReportFormat::json) return "json";
+    if (format == ReportFormat::dot) return "dot";
+    if (format == ReportFormat::html) return "html";
+    return "console";
+}
+
+std::string_view verbose_output_label(const CliOptions& options) {
+    return options.output_path.empty() ? "stdout" : "file";
+}
+
+std::string_view verbose_input_or_analysis_stage(CompileDatabaseError error) {
+    if (error == CompileDatabaseError::file_not_accessible ||
+        error == CompileDatabaseError::file_api_not_accessible) {
+        return "input";
+    }
+    return "analysis";
+}
+
+VerboseErrorContext make_verbose_error_context(std::string_view command, ReportFormat format,
+                                                 const CliOptions& options,
+                                                 std::string_view stage) {
+    return {command, verbose_format_label(format), verbose_output_label(options), stage};
+}
+
+int emit_rendered_report_with_verbose(const CliReportRenderer& renderer,
+                                        std::string_view output_path,
+                                        AtomicReportWriter& writer, CliOutputStreams streams,
+                                        const VerboseErrorContext* verbose_ctx) {
+    const auto result = renderer.render();
+    if (result.error.has_value()) {
+        streams.err << "error: cannot render report: " << result.error->message << '\n';
+        if (verbose_ctx != nullptr) {
+            const VerboseErrorContext ctx{verbose_ctx->command, verbose_ctx->format,
+                                           verbose_ctx->output, "render"};
+            format_verbose_error_context(streams.err, ctx);
+        }
+        return ExitCode::unexpected_error;
+    }
+    const auto& content = result.content.value_or(std::string{});
+    if (output_path.empty()) {
+        streams.out << content;
+        return ExitCode::success;
+    }
+    const auto write_failure =
+        writer.write_atomic(std::filesystem::path{output_path}, content);
+    if (!write_failure.has_value()) return ExitCode::success;
+    streams.err << "error: cannot write report: " << write_failure->path << ": "
+                << write_failure->reason << '\n';
+    streams.err << "hint: check the output path and directory permissions\n";
+    if (verbose_ctx != nullptr) {
+        const VerboseErrorContext ctx{verbose_ctx->command, verbose_ctx->format,
+                                       verbose_ctx->output, "write"};
+        format_verbose_error_context(streams.err, ctx);
+    }
+    return ExitCode::unexpected_error;
+}
+
 int run_emit_for_renderer(const CliReportRenderer& renderer, const CliOptions& options,
-                          CliOutputStreams streams) {
+                          CliOutputStreams streams,
+                          const VerboseErrorContext* verbose_ctx = nullptr) {
     DefaultAtomicFilePlatformOps ops;
     AtomicReportWriter writer{ops};
-    return emit_rendered_report(renderer, options.output_path, writer, streams);
+    return emit_rendered_report_with_verbose(renderer, options.output_path, writer, streams,
+                                               verbose_ctx);
+}
+
+int finalize_compile_database_error(const xray::hexagon::model::CompileDatabaseResult& cdb,
+                                      std::string_view command, ReportFormat format,
+                                      const CliOptions& options, CliOutputStreams streams) {
+    format_error(streams.err, cdb);
+    if (options.verbosity == OutputVerbosity::verbose) {
+        format_verbose_error_context(
+            streams.err,
+            make_verbose_error_context(command, format, options,
+                                          verbose_input_or_analysis_stage(cdb.error())));
+    }
+    return map_error_to_exit_code(cdb.error());
 }
 
 // AP M5-1.5 Tranche B.2: helpers for the verbose: stderr block emitted after
@@ -360,13 +451,31 @@ void emit_artifact_verbose_stderr_impact(
     err << '\n';
 }
 
+int handle_analysis_artifact(const xray::hexagon::model::AnalysisResult& result,
+                               const xray::hexagon::ports::driving::GenerateReportPort& report_port,
+                               ReportFormat format, const CliOptions& options,
+                               CliOutputStreams streams) {
+    const AnalysisCliReportRenderer renderer{report_port, result, options.top_limit};
+    std::optional<VerboseErrorContext> ctx_storage;
+    if (options.verbosity == OutputVerbosity::verbose) {
+        ctx_storage = make_verbose_error_context("analyze", format, options, {});
+    }
+    const auto* ctx_ptr = ctx_storage.has_value() ? &*ctx_storage : nullptr;
+    const auto exit_code = run_emit_for_renderer(renderer, options, streams, ctx_ptr);
+    if (exit_code == ExitCode::success &&
+        should_emit_artifact_verbose_stderr(format, options.verbosity)) {
+        emit_artifact_verbose_stderr_analyze(streams.err, format, options, result);
+    }
+    return exit_code;
+}
+
 int handle_analysis_result(const xray::hexagon::model::AnalysisResult& result,
                            const xray::hexagon::ports::driving::GenerateReportPort& report_port,
                            ReportFormat format, const CliOptions& options,
                            CliOutputStreams streams) {
     if (!result.compile_database.is_success()) {
-        format_error(streams.err, result.compile_database);
-        return map_error_to_exit_code(result.compile_database.error());
+        return finalize_compile_database_error(result.compile_database, "analyze", format, options,
+                                                 streams);
     }
     if (format == ReportFormat::console && options.verbosity == OutputVerbosity::quiet) {
         const auto top_limit = options.top_limit;
@@ -380,13 +489,7 @@ int handle_analysis_result(const xray::hexagon::model::AnalysisResult& result,
             [&result, top_limit] { return render_console_verbose_analyze(result, top_limit); }};
         return run_emit_for_renderer(renderer, options, streams);
     }
-    const AnalysisCliReportRenderer renderer{report_port, result, options.top_limit};
-    const auto exit_code = run_emit_for_renderer(renderer, options, streams);
-    if (exit_code == ExitCode::success &&
-        should_emit_artifact_verbose_stderr(format, options.verbosity)) {
-        emit_artifact_verbose_stderr_analyze(streams.err, format, options, result);
-    }
-    return exit_code;
+    return handle_analysis_artifact(result, report_port, format, options, streams);
 }
 
 // AP M5-1.5 Tranche B: factored render-precondition helper. The HTML adapter
@@ -441,13 +544,31 @@ std::optional<int> validate_impact_render_preconditions(
     return std::nullopt;
 }
 
+int handle_impact_artifact(const xray::hexagon::model::ImpactResult& result,
+                             const xray::hexagon::ports::driving::GenerateReportPort& report_port,
+                             ReportFormat format, const CliOptions& options,
+                             CliOutputStreams streams) {
+    const ImpactCliReportRenderer renderer{report_port, result};
+    std::optional<VerboseErrorContext> ctx_storage;
+    if (options.verbosity == OutputVerbosity::verbose) {
+        ctx_storage = make_verbose_error_context("impact", format, options, {});
+    }
+    const auto* ctx_ptr = ctx_storage.has_value() ? &*ctx_storage : nullptr;
+    const auto exit_code = run_emit_for_renderer(renderer, options, streams, ctx_ptr);
+    if (exit_code == ExitCode::success &&
+        should_emit_artifact_verbose_stderr(format, options.verbosity)) {
+        emit_artifact_verbose_stderr_impact(streams.err, format, options, result);
+    }
+    return exit_code;
+}
+
 int handle_impact_result(const xray::hexagon::model::ImpactResult& result,
                          const xray::hexagon::ports::driving::GenerateReportPort& report_port,
                          ReportFormat format, const CliOptions& options,
                          CliOutputStreams streams) {
     if (!result.compile_database.is_success()) {
-        format_error(streams.err, result.compile_database);
-        return map_error_to_exit_code(result.compile_database.error());
+        return finalize_compile_database_error(result.compile_database, "impact", format, options,
+                                                 streams);
     }
     if (const auto e = validate_impact_render_preconditions(result, format, options.verbosity,
                                                              streams.err);
@@ -464,13 +585,7 @@ int handle_impact_result(const xray::hexagon::model::ImpactResult& result,
             [&result] { return render_console_verbose_impact(result); }};
         return run_emit_for_renderer(renderer, options, streams);
     }
-    const ImpactCliReportRenderer renderer{report_port, result};
-    const auto exit_code = run_emit_for_renderer(renderer, options, streams);
-    if (exit_code == ExitCode::success &&
-        should_emit_artifact_verbose_stderr(format, options.verbosity)) {
-        emit_artifact_verbose_stderr_impact(streams.err, format, options, result);
-    }
-    return exit_code;
+    return handle_impact_artifact(result, report_port, format, options, streams);
 }
 
 xray::hexagon::ports::driving::InputPathArgument make_input_path_argument(
@@ -528,23 +643,7 @@ std::optional<int> validate_subcommand_options(const CliOptions& options, bool i
 
 int emit_rendered_report(const CliReportRenderer& renderer, std::string_view output_path,
                          AtomicReportWriter& writer, CliOutputStreams streams) {
-    const auto result = renderer.render();
-    if (result.error.has_value()) {
-        streams.err << "error: cannot render report: " << result.error->message << '\n';
-        return ExitCode::unexpected_error;
-    }
-    const auto& content = result.content.value_or(std::string{});
-    if (output_path.empty()) {
-        streams.out << content;
-        return ExitCode::success;
-    }
-    const auto write_failure =
-        writer.write_atomic(std::filesystem::path{output_path}, content);
-    if (!write_failure.has_value()) return ExitCode::success;
-    streams.err << "error: cannot write report: " << write_failure->path << ": "
-                << write_failure->reason << '\n';
-    streams.err << "hint: check the output path and directory permissions\n";
-    return ExitCode::unexpected_error;
+    return emit_rendered_report_with_verbose(renderer, output_path, writer, streams, nullptr);
 }
 
 AnalysisCliReportRenderer::AnalysisCliReportRenderer(

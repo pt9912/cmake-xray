@@ -767,6 +767,373 @@ assert_exit "empty array exits 4" 4 "$BINARY" analyze --compile-commands "$TESTD
 assert_exit "missing fields exits 4" 4 "$BINARY" analyze --compile-commands "$TESTDATA/missing_fields/compile_commands.json"
 assert_exit "mixed valid/invalid exits 4" 4 "$BINARY" analyze --compile-commands "$TESTDATA/mixed_valid_invalid/compile_commands.json"
 
+# ---- AP M5-1.5 Tranche C.2: Console quiet/verbose + artifact noop binary smokes ----
+
+# Diff-based stderr-line pin: plan ~749 requires the exact Verbose-Artefakt-
+# stderr-Sequenz pro Subcommand und Format zu pinnen. assert_stderr_contains
+# wiederholt waere Reihenfolge-blind und CCN-belastend; cmp gegen ein
+# heredoc-gebautes Erwartungs-File pinnt 7- und 8-Zeilen-Sequenzen exakt.
+assert_stderr_equals_file() {
+    local description="$1" expected_file="$2"
+    shift 2
+    local actual_file actual_clean expected_clean
+    actual_file="$(mktemp)"
+    actual_clean="$(mktemp)"
+    expected_clean="$(mktemp)"
+    "$@" 2>"$actual_file" >/dev/null || true
+    normalize_line_endings "$actual_file" > "$actual_clean"
+    normalize_line_endings "$expected_file" > "$expected_clean"
+    if cmp -s "$actual_clean" "$expected_clean"; then
+        echo "PASS: $description"
+    else
+        echo "FAIL: $description — stderr differed from expected sequence" >&2
+        diff -u "$expected_clean" "$actual_clean" >&2 || true
+        failures=$((failures + 1))
+    fi
+    rm -f "$actual_file" "$actual_clean" "$expected_clean"
+}
+
+assert_stderr_empty() {
+    local description="$1"
+    shift
+    local actual_file
+    actual_file="$(mktemp)"
+    "$@" 2>"$actual_file" >/dev/null || true
+    if [ -s "$actual_file" ]; then
+        echo "FAIL: $description — stderr was not empty" >&2
+        cat "$actual_file" >&2
+        failures=$((failures + 1))
+    else
+        echo "PASS: $description"
+    fi
+    rm -f "$actual_file"
+}
+
+assert_stdout_ends_with_newline() {
+    local description="$1"
+    shift
+    local actual_file
+    actual_file="$(mktemp)"
+    "$@" >"$actual_file" 2>/dev/null || true
+    if [ ! -s "$actual_file" ]; then
+        echo "FAIL: $description — stdout was empty" >&2
+        failures=$((failures + 1))
+        rm -f "$actual_file"
+        return
+    fi
+    local last_byte
+    last_byte=$(tail -c 1 "$actual_file" | od -An -tx1 | tr -d ' \n')
+    if [ "$last_byte" = "0a" ]; then
+        echo "PASS: $description"
+    else
+        echo "FAIL: $description — stdout did not end with a single newline (last byte 0x$last_byte)" >&2
+        failures=$((failures + 1))
+    fi
+    rm -f "$actual_file"
+}
+
+assert_stderr_does_not_contain() {
+    local description="$1" pattern="$2"
+    shift 2
+    local errout
+    errout=$("$@" 2>&1 1>/dev/null) || true
+    if echo "$errout" | grep -q "$pattern"; then
+        echo "FAIL: $description — stderr contained forbidden pattern '$pattern'" >&2
+        failures=$((failures + 1))
+    else
+        echo "PASS: $description"
+    fi
+}
+
+# HTML structure validator analog to assert_dot_stdout_validates /
+# assert_json_stdout_validates. Plan ~746: ein neuer
+# assert_html_stdout_validates-Helfer wird in run_e2e.sh ergaenzt.
+html_validator_script="$(native_path "$REPO_ROOT/tests/validate_html_reports.py")"
+assert_html_stdout_validates() {
+    local description="$1"
+    shift
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "SKIP: $description (python3 not available)"
+        return
+    fi
+    if ! [ -f "$REPO_ROOT/tests/validate_html_reports.py" ]; then
+        echo "SKIP: $description (validator missing)"
+        return
+    fi
+    local captured captured_native
+    captured="$(mktemp)"
+    "$@" >"$captured" 2>/dev/null || true
+    captured_native="$(native_path "$captured")"
+    if python3 "$html_validator_script" --validate-file "$captured_native" >/dev/null 2>&1; then
+        echo "PASS: $description"
+    else
+        echo "FAIL: $description — produced HTML did not satisfy validate_html_reports.py" >&2
+        python3 "$html_validator_script" --validate-file "$captured_native" >&2 || true
+        failures=$((failures + 1))
+    fi
+    rm -f "$captured"
+}
+
+# Console quiet binary smokes
+assert_exit "M5 console analyze --quiet exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --quiet --top 2
+assert_stdout_equals_file "M5 console analyze --quiet matches console-analyze-quiet golden" tests/e2e/testdata/m5/verbosity/console-analyze-quiet.txt \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --quiet --top 2
+assert_stderr_empty "M5 console analyze --quiet keeps stderr empty" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --quiet --top 2
+assert_stdout_ends_with_newline "M5 console analyze --quiet stdout ends with newline" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --quiet --top 2
+
+assert_exit "M5 console impact --quiet exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --quiet
+assert_stdout_equals_file "M5 console impact --quiet matches console-impact-quiet golden" tests/e2e/testdata/m5/verbosity/console-impact-quiet.txt \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --quiet
+assert_stderr_empty "M5 console impact --quiet keeps stderr empty" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --quiet
+assert_stdout_ends_with_newline "M5 console impact --quiet stdout ends with newline" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --quiet
+
+# Console verbose binary smokes — verbose-stderr fuer Console wird nur beim
+# Fehler aktiv; im Erfolgsfall bleibt stderr leer.
+assert_exit "M5 console analyze --verbose exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --verbose --top 2
+assert_stdout_equals_file "M5 console analyze --verbose matches console-analyze-verbose golden" tests/e2e/testdata/m5/verbosity/console-analyze-verbose.txt \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --verbose --top 2
+assert_stderr_empty "M5 console analyze --verbose keeps stderr empty on success" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --verbose --top 2
+assert_stdout_ends_with_newline "M5 console analyze --verbose stdout ends with newline" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --verbose --top 2
+
+assert_exit "M5 console impact --verbose exits 0" 0 "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --verbose
+assert_stdout_equals_file "M5 console impact --verbose matches console-impact-verbose golden" tests/e2e/testdata/m5/verbosity/console-impact-verbose.txt \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --verbose
+assert_stderr_empty "M5 console impact --verbose keeps stderr empty on success" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --verbose
+assert_stdout_ends_with_newline "M5 console impact --verbose stdout ends with newline" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --verbose
+
+# ---- Quiet artifact byte-stability stdout (analyze + impact x 4 formats) ----
+
+assert_stdout_equals_file "M5 markdown analyze --quiet stdout byte-stable to normal-mode markdown" tests/e2e/testdata/m3/report_project/analyze-markdown.md \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --quiet --format markdown --top 2
+assert_stderr_empty "M5 markdown analyze --quiet keeps stderr empty" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --quiet --format markdown --top 2
+
+assert_stdout_equals_file "M5 json analyze --quiet stdout byte-stable to compile-db-only golden" tests/e2e/testdata/m5/json-reports/analyze_compile_db_only.json \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --quiet --format json
+assert_stderr_empty "M5 json analyze --quiet keeps stderr empty" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --quiet --format json
+
+assert_stdout_equals_file "M5 dot analyze --quiet stdout byte-stable to compile-db-only golden" tests/e2e/testdata/m5/dot-reports/analyze_compile_db_only.dot \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --quiet --format dot --top 2
+assert_stderr_empty "M5 dot analyze --quiet keeps stderr empty" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --quiet --format dot --top 2
+
+assert_stdout_equals_file "M5 html analyze --quiet stdout byte-stable to compile-db-only golden" tests/e2e/testdata/m5/html-reports/analyze_compile_db_only.html \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --quiet --format html --top 2
+assert_stderr_empty "M5 html analyze --quiet keeps stderr empty" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --quiet --format html --top 2
+
+assert_stdout_equals_file "M5 markdown impact --quiet stdout byte-stable to normal-mode markdown" tests/e2e/testdata/m3/report_impact_header/impact-markdown.md \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --quiet --format markdown
+assert_stderr_empty "M5 markdown impact --quiet keeps stderr empty" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --quiet --format markdown
+
+assert_stdout_equals_file "M5 json impact --quiet stdout byte-stable to compile-db-relative golden" tests/e2e/testdata/m5/json-reports/impact_compile_db_relative.json \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --quiet --format json
+assert_stderr_empty "M5 json impact --quiet keeps stderr empty" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --quiet --format json
+
+assert_dot_stdout_equals_file "M5 dot impact --quiet stdout byte-stable to heuristic-edges golden" tests/e2e/testdata/m5/dot-reports/impact_heuristic_edges.dot \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --quiet --format dot
+assert_stderr_empty "M5 dot impact --quiet keeps stderr empty" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --quiet --format dot
+
+assert_stdout_equals_file "M5 html impact --quiet stdout byte-stable to compile-db-relative golden" tests/e2e/testdata/m5/html-reports/impact_compile_db_relative.html \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --quiet --format html
+assert_stderr_empty "M5 html impact --quiet keeps stderr empty" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --quiet --format html
+
+# ---- Verbose artifact byte-stability stdout (analyze + impact x 4 formats) ----
+# Verbose stdout muss zum Normalmodus byte-identisch sein; stderr enthaelt
+# den dokumentierten 7-/8-Zeilen-Block. Die exakten stderr-Sequenzen werden
+# unten ueber assert_stderr_equals_file gegen ein heredoc-File gepinnt.
+
+assert_stdout_equals_file "M5 markdown analyze --verbose stdout byte-stable to normal-mode markdown" tests/e2e/testdata/m3/report_project/analyze-markdown.md \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --verbose --format markdown --top 2
+
+assert_stdout_equals_file "M5 json analyze --verbose stdout byte-stable to compile-db-only golden" tests/e2e/testdata/m5/json-reports/analyze_compile_db_only.json \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --verbose --format json
+assert_json_stdout_validates "M5 json analyze --verbose stdout validates against schema" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --verbose --format json
+
+assert_stdout_equals_file "M5 dot analyze --verbose stdout byte-stable to compile-db-only golden" tests/e2e/testdata/m5/dot-reports/analyze_compile_db_only.dot \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --verbose --format dot --top 2
+assert_dot_stdout_validates "M5 dot analyze --verbose stdout validates against syntax gate" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --verbose --format dot --top 2
+
+assert_stdout_equals_file "M5 html analyze --verbose stdout byte-stable to compile-db-only golden" tests/e2e/testdata/m5/html-reports/analyze_compile_db_only.html \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --verbose --format html --top 2
+assert_html_stdout_validates "M5 html analyze --verbose stdout validates against structure gate" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --verbose --format html --top 2
+
+assert_stdout_equals_file "M5 markdown impact --verbose stdout byte-stable to normal-mode markdown" tests/e2e/testdata/m3/report_impact_header/impact-markdown.md \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --verbose --format markdown
+
+assert_stdout_equals_file "M5 json impact --verbose stdout byte-stable to compile-db-relative golden" tests/e2e/testdata/m5/json-reports/impact_compile_db_relative.json \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --verbose --format json
+assert_json_stdout_validates "M5 json impact --verbose stdout validates against schema" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --verbose --format json
+
+assert_dot_stdout_equals_file "M5 dot impact --verbose stdout byte-stable to heuristic-edges golden" tests/e2e/testdata/m5/dot-reports/impact_heuristic_edges.dot \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --verbose --format dot
+assert_dot_stdout_validates "M5 dot impact --verbose stdout validates against syntax gate" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --verbose --format dot
+
+assert_stdout_equals_file "M5 html impact --verbose stdout byte-stable to compile-db-relative golden" tests/e2e/testdata/m5/html-reports/impact_compile_db_relative.html \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --verbose --format html
+assert_html_stdout_validates "M5 html impact --verbose stdout validates against structure gate" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --verbose --format html
+
+# ---- Verbose artifact stderr exact-line pinning (8 sequences) ----
+# Plan ~749 mandates a diff-based helper; the heredoc files below pin the
+# 7-line analyze and 8-line impact sequences for all four artifact formats.
+verbose_stderr_dir="$(mktemp -d)"
+
+cat > "$verbose_stderr_dir/analyze-markdown.txt" <<'EOF'
+verbose: report_type=analyze
+verbose: format=markdown
+verbose: output=stdout
+verbose: compile_database_source=cli
+verbose: cmake_file_api_source=not_provided
+verbose: observation_source=exact
+verbose: target_metadata=not_loaded
+EOF
+assert_stderr_equals_file "M5 markdown analyze --verbose stderr matches 7-line block" "$verbose_stderr_dir/analyze-markdown.txt" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m3/report_project/compile_commands.json --verbose --format markdown --top 2
+
+cat > "$verbose_stderr_dir/analyze-json.txt" <<'EOF'
+verbose: report_type=analyze
+verbose: format=json
+verbose: output=stdout
+verbose: compile_database_source=cli
+verbose: cmake_file_api_source=not_provided
+verbose: observation_source=exact
+verbose: target_metadata=not_loaded
+EOF
+assert_stderr_equals_file "M5 json analyze --verbose stderr matches 7-line block" "$verbose_stderr_dir/analyze-json.txt" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --verbose --format json
+
+cat > "$verbose_stderr_dir/analyze-dot.txt" <<'EOF'
+verbose: report_type=analyze
+verbose: format=dot
+verbose: output=stdout
+verbose: compile_database_source=cli
+verbose: cmake_file_api_source=not_provided
+verbose: observation_source=exact
+verbose: target_metadata=not_loaded
+EOF
+assert_stderr_equals_file "M5 dot analyze --verbose stderr matches 7-line block" "$verbose_stderr_dir/analyze-dot.txt" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --verbose --format dot --top 2
+
+cat > "$verbose_stderr_dir/analyze-html.txt" <<'EOF'
+verbose: report_type=analyze
+verbose: format=html
+verbose: output=stdout
+verbose: compile_database_source=cli
+verbose: cmake_file_api_source=not_provided
+verbose: observation_source=exact
+verbose: target_metadata=not_loaded
+EOF
+assert_stderr_equals_file "M5 html analyze --verbose stderr matches 7-line block" "$verbose_stderr_dir/analyze-html.txt" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --verbose --format html --top 2
+
+cat > "$verbose_stderr_dir/impact-markdown.txt" <<'EOF'
+verbose: report_type=impact
+verbose: format=markdown
+verbose: output=stdout
+verbose: compile_database_source=cli
+verbose: cmake_file_api_source=not_provided
+verbose: observation_source=exact
+verbose: target_metadata=not_loaded
+verbose: changed_file_source=compile_database_directory
+EOF
+assert_stderr_equals_file "M5 markdown impact --verbose stderr matches 8-line block" "$verbose_stderr_dir/impact-markdown.txt" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m3/report_impact_header/compile_commands.json --changed-file include/common/config.h --verbose --format markdown
+
+cat > "$verbose_stderr_dir/impact-json.txt" <<'EOF'
+verbose: report_type=impact
+verbose: format=json
+verbose: output=stdout
+verbose: compile_database_source=cli
+verbose: cmake_file_api_source=not_provided
+verbose: observation_source=exact
+verbose: target_metadata=not_loaded
+verbose: changed_file_source=compile_database_directory
+EOF
+assert_stderr_equals_file "M5 json impact --verbose stderr matches 8-line block" "$verbose_stderr_dir/impact-json.txt" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --verbose --format json
+
+cat > "$verbose_stderr_dir/impact-dot.txt" <<'EOF'
+verbose: report_type=impact
+verbose: format=dot
+verbose: output=stdout
+verbose: compile_database_source=cli
+verbose: cmake_file_api_source=not_provided
+verbose: observation_source=exact
+verbose: target_metadata=not_loaded
+verbose: changed_file_source=compile_database_directory
+EOF
+assert_stderr_equals_file "M5 dot impact --verbose stderr matches 8-line block" "$verbose_stderr_dir/impact-dot.txt" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --verbose --format dot
+
+cat > "$verbose_stderr_dir/impact-html.txt" <<'EOF'
+verbose: report_type=impact
+verbose: format=html
+verbose: output=stdout
+verbose: compile_database_source=cli
+verbose: cmake_file_api_source=not_provided
+verbose: observation_source=exact
+verbose: target_metadata=not_loaded
+verbose: changed_file_source=compile_database_directory
+EOF
+assert_stderr_equals_file "M5 html impact --verbose stderr matches 8-line block" "$verbose_stderr_dir/impact-html.txt" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --verbose --format html
+
+# top_limit darf NICHT in der Verbose-Artefakt-stderr auftauchen (plan ~754).
+assert_stderr_does_not_contain "M5 verbose artifact stderr does not include top_limit" "top_limit" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --verbose --format json --top 2
+assert_stderr_does_not_contain "M5 verbose impact stderr does not include top_limit" "top_limit" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --verbose --format json
+
+# ---- Quiet/Verbose --output file byte-stability ----
+output_dir="$(native_path "$(mktemp -d)")"
+
+# Quiet --output writes byte-stable file with empty stdout/stderr.
+quiet_json_target="$output_dir/analyze-quiet.json"
+assert_exit "M5 json analyze --quiet --output exits 0" 0 \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --quiet --format json --output "$quiet_json_target"
+assert_file_equals "M5 json analyze --quiet --output writes byte-stable file" "$quiet_json_target" tests/e2e/testdata/m5/json-reports/analyze_compile_db_only.json
+
+# Verbose --output writes byte-stable file with empty stdout and the documented
+# stderr block including output=file.
+verbose_json_target="$output_dir/analyze-verbose.json"
+assert_exit "M5 json analyze --verbose --output exits 0" 0 \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --verbose --format json --output "$verbose_json_target"
+assert_file_equals "M5 json analyze --verbose --output writes byte-stable file" "$verbose_json_target" tests/e2e/testdata/m5/json-reports/analyze_compile_db_only.json
+
+cat > "$verbose_stderr_dir/analyze-json-output-file.txt" <<'EOF'
+verbose: report_type=analyze
+verbose: format=json
+verbose: output=file
+verbose: compile_database_source=cli
+verbose: cmake_file_api_source=not_provided
+verbose: observation_source=exact
+verbose: target_metadata=not_loaded
+EOF
+assert_stderr_equals_file "M5 json analyze --verbose --output stderr emits output=file block" \
+    "$verbose_stderr_dir/analyze-json-output-file.txt" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --verbose --format json --output "$output_dir/analyze-verbose-stderr.json"
+
+rm -rf "$verbose_stderr_dir" "$output_dir"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "$failures E2E test(s) FAILED" >&2

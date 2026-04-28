@@ -387,6 +387,68 @@ Mit Target-Sicht (File API):
 - [docs/examples/impact-report-targets.md](./examples/impact-report-targets.md)
 - [docs/examples/impact-report-targets.html](./examples/impact-report-targets.html)
 
+## CLI-Modi: `--quiet` und `--verbose`
+
+`analyze` und `impact` akzeptieren je `--quiet` oder `--verbose` als
+command-lokales Flag. Beide Flags sind gegenseitig exklusiv und muessen
+hinter dem Subcommand stehen; eine globale Position vor dem Subcommand
+wird abgelehnt. Der vollstaendige Vertrag steht in
+[plan-M5-1-5.md](./plan-M5-1-5.md); `quality.md` listet die zugehoerigen
+Quality-Gates.
+
+### Anwendungsfall Quiet: knappe CI-Logs
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --quiet
+```
+
+Quiet reduziert den Console-Report auf wenige Pflichtzeilen (Status,
+Anzahl analysierter Translation Units, Top-Hotspot, optional `target
+metadata`). Fuer Markdown, JSON, DOT und HTML bleibt der Reportinhalt
+unveraendert: stdout ist byte-stabil zum Normalmodus, `--output`-Dateien
+sind byte-identisch, stderr bleibt im Erfolgsfall leer. Quiet eignet sich
+fuer CI-Logs, in denen ein reines "ist die Analyse durchgelaufen"-Signal
+genuegt.
+
+Wichtig: Quiet unterdrueckt keine Fehler. Eingabe-, Render- und
+Schreibfehler erscheinen weiter auf stderr und liefern denselben
+nonzero Exit-Code wie ohne Quiet.
+
+### Anwendungsfall Verbose: lokale Diagnose
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --verbose
+```
+
+Verbose schreibt im Console-Modus zusaetzliche Diagnose-Sections nach
+stdout (`inputs`, `targets`, `observations`, `notes`). Fuer
+Artefaktformate bleibt stdout byte-stabil zum Normalmodus, und ein
+zusaetzlicher `verbose: ...`-Block geht ausschliesslich nach stderr; er
+nennt `report_type`, `format`, `output`, die Eingabequellen und
+Beobachtungs-/Targetstatus. Verbose veraendert keine Exit-Codes.
+
+### Verbose-Fehlerkontext
+
+Bei Render- oder Schreibfehlern ergaenzt Verbose die normale
+Fehlermeldung um vier `verbose:`-Zeilen mit `command`, `format`,
+`output` und `validation_stage`. Beispiel fuer einen Renderfehler:
+
+```text
+error: cannot render report: <message>
+verbose: command=analyze
+verbose: format=json
+verbose: output=stdout
+verbose: validation_stage=render
+```
+
+`validation_stage` nimmt die Werte `input`, `analysis`, `render` oder
+`write` an und wird aus der CLI-Schicht gesetzt; Stacktraces oder
+C++-Typnamen werden nie ausgegeben.
+
 ## Heuristiken einordnen
 
 Include-Hotspots und Header-Impact beruhen im aktuellen Stand auf

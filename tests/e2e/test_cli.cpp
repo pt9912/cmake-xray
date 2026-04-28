@@ -1731,6 +1731,10 @@ TEST_CASE_FIXTURE(CliFixture,
     CHECK(out.str().empty());
     CHECK(err.str().find("--quiet and --verbose are mutually exclusive") != std::string::npos);
     CHECK(err.str().find("hint:") != std::string::npos);
+    // AP M5-1.5 Tranche C.1: Mutual-Exclusion ist Praezedenzstufe 1 und greift
+    // vor jedem Verbose-Kontext-Helfer; stderr darf hier kein verbose:-Praefix
+    // enthalten.
+    CHECK(err.str().find("verbose:") == std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture,
@@ -1741,6 +1745,7 @@ TEST_CASE_FIXTURE(CliFixture,
           ExitCode::cli_usage_error);
     CHECK(out.str().empty());
     CHECK(err.str().find("--quiet and --verbose are mutually exclusive") != std::string::npos);
+    CHECK(err.str().find("verbose:") == std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture,
@@ -2617,4 +2622,602 @@ TEST_CASE("verbose impact stderr falls back to not_provided when changed_file_so
     CHECK(exit_code == ExitCode::success);
     CHECK(err.str().find("verbose: changed_file_source=not_provided\n") !=
           std::string::npos);
+}
+
+// ---- AP M5-1.5 Tranche C.1: Verbose-Fehlerkontext und Quiet-Fehlerregel ----
+//
+// Tranche C.1 aktiviert die in Tranche A/B vorbereiteten verbose-stderr-Pfade
+// fuer Render-, Schreib-, Eingabe- und Analysefehler. Verbose ergaenzt die
+// normale Fehlermeldung um vier verbose:-Zeilen mit dem aus der CLI-Schicht
+// gesetzten validation_stage. Quiet ist Fehler-Nicht-Unterdrueckend und enthaelt
+// keine verbose:-Zeilen.
+
+namespace {
+
+class FixedImpactPortForVerboseTests final
+    : public xray::hexagon::ports::driving::AnalyzeImpactPort {
+public:
+    explicit FixedImpactPortForVerboseTests(ImpactResult result) : result_(std::move(result)) {}
+    ImpactResult analyze_impact(
+        xray::hexagon::ports::driving::AnalyzeImpactRequest /*request*/) const override {
+        return result_;
+    }
+
+private:
+    ImpactResult result_;
+};
+
+AnalysisResult make_analyze_success_for_verbose_tests() {
+    AnalysisResult r;
+    r.application = xray::hexagon::model::application_info();
+    r.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    return r;
+}
+
+ImpactResult make_impact_success_for_verbose_tests() {
+    ImpactResult r;
+    r.application = xray::hexagon::model::application_info();
+    r.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    r.inputs.changed_file = std::string{"src/app/main.cpp"};
+    r.inputs.changed_file_source =
+        xray::hexagon::model::ChangedFileSource::compile_database_directory;
+    return r;
+}
+
+}  // namespace
+
+// ---- Render errors with --verbose: 5-line stderr sequence ---------------
+
+TEST_CASE("analyze --verbose --format json with throwing renderer emits exact 5-line stderr") {
+    const StubAnalyzeProjectPort analyze_project_port{make_analyze_success_for_verbose_tests()};
+    const StubAnalyzeImpactPort analyze_impact_port;
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const ThrowingGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",      "analyze",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--verbose",       "--format", "json"};
+    const int exit_code = cli.run(7, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected =
+        "error: cannot render report: analysis report exception\n"
+        "verbose: command=analyze\n"
+        "verbose: format=json\n"
+        "verbose: output=stdout\n"
+        "verbose: validation_stage=render\n";
+    CHECK(err.str() == expected);
+}
+
+TEST_CASE("analyze --verbose --format markdown with throwing renderer appends verbose render block") {
+    const StubAnalyzeProjectPort analyze_project_port{make_analyze_success_for_verbose_tests()};
+    const StubAnalyzeImpactPort analyze_impact_port;
+    const StubGenerateReportPort console_report_port;
+    const ThrowingGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",      "analyze",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--verbose",       "--format", "markdown"};
+    const int exit_code = cli.run(7, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("error: cannot render report:") != std::string::npos);
+    const std::string expected_suffix =
+        "verbose: command=analyze\n"
+        "verbose: format=markdown\n"
+        "verbose: output=stdout\n"
+        "verbose: validation_stage=render\n";
+    CHECK(err.str().find(expected_suffix) != std::string::npos);
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE("analyze --verbose --format dot with throwing renderer appends verbose render block") {
+    const StubAnalyzeProjectPort analyze_project_port{make_analyze_success_for_verbose_tests()};
+    const StubAnalyzeImpactPort analyze_impact_port;
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const ThrowingGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",      "analyze",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--verbose",       "--format", "dot"};
+    const int exit_code = cli.run(7, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=analyze\n"
+        "verbose: format=dot\n"
+        "verbose: output=stdout\n"
+        "verbose: validation_stage=render\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE("analyze --verbose --format html with throwing renderer appends verbose render block") {
+    const StubAnalyzeProjectPort analyze_project_port{make_analyze_success_for_verbose_tests()};
+    const StubAnalyzeImpactPort analyze_impact_port;
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const ThrowingGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",      "analyze",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--verbose",       "--format", "html"};
+    const int exit_code = cli.run(7, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=analyze\n"
+        "verbose: format=html\n"
+        "verbose: output=stdout\n"
+        "verbose: validation_stage=render\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE("impact --verbose --format json with throwing renderer emits exact 5-line stderr") {
+    const StubAnalyzeProjectPort analyze_project_port{make_analyze_success_for_verbose_tests()};
+    const FixedImpactPortForVerboseTests impact_port{make_impact_success_for_verbose_tests()};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const ThrowingGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",      "impact",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--changed-file",  "src/app/main.cpp",
+                          "--verbose",       "--format", "json"};
+    const int exit_code = cli.run(9, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected =
+        "error: cannot render report: impact report exception\n"
+        "verbose: command=impact\n"
+        "verbose: format=json\n"
+        "verbose: output=stdout\n"
+        "verbose: validation_stage=render\n";
+    CHECK(err.str() == expected);
+}
+
+TEST_CASE("impact --verbose --format markdown with throwing renderer appends verbose render block") {
+    const StubAnalyzeProjectPort analyze_project_port{make_analyze_success_for_verbose_tests()};
+    const FixedImpactPortForVerboseTests impact_port{make_impact_success_for_verbose_tests()};
+    const StubGenerateReportPort console_report_port;
+    const ThrowingGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",      "impact",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--changed-file",  "src/app/main.cpp",
+                          "--verbose",       "--format", "markdown"};
+    const int exit_code = cli.run(9, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=impact\n"
+        "verbose: format=markdown\n"
+        "verbose: output=stdout\n"
+        "verbose: validation_stage=render\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE("impact --verbose --format dot with throwing renderer appends verbose render block") {
+    const StubAnalyzeProjectPort analyze_project_port{make_analyze_success_for_verbose_tests()};
+    const FixedImpactPortForVerboseTests impact_port{make_impact_success_for_verbose_tests()};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const ThrowingGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",      "impact",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--changed-file",  "src/app/main.cpp",
+                          "--verbose",       "--format", "dot"};
+    const int exit_code = cli.run(9, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=impact\n"
+        "verbose: format=dot\n"
+        "verbose: output=stdout\n"
+        "verbose: validation_stage=render\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE("impact --verbose --format html with throwing renderer appends verbose render block") {
+    const StubAnalyzeProjectPort analyze_project_port{make_analyze_success_for_verbose_tests()};
+    const FixedImpactPortForVerboseTests impact_port{make_impact_success_for_verbose_tests()};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const ThrowingGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",      "impact",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--changed-file",  "src/app/main.cpp",
+                          "--verbose",       "--format", "html"};
+    const int exit_code = cli.run(9, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=impact\n"
+        "verbose: format=html\n"
+        "verbose: output=stdout\n"
+        "verbose: validation_stage=render\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+// ---- Write errors with --verbose: 6-line stderr sequence ----------------
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --verbose --format json --output <missing-dir> emits exact 6-line stderr") {
+    const TemporaryDirectory temp_dir;
+    const auto missing_target = (temp_dir.path() / "missing-dir" / "report.json").string();
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+               "--format", "json", "--output", missing_target.c_str()}) !=
+          ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("error: cannot write report:") != std::string::npos);
+    CHECK(err.str().find("hint: check the output path") != std::string::npos);
+    const std::string expected_suffix =
+        "verbose: command=analyze\n"
+        "verbose: format=json\n"
+        "verbose: output=file\n"
+        "verbose: validation_stage=write\n";
+    CHECK(err.str().ends_with(expected_suffix));
+    CHECK_FALSE(std::filesystem::exists(missing_target));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --verbose --format markdown --output <missing-dir> appends verbose write block") {
+    const TemporaryDirectory temp_dir;
+    const auto missing_target = (temp_dir.path() / "missing-dir" / "report.md").string();
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+               "--format", "markdown", "--output", missing_target.c_str()}) !=
+          ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=analyze\n"
+        "verbose: format=markdown\n"
+        "verbose: output=file\n"
+        "verbose: validation_stage=write\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --verbose --format dot --output <missing-dir> appends verbose write block") {
+    const TemporaryDirectory temp_dir;
+    const auto missing_target = (temp_dir.path() / "missing-dir" / "report.dot").string();
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+               "--format", "dot", "--output", missing_target.c_str()}) !=
+          ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=analyze\n"
+        "verbose: format=dot\n"
+        "verbose: output=file\n"
+        "verbose: validation_stage=write\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --verbose --format html --output <missing-dir> appends verbose write block") {
+    const TemporaryDirectory temp_dir;
+    const auto missing_target = (temp_dir.path() / "missing-dir" / "report.html").string();
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+               "--format", "html", "--output", missing_target.c_str()}) !=
+          ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=analyze\n"
+        "verbose: format=html\n"
+        "verbose: output=file\n"
+        "verbose: validation_stage=write\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose --format json --output <missing-dir> emits exact 6-line stderr") {
+    const TemporaryDirectory temp_dir;
+    const auto missing_target = (temp_dir.path() / "missing-dir" / "impact.json").string();
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(),
+               "--changed-file", "include/common/shared.h", "--verbose", "--format", "json",
+               "--output", missing_target.c_str()}) != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("error: cannot write report:") != std::string::npos);
+    CHECK(err.str().find("hint: check the output path") != std::string::npos);
+    const std::string expected_suffix =
+        "verbose: command=impact\n"
+        "verbose: format=json\n"
+        "verbose: output=file\n"
+        "verbose: validation_stage=write\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose --format markdown --output <missing-dir> appends verbose write block") {
+    const TemporaryDirectory temp_dir;
+    const auto missing_target = (temp_dir.path() / "missing-dir" / "impact.md").string();
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(),
+               "--changed-file", "include/common/shared.h", "--verbose", "--format",
+               "markdown", "--output", missing_target.c_str()}) != ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=impact\n"
+        "verbose: format=markdown\n"
+        "verbose: output=file\n"
+        "verbose: validation_stage=write\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose --format dot --output <missing-dir> appends verbose write block") {
+    const TemporaryDirectory temp_dir;
+    const auto missing_target = (temp_dir.path() / "missing-dir" / "impact.dot").string();
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(),
+               "--changed-file", "include/common/shared.h", "--verbose", "--format", "dot",
+               "--output", missing_target.c_str()}) != ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=impact\n"
+        "verbose: format=dot\n"
+        "verbose: output=file\n"
+        "verbose: validation_stage=write\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose --format html --output <missing-dir> appends verbose write block") {
+    const TemporaryDirectory temp_dir;
+    const auto missing_target = (temp_dir.path() / "missing-dir" / "impact.html").string();
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(),
+               "--changed-file", "include/common/shared.h", "--verbose", "--format", "html",
+               "--output", missing_target.c_str()}) != ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=impact\n"
+        "verbose: format=html\n"
+        "verbose: output=file\n"
+        "verbose: validation_stage=write\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+// ---- Input and analysis errors with --verbose ---------------------------
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --verbose with non-existent compile-database appends verbose input block") {
+    CHECK(run({"analyze", "--compile-commands", "/nonexistent/compile_commands.json",
+               "--verbose"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=analyze\n"
+        "verbose: format=console\n"
+        "verbose: output=stdout\n"
+        "verbose: validation_stage=input\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose with non-existent compile-database appends verbose input block") {
+    CHECK(run({"impact", "--compile-commands", "/nonexistent/compile_commands.json",
+               "--changed-file", "src/app/main.cpp", "--verbose"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=impact\n"
+        "verbose: format=console\n"
+        "verbose: output=stdout\n"
+        "verbose: validation_stage=input\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --verbose with invalid file-api reply appends verbose analysis block") {
+    CHECK(run({"analyze", "--cmake-file-api",
+               fixture_path("m4/invalid_file_api/build").c_str(), "--verbose"}) !=
+          ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=analyze\n"
+        "verbose: format=console\n"
+        "verbose: output=stdout\n"
+        "verbose: validation_stage=analysis\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose with invalid file-api reply appends verbose analysis block") {
+    CHECK(run({"impact", "--cmake-file-api",
+               fixture_path("m4/invalid_file_api/build").c_str(), "--changed-file",
+               "src/app/main.cpp", "--verbose"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    const std::string expected_suffix =
+        "verbose: command=impact\n"
+        "verbose: format=console\n"
+        "verbose: output=stdout\n"
+        "verbose: validation_stage=analysis\n";
+    CHECK(err.str().ends_with(expected_suffix));
+}
+
+// ---- Quiet does not suppress errors and emits no verbose: lines ---------
+
+TEST_CASE("analyze --quiet --format json with throwing renderer keeps stderr free of verbose: lines") {
+    const StubAnalyzeProjectPort analyze_project_port{make_analyze_success_for_verbose_tests()};
+    const StubAnalyzeImpactPort analyze_impact_port;
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const ThrowingGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",      "analyze",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--quiet",         "--format", "json"};
+    const int exit_code = cli.run(7, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("error: cannot render report:") != std::string::npos);
+    CHECK(err.str().find("verbose:") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --quiet --format json --output <missing-dir> keeps stderr free of verbose: lines") {
+    const TemporaryDirectory temp_dir;
+    const auto missing_target = (temp_dir.path() / "missing-dir" / "report.json").string();
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--quiet",
+               "--format", "json", "--output", missing_target.c_str()}) !=
+          ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("error: cannot write report:") != std::string::npos);
+    CHECK(err.str().find("verbose:") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --quiet with non-existent compile-database keeps stderr free of verbose: lines") {
+    CHECK(run({"analyze", "--compile-commands", "/nonexistent/compile_commands.json",
+               "--quiet"}) != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK_FALSE(err.str().empty());
+    CHECK(err.str().find("verbose:") == std::string::npos);
+}
+
+TEST_CASE("analyze normal-mode render error keeps stderr free of verbose: lines") {
+    // Negative test: without --verbose the existing render-error stderr stays
+    // untouched; no verbose:-Praefix may leak in.
+    const StubAnalyzeProjectPort analyze_project_port{make_analyze_success_for_verbose_tests()};
+    const StubAnalyzeImpactPort analyze_impact_port;
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const ThrowingGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, analyze_impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",      "analyze",
+                          "--compile-commands",
+                          "tests/e2e/testdata/m2/basic_project/compile_commands.json",
+                          "--format",        "json"};
+    const int exit_code = cli.run(6, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(err.str().find("error: cannot render report:") != std::string::npos);
+    CHECK(err.str().find("verbose:") == std::string::npos);
 }

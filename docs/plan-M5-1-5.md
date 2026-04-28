@@ -440,8 +440,8 @@ DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert 
 
 - Tranche A ausgeliefert in commit `cdaec1c` ("feat: deliver M5 AP 1.5 Tranche A CLI verbosity model and noop policy").
 - Tranche B.1 ausgeliefert in commit `628dca7` ("feat: deliver M5 AP 1.5 Tranche B.1 console quiet renderers").
-- Tranche B.2 ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; Console Verbose Renderer und Verbose-Artefakt-stderr-Emitter stehen).
-- Tranche C offen.
+- Tranche B.2 ausgeliefert in commit `dd4ca70` ("feat: deliver M5 AP 1.5 Tranche B.2 console verbose renderers").
+- Tranche C ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; Verbose-Fehlerkontext, Binary-E2E-Smokes und Nutzerdoku stehen).
 - Tranche D optional und offen.
 
 ### Tranche A - CLI-Modell, Parservertrag und Artefakt-Noop-Policy
@@ -712,15 +712,15 @@ Sub-Risiken C.1:
 
 Definition of Done Sub-Tranche C.1:
 
-- [ ] `VerboseErrorContext`-Helfer und `format_verbose_error_context`-Funktion existieren als file-lokale Helfer in `cli_adapter.cpp`.
-- [ ] Verbose-Renderfehler erzeugen exakt die dokumentierte fuenfzeilige stderr-Sequenz fuer Markdown, JSON, DOT und HTML.
-- [ ] Verbose-Schreibfehler erzeugen exakt die dokumentierte sechszeilige stderr-Sequenz fuer Markdown, JSON, DOT und HTML.
-- [ ] Verbose-Eingabe- und -Analysefehler ergaenzen die normale Fehlermeldung um vier `verbose:`-Zeilen mit korrektem `validation_stage`.
-- [ ] Quiet-Fehlerpfade zeigen weiterhin Text auf stderr und nonzero Exit ohne `verbose:`-Zeilen.
-- [ ] Verbose-Zeilen erscheinen weder im Normal- noch im Quiet-Modus.
-- [ ] `impact --verbose` ohne `--changed-file` liefert nur den Usage-Fehler ohne `verbose:`-Block.
-- [ ] Mutual-Exclusion-Test aus Tranche A bleibt unveraendert gruen und liefert keinen `verbose:`-Block.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `VerboseErrorContext`-Helfer und `format_verbose_error_context`-Funktion existieren als file-lokale Helfer in `cli_adapter.cpp`.
+- [x] Verbose-Renderfehler erzeugen exakt die dokumentierte fuenfzeilige stderr-Sequenz fuer Markdown, JSON, DOT und HTML.
+- [x] Verbose-Schreibfehler erzeugen exakt die dokumentierte sechszeilige stderr-Sequenz fuer Markdown, JSON, DOT und HTML.
+- [x] Verbose-Eingabe- und -Analysefehler ergaenzen die normale Fehlermeldung um vier `verbose:`-Zeilen mit korrektem `validation_stage`.
+- [x] Quiet-Fehlerpfade zeigen weiterhin Text auf stderr und nonzero Exit ohne `verbose:`-Zeilen.
+- [x] Verbose-Zeilen erscheinen weder im Normal- noch im Quiet-Modus.
+- [x] `impact --verbose` ohne `--changed-file` liefert nur den Usage-Fehler ohne `verbose:`-Block.
+- [x] Mutual-Exclusion-Test aus Tranche A bleibt unveraendert gruen und liefert keinen `verbose:`-Block.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 #### Sub-Tranche C.2 - Binary-E2E-Smokes
 
@@ -757,13 +757,13 @@ Sub-Risiken C.2:
 
 Definition of Done Sub-Tranche C.2:
 
-- [ ] `e2e_binary` deckt `analyze --quiet`, `analyze --verbose`, `impact --quiet` und `impact --verbose` ueber Console-Goldens ab; alle Smokes laufen ueber die echte `cmake-xray`-Binary inklusive `src/main.cpp`.
-- [ ] `e2e_binary` deckt Quiet- und Verbose-Artefakt-Byte-Stabilitaet fuer Markdown, JSON, DOT und HTML ab.
-- [ ] Verbose-stdout fuer JSON, DOT und HTML wird zusaetzlich durch die jeweiligen Syntax-/Schema-Validatoren aus AP 1.2 / 1.3 / 1.4 verifiziert; Verbose-stderr-Lecks in stdout sind dadurch implizit ausgeschlossen.
-- [ ] Verbose-Artefakt-stderr-Reihenfolge ist durch einen Helfer mit `diff`-Aequivalent pro Subcommand und Format exakt gepinnt (7 Zeilen fuer `analyze`, 8 Zeilen fuer `impact`).
-- [ ] `top_limit` taucht in Verbose-Artefakt-stderr nicht auf.
-- [ ] Bestehende Console-, Markdown-, JSON-, DOT- und HTML-Goldens bleiben byte-stabil.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `e2e_binary` deckt `analyze --quiet`, `analyze --verbose`, `impact --quiet` und `impact --verbose` ueber Console-Goldens ab; alle Smokes laufen ueber die echte `cmake-xray`-Binary inklusive `src/main.cpp`.
+- [x] `e2e_binary` deckt Quiet- und Verbose-Artefakt-Byte-Stabilitaet fuer Markdown, JSON, DOT und HTML ab.
+- [x] Verbose-stdout fuer JSON, DOT und HTML wird zusaetzlich durch die jeweiligen Syntax-/Schema-Validatoren aus AP 1.2 / 1.3 / 1.4 verifiziert; Verbose-stderr-Lecks in stdout sind dadurch implizit ausgeschlossen.
+- [x] Verbose-Artefakt-stderr-Reihenfolge ist durch einen Helfer mit `diff`-Aequivalent pro Subcommand und Format exakt gepinnt (7 Zeilen fuer `analyze`, 8 Zeilen fuer `impact`).
+- [x] `top_limit` taucht in Verbose-Artefakt-stderr nicht auf.
+- [x] Bestehende Console-, Markdown-, JSON-, DOT- und HTML-Goldens bleiben byte-stabil.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 #### Sub-Tranche C.3 - Nutzerdoku und Quality-Gates-Finalcheck
 
@@ -799,12 +799,12 @@ Sub-Risiken C.3:
 
 Definition of Done Sub-Tranche C.3:
 
-- [ ] `README.md` listet `--quiet` und `--verbose` mit Beispielen.
-- [ ] `docs/guide.md` enthaelt eine "CLI-Modi: --quiet und --verbose"-Sektion mit praktischen Anwendungsfaellen.
-- [ ] `docs/quality.md` listet Mutual-Exclusion-Test, Console-Goldens, Artefakt-Byte-Stabilitaet, Verbose-Fehlerkontext und Binary-E2E-Smokes als verbindliche Gates.
-- [ ] Coverage-, Lizard- und Clang-Tidy-Gates sind gruen, ohne neue Befunde nach Tranche D zu verschieben.
-- [ ] Plan-`Liefer-Stand` reflektiert die Tranche-A/B/C-Lieferung mit Commit-Hash.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `README.md` listet `--quiet` und `--verbose` mit Beispielen.
+- [x] `docs/guide.md` enthaelt eine "CLI-Modi: --quiet und --verbose"-Sektion mit praktischen Anwendungsfaellen.
+- [x] `docs/quality.md` listet Mutual-Exclusion-Test, Console-Goldens, Artefakt-Byte-Stabilitaet, Verbose-Fehlerkontext und Binary-E2E-Smokes als verbindliche Gates.
+- [x] Coverage-, Lizard- und Clang-Tidy-Gates sind gruen, ohne neue Befunde nach Tranche D zu verschieben.
+- [x] Plan-`Liefer-Stand` reflektiert die Tranche-A/B/C-Lieferung mit Commit-Hash.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 #### Abnahme und Definition of Done Tranche C
 
@@ -814,15 +814,15 @@ Abnahme Tranche C: alle Docker-Gates aus `README.md` und `docs/quality.md` gruen
 
 Definition of Done Tranche C:
 
-- [ ] Verbose-Fehlerkontext ist fuer Render-, Schreib-, Eingabe- und Analysefehler getestet.
-- [ ] Quiet-Fehlerpfade zeigen weiterhin Text auf stderr und nonzero Exit ohne `verbose:`-Zeilen.
-- [ ] Binary-Smokes decken beide Subcommands und beide Modi ueber Console-Goldens ab und laufen alle ueber die echte `cmake-xray`-Binary inklusive `src/main.cpp`.
-- [ ] Binary-Smokes decken Quiet- und Verbose-Artefakt-Byte-Stabilitaet fuer Markdown, JSON, DOT und HTML ab.
-- [ ] Verbose-stdout fuer JSON, DOT und HTML wird zusaetzlich durch die jeweiligen Syntax-/Schema-Validatoren aus AP 1.2 / 1.3 / 1.4 verifiziert.
-- [ ] Artefakt-stdout und Datei-Inhalt bleiben in Quiet und Verbose byte-stabil; stdout endet mit demselben Newline-Vertrag wie der Normalmodus.
-- [ ] Verbose-Artefakt-stderr enthaelt 7 Zeilen fuer `analyze` und 8 Zeilen fuer `impact` in dokumentierter Reihenfolge ohne `top_limit`-Eintrag.
-- [ ] `README.md`, `docs/guide.md` und `docs/quality.md` sind aktualisiert.
-- [ ] Coverage-, Lizard- und Clang-Tidy-Gates sind gruen.
+- [x] Verbose-Fehlerkontext ist fuer Render-, Schreib-, Eingabe- und Analysefehler getestet.
+- [x] Quiet-Fehlerpfade zeigen weiterhin Text auf stderr und nonzero Exit ohne `verbose:`-Zeilen.
+- [x] Binary-Smokes decken beide Subcommands und beide Modi ueber Console-Goldens ab und laufen alle ueber die echte `cmake-xray`-Binary inklusive `src/main.cpp`.
+- [x] Binary-Smokes decken Quiet- und Verbose-Artefakt-Byte-Stabilitaet fuer Markdown, JSON, DOT und HTML ab.
+- [x] Verbose-stdout fuer JSON, DOT und HTML wird zusaetzlich durch die jeweiligen Syntax-/Schema-Validatoren aus AP 1.2 / 1.3 / 1.4 verifiziert.
+- [x] Artefakt-stdout und Datei-Inhalt bleiben in Quiet und Verbose byte-stabil; stdout endet mit demselben Newline-Vertrag wie der Normalmodus.
+- [x] Verbose-Artefakt-stderr enthaelt 7 Zeilen fuer `analyze` und 8 Zeilen fuer `impact` in dokumentierter Reihenfolge ohne `top_limit`-Eintrag.
+- [x] `README.md`, `docs/guide.md` und `docs/quality.md` sind aktualisiert.
+- [x] Coverage-, Lizard- und Clang-Tidy-Gates sind gruen.
 
 ### Tranche D - Optionale Haertung
 
