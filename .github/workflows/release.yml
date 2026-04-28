@@ -9,6 +9,15 @@ permissions:
   contents: write
   packages: write
 
+# AP M5-1.6 Tranche C: OCI publish gating. The OCI build and container
+# smoke happen unconditionally in the Verify-Job; the actual GHCR push
+# (versioned tag plus the conditional `latest`) is gated by this flag so
+# Tranche E can move it to a separate publish job at the right time. To
+# enable a real push, flip XRAY_OCI_PUBLISH_ENABLED to 'true' in
+# Tranche-E's release.yml refactor (or temporarily via repo Variables).
+env:
+  XRAY_OCI_PUBLISH_ENABLED: "false"
+
 jobs:
   verify:
     name: Verify (Docker)
@@ -39,17 +48,40 @@ jobs:
       - name: Verify quality gate
         run: docker build --target quality-check -t cmake-xray:quality-check .
 
-      - name: Build runtime image
-        run: docker build --target runtime -t "cmake-xray:${{ steps.meta.outputs.tag }}" .
+      # AP M5-1.6 Tranche C: build the OCI runtime image via the
+      # publish-script so the local image is tagged exactly as the
+      # versioned remote (image_repo:version, no leading 'v') and the
+      # subsequent push step (gated) operates on the same artifact.
+      - name: Build OCI runtime image
+        run: |
+          bash scripts/oci-image-publish.sh \
+            "${{ steps.meta.outputs.image_repo }}" \
+            "${{ steps.meta.outputs.version }}" \
+            build
 
-      - name: Smoke test runtime image
-        run: docker run --rm "cmake-xray:${{ steps.meta.outputs.tag }}" --help
+      - name: Smoke test OCI image (--help)
+        run: |
+          docker run --rm \
+            "${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.version }}" \
+            --help > /dev/null
+
+      - name: Smoke test OCI image (--version matches tag)
+        run: |
+          set -eu
+          extracted=$(docker run --rm \
+            "${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.version }}" \
+            --version)
+          expected="${{ steps.meta.outputs.version }}"
+          if [ "$extracted" != "$expected" ]; then
+            echo "error: OCI --version='${extracted}' does not match expected '${expected}'" >&2
+            exit 1
+          fi
 
       - name: Smoke test markdown analyze path
         run: |
           docker run --rm \
             -v "$PWD/tests/e2e/testdata/m3:/data:ro" \
-            "cmake-xray:${{ steps.meta.outputs.tag }}" \
+            "${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.version }}" \
             analyze \
             --compile-commands /data/report_project/compile_commands.json \
             --format markdown
@@ -58,7 +90,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$PWD/tests/e2e/testdata/m3:/data:ro" \
-            "cmake-xray:${{ steps.meta.outputs.tag }}" \
+            "${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.version }}" \
             impact \
             --compile-commands /data/report_impact_header/compile_commands.json \
             --changed-file include/common/config.h \
@@ -97,23 +129,36 @@ jobs:
             exit 1
           fi
 
+      # AP M5-1.6 Tranche C: gated OCI publish. Tranche-E will move this
+      # to a dedicated publish job; for now the steps stay in the Verify-
+      # Job behind an env-flag (XRAY_OCI_PUBLISH_ENABLED), so a re-run of
+      # this workflow with the flag still 'false' performs build+smoke
+      # without ever pushing to GHCR.
       - name: Log in to GHCR
+        if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
         run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Publish container image
+      - name: Publish OCI image (versioned tag)
+        if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
+        run: |
+          bash scripts/oci-image-publish.sh \
+            "${{ steps.meta.outputs.image_repo }}" \
+            "${{ steps.meta.outputs.version }}" \
+            push
+
+      - name: Publish OCI image (latest tag for stable releases)
+        if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
         run: |
           set -eu
-          image_repo="${{ steps.meta.outputs.image_repo }}"
           version="${{ steps.meta.outputs.version }}"
-          tag="${{ steps.meta.outputs.tag }}"
-
-          docker tag "cmake-xray:${tag}" "${image_repo}:${tag}"
-          docker push "${image_repo}:${tag}"
-
-          if [[ "$version" != *-* ]]; then
-            docker tag "cmake-xray:${tag}" "${image_repo}:latest"
-            docker push "${image_repo}:latest"
+          if [[ "$version" == *-* ]]; then
+            echo "skipping latest update for prerelease ${version}"
+            exit 0
           fi
+          bash scripts/oci-image-publish.sh \
+            "${{ steps.meta.outputs.image_repo }}" \
+            "$version" \
+            latest
 
   build:
     name: Build (${{ matrix.name }})

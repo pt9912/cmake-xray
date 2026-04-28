@@ -42,9 +42,21 @@ FROM toolchain AS build
 
 COPY . .
 
+# AP M5-1.6 Tranche C: optional XRAY_APP_VERSION build-arg flows into the
+# cmake configure step so the produced binary (and the runtime image
+# below) carries the canonical app version. When the build-arg is empty
+# the CMake plumbing falls back to PROJECT_VERSION + XRAY_VERSION_SUFFIX
+# (see CMakeLists.txt). Existing stages (test, coverage, quality) inherit
+# this build via FROM build and therefore see the same versioning.
+ARG XRAY_APP_VERSION=
+
 # Parallel cmake build keeps the build stage from serialising compilation;
 # previously each stage spent ~2 min on sequential cc1plus invocations.
-RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
+RUN if [ -n "$XRAY_APP_VERSION" ]; then \
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DXRAY_APP_VERSION="$XRAY_APP_VERSION"; \
+    else \
+        cmake -B build -DCMAKE_BUILD_TYPE=Release; \
+    fi \
     && cmake --build build --parallel
 
 FROM build AS test
@@ -165,6 +177,17 @@ RUN if [ -z "$XRAY_APP_VERSION" ]; then \
 ENTRYPOINT ["bash", "/workspace/scripts/release-archive-entrypoint.sh"]
 
 FROM ubuntu:24.04 AS runtime
+
+# AP M5-1.6 Tranche C: OCI runtime image. The XRAY_APP_VERSION build-arg
+# is forwarded to the build stage above (see ARG further up) so the
+# embedded binary carries the right `--version` string. The OCI label
+# below stays in lockstep so `docker inspect` and the binary report the
+# same value; downstream Tranche-E publish logic treats this label as
+# the canonical Versions-Tag-Quelle.
+ARG XRAY_APP_VERSION=
+LABEL org.opencontainers.image.title="cmake-xray" \
+      org.opencontainers.image.source="https://github.com/pt9912/cmake-xray" \
+      org.opencontainers.image.version="${XRAY_APP_VERSION}"
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \

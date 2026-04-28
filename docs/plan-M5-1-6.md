@@ -201,8 +201,8 @@ Die Umsetzung erfolgt in sechs verbindlichen Tranchen. Jede Tranche endet mit ei
 DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert eine in einem konkreten Commit ausgelieferte Anforderung, `[ ]` markiert eine offene Anforderung. Liefer-Stand zum Zeitpunkt der Tranche-A-Vorbereitung:
 
 - Tranche A ausgeliefert in commits `8f6b2da` ("feat: deliver M5 AP 1.6 Tranche A tag validator and --version flag") und `ad2c9b1` ("fix: pin Tranche-A --help app name to 'cmake-xray' for CI Linux").
-- Tranche B ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; Reproduzierbares Linux-Archiv, SHA-256-Sidecar, Repro-Smoke und `release-archive`-Docker-Stage stehen).
-- Tranche C offen.
+- Tranche B ausgeliefert in commits `a6ea384` ("feat: deliver M5 AP 1.6 Tranche B reproducible Linux release archive") und `cc78152` ("docs: address Tranche B review findings — pax docstring, locale and verify smoke").
+- Tranche C ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; OCI-Build via publish-Skript, Container-Smoke, Idempotenz-Logik und gegate-ter Push fuer Tranche E stehen).
 - Tranche D offen.
 - Tranche E offen.
 - Tranche F offen.
@@ -320,13 +320,13 @@ Sub-Risiken Tranche C:
 
 Definition of Done Tranche C:
 
-- [ ] `Dockerfile` Runtime-Stage baut `cmake-xray` mit `XRAY_APP_VERSION` als Build-Argument.
-- [ ] `scripts/oci-image-publish.sh` baut, pusht (Push-Pfad selbst gegen die lokale Registry aus Tranche D testbar), liest Digest und prueft Idempotenz.
-- [ ] Re-Run mit existierendem Versions-Tag und gleichem Digest ist erfolgreich; Re-Run mit Digest-Mismatch bricht vor `latest` ab.
-- [ ] `latest`-Tag wird nur fuer Non-Prerelease gesetzt; bei Mismatch zwischen `latest` und Versions-Tag-Digest bricht der Workflow ab.
-- [ ] Container-Smoke `cmake-xray --help` und `cmake-xray --version` laeuft im gebauten Image.
-- [ ] Im Verify-Job wird das OCI-Image gebaut und Container-Smoke ausgefuehrt, ohne Push. Der Push-Step im finalen Release-Job existiert als separater Workflow-Job-Stub mit `if:`-Gate, das in Tranche E aktiviert wird.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `Dockerfile` Runtime-Stage baut `cmake-xray` mit `XRAY_APP_VERSION` als Build-Argument; das Image traegt zusaetzlich das OCI-Label `org.opencontainers.image.version`, das in lockstep mit der `--version`-Ausgabe steht.
+- [x] `scripts/oci-image-publish.sh` baut, pusht (Push-Pfad selbst gegen die lokale Registry aus Tranche D testbar), liest Digest und prueft Idempotenz. Das Skript splittet die Operationen in `build`, `push` und `latest`, sodass Tranche E die Push-/Latest-Pfade einzeln gaten kann.
+- [x] Re-Run mit existierendem Versions-Tag und gleichem Digest ist erfolgreich; Re-Run mit Digest-Mismatch bricht vor `latest` ab. Der `push`-Pfad liest den remote-Digest vor und nach dem Push und vergleicht sie.
+- [x] `latest`-Tag wird nur fuer Non-Prerelease gesetzt (Versions-String ohne `-`); bei Mismatch zwischen `latest` und Versions-Tag-Digest bricht der Workflow ab. Der `latest`-Pfad refused fuer Prerelease-Versionen mit Klartext-Fehler.
+- [x] Container-Smoke `cmake-xray --help` und `cmake-xray --version` laeuft im gebauten Image; der `--version`-Output wird gegen den Build-Arg-Wert (Tag-ohne-`v`) gepinnt. Das OCI-Label wird ebenfalls gegen denselben Wert gepinnt, sodass eine Drift zwischen Binary und Container-Metadaten den Smoke abbricht.
+- [x] Im Verify-Job wird das OCI-Image via `oci-image-publish.sh build` lokal gebaut und Container-Smoke ausgefuehrt, ohne Push. Der Push-Step (`oci-image-publish.sh push` plus optionaler `latest`-Pfad) existiert in `release.yml` mit `if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'` und ist in Tranche C ausgeschaltet (`env.XRAY_OCI_PUBLISH_ENABLED: "false"` auf Workflow-Ebene); Tranche E flippt das Flag.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen. Der CTest-Eintrag `oci_image_smoke` SKIPpt im Docker-Test-Stage (kein docker-in-docker), laeuft aber auf der Native-Linux-CI-Matrix voll.
 
 ### Tranche D - Release-Dry-Run und Recovery-Pfad
 

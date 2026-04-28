@@ -81,6 +81,20 @@ if(BASH_PROGRAM)
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     )
 
+    # AP M5-1.6 Tranche C: OCI runtime image smoke. Builds the runtime
+    # image locally via scripts/oci-image-publish.sh build, smoke-tests
+    # --help and --version inside the container, pins the OCI label
+    # against the build-arg version, and verifies the latest-refusal
+    # contract for prerelease versions. SKIPs cleanly when docker is
+    # missing or the host is not Linux.
+    add_test(
+        NAME oci_image_smoke
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/release/test_oci_image_smoke.sh
+    )
+    set_tests_properties(oci_image_smoke PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
+
     # AP M5-1.5 Tranche D Folge-Refactor: split the monolithic run_e2e.sh
     # into focused sub-suites and register each as its own CTest entry so
     # `ctest --parallel` schedules them concurrently. run_e2e_lib.sh holds
