@@ -292,17 +292,42 @@ docker pull alpine:3.21 >/dev/null 2>&1 || true
 docker tag alpine:3.21 "$mismatch_tag"
 docker push "$mismatch_tag" >/dev/null
 
+# AP M5-1.6 Tranche I.2: capture the pre-seed digest *before* the
+# dry-run runs so we can verify after the abort that the versioned
+# tag was not silently overwritten. plan-M5-1-6.md OCI-Image-Vertrag
+# verlangt Abbruch *vor* dem Push; ohne diese Pinning fiele ein
+# bereits ueberschriebener versioned-Tag-Digest nicht auf, weil der
+# alte Test nur latest gegen den (potentiell schon umgeschriebenen)
+# versioned_digest verglich.
+preseed_versioned_digest=$(docker buildx imagetools inspect "$mismatch_tag" \
+    --format '{{.Manifest.Digest}}')
+
 assert_dry_run_aborts "scenario 6 oci-digest-mismatch aborts before release_published" \
     v0.0.0-mismatch "$state6_dir" "" "release_published"
+
+# AP M5-1.6 Tranche I.2: hard invariant -- der versionierte Remote-
+# Tag muss nach dem abgebrochenen Dry-Run byte-identisch zum Pre-
+# Seed-Stand sein. Die alte Variante (latest_digest = versioned_digest)
+# erkennt diesen Fall nicht, weil sie nur prueft, dass `latest` nicht
+# auf den *neuen* Versions-Digest zeigt -- der Versions-Tag selbst
+# konnte still ueberschrieben werden, bevor der Workflow abbrach.
+post_versioned_digest=$(docker buildx imagetools inspect "$mismatch_tag" \
+    --format '{{.Manifest.Digest}}' 2>/dev/null || true)
+if [ "$post_versioned_digest" = "$preseed_versioned_digest" ]; then
+    echo "PASS: scenario 6 versioned tag is byte-identical to pre-seed (digest=${post_versioned_digest})"
+else
+    echo "FAIL: scenario 6 versioned tag was overwritten despite digest mismatch" >&2
+    echo "       pre-seed: ${preseed_versioned_digest}" >&2
+    echo "       post:     ${post_versioned_digest:-<unset>}" >&2
+    failures=$((failures + 1))
+fi
 
 # Belt-and-braces: latest must not have been updated to the dry-run's
 # new image either. The publish-script logic refuses to touch latest
 # when the version-tag digest does not match the dry-run's push.
 latest_digest=$(docker buildx imagetools inspect "${mismatch_repo}:latest" \
     --format '{{.Manifest.Digest}}' 2>/dev/null || true)
-versioned_digest=$(docker buildx imagetools inspect "$mismatch_tag" \
-    --format '{{.Manifest.Digest}}' 2>/dev/null || true)
-if [ -n "$latest_digest" ] && [ "$latest_digest" = "$versioned_digest" ]; then
+if [ -n "$latest_digest" ] && [ "$latest_digest" = "$post_versioned_digest" ]; then
     echo "FAIL: scenario 6 latest tag was updated despite digest mismatch" >&2
     failures=$((failures + 1))
 else
