@@ -125,8 +125,18 @@ if ! gh release view "$tag" >/dev/null 2>&1; then
     exit 0
 fi
 
-existing_meta="$(gh release view "$tag" --json assets,body,isDraft 2>/dev/null \
-    || gh release view "$tag")"
+# AP M5-1.6 Tranche G.4: log line is the diagnostic anchor that
+# tests/release/test_release_dry_run.sh asserts for scenarios 1 and 2
+# ("already exists"); also keeps the operator-visible signal that the
+# helper is taking the existing-release branch instead of create.
+echo "release '$tag' already exists; validating manifest"
+
+# `--json assets,body,isDraft` is the canonical view shape; we rely on
+# both real `gh` (since 2022) and the fake-gh wrapper (which ignores
+# unknown args and emits the full metadata.json). No fallback: a hard
+# `gh` failure should surface, not silently degrade to a different
+# JSON shape that the lookups below would shape-mismatch.
+existing_meta="$(gh release view "$tag" --json assets,body,isDraft)"
 
 # AP M5-1.6 Tranche G.3: gh's JSON `assets[]` includes a `digest` field
 # of the form "sha256:<hex>" but historically also exposed `sha256`;
@@ -155,10 +165,29 @@ for asset in "${assets[@]}"; do
     fi
 done
 
-expected_notes="$(cat "$notes_file")"
+# AP M5-1.6 Tranche G.4: GitHub's API normalises CRLF -> LF and may
+# strip a trailing newline on stored release bodies. A naive byte
+# compare would fire a manifest-mismatch on every legitimate re-run
+# where the API has touched the notes. Normalise both sides (drop CR,
+# strip trailing whitespace per line, strip trailing blank lines)
+# and compare via sha256 so the diff stays cheap and order-stable.
+normalize_notes() {
+    awk '
+        { sub(/\r$/, ""); sub(/[ \t]+$/, ""); lines[NR] = $0 }
+        END {
+            n = NR
+            while (n > 0 && lines[n] == "") n--
+            for (i = 1; i <= n; i++) print lines[i]
+        }
+    '
+}
+expected_notes_sha="$(normalize_notes <"$notes_file" | sha256sum | awk '{print $1}')"
 existing_notes="$(jq -r '.body // .notes // ""' <<<"$existing_meta")"
-if [ -n "$existing_notes" ] && [ "$existing_notes" != "$expected_notes" ]; then
+existing_notes_sha="$(printf '%s\n' "$existing_notes" \
+    | normalize_notes | sha256sum | awk '{print $1}')"
+if [ -n "$existing_notes" ] && [ "$existing_notes_sha" != "$expected_notes_sha" ]; then
     echo "error: existing release notes for '$tag' differ from the local manifest" >&2
+    echo "       (expected sha256=$expected_notes_sha, remote sha256=$existing_notes_sha after CRLF normalisation)" >&2
     echo "       this is a manifest-mismatch and must be resolved manually before re-run" >&2
     mismatches=$((mismatches + 1))
 fi
