@@ -245,7 +245,7 @@ Sub-Risiken Tranche A:
 Definition of Done Tranche A:
 
 - [x] `XRAY_APP_VERSION` und `XRAY_VERSION_SUFFIX` sind als CMake-Cache-Variablen dokumentiert; gleichzeitiges Setzen ist fail-fast.
-- [x] `XRAY_APP_VERSION_STRING` wird ueber `target_compile_definitions` an `application_info` weitergereicht; alte Versionsquellen sind entfernt.
+- [x] `XRAY_APP_VERSION_STRING` wird ueber `add_compile_definitions` global an alle TUs weitergereicht (saemtliche Bibliotheken, Binary und Tests sehen denselben Wert); alte Versionsquellen sind entfernt. Die Plan-Vorlage erwaehnte `target_compile_definitions`; im Single-Repo-Single-Target-Layout ist die globale Variante aequivalent und der saubere Default, weil das Define als `#error`-Guard in `application_info.h` abgesichert ist und jede TU es beim Compile sehen muss.
 - [x] `scripts/validate-release-tag.sh` lehnt alle 12 Negativfaelle aus dem Plan-Smoke-Vertrag ab und akzeptiert alle 4 Positivfaelle; die App-Version ohne `v` wird auf stdout gedruckt.
 - [x] `cmake-xray --version` druckt die App-Version ohne `v` auf stdout, beendet mit Exit `0`, ohne Subcommand-Pipeline zu starten.
 - [x] `--version` ist global und gleichbedeutend an Root-CLI verfuegbar; CLI-Tests pinnen es vor Subcommand-Dispatch.
