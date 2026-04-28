@@ -207,6 +207,26 @@ DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert 
 - Tranche E ausgeliefert in commit `1ddd8cc` ("feat: deliver M5 AP 1.6 Tranche E platform allowlist and OCI publish enablement").
 - Tranche F.1 ausgeliefert in commit `ac05172` ("perf: speed up release_dry_run and oci_image_smoke ahead of Tranche F.2"); F.2 ausgeliefert in commit `4f91846` ("docs: deliver M5 AP 1.6 Tranche F.2 final docs sweep and reviewer fixups": Doku-Sweep `releasing.md`/`README.md`/`quality.md`, Reviewer-Findings `release.yml` Windows-Dead-Code und Drei-Wege-Versionscheck am OCI-Image, Plan-DoD-Flip).
 
+Nach Tranche F.2 ergaben User-Audits drei zusaetzliche Workflow-Verdrahtungs-Luecken, die Tranchen G-J schliessen. Die Plan-Skripte/-Tests aus A-F waren vorhanden und korrekt, aber `release.yml` rief sie nicht an den Plan-Gate-Punkten auf:
+
+- Tranche G — Workflow-Verdrahtung der Plan-Skripte (Tag-Validator als Pre-Build-Gate, reproduzierbarer Publish-Pfad, Manifest-Idempotenz statt `gh release upload --clobber`):
+  - G.1 Tag-Validator-Gate ausgeliefert in commit `fecce43` ("ci: deliver M5 AP 1.6 Tranche G.1 hard tag-validator gate in release.yml").
+  - G.2 Reproduzierbarer Publish-Pfad ausgeliefert in commit `4010471` ("ci: deliver M5 AP 1.6 Tranche G.2 reproducible publish path in release.yml").
+  - G.3 Manifest-Idempotenz-Helper ausgeliefert in commit `c79fb41` ("ci: deliver M5 AP 1.6 Tranche G.3 manifest idempotency in release.yml") plus Reviewer-Fixup in commit `98f1cd6` ("fix: address Tranche G.3 reviewer findings ... already-exists log line, gh-json fallback, notes whitespace normalisation").
+  - Build-Workflow-Hotfix `8870a9d` ("ci: pin shell to bash in build.yml Configure CMake step for Windows runner") loest einen unverwandten CI-Failure, der waehrend Tranche G auffiel.
+- Tranche H — Publish-Sequenz und Manifest-Strenge (OCI-Push aus dem verify-Job in den release-Job, Draft-Zwischenzustand, exakte Asset-Liste, Registry-Guard):
+  - H.1 OCI-Push-Move ausgeliefert in commit `a96b816` ("ci: deliver M5 AP 1.6 Tranche H.1 move OCI publish to release-job").
+  - H.2 Draft-State ausgeliefert in commit `1d6e9bc` ("ci: deliver M5 AP 1.6 Tranche H.2 draft state in release-job").
+  - H.3 Extra-Remote-Asset-Detection ausgeliefert in commit `bc5ae4a` ("feat: deliver M5 AP 1.6 Tranche H.3 extra-remote-asset detection").
+  - H.4 Registry-Localhost-Guard ausgeliefert in commit `b51d2b7` ("feat: deliver M5 AP 1.6 Tranche H.4 XRAY_DRY_RUN_REGISTRY localhost guard") plus Reviewer-Nits-Fixup in commit `90e7c4f` ("fix: address Tranche H reviewer nits ...").
+- Tranche I — OCI Pre-Push-Idempotenz (Mismatch-Abort *vor* `docker push` statt danach, Dry-Run-Test pinnt versioned-tag-Invarianz):
+  - I.1 Pre-Push-Image-ID-Vergleich ausgeliefert in commit `3af151c` ("fix: deliver M5 AP 1.6 Tranche I.1 OCI pre-push idempotency check").
+  - I.2 versioned-Tag-Invarianz im Dry-Run-Szenario 6 ausgeliefert in commit `5cd5448` ("test: deliver M5 AP 1.6 Tranche I.2 pin versioned-tag invariance in dry-run scenario 6").
+- Tranche J — Build OCI runtime image im release-Job (GitHub-Actions-Jobs teilen keinen Image-Store; ohne diesen Build-Step waere `oci-image-publish.sh push` nicht aufrufbar):
+  - J.1 OCI-Build im release-Job ausgeliefert in commit `67ad728` ("fix: deliver M5 AP 1.6 Tranche J.1 build OCI image in release-job before push").
+
+Tranchen G-J behandeln keine neuen Plan-Anforderungen, sondern schliessen die Verdrahtung der A-F-Skripte gegen den `release.yml`-Workflow. Die Kategorisierung als eigene Tranchen statt Reviewer-Fixups ist beabsichtigt: jede Sub-Tranche enthaelt Skript- oder Test-Aenderungen jenseits einer reinen Dokumentations- oder Kommentaranpassung.
+
 ### Tranche A - Tag-/Versionsvertrag und `--version`-Flag
 
 Fokus auf Versionsquellen und CLI-Verdrahtung. Tranche A liefert noch kein Release-Artefakt: kein Linux-Archiv, kein OCI-Image, kein Workflow-Trigger. Sie macht aber jeden spaeteren Schritt versionsfaehig, indem sie die kanonische Quelle `XRAY_APP_VERSION`, die Tag-Validierung und das globale `--version`-Flag etabliert.
