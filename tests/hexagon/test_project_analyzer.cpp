@@ -195,7 +195,9 @@ TEST_CASE("project analyzer builds ranked translation units and hotspots") {
         make_project_request("/tmp/compile_commands.json", ""));
 
     CHECK(result.application.name == std::string_view{"cmake-xray"});
-    CHECK(result.application.version == std::string_view{"v1.1.0"});
+    // AP M5-1.6 Tranche A: app version source is now the build-time
+    // XRAY_APP_VERSION_STRING define, normalised without a leading 'v'.
+    CHECK(result.application.version == std::string_view{XRAY_APP_VERSION_STRING});
     CHECK(result.compile_database.is_success());
     CHECK(result.compile_database_path == "/tmp/compile_commands.json");
     REQUIRE(result.inputs.compile_database_path.has_value());

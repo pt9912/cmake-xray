@@ -200,7 +200,7 @@ Die Umsetzung erfolgt in sechs verbindlichen Tranchen. Jede Tranche endet mit ei
 
 DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert eine in einem konkreten Commit ausgelieferte Anforderung, `[ ]` markiert eine offene Anforderung. Liefer-Stand zum Zeitpunkt der Tranche-A-Vorbereitung:
 
-- Tranche A offen.
+- Tranche A ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; Tag-Validator, CMake-Versionsplumbing und `--version`-Flag stehen).
 - Tranche B offen.
 - Tranche C offen.
 - Tranche D offen.
@@ -244,15 +244,15 @@ Sub-Risiken Tranche A:
 
 Definition of Done Tranche A:
 
-- [ ] `XRAY_APP_VERSION` und `XRAY_VERSION_SUFFIX` sind als CMake-Cache-Variablen dokumentiert; gleichzeitiges Setzen ist fail-fast.
-- [ ] `XRAY_APP_VERSION_STRING` wird ueber `target_compile_definitions` an `application_info` weitergereicht; alte Versionsquellen sind entfernt.
-- [ ] `scripts/validate-release-tag.sh` lehnt alle 12 Negativfaelle aus dem Plan-Smoke-Vertrag ab und akzeptiert alle 4 Positivfaelle; die App-Version ohne `v` wird auf stdout gedruckt.
-- [ ] `cmake-xray --version` druckt die App-Version ohne `v` auf stdout, beendet mit Exit `0`, ohne Subcommand-Pipeline zu starten.
-- [ ] `--version` ist global und gleichbedeutend an Root-CLI verfuegbar; CLI-Tests pinnen es vor Subcommand-Dispatch.
-- [ ] Konsistenz-Test pinnt Gleichheit von Tag-ohne-`v`, `--version`-Ausgabe und `XRAY_APP_VERSION_STRING`.
-- [ ] CMake-Projektversion bleibt numerisch (`MAJOR.MINOR.PATCH`).
-- [ ] `tests/release/test_validate_release_tag.sh` ist als CTest-Eintrag registriert.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `XRAY_APP_VERSION` und `XRAY_VERSION_SUFFIX` sind als CMake-Cache-Variablen dokumentiert; gleichzeitiges Setzen ist fail-fast.
+- [x] `XRAY_APP_VERSION_STRING` wird ueber `target_compile_definitions` an `application_info` weitergereicht; alte Versionsquellen sind entfernt.
+- [x] `scripts/validate-release-tag.sh` lehnt alle 12 Negativfaelle aus dem Plan-Smoke-Vertrag ab und akzeptiert alle 4 Positivfaelle; die App-Version ohne `v` wird auf stdout gedruckt.
+- [x] `cmake-xray --version` druckt die App-Version ohne `v` auf stdout, beendet mit Exit `0`, ohne Subcommand-Pipeline zu starten.
+- [x] `--version` ist global und gleichbedeutend an Root-CLI verfuegbar; CLI-Tests pinnen es vor Subcommand-Dispatch.
+- [x] Konsistenz-Test pinnt Gleichheit von Tag-ohne-`v`, `--version`-Ausgabe und `XRAY_APP_VERSION_STRING`.
+- [x] CMake-Projektversion bleibt numerisch (`MAJOR.MINOR.PATCH`).
+- [x] `tests/release/test_validate_release_tag.sh` ist als CTest-Eintrag registriert.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 ### Tranche B - Linux-Archiv und Reproducibility
 

@@ -11,6 +11,7 @@
 #include "adapters/cli/cli_console_renderers.h"
 #include "adapters/cli/exit_codes.h"
 #include "adapters/cli/output_verbosity.h"
+#include "hexagon/model/application_info.h"
 #include "hexagon/model/compile_database_result.h"
 #include "hexagon/model/report_inputs.h"
 
@@ -639,6 +640,27 @@ std::optional<int> validate_subcommand_options(const CliOptions& options, bool i
     return validate_input_options(options, err);
 }
 
+struct CliDispatchContext {
+    const xray::hexagon::ports::driving::AnalyzeProjectPort& analyze_project_port;
+    const xray::hexagon::ports::driving::AnalyzeImpactPort& analyze_impact_port;
+    const ReportPorts& report_ports;
+};
+
+int dispatch_subcommand(const CliOptions& options, bool is_impact,
+                          const CliDispatchContext& ctx, CliOutputStreams streams) {
+    const auto report_format = parse_report_format(options.report_format);
+    const auto& report_port = select_report_port(report_format, ctx.report_ports);
+    const auto report_display_base = std::filesystem::current_path();
+    if (is_impact) {
+        const auto result = ctx.analyze_impact_port.analyze_impact(
+            build_impact_request(options, report_display_base));
+        return handle_impact_result(result, report_port, report_format, options, streams);
+    }
+    const auto result = ctx.analyze_project_port.analyze_project(
+        build_project_request(options, report_display_base));
+    return handle_analysis_result(result, report_port, report_format, options, streams);
+}
+
 }  // namespace
 
 int emit_rendered_report(const CliReportRenderer& renderer, std::string_view output_path,
@@ -684,6 +706,10 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
                     std::ostream& err) const {
     CLI::App app{"cmake-xray - build dependency analysis for CMake projects"};
     app.require_subcommand(0, 1);
+    // AP M5-1.6 Tranche A: global --version flag handled by CLI11 before
+    // subcommand dispatch; CLI::CallForVersion is caught as success below.
+    app.set_version_flag("--version",
+                         std::string{xray::hexagon::model::application_info().version});
 
     CliOptions options;
     CLI::App* analyze_cmd = nullptr;
@@ -709,21 +735,8 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
         return *validation_error;
     }
     options.verbosity = resolve_verbosity(options);
-
-    const CliOutputStreams streams{out, err};
-    const auto report_format = parse_report_format(options.report_format);
-    const auto& report_port = select_report_port(report_format, report_ports_);
-
-    const auto report_display_base = std::filesystem::current_path();
-    if (impact_cmd->parsed()) {
-        const auto result = analyze_impact_port_.analyze_impact(
-            build_impact_request(options, report_display_base));
-        return handle_impact_result(result, report_port, report_format, options, streams);
-    }
-
-    const auto result = analyze_project_port_.analyze_project(
-        build_project_request(options, report_display_base));
-    return handle_analysis_result(result, report_port, report_format, options, streams);
+    const CliDispatchContext ctx{analyze_project_port_, analyze_impact_port_, report_ports_};
+    return dispatch_subcommand(options, impact_cmd->parsed(), ctx, CliOutputStreams{out, err});
 }
 
 }  // namespace xray::adapters::cli

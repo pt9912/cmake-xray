@@ -59,6 +59,14 @@ if(BASH_PROGRAM)
         COMMAND bash ${PROJECT_SOURCE_DIR}/cmake/check_hexagon_boundary.sh ${PROJECT_SOURCE_DIR}/src/hexagon
     )
 
+    # AP M5-1.6 Tranche A: SemVer-Tag-Validator-Smokes. Pinnt 4 Positiv-
+    # und 12 Negativfaelle aus plan-M5-1-6.md "Smoke- und Validierungstests"
+    # plus den Usage-Error-Pfad (Exit 2).
+    add_test(
+        NAME release_tag_validation
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/release/test_validate_release_tag.sh
+    )
+
     # AP M5-1.5 Tranche D Folge-Refactor: split the monolithic run_e2e.sh
     # into focused sub-suites and register each as its own CTest entry so
     # `ctest --parallel` schedules them concurrently. run_e2e_lib.sh holds

@@ -48,6 +48,67 @@ TEST_CASE_FIXTURE(CliFixture, "impact --help returns exit 0 with help on stdout"
     CHECK(err.str().empty());
 }
 
+// ---- AP M5-1.6 Tranche A: --version-Flag ---------------------------------
+//
+// `cmake-xray --version` ist ein globales Flag, das CLI11 vor jedem
+// Subcommand-Dispatch behandelt. Die Ausgabe ist die kanonische App-Version
+// ohne fuehrendes 'v', Exit 0; die Analyse-Pipeline wird nie gestartet.
+// XRAY_APP_VERSION_STRING ist das Build-Time-Define aus der Root-CMakeLists
+// und die einzige Quelle der Wahrheit fuer die Assertions.
+
+TEST_CASE_FIXTURE(CliFixture, "cmake-xray --version prints app version on stdout and exits 0") {
+    CHECK(run({"--version"}) == ExitCode::success);
+    CHECK(out.str() == std::string{XRAY_APP_VERSION_STRING} + "\n");
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "cmake-xray --version output matches application_info().version") {
+    // Konsistenz-Test (plan-M5-1-6.md DoD Tranche A): die --version-Ausgabe,
+    // application_info().version und XRAY_APP_VERSION_STRING muessen
+    // uebereinstimmen.
+    CHECK(run({"--version"}) == ExitCode::success);
+    const std::string expected =
+        std::string{xray::hexagon::model::application_info().version} + "\n";
+    CHECK(out.str() == expected);
+    CHECK(std::string_view{XRAY_APP_VERSION_STRING} ==
+          xray::hexagon::model::application_info().version);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "cmake-xray --version output has no leading v") {
+    CHECK(run({"--version"}) == ExitCode::success);
+    REQUIRE_FALSE(out.str().empty());
+    CHECK(out.str().front() != 'v');
+}
+
+TEST_CASE("cmake-xray --version short-circuits before subcommand dispatch") {
+    // Stub-Ports duerfen nicht aufgerufen werden, wenn --version das einzige
+    // Argument ist; CLI11 wirft CLI::CallForVersion vor dem Subcommand-
+    // Callback, und das Versions-Flag funktioniert auch ohne
+    // --compile-commands oder --cmake-file-api.
+    AnalysisResult unused_analysis;
+    unused_analysis.application = xray::hexagon::model::application_info();
+    unused_analysis.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    const StubAnalyzeProjectPort analyze_port{unused_analysis};
+    const StubAnalyzeImpactPort impact_port;
+    const StubGenerateReportPort console_port;
+    const StubGenerateReportPort markdown_port;
+    const StubGenerateReportPort json_port;
+    const StubGenerateReportPort dot_port;
+    const StubGenerateReportPort html_port;
+    const xray::adapters::cli::ReportPorts ports{console_port, markdown_port, json_port,
+                                                  dot_port, html_port};
+    const CliAdapter cli{analyze_port, impact_port, ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray", "--version"};
+    CHECK(cli.run(2, argv, out, err) == ExitCode::success);
+    CHECK(out.str() == std::string{XRAY_APP_VERSION_STRING} + "\n");
+    CHECK(err.str().empty());
+}
+
 TEST_CASE_FIXTURE(CliFixture, "analyze success path renders ranking and hotspots") {
     const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
 
