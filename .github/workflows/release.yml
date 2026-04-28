@@ -327,6 +327,41 @@ jobs:
       # GitHub-Release-Assets hinterlassen. Der Versions-Tag-Push
       # muss laut Plan vor `latest` laufen und beide muessen vor dem
       # finalen `release_published` greifen.
+      #
+      # AP M5-1.6 Tranche J.1: GitHub-Actions-Jobs teilen keinen
+      # Docker-Image-Store. Der Verify-Job baut den OCI-Tag nur fuer
+      # seinen eigenen Smoke; im Release-Job-Daemon existiert das
+      # Image nicht. `oci-image-publish.sh push` verlangt aber ein
+      # bereits lokal gebautes Image und bricht sonst mit
+      # "local image missing" ab. Der Build-Step holt das Image
+      # daher hier vor dem Push nach. Reproducibility-Vertrag aus
+      # plan-M5-1-6.md "Entscheidungen" ist erfuellt: das Skript
+      # defaultet SOURCE_DATE_EPOCH auf 1 (verify-Job und release-
+      # Job nutzen denselben Default), und XRAY_APP_VERSION kommt
+      # aus dem `validate-tag`-Output. Damit ist die lokale Image-
+      # ID deterministisch zwischen den Jobs und der I.1-Pre-Push-
+      # Check funktioniert idempotent.
+      - name: Build OCI runtime image
+        if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
+        run: |
+          bash scripts/oci-image-publish.sh \
+            "${{ needs.validate-tag.outputs.image_repo }}" \
+            "${{ needs.validate-tag.outputs.version }}" \
+            build
+
+      - name: Smoke test OCI image (--version matches tag)
+        if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
+        run: |
+          set -eu
+          extracted=$(docker run --rm \
+            "${{ needs.validate-tag.outputs.image_repo }}:${{ needs.validate-tag.outputs.version }}" \
+            --version)
+          expected="${{ needs.validate-tag.outputs.version }}"
+          if [ "$extracted" != "$expected" ]; then
+            echo "error: pre-push OCI --version='${extracted}' does not match expected '${expected}'" >&2
+            exit 1
+          fi
+
       - name: Log in to GHCR
         if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
         run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
