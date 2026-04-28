@@ -309,6 +309,28 @@ else
     echo "PASS: scenario 6 latest tag stays out of the picture (digest=${latest_digest:-<unset>})"
 fi
 
+# ---- Scenario 7: Extra-Remote-Asset -> abort ----
+#
+# AP M5-1.6 Tranche H.3: pre-seed a release that has an additional
+# asset name beyond the M5 allowlist (linux archive + sidecar). The
+# helper must detect the extra remote asset as a manifest-mismatch
+# and abort before release_published; without the H.3 check, a stale
+# `*-darwin-arm64.tar.gz` from a pre-Tranche-E world or a manual
+# operator upload would silently survive an automated re-run.
+state7_dir="$(mktemp -d -t cmake-xray-dry-run-s7.XXXXXX)"
+state_dirs+=("$state7_dir")
+mkdir -p "$state7_dir/state"
+run_dry_run v0.0.0-dryrun-s7 "$state7_dir" >/dev/null 2>&1
+run_in_alpine "$state7_dir" "
+    apk add --no-cache jq >/dev/null 2>&1
+    meta=/state/fake-gh/releases/v0.0.0-dryrun-s7/metadata.json
+    jq '.assets += [{\"name\": \"cmake-xray_0.0.0-dryrun-s7_darwin_arm64.tar.gz\", \"sha256\": \"deadbeef\"}]' \
+       \$meta > \$meta.new && mv \$meta.new \$meta
+"
+rm -f "$state7_dir/state/release_published"
+assert_dry_run_aborts "scenario 7 extra-remote-asset aborts before release_published" \
+    v0.0.0-dryrun-s7 "$state7_dir" "" "release_published"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "$failures release dry-run check(s) FAILED" >&2

@@ -154,6 +154,35 @@ remote_asset_sha() {
 }
 
 mismatches=0
+expected_basenames=()
+for asset in "${assets[@]}"; do
+    expected_basenames+=("$(basename "$asset")")
+done
+
+# AP M5-1.6 Tranche H.3: extra-remote-asset detection. plan-M5-1-6.md
+# "Veroeffentlichungskette" verlangt eine *exakte* Asset-Liste; ein
+# Remote-Release mit zusaetzlichen Assets, die lokal nicht erwartet
+# werden (z. B. ein altes `*-darwin-arm64.tar.gz` aus einer Pre-
+# Tranche-E-Welt, ein manueller Operator-Upload, ein Remnant aus
+# einem halb-gefailten Run) ist ein Manifest-Mismatch. Vor Tranche
+# H.3 wurden solche Asset-Reste stillschweigend uebernommen, weil
+# der Helper nur die andere Richtung (lokal-fehlt-remote vs.
+# lokal-vs-remote-Sha) geprueft hat.
+while IFS= read -r remote_name; do
+    [ -z "$remote_name" ] && continue
+    found="false"
+    for expected in "${expected_basenames[@]}"; do
+        if [ "$remote_name" = "$expected" ]; then
+            found="true"
+            break
+        fi
+    done
+    if [ "$found" = "false" ]; then
+        echo "error: remote release has unexpected asset '$remote_name' not in local manifest" >&2
+        mismatches=$((mismatches + 1))
+    fi
+done < <(jq -r '.assets[].name' <<<"$existing_meta")
+
 for asset in "${assets[@]}"; do
     name="$(basename "$asset")"
     expected_sha="$(asset_basename_sha "$asset")"
