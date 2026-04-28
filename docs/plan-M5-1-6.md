@@ -205,7 +205,7 @@ DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert 
 - Tranche C ausgeliefert in commits `cfb5b4c` ("feat: deliver M5 AP 1.6 Tranche C OCI image idempotency and gated publish") und `790a120` ("docs: address Tranche C review findings — manifest digest semantics").
 - Tranche D ausgeliefert in commits `043ab68` (D.1 — fake-gh, dry-run-Orchestrator, 2 Happy-Path-Szenarien), `f21f4ea` (D.2 — 4 Abort-Szenarien, Recovery-Runbook) und `d51865a` (Review-Fixup — fake-gh asset dedupe und draft strictness).
 - Tranche E ausgeliefert in commit `1ddd8cc` ("feat: deliver M5 AP 1.6 Tranche E platform allowlist and OCI publish enablement").
-- Tranche F.1 ausgeliefert in commit `ac05172` ("perf: speed up release_dry_run and oci_image_smoke ahead of Tranche F.2"); F.2 ausgeliefert im Folge-Commit (Doku-Sweep `releasing.md`/`README.md`/`quality.md`, Reviewer-Findings `release.yml` Windows-Dead-Code und Drei-Wege-Versionscheck am OCI-Image, Plan-DoD-Flip).
+- Tranche F.1 ausgeliefert in commit `ac05172` ("perf: speed up release_dry_run and oci_image_smoke ahead of Tranche F.2"); F.2 ausgeliefert in commit `4f91846` ("docs: deliver M5 AP 1.6 Tranche F.2 final docs sweep and reviewer fixups": Doku-Sweep `releasing.md`/`README.md`/`quality.md`, Reviewer-Findings `release.yml` Windows-Dead-Code und Drei-Wege-Versionscheck am OCI-Image, Plan-DoD-Flip).
 
 ### Tranche A - Tag-/Versionsvertrag und `--version`-Flag
 
