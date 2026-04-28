@@ -89,6 +89,8 @@ Voraussichtlich zu aendern:
 Neue Dateien, falls die bestehende Struktur nicht ausreicht:
 
 - `tests/platform/test_atomic_writer_platform.cpp`
+- `tests/platform/platform-smoke-report.schema.json`
+- `tests/platform/validate_platform_smoke_report.py`
 - `tests/platform/README.md`
 - `scripts/platform-smoke.sh`
 - `scripts/platform-smoke.ps1`
@@ -164,6 +166,10 @@ Regeln:
   - ein reproduzierbarer Smoke-Report-Upload mit Host-, Toolchain-,
     CMake-Version, Kommando-Log, Exit-Codes und Checksummen der erzeugten
     Reports, der als verpflichtender Review-Check ausgewertet wird.
+- Smoke-Reports muessen gegen `tests/platform/platform-smoke-report.schema.json`
+  validieren und zusaetzlich durch
+  `tests/platform/validate_platform_smoke_report.py` fachlich gegen erwartete
+  Plattform, Commit, Pflichtkommandos und Checksummen geprueft werden.
 - Der gewaehlte Nachweispfad ist fuer PRs ein Required Check und fuer
   taggesteuerte Releases ein zwingendes `needs`-Gate vor Publish-Jobs.
 - Fehlt dieser Nachweispfad, darf die Plattform nur als `known_limited`
@@ -223,6 +229,49 @@ plattformfaehiges Smoke-Skript existieren:
   wenn der Report deterministisch aus dem aktuellen Commit erzeugt wird, nicht
   manuell editierbar ist und der validierende Check in Branch-Protection oder
   Release-Gates verpflichtend ist.
+
+### Smoke-Report-Vertrag
+
+Der maschinenlesbare Smoke-Report ist nur dann ein zulaessiger Nachweis fuer
+`validated_smoke`, wenn sein Format versioniert und automatisiert validiert
+wird.
+
+Pflichtfelder:
+
+- `format`: fester Wert `cmake-xray.platform-smoke`.
+- `format_version`: fester Wert fuer den M5-Reportvertrag.
+- `commit_sha`: exakt der gepruefte Commit.
+- `platform`: `macos` oder `windows`.
+- `runner_image`, `architecture`, `generator`, `build_type`.
+- `cmake.version`, `cmake.minimum_version`, `cmake.minimum_satisfied`.
+- `compiler.id`, `compiler.version`, `compiler.minimum_version`,
+  `compiler.minimum_satisfied`.
+- `msys_path_mode` fuer Windows: `disabled`, `native_powershell`,
+  `conversion_enabled_control`, oder `not_applicable`.
+- `commands[]` mit Name, Argumentliste, Exit-Code, stdout-/stderr-Checksumme
+  und erzeugten Report-Checksummen.
+- `required_commands_satisfied`: Boolean.
+- `atomic_replace_satisfied`: Boolean.
+- `path_cases_satisfied`: Boolean.
+
+Validierungsregeln:
+
+- Schema-Verletzungen fuehren zu nonzero Exit.
+- `commit_sha` muss zum CI-Checkout passen.
+- `cmake.minimum_satisfied`, `compiler.minimum_satisfied`,
+  `required_commands_satisfied`, `atomic_replace_satisfied` und
+  `path_cases_satisfied` muessen `true` sein.
+- Alle Pflichtkommandos aus dem CLI-Smoke-Vertrag muessen vorhanden sein und
+  Exit-Code `0` haben.
+- Report-Checksummen muessen gegen die im CI-Arbeitsverzeichnis vorhandenen
+  Dateien neu berechnet werden.
+- Windows-Smoke-Reports muessen den verwendeten `msys_path_mode` explizit
+  ausweisen; ein fehlender oder unbekannter Modus ist ein Validierungsfehler.
+
+Ein Smoke-Report darf einen direkten Matrix-Smoke nur ersetzen, wenn derselbe
+Workflow den Report erzeugt, validiert und als Artefakt hochlaedt. Vorgefertigte
+Reports aus frueheren Runs oder manuell hochgeladene Dateien sind fuer
+`validated_smoke` nicht zulaessig.
 
 ## Atomic-Replace-Matrix
 
@@ -319,7 +368,14 @@ Windows-spezifische Risiken:
 
 Regeln:
 
-- E2E-Skripte setzen die MSYS-Pfadkonvertierung fuer CLI-Argumente bewusst.
+- Der Standardmodus fuer Windows-E2E- und Plattform-Smokes ist
+  konvertierungsfrei: `MSYS_NO_PATHCONV=1` und `MSYS2_ARG_CONV_EXCL=*` sind
+  gesetzt, oder der Smoke laeuft unter PowerShell mit nativen Windows-Pfaden.
+- Zusaetzliche MSYS-Konvertierungs-Smokes sind erlaubt, muessen aber als
+  eigener Modus `conversion_enabled_control` gekennzeichnet sein und duerfen
+  nicht die konvertierungsfreien Pflicht-Smokes ersetzen.
+- Jeder Windows-Smoke dokumentiert im Log und, falls genutzt, im Smoke-Report
+  den Modus `disabled`, `native_powershell` oder `conversion_enabled_control`.
 - Windows-Goldens fuer absolute Pfade sind eigene Varianten, wenn POSIX- und
   Windows-Semantik fachlich verschieden sind.
 - Laufwerksbuchstaben werden in Display-Pfaden stabil und dokumentiert
@@ -327,6 +383,16 @@ Regeln:
 - UNC-Pfade (`\\server\share\...`) und Extended-Length-Pfade
   (`\\?\C:\...`) sind verpflichtende Windows-Testfaelle fuer Pfadanzeige,
   Escaping und mindestens einen CLI- oder Golden-Pfad.
+- UNC-Tests duerfen in GitHub-hosted Windows-Runs nicht von externer
+  Netzwerkfreigabe abhaengen. Sie nutzen entweder rein synthetische
+  Display-/Adapter-Fixtures oder eine im Job lokal provisionierte Freigabe
+  wie `\\localhost\cmake-xray-smoke`, deren Einrichtung und Cleanup Teil des
+  Jobs ist.
+- Extended-Length-Tests verwenden ein lokal erzeugtes Temp-Verzeichnis unter
+  dem Runner-Workspace und pruefen vorab die Windows-Long-Path-Faehigkeit.
+  Wenn der Host Extended-Length-Dateiziele nicht zulaesst, wird der konkrete
+  Test als `known_limited` dokumentiert; synthetische Parser-/Golden-Faelle
+  bleiben trotzdem verpflichtend.
 - Atomic-Writer-Tests muessen mindestens einen Extended-Length-Zielpfad oder
   einen dokumentierten Windows-API-Skip mit `known_limited`-Folge pruefen.
 - Test-Helfer muessen Pfade ueber `native_path` oder einen aequivalenten
@@ -560,6 +626,10 @@ CI- und Build-Tests:
   konfiguriert.
 - Smoke-Report-Artefakte enthalten Host, Toolchain, CMake-Version,
   ausgefuehrte Kommandos, Exit-Codes und Checksummen erzeugter Reports.
+- Smoke-Report-Artefakte validieren gegen das versionierte JSON-Schema und
+  den fachlichen Verifier; beide Gates muessen nonzero fehlschlagen, wenn
+  Pflichtfelder, Pflichtkommandos, Commit, Checksummen oder Mindestversionen
+  nicht passen.
 - CI-Logs zeigen CMake- und Compiler-Versionen oder machen sie aus
   Workflow-Kontext eindeutig nachvollziehbar.
 - CMake-Versionen werden pro Plattform gegen die dokumentierte
@@ -616,6 +686,11 @@ Pfad- und Golden-Tests:
   mindestens einem Adapter-, CLI- oder Golden-Test abgedeckt.
 - Windows-Extended-Length-Pfade wie `\\?\C:\project\src\main.cpp` werden in
   mindestens einem Pfad- oder Atomic-Writer-Test abgedeckt.
+- Windows-UNC-Tests nutzen keine externe Netzwerkabhaengigkeit; sie sind
+  synthetisch oder ueber eine lokale `\\localhost\...`-Freigabe reproduzierbar.
+- Windows-Extended-Length-Tests dokumentieren Long-Path-Provisionierung und
+  fallen bei fehlender Host-Unterstuetzung auf `known_limited` statt auf einen
+  stillen Skip.
 - POSIX-absolute Pfade werden auf Windows nicht faelschlich als absoluter
   Windows-Pfad erwartet.
 - Backslash-Faelle werden in DOT, HTML und JSON stabil behandelt.
@@ -624,6 +699,8 @@ Pfad- und Golden-Tests:
 - CRLF wird in E2E-Golden-Vergleichen normalisiert.
 - Host-abhaengige Checkout-Pfade erscheinen nicht unnormalisiert in Goldens.
 - MSYS-Pfadkonvertierung ist fuer CLI-Argumente explizit kontrolliert.
+- Windows-Pfadszenarien trennen konvertierungsfreie Pflicht-Smokes von
+  optionalen MSYS-Konvertierungs-Kontrollsmokes.
 
 Dokumentationstests oder Review-Gates:
 
@@ -674,11 +751,16 @@ AP 1.7 ist abnahmefaehig, wenn:
 - Pfadnormalisierung fuer Laufwerksbuchstaben, UNC-Pfade,
   Extended-Length-Pfade, Backslashes und POSIX-absolute Testpfade abgesichert
   ist.
+- Windows-Smokes den konvertierungsfreien MSYS-/PowerShell-Pflichtmodus klar
+  von optionalen MSYS-Konvertierungs-Kontrollsmokes trennen.
 - CRLF keine Golden-Scheindifferenzen erzeugt.
 - CMake- und Compiler-Mindestversionen in Doku und CI konsistent sind und die
   CI bei zu alter CMake- oder Compiler-Version vor dem Build abbricht.
 - `validated_smoke`-Nachweise fuer macOS und Windows als Required Checks oder
   nicht ueberspringbare Release-Gates konfiguriert sind.
+- Smoke-Report-Nachweise ein versioniertes JSON-Schema und einen fachlichen
+  Verifier verwenden, die Pflichtkommandos, Commit, Checksummen,
+  Mindestversionen und Windows-Path-Modus pruefen.
 - CMake-File-API-Einschraenkungen aus M4/M5 weiterhin dokumentiert sind.
 - `docs/quality.md` die Plattform-Gates und Smoke-Abdeckung beschreibt.
 - `docs/releasing.md` die Release- und Preview-Grenzen beschreibt.
