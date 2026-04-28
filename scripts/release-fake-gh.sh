@@ -128,8 +128,14 @@ cmd_create() {
         cp "$asset" "$rel_dir/assets/$name"
         local sha
         sha="$(asset_sha256 "$asset")"
+        # Dedupe by name (consistent with cmd_upload). Without this a
+        # caller passing the same asset twice would produce two array
+        # entries; a later `select(.name == $name) | .sha256` lookup in
+        # release-dry-run.sh would return two lines and break the
+        # asset-sha256 mismatch check.
         assets_json="$(jq --arg name "$name" --arg sha "$sha" \
-            '. + [{"name": $name, "sha256": $sha}]' <<<"$assets_json")"
+            'map(select(.name != $name)) + [{"name": $name, "sha256": $sha}]' \
+            <<<"$assets_json")"
     done
 
     jq -n --arg tag "$tag" --arg title "$title" --arg notes "$notes" \
@@ -172,6 +178,16 @@ cmd_edit() {
         mv "$meta.new" "$meta"
     fi
     if [ -n "$draft_flag" ]; then
+        # Reject anything other than the canonical 'true' / 'false' so a
+        # typo (--draft=yes) cannot silently land as 'false' in the
+        # metadata; the orchestrator and tests both compare against
+        # boolean draft state.
+        case "$draft_flag" in
+            true|false) ;;
+            *)
+                echo "fake-gh: error: --draft must be 'true' or 'false', got '$draft_flag'" >&2
+                exit 2 ;;
+        esac
         jq --arg draft "$draft_flag" '.draft = ($draft == "true")' "$meta" > "$meta.new"
         mv "$meta.new" "$meta"
     fi
