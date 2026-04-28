@@ -441,8 +441,8 @@ DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert 
 - Tranche A ausgeliefert in commit `cdaec1c` ("feat: deliver M5 AP 1.5 Tranche A CLI verbosity model and noop policy").
 - Tranche B.1 ausgeliefert in commit `628dca7` ("feat: deliver M5 AP 1.5 Tranche B.1 console quiet renderers").
 - Tranche B.2 ausgeliefert in commit `dd4ca70` ("feat: deliver M5 AP 1.5 Tranche B.2 console verbose renderers").
-- Tranche C ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; Verbose-Fehlerkontext, Binary-E2E-Smokes und Nutzerdoku stehen).
-- Tranche D optional und offen.
+- Tranche C ausgeliefert in commit `1774dd5` ("feat: deliver M5 AP 1.5 Tranche C verbose error context, binary E2E and docs").
+- Tranche D ausgeliefert in commits `a67a7ca` ("refactor: split run_e2e.sh and test_cli.cpp into focused suites") und vorliegendem Commit (Hash siehe `git log` nach Commit; Praezedenz-Cross-Tests und Order-Independence-Tests stehen).
 
 ### Tranche A - CLI-Modell, Parservertrag und Artefakt-Noop-Policy
 
@@ -826,18 +826,21 @@ Definition of Done Tranche C:
 
 ### Tranche D - Optionale Haertung
 
-Ohne diese Tranche gilt AP 1.5 als abgenommen, sobald Tranche C gruen ist.
+Ohne diese Tranche gilt AP 1.5 als abgenommen, sobald Tranche C gruen ist. Die ausgelieferte Tranche-D-Haertung umfasst zwei Schwerpunkte:
 
-- Weitere plattformspezifische CLI-Argument-Positionsfaelle.
-- Zusaetzliche Golden-Faelle fuer grosse Diagnostic-Mengen.
-- Weitere E2E-Smokes fuer alle Artefaktformate, falls AP 1.2 bis AP 1.4 in anderer Reihenfolge umgesetzt wurden.
-- Zusaetzliche gezielte Regressionstests fuer Grenzfaelle, die ueber die verpflichtenden Coverage-, Lizard- und Clang-Tidy-Gates aus Tranche C hinausgehen.
+1. **Test-Datei- und Skript-Split** (Commit `a67a7ca`). `tests/e2e/test_cli.cpp` wurde in `test_cli.cpp`, `test_cli_render_errors.cpp` und `test_cli_verbosity.cpp` zerlegt; gemeinsame Helfer leben in `tests/e2e/cli_test_support.h`. `tests/e2e/run_e2e.sh` wurde in `run_e2e_lib.sh` (gemeinsame Helfer) plus `run_e2e_smoke.sh`, `run_e2e_artifacts.sh` und `run_e2e_verbosity.sh` zerlegt; jede Sub-Suite ist ein eigener `add_test()`-Eintrag, sodass `ctest --parallel` sie nebenlaeufig faehrt. Beim Splitten wurden zwei Code-Review-Fixups aus dem Tranche-C-Review beigemischt (Quiet-Analyse-Stage-Negativtest, defensiverer `grep -F`-Matcher in `assert_stderr_does_not_contain`).
+2. **Praezedenz-Cross-Tests und Order-Independence-Tests** (vorliegender Commit). Die Cross-Tests pinnen die in `Fehlerpraezedenz` gelisteten 9 Stufen explizit fuer Kombinationen, in denen mehrere Stufen gleichzeitig verletzt sind (Stufe 1 vor 3, 1 vor 4, 3 vor 4, 1 vor 3 vor 4, 4 vor Verbose-Block). Die Order-Independence-Tests pinnen, dass `--quiet`/`--verbose` an jeder Position hinter dem Subcommand akzeptiert werden, indem sie die Goldens aus `tests/e2e/testdata/m5/verbosity/` aus mehreren Argument-Reihenfolgen treffen.
+
+Bewusst weggelassene Hartungen (kein konkretes Risikobild):
+
+- Zusaetzliche Golden-Faelle fuer grosse Diagnostic-Mengen — Truncation-Vertrag ist ueber den 20-Eintrag-Test in `tests/e2e/test_cli.cpp` bereits gesichert.
+- Plattformspezifische CLI-Faelle ueber das hinaus, was die Artefakt-Goldens bereits per `case $(uname -s)` splitten.
 
 Definition of Done Tranche D:
 
-- [ ] Jede zusaetzliche Haertung ist durch einen fokussierten Test oder ein Golden abgesichert.
-- [ ] Keine optionale Haertung veraendert den dokumentierten AP-1.5-Vertrag ohne Update dieses Plans oder der Nutzerdoku.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` bleiben gruen.
+- [x] Jede zusaetzliche Haertung ist durch einen fokussierten Test oder ein Golden abgesichert.
+- [x] Keine optionale Haertung veraendert den dokumentierten AP-1.5-Vertrag ohne Update dieses Plans oder der Nutzerdoku.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` bleiben gruen.
 
 ## Entscheidungen
 

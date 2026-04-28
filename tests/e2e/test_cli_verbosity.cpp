@@ -1527,3 +1527,129 @@ TEST_CASE("analyze normal-mode render error keeps stderr free of verbose: lines"
     CHECK(err.str().find("error: cannot render report:") != std::string::npos);
     CHECK(err.str().find("verbose:") == std::string::npos);
 }
+
+// ---- AP M5-1.5 Tranche D: Praezedenz-Cross-Tests ----------------------
+//
+// Plan-Sektion "Fehlerpraezedenz" listet 9 Stufen. Tranche A/C-Tests pruefen
+// jede Stufe einzeln; die Cross-Tests unten pinnen die Reihenfolge, wenn
+// gleichzeitig MEHRERE Stufen verletzt sind. Die hoehere Stufe muss gewinnen,
+// und Verbose-Block darf erst nach Stufe 4 (Pflichtoptionen) emittiert werden.
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "analyze --quiet --verbose --format console --output: mutual-exclusion vor --output-console") {
+    // Plan-Praezedenz Stufe 1 (Mutual-Exclusion) muss vor Stufe 3
+    // (--output mit --format console) greifen. stderr enthaelt nur die
+    // Mutual-Exclusion-Meldung, nicht die --output-Fehlermeldung.
+    const TemporaryDirectory temp_dir;
+    const auto target = (temp_dir.path() / "report.txt").string();
+    CHECK(run({"analyze", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--quiet",
+               "--verbose", "--format", "console", "--output", target.c_str()}) ==
+          ExitCode::cli_usage_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("--quiet and --verbose are mutually exclusive") != std::string::npos);
+    CHECK(err.str().find("--output is not supported with --format console") == std::string::npos);
+    CHECK(err.str().find("verbose:") == std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(target));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --quiet --verbose without --changed-file: mutual-exclusion vor Pflichtoption") {
+    // Plan-Praezedenz Stufe 1 vor Stufe 4. stderr enthaelt nur den
+    // Mutual-Exclusion-Fehler, nicht "impact requires --changed-file".
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--quiet",
+               "--verbose"}) == ExitCode::cli_usage_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("--quiet and --verbose are mutually exclusive") != std::string::npos);
+    CHECK(err.str().find("impact requires --changed-file") == std::string::npos);
+    CHECK(err.str().find("verbose:") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --format console --output without --changed-file: --output-console vor Pflichtoption") {
+    // Plan-Praezedenz Stufe 3 vor Stufe 4. stderr enthaelt nur den
+    // --output-mit-console-Fehler, nicht "impact requires --changed-file".
+    const TemporaryDirectory temp_dir;
+    const auto target = (temp_dir.path() / "report.txt").string();
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--format",
+               "console", "--output", target.c_str()}) == ExitCode::cli_usage_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("--output is not supported with --format console") != std::string::npos);
+    CHECK(err.str().find("impact requires --changed-file") == std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(target));
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --quiet --verbose --format console --output without --changed-file: Stufe 1 gewinnt vor 3 und 4") {
+    // Triple-Verletzung: Mutual-Exclusion + --output console + missing
+    // --changed-file. Stufe 1 (Mutual-Exclusion) muss gewinnen.
+    const TemporaryDirectory temp_dir;
+    const auto target = (temp_dir.path() / "report.txt").string();
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--quiet",
+               "--verbose", "--format", "console", "--output", target.c_str()}) ==
+          ExitCode::cli_usage_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("--quiet and --verbose are mutually exclusive") != std::string::npos);
+    CHECK(err.str().find("--output is not supported with --format console") == std::string::npos);
+    CHECK(err.str().find("impact requires --changed-file") == std::string::npos);
+    CHECK(err.str().find("verbose:") == std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                  "impact --verbose --format json --output without --changed-file: Pflichtoption vor Verbose-Block") {
+    // Plan-Praezedenz Stufe 4 (Pflichtoption) greift bevor der Verbose-
+    // Fehlerkontext-Helfer aus Tranche C.1 feuern darf. stderr enthaelt
+    // nur die Usage-Fehlermeldung, kein verbose:-Praefix.
+    const TemporaryDirectory temp_dir;
+    const auto target = (temp_dir.path() / "report.json").string();
+    CHECK(run({"impact", "--compile-commands",
+               fixture_path("m2/basic_project/compile_commands.json").c_str(), "--verbose",
+               "--format", "json", "--output", target.c_str()}) == ExitCode::cli_usage_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("impact requires --changed-file") != std::string::npos);
+    CHECK(err.str().find("verbose:") == std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(target));
+}
+
+// ---- AP M5-1.5 Tranche D: Order-Independence ---------------------------
+//
+// `--quiet`/`--verbose` muessen an jeder Position hinter dem Subcommand
+// akzeptiert werden. CLI11 ist von sich aus order-tolerant, aber die Tests
+// pinnen das Verhalten als Vertrag fuer kuenftige Refactorings.
+
+TEST_CASE_FIXTURE(CliFixture, "analyze --quiet position-independence: trailing flag") {
+    // --quiet at the very end after --top.
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m3/report_project/compile_commands.json").c_str(), "--format",
+                 "console", "--top", "2", "--quiet"}) == ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-analyze-quiet.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "analyze --verbose position-independence: between input and format") {
+    // --verbose between --compile-commands and --format.
+    REQUIRE(run({"analyze", "--compile-commands",
+                 fixture_path("m3/report_project/compile_commands.json").c_str(), "--verbose",
+                 "--format", "console", "--top", "2"}) == ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-analyze-verbose.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "impact --quiet position-independence: leading flag") {
+    // --quiet immediately after the subcommand, before any other option.
+    REQUIRE(run({"impact", "--quiet", "--compile-commands",
+                 fixture_path("m3/report_impact_header/compile_commands.json").c_str(),
+                 "--changed-file", "include/common/config.h", "--format", "console"}) ==
+            ExitCode::success);
+    const auto golden =
+        read_text_file(fixture_path("m5/verbosity/console-impact-quiet.txt"));
+    CHECK(out.str() == golden);
+    CHECK(err.str().empty());
+}
