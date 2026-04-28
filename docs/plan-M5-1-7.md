@@ -89,6 +89,7 @@ Voraussichtlich zu aendern:
 Neue Dateien, falls die bestehende Struktur nicht ausreicht:
 
 - `tests/platform/test_atomic_writer_platform.cpp`
+- `tests/platform/toolchain-minimums.json`
 - `tests/platform/platform-smoke-report.schema.json`
 - `tests/platform/validate_platform_smoke_report.py`
 - `tests/platform/README.md`
@@ -169,7 +170,8 @@ Regeln:
 - Smoke-Reports muessen gegen `tests/platform/platform-smoke-report.schema.json`
   validieren und zusaetzlich durch
   `tests/platform/validate_platform_smoke_report.py` fachlich gegen erwartete
-  Plattform, Commit, Pflichtkommandos und Checksummen geprueft werden.
+  Plattform, `checkout_sha`, `head_sha`, Pflichtkommandos und Checksummen
+  geprueft werden.
 - Der gewaehlte Nachweispfad ist fuer PRs ein Required Check und fuer
   taggesteuerte Releases ein zwingendes `needs`-Gate vor Publish-Jobs.
 - Fehlt dieser Nachweispfad, darf die Plattform nur als `known_limited`
@@ -243,7 +245,11 @@ Pflichtfelder:
 
 - `format`: fester Wert `cmake-xray.platform-smoke`.
 - `format_version`: Integer `1`.
-- `commit_sha`: exakt der gepruefte Commit.
+- `checkout_sha`: exakt der Commit, der im CI-Arbeitsverzeichnis ausgecheckt
+  und gebaut wurde.
+- `head_sha`: bei Pull Requests der Quell-Branch-Head-Commit, bei Push-,
+  Tag- und manuellen Runs identisch zu `checkout_sha`.
+- `event_name`: zum Beispiel `pull_request`, `push`, `workflow_dispatch`.
 - `platform`: `macos` oder `windows`.
 - `runner_image`, `architecture`, `generator`, `build_type`.
 - `cmake.version`, `cmake.minimum_version`, `cmake.minimum_satisfied`.
@@ -261,7 +267,17 @@ Validierungsregeln:
 
 - Schema-Verletzungen fuehren zu nonzero Exit.
 - `format_version` muss exakt `1` sein.
-- `commit_sha` muss zum CI-Checkout passen.
+- `checkout_sha` muss exakt zum lokalen CI-Checkout passen. In GitHub Actions
+  ist das der tatsachlich ausgecheckte SHA, also fuer Standard-PR-Workflows
+  typischerweise der Merge-Commit aus `github.sha`/`GITHUB_SHA`, sofern der
+  Checkout nicht explizit auf den Head-Commit umgestellt wurde.
+- `head_sha` muss bei `pull_request`-Runs dem PR-Head entsprechen, also
+  `github.event.pull_request.head.sha`; bei `push`, `workflow_dispatch` und
+  taggesteuerten Release-Runs muss `head_sha == checkout_sha` gelten.
+- Der Verifier prueft immer `checkout_sha` gegen das Arbeitsverzeichnis und
+  prueft `head_sha` nur gegen den Event-Kontext. Ein PR-Report darf nicht
+  fehlschlagen, nur weil `checkout_sha` der Merge-SHA und `head_sha` der
+  Branch-Head-SHA ist.
 - `cmake.minimum_satisfied`, `compiler.minimum_satisfied`,
   `required_commands_satisfied`, `atomic_replace_satisfied` und
   `path_cases_satisfied` muessen `true` sein.
@@ -431,24 +447,27 @@ M5 haelt die dokumentierte Mindestversion:
 
 Kompatibilitaetsregeln:
 
-- Die native Matrix legt pro Host eine erwartete CMake-Mindestversion fest,
-  zum Beispiel als `CMAKE_MIN_VERSION` oder explizite Matrixspalte.
-- Die native Matrix legt pro Host eine erwartete Compiler-Mindestversion fest,
-  zum Beispiel als `CXX_MIN_VERSION` plus `CXX_COMPILER_ID` oder explizite
-  Matrixspalten fuer MSVC, AppleClang, Clang und GCC.
+- `tests/platform/toolchain-minimums.json` ist die einzige autoritative,
+  maschinenlesbare Quelle fuer CMake- und Compiler-Mindestversionen in AP 1.7.
+- Die Datei enthaelt mindestens `cmake.minimum_version` sowie je Compiler-ID
+  `compiler_minimums.MSVC`, `compiler_minimums.AppleClang`,
+  `compiler_minimums.Clang` und `compiler_minimums.GNU`.
+- Native Matrix, Smoke-Skripte, Smoke-Report-Verifier und Dokumentationschecks
+  duerfen Mindestversionen nicht duplizieren, sondern muessen diese Datei lesen
+  oder aus ihr generierte CI-Outputs verwenden.
 - Jeder Plattformjob protokolliert `cmake --version` vor der Konfiguration und
-  bricht vor dem Build ab, wenn die gefundene Version unter der dokumentierten
-  Mindestversion liegt.
+  bricht vor dem Build ab, wenn die gefundene Version unter
+  `tests/platform/toolchain-minimums.json` liegt.
 - Jeder Plattformjob protokolliert Compiler-ID und Compiler-Version vor der
   Konfiguration und bricht vor dem Build ab, wenn die gefundene Version unter
-  der dokumentierten Mindestversion fuer diesen Compiler liegt.
+  dem zugehoerigen Eintrag in `tests/platform/toolchain-minimums.json` liegt.
 - Mindestens ein Matrixjob pro Hostfamilie nutzt eine explizit eingerichtete
   aktuelle CMake-/Compiler-Kombination statt nur implizit vorinstallierter
   Runner-Defaults; die konkreten Versionen werden in `docs/quality.md`
   dokumentiert.
 - Compiler-Mindestanforderungen werden nicht implizit angehoben; jede
-  Anhebung braucht dieselbe Doku-, Matrix- und Fail-Fast-Aktualisierung wie
-  eine CMake-Mindestversionsaenderung.
+  Anhebung aendert zuerst `tests/platform/toolchain-minimums.json`; Doku,
+  Matrix und Fail-Fast-Checks werden daraus nachgezogen.
 - Falls ein Plattformfix eine neuere C++- oder CMake-Funktion braucht, wird die
   Mindestversion bewusst angepasst und in Doku, CI und Changelog nachgezogen.
 - CMake-File-API-v1 bleibt der einzige M5-Vertrag; neuere CMake-Versionen
@@ -541,6 +560,8 @@ Plattformvoraussetzungen beruehrt:
 
 - CMake-Mindestversion ist identisch zu `README.md` und
   `cmake_minimum_required`,
+- Compiler-Mindestversionen und CMake-Mindestversion stammen aus
+  `tests/platform/toolchain-minimums.json`,
 - lokale Plattform-Smokes oder Verweise darauf widersprechen nicht
   `docs/quality.md`,
 - Beispiele versprechen keine weitergehende macOS-/Windows-Freigabe als
@@ -553,7 +574,7 @@ Plattformvoraussetzungen beruehrt:
 1. Bestehende `build.yml`- und `release.yml`-Matrizen gegen den
    Plattformstatusvertrag pruefen.
 2. CMake-, Compiler- und Runner-Versionen in CI-Ausgaben sichtbar machen und
-   CMake-/Compiler-Versionen gegen die dokumentierten Mindestversionen
+   CMake-/Compiler-Versionen gegen `tests/platform/toolchain-minimums.json`
    fail-fast pruefen.
 3. Entscheiden, ob macOS-/Windows-Jobs verpflichtende Gates sind oder ob ein
    verpflichtend validierter Smoke-Report-Upload den Nachweis liefert; dieser
@@ -647,16 +668,16 @@ CI- und Build-Tests:
   ausgefuehrte Kommandos, Exit-Codes und Checksummen erzeugter Reports.
 - Smoke-Report-Artefakte validieren gegen das versionierte JSON-Schema und
   den fachlichen Verifier; beide Gates muessen nonzero fehlschlagen, wenn
-  Pflichtfelder, Pflichtkommandos, Commit, Checksummen oder Mindestversionen
-  nicht passen.
+  Pflichtfelder, Pflichtkommandos, `checkout_sha`, `head_sha`, Checksummen
+  oder Mindestversionen nicht passen.
 - CI-Logs zeigen CMake- und Compiler-Versionen oder machen sie aus
   Workflow-Kontext eindeutig nachvollziehbar.
-- CMake-Versionen werden pro Plattform gegen die dokumentierte
-  Mindestversion geprueft; Unterschreitung fuehrt vor dem Build zu nonzero
-  Exit.
-- Compiler-Versionen werden pro Plattform gegen die dokumentierte
-  Mindestversion fuer den jeweiligen Compiler geprueft; Unterschreitung
-  fuehrt vor dem Build zu nonzero Exit.
+- CMake-Versionen werden pro Plattform gegen
+  `tests/platform/toolchain-minimums.json` geprueft; Unterschreitung fuehrt vor
+  dem Build zu nonzero Exit.
+- Compiler-Versionen werden pro Plattform gegen
+  `tests/platform/toolchain-minimums.json` fuer den jeweiligen Compiler
+  geprueft; Unterschreitung fuehrt vor dem Build zu nonzero Exit.
 - `fail-fast: false` bleibt fuer Plattformmatrizen gesetzt.
 - Fehlende Python-Validator-Abhaengigkeit fuehrt zu konkretem Fehler statt zu
   stillem Skip.
@@ -771,8 +792,8 @@ AP 1.7 ist abnahmefaehig, wenn:
 - `validated_smoke`-Nachweise fuer macOS und Windows als Required Checks oder
   nicht ueberspringbare Release-Gates konfiguriert sind.
 - Smoke-Report-Nachweise ein versioniertes JSON-Schema und einen fachlichen
-  Verifier verwenden, die Pflichtkommandos, Commit, Checksummen,
-  Mindestversionen und Windows-Path-Modus pruefen.
+  Verifier verwenden, die Pflichtkommandos, `checkout_sha`, `head_sha`,
+  Checksummen, Mindestversionen und Windows-Path-Modus pruefen.
 - CMake-File-API-Einschraenkungen aus M4/M5 weiterhin dokumentiert sind.
 - `docs/quality.md` die Plattform-Gates und Smoke-Abdeckung beschreibt.
 - `docs/releasing.md` die Release- und Preview-Grenzen beschreibt.
