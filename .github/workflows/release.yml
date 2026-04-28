@@ -211,49 +211,41 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.x"
-
-      - name: Install JSON schema validator dependency
-        # Required by tests/validate_json_schema.py (AP M5-1.2 Tranche A gate).
-        # --require-hashes refuses to install if any wheel hash drifts from
-        # the lockfile; CTest fails loud if the dependency is missing.
-        run: python -m pip install --upgrade pip && python -m pip install --require-hashes -r tests/requirements-json-schema.txt
-
-      - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build --config Release
-
-      - name: Run tests
-        run: ctest --test-dir build --output-on-failure -C Release
-
-      - name: Derive archive name
-        id: meta
-        shell: bash
-        run: |
-          version="${{ needs.validate-tag.outputs.version }}"
-          archive="cmake-xray_${version}_${{ matrix.artifact }}.${{ matrix.archive_ext }}"
-          echo "archive=${archive}" >> "$GITHUB_OUTPUT"
-
-      # AP M5-1.6 Tranche F.2: nach dem Tranche-E-Refactor ist die
-      # Build-Matrix Linux-only; der frueher noetige Windows-Package-
-      # Pfad ist tot und entfernt. Ein zukuenftiger Preview-Job mit
-      # eigener Allowlist (plan-M5-1-6.md "Plattformartefakte") muesste
-      # diesen Pfad als separaten Job neu anlegen.
-      - name: Package
+      # AP M5-1.6 Tranche G.2: der publishte Linux-Archiv-Build laeuft
+      # ueber dieselbe `release-archive`-Docker-Stage wie der
+      # Verify-Job-Archiv-Smoke. Vor Tranche G nutzte der Build-Job
+      # einen plain `cmake -B build` plus `tar -czf` ohne
+      # `XRAY_APP_VERSION`, ohne `SOURCE_DATE_EPOCH` und ohne die
+      # ustar-/`gzip -n`-Repro-Flags aus
+      # `scripts/build-release-archive.sh`; das publishte Archiv war
+      # damit weder versionsstabil noch byte-reproduzierbar trotz
+      # gruener Repro-Smokes im Verify-Job. Die Test-/Coverage-/Quality-
+      # Gates aus dem alten `Run tests`-Step laufen weiterhin im
+      # Verify-Job (`docker build --target test/coverage-check/
+      # quality-check`); ein duplizierter Native-CTest im Build-Job
+      # verlaengerte den Release-Lauf um ~13 min ohne neuen Pruefwert.
+      - name: Build reproducible release archive
         run: |
           set -eu
-          mkdir -p release-assets/package
-          cp build/cmake-xray LICENSE README.md release-assets/package/
-          tar -C release-assets/package -czf "release-assets/${{ steps.meta.outputs.archive }}" \
-            cmake-xray LICENSE README.md
-          sha256sum "release-assets/${{ steps.meta.outputs.archive }}" \
-            > "release-assets/${{ steps.meta.outputs.archive }}.sha256"
-          rm -rf release-assets/package
+          version="${{ needs.validate-tag.outputs.version }}"
+          tag="${{ needs.validate-tag.outputs.tag }}"
+          source_date_epoch=$(git log -1 --pretty=%ct "$tag")
+
+          docker build --target release-archive \
+            --build-arg XRAY_APP_VERSION="$version" \
+            --build-arg SOURCE_DATE_EPOCH="$source_date_epoch" \
+            -t cmake-xray:release-archive .
+
+          mkdir -p release-assets
+          docker run --rm -v "$PWD/release-assets:/output" cmake-xray:release-archive
+
+          archive_name="cmake-xray_${version}_${{ matrix.artifact }}.${{ matrix.archive_ext }}"
+          if [ ! -f "release-assets/${archive_name}" ] || [ ! -f "release-assets/${archive_name}.sha256" ]; then
+            echo "error: release-archive stage did not produce expected files" >&2
+            ls -la release-assets/ >&2
+            exit 1
+          fi
+          ( cd release-assets && sha256sum -c "${archive_name}.sha256" )
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
