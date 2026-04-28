@@ -145,16 +145,24 @@ fi
 image_repo="${registry}/cmake-xray"
 versioned_tag="${image_repo}:${version}"
 
-# 5. Build the linux release archive.
-SOURCE_DATE_EPOCH=1 bash "$build_archive_script" "$version" "$state_dir/release-out"
+# 5. Build the linux release archive (skip when a re-run already has a
+# byte-identical artifact in the state dir; the build is reproducible
+# under a fixed SOURCE_DATE_EPOCH so re-running build-release-archive.sh
+# would only burn cmake cycles re-emitting the same bytes).
 archive_basename="cmake-xray_${version}_linux_x86_64.tar.gz"
 archive_path="$state_dir/release-out/$archive_basename"
 sha_path="$archive_path.sha256"
-if [ ! -f "$archive_path" ] || [ ! -f "$sha_path" ]; then
-    echo "error: archive build did not produce expected files" >&2
-    exit 1
+if [ -f "$archive_path" ] && [ -f "$sha_path" ] \
+    && (cd "$state_dir/release-out" && sha256sum -c "$archive_basename.sha256" >/dev/null 2>&1); then
+    echo "[dry-run] reusing existing archive $archive_path"
+else
+    SOURCE_DATE_EPOCH=1 bash "$build_archive_script" "$version" "$state_dir/release-out"
+    if [ ! -f "$archive_path" ] || [ ! -f "$sha_path" ]; then
+        echo "error: archive build did not produce expected files" >&2
+        exit 1
+    fi
+    echo "[dry-run] built $archive_path"
 fi
-echo "[dry-run] built $archive_path"
 
 # AP M5-1.6 Tranche E: enforce the M5 allowlist on the candidate assets
 # before any state-changing GitHub or OCI operation. Plan-Veroeffentlichungs-

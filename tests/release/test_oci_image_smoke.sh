@@ -99,8 +99,12 @@ label_version=$(docker inspect \
 assert_equal "OCI label image.version matches --version" "$stable_version" "$label_version"
 
 # --- latest refusal for prerelease ---
-# Build a separate prerelease image; the latest command must refuse.
-bash "$publish_script" "$local_repo" "$prerelease_version" build >/dev/null
+# `cmd_latest` (scripts/oci-image-publish.sh) checks the prerelease
+# pattern *-* in the version string before it ever touches a remote or
+# local image. A `docker tag` of the existing stable image is enough to
+# stage a prerelease artifact; building the prerelease image from
+# scratch (cmake + docker build) would burn ~120 s for nothing.
+docker tag "$stable_tag" "$prerelease_tag"
 assert_command_fails "publish-script refuses 'latest' for prerelease version" \
     bash "$publish_script" "$local_repo" "$prerelease_version" latest
 
