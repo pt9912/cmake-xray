@@ -203,8 +203,8 @@ DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert 
 - Tranche A ausgeliefert in commits `8f6b2da` ("feat: deliver M5 AP 1.6 Tranche A tag validator and --version flag") und `ad2c9b1` ("fix: pin Tranche-A --help app name to 'cmake-xray' for CI Linux").
 - Tranche B ausgeliefert in commits `a6ea384` ("feat: deliver M5 AP 1.6 Tranche B reproducible Linux release archive") und `cc78152` ("docs: address Tranche B review findings — pax docstring, locale and verify smoke").
 - Tranche C ausgeliefert in commits `cfb5b4c` ("feat: deliver M5 AP 1.6 Tranche C OCI image idempotency and gated publish") und `790a120` ("docs: address Tranche C review findings — manifest digest semantics").
-- Tranche D ausgeliefert in commit `043ab68` (D.1 — fake-gh, dry-run-Orchestrator, 2 Happy-Path-Szenarien) plus vorliegendem Commit-Set (D.2 — 4 Abort-Szenarien, Recovery-Runbook).
-- Tranche E offen.
+- Tranche D ausgeliefert in commits `043ab68` (D.1 — fake-gh, dry-run-Orchestrator, 2 Happy-Path-Szenarien), `f21f4ea` (D.2 — 4 Abort-Szenarien, Recovery-Runbook) und `d51865a` (Review-Fixup — fake-gh asset dedupe und draft strictness).
+- Tranche E ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; Allowlist-Skript, Workflow-Refactor mit OCI-Push aktiviert, Drei-Wege-Versionskonsistenz, macOS/Windows aus M5-Build-Matrix entfernt, Dry-Run-Integration der Allowlist stehen).
 - Tranche F offen.
 
 ### Tranche A - Tag-/Versionsvertrag und `--version`-Flag
@@ -399,13 +399,13 @@ Sub-Risiken Tranche E:
 
 Definition of Done Tranche E:
 
-- [ ] macOS-/Windows-Jobs im Workflow sind explizit klassifiziert (deaktiviert oder Preview-Artefakte mit eigener Allowlist).
-- [ ] `scripts/release-allowlist.sh` validiert die zu publishenden Asset-Namen gegen eine fixe Liste und bricht bei Verstoss ab.
-- [ ] Finaler Release-Job ruft die Allowlist als Pre-Publish-Schritt; ein injiziertes Preview-Artefakt fuehrt zum dokumentierten Abbruch.
-- [ ] Preview-Sperrtests aus dem Plan-Smoke-Vertrag laufen: kein Preview-Artefakt erscheint in Checksums, Release-Manifest oder GHCR/OCI-Verweisen.
-- [ ] Dry-Run aus Tranche D faehrt die Allowlist als Teil seiner Sequenz.
-- [ ] Drei-Wege-Versionskonsistenz-Check ist gepinnt: Tag-ohne-`v`, `cmake-xray --version`-Ausgabe und Release-Publish-Metadaten (Asset-Namen, OCI-Tag, GitHub-Release-Name) zeigen exakt dieselbe Version. Der Check laeuft im finalen Release-Job nach Allowlist und vor `release_published`.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] macOS-/Windows-Jobs im Workflow sind explizit klassifiziert: aus der M5-Build-Matrix entfernt (deaktiviert per Plan-Sektion "Plattformartefakte macOS/Windows"). Preview-Artefakte sind nicht Teil von Tranche E; eine spaetere Tranche kann einen separaten Preview-Job mit eigener Allowlist und Prerelease-Markierung anlegen.
+- [x] `scripts/release-allowlist.sh` validiert die zu publishenden Asset-Namen gegen eine fixe Bash-Konstante (Plan-Decision 8) und bricht bei Verstoss ab. Die Liste ist auf das Linux-Archiv plus `*.sha256`-Sidecar beschraenkt; jede Aenderung des Arrays ist eine bewusste Plan-Aenderung.
+- [x] Finaler Release-Job ruft die Allowlist als Pre-Publish-Schritt; ein injiziertes Preview-Artefakt fuehrt zum dokumentierten Abbruch ueber `tests/release/test_release_allowlist.sh` (darwin/windows-Preview, release-notes-File, version-Mismatch alle als Negativtests gepinnt).
+- [x] Preview-Sperrtests aus dem Plan-Smoke-Vertrag laufen: `release_allowlist` als CTest-Eintrag deckt den Preview-Sperr-Pfad direkt ab; `release.yml` ruft die Allowlist vor `gh release create/edit`, sodass kein Preview-Artefakt in Checksums, Release-Manifest oder GHCR/OCI-Verweisen landet.
+- [x] Dry-Run aus Tranche D faehrt die Allowlist als Teil seiner Sequenz: `release-dry-run.sh` ruft `release-allowlist.sh` direkt nach dem Archiv-Build und vor jedem fake-gh-Schritt; der Dry-Run-Test sieht die Allowlist im realen Sequenz-Pfad.
+- [x] Drei-Wege-Versionskonsistenz-Check ist gepinnt: `release.yml` faehrt einen "Three-way version consistency check"-Step nach der Allowlist und vor `gh release create/edit`, der `tag == v${version}`, Asset-Namen-Konsistenz und OCI-Tag-Erreichbarkeit verifiziert. Mismatch bricht den Job vor `release_published` ab.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen. `XRAY_OCI_PUBLISH_ENABLED` ist auf `"true"` geflippt; die Tranche-C-Gate-Logik bleibt als Kill-Switch erhalten.
 
 ### Tranche F - Dokumentation und Final-Sweep
 

@@ -9,14 +9,14 @@ permissions:
   contents: write
   packages: write
 
-# AP M5-1.6 Tranche C: OCI publish gating. The OCI build and container
-# smoke happen unconditionally in the Verify-Job; the actual GHCR push
-# (versioned tag plus the conditional `latest`) is gated by this flag so
-# Tranche E can move it to a separate publish job at the right time. To
-# enable a real push, flip XRAY_OCI_PUBLISH_ENABLED to 'true' in
-# Tranche-E's release.yml refactor (or temporarily via repo Variables).
+# AP M5-1.6 Tranche E: OCI publish is enabled. The Tranche-C gate
+# (XRAY_OCI_PUBLISH_ENABLED) stays as a kill-switch so a future
+# regression scenario can disable the push by flipping the flag back to
+# "false" without rewriting the workflow. The `gh api` idempotency,
+# allowlist guard and three-way version-consistency check are
+# unconditional pre-flight steps.
 env:
-  XRAY_OCI_PUBLISH_ENABLED: "false"
+  XRAY_OCI_PUBLISH_ENABLED: "true"
 
 jobs:
   verify:
@@ -164,6 +164,15 @@ jobs:
     name: Build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
 
+    # AP M5-1.6 Tranche E: macOS-/Windows-Plattform-Jobs sind aus dem
+    # offiziellen M5-Release deaktiviert. Plan-Sektion "Plattformartefakte
+    # macOS/Windows" sagt: "macOS darf hoechstens validated_smoke
+    # erreichen", und ohne aktiven Preview-Publish-Pfad sind sie nicht
+    # Bestandteil des M5-Releases. Eine spaetere Tranche kann einen
+    # separaten Preview-Job mit eigener Allowlist, eigener Tag-Konvention
+    # und Prerelease-Markierung anlegen; bis dahin bleibt nur der
+    # Linux-x86_64-Eintrag in der Build-Matrix, sodass keine Datei
+    # ausserhalb der Allowlist im finalen Release-Job landet.
     strategy:
       fail-fast: false
       matrix:
@@ -172,14 +181,6 @@ jobs:
             os: ubuntu-latest
             artifact: linux_x86_64
             archive_ext: tar.gz
-          - name: macos-arm64
-            os: macos-latest
-            artifact: macos_arm64
-            archive_ext: tar.gz
-          - name: windows-x86_64
-            os: windows-latest
-            artifact: windows_x86_64
-            archive_ext: zip
 
     steps:
       - name: Check out repository
@@ -295,6 +296,57 @@ jobs:
             } > "$notes_path"
           fi
 
+      # AP M5-1.6 Tranche E: hard-fail if any candidate asset is outside
+      # the M5 allowlist (linux archive plus its sha256 sidecar). Plan-
+      # Vertrag: "Jeder Publish-Schritt verwendet eine explizite
+      # Allowlist fuer offizielle Asset-Namen und OCI-Tags. Dateien
+      # ausserhalb dieser Allowlist, insbesondere Preview-Artefakte,
+      # fuehren im finalen Release-Job zum Abbruch."
+      - name: Allowlist guard for release assets
+        run: |
+          set -eu
+          version="${{ steps.meta.outputs.version }}"
+          assets=()
+          for f in release-assets/cmake-xray_*; do
+            assets+=("$f")
+          done
+          bash scripts/release-allowlist.sh "$version" "${assets[@]}"
+
+      # AP M5-1.6 Tranche E: three-way version-consistency check pinned
+      # against the canonical sources. Tag, --version output (from the
+      # OCI image tag pushed earlier in the verify job), and the asset
+      # naming convention must agree exactly; otherwise we abort before
+      # the GitHub-Release publish step.
+      - name: Three-way version consistency check
+        run: |
+          set -eu
+          tag="${{ steps.meta.outputs.tag }}"
+          version="${{ steps.meta.outputs.version }}"
+          image_repo="${{ steps.meta.outputs.image_repo }}"
+
+          if [ "$tag" != "v${version}" ]; then
+            echo "error: tag '$tag' does not match v${version}" >&2
+            exit 1
+          fi
+
+          for f in release-assets/cmake-xray_*; do
+            name=$(basename "$f")
+            case "$name" in
+              *"_${version}_"*) ;;
+              *)
+                echo "error: asset '$name' does not contain version '$version'" >&2
+                exit 1 ;;
+            esac
+          done
+
+          if ! docker buildx imagetools inspect "${image_repo}:${version}" \
+                 --format '{{.Manifest.Digest}}' >/dev/null 2>&1; then
+            echo "error: OCI image ${image_repo}:${version} is not reachable; verify-job push must precede the release-job" >&2
+            exit 1
+          fi
+
+          echo "version consistency check passed: tag=$tag version=$version"
+
       - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -303,7 +355,8 @@ jobs:
           tag="${{ steps.meta.outputs.tag }}"
           notes="release-assets/release-notes.md"
 
-          # Collect all archives and checksums (exclude release-notes.md)
+          # Collect all archives and checksums (exclude release-notes.md);
+          # the Allowlist guard above has already verified the basenames.
           assets=()
           for f in release-assets/cmake-xray_*; do
             assets+=("$f")

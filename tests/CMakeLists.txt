@@ -109,6 +109,17 @@ if(BASH_PROGRAM)
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     )
 
+    # AP M5-1.6 Tranche E: release-allowlist guard tests. Pinnt die
+    # offizielle Linux-Asset-Liste, lehnt darwin/windows-Preview-Artefakte
+    # und unbekannte Dateien ab und verifiziert die Usage-Error-Pfade.
+    add_test(
+        NAME release_allowlist
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/release/test_release_allowlist.sh
+    )
+    set_tests_properties(release_allowlist PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
+
     # AP M5-1.5 Tranche D Folge-Refactor: split the monolithic run_e2e.sh
     # into focused sub-suites and register each as its own CTest entry so
     # `ctest --parallel` schedules them concurrently. run_e2e_lib.sh holds

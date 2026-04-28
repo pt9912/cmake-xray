@@ -64,9 +64,10 @@ validate_tag_script="$repo_root/scripts/validate-release-tag.sh"
 build_archive_script="$repo_root/scripts/build-release-archive.sh"
 oci_publish_script="$repo_root/scripts/oci-image-publish.sh"
 fake_gh_script="$repo_root/scripts/release-fake-gh.sh"
+allowlist_script="$repo_root/scripts/release-allowlist.sh"
 
 for required in "$validate_tag_script" "$build_archive_script" \
-                "$oci_publish_script" "$fake_gh_script"; do
+                "$oci_publish_script" "$fake_gh_script" "$allowlist_script"; do
     if ! [ -x "$required" ]; then
         echo "error: required script $required missing or not executable" >&2
         exit 2
@@ -154,6 +155,16 @@ if [ ! -f "$archive_path" ] || [ ! -f "$sha_path" ]; then
     exit 1
 fi
 echo "[dry-run] built $archive_path"
+
+# AP M5-1.6 Tranche E: enforce the M5 allowlist on the candidate assets
+# before any state-changing GitHub or OCI operation. Plan-Veroeffentlichungs-
+# kette: "Jeder Publish-Schritt verwendet eine explizite Allowlist fuer
+# offizielle Asset-Namen ... Dateien ausserhalb dieser Allowlist fuehren
+# zum Abbruch statt zu Upload oder implizitem Ignorieren." The dry-run
+# triggers the same guard so divergence between dry-run and the real
+# release.yml stays impossible.
+bash "$allowlist_script" "$version" "$archive_path" "$sha_path"
+echo "[dry-run] allowlist accepted ${archive_basename} and sidecar"
 
 # 6. Generate a release-notes file (kept minimal; Tranche E will source
 # the canonical CHANGELOG).
