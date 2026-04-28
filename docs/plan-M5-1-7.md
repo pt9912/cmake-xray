@@ -26,7 +26,10 @@ Umsetzen:
 - Bewertung von Pfadnormalisierung, Laufwerksbuchstaben, Backslashes und
   Zeilenenden in Tests, Goldens und Report-Ausgaben.
 - Dokumentierte Mindestversionen fuer CMake und Compiler bestaetigen.
-- Mindestens eine aktuelle CMake-Version in CI oder Smoke-Checks ausfuehren.
+- Mindestversionen fuer CMake und Compiler in CI oder verpflichtend
+  validierten Smoke-Reports fail-fast pruefen.
+- Mindestens eine aktuelle CMake- und Compiler-Kombination in CI oder
+  verpflichtend validierten Smoke-Checks ausfuehren.
 - Bekannte CMake-File-API-Einschraenkungen aus M4 und M5 in der
   Plattformbewertung erhalten.
 - `docs/quality.md` und `docs/releasing.md` um Plattformstatus,
@@ -113,6 +116,9 @@ Fuer M5 gilt:
   Kontext: entweder verpflichtende CI-Jobs pro Plattform oder ein
   reproduzierbarer Smoke-Report als verpflichtendes Review-Artefakt mit
   nonzero Fail-Verhalten bei Abweichungen.
+- Der Nachweispfad muss als Required Check in der Branch-Protection oder als
+  nicht ueberspringbares Release-Gate konfiguriert sein, bevor
+  `validated_smoke` dokumentiert werden darf.
 - `known_limited` ist zu verwenden, sobald ein Pflichtgate rot ist, nur
   manuell statt in CI laeuft, bewusst uebersprungen wird oder nur mit einer
   dokumentierten Einschraenkung aussagekraeftig ist.
@@ -158,6 +164,8 @@ Regeln:
   - ein reproduzierbarer Smoke-Report-Upload mit Host-, Toolchain-,
     CMake-Version, Kommando-Log, Exit-Codes und Checksummen der erzeugten
     Reports, der als verpflichtender Review-Check ausgewertet wird.
+- Der gewaehlte Nachweispfad ist fuer PRs ein Required Check und fuer
+  taggesteuerte Releases ein zwingendes `needs`-Gate vor Publish-Jobs.
 - Fehlt dieser Nachweispfad, darf die Plattform nur als `known_limited`
   dokumentiert werden.
 
@@ -211,6 +219,10 @@ plattformfaehiges Smoke-Skript existieren:
 - Wenn Smoke-Skripte statt direkter Matrixschritte den Plattformstatus
   begruenden, muessen sie einen maschinenlesbaren Report erzeugen, der in CI
   hochgeladen und durch einen verpflichtenden Check validiert wird.
+- Diese Smoke-Report-Variante ersetzt einen direkten Matrix-Smoke nur dann,
+  wenn der Report deterministisch aus dem aktuellen Commit erzeugt wird, nicht
+  manuell editierbar ist und der validierende Check in Branch-Protection oder
+  Release-Gates verpflichtend ist.
 
 ## Atomic-Replace-Matrix
 
@@ -336,13 +348,22 @@ Kompatibilitaetsregeln:
 
 - Die native Matrix legt pro Host eine erwartete CMake-Mindestversion fest,
   zum Beispiel als `CMAKE_MIN_VERSION` oder explizite Matrixspalte.
+- Die native Matrix legt pro Host eine erwartete Compiler-Mindestversion fest,
+  zum Beispiel als `CXX_MIN_VERSION` plus `CXX_COMPILER_ID` oder explizite
+  Matrixspalten fuer MSVC, AppleClang, Clang und GCC.
 - Jeder Plattformjob protokolliert `cmake --version` vor der Konfiguration und
   bricht vor dem Build ab, wenn die gefundene Version unter der dokumentierten
   Mindestversion liegt.
+- Jeder Plattformjob protokolliert Compiler-ID und Compiler-Version vor der
+  Konfiguration und bricht vor dem Build ab, wenn die gefundene Version unter
+  der dokumentierten Mindestversion fuer diesen Compiler liegt.
 - Mindestens ein Matrixjob pro Hostfamilie nutzt eine explizit eingerichtete
-  aktuelle CMake-Version statt nur implizit vorinstallierter Runner-Defaults;
-  die konkrete Version wird in `docs/quality.md` dokumentiert.
-- Compiler-Mindestanforderungen werden nicht implizit angehoben.
+  aktuelle CMake-/Compiler-Kombination statt nur implizit vorinstallierter
+  Runner-Defaults; die konkreten Versionen werden in `docs/quality.md`
+  dokumentiert.
+- Compiler-Mindestanforderungen werden nicht implizit angehoben; jede
+  Anhebung braucht dieselbe Doku-, Matrix- und Fail-Fast-Aktualisierung wie
+  eine CMake-Mindestversionsaenderung.
 - Falls ein Plattformfix eine neuere C++- oder CMake-Funktion braucht, wird die
   Mindestversion bewusst angepasst und in Doku, CI und Changelog nachgezogen.
 - CMake-File-API-v1 bleibt der einzige M5-Vertrag; neuere CMake-Versionen
@@ -447,9 +468,11 @@ Plattformvoraussetzungen beruehrt:
 1. Bestehende `build.yml`- und `release.yml`-Matrizen gegen den
    Plattformstatusvertrag pruefen.
 2. CMake-, Compiler- und Runner-Versionen in CI-Ausgaben sichtbar machen und
-   CMake-Versionen gegen die dokumentierte Mindestversion fail-fast pruefen.
+   CMake-/Compiler-Versionen gegen die dokumentierten Mindestversionen
+   fail-fast pruefen.
 3. Entscheiden, ob macOS-/Windows-Jobs verpflichtende Gates sind oder ob ein
-   verpflichtend validierter Smoke-Report-Upload den Nachweis liefert.
+   verpflichtend validierter Smoke-Report-Upload den Nachweis liefert; dieser
+   Nachweis wird als Required Check oder Release-`needs`-Gate verankert.
 4. `docs/quality.md` mit dem vorlaeufigen Plattformstatus ergaenzen.
 
 Tranche A ist fertig, wenn Build- und Testjobs fuer alle vorgesehenen Hosts
@@ -532,6 +555,9 @@ CI- und Build-Tests:
 - Native Matrix fuehrt `ctest` auf allen drei Plattformen aus.
 - `validated_smoke` fuer macOS oder Windows ist durch verpflichtende CI-Jobs
   oder durch einen verpflichtend validierten Smoke-Report-Upload belegt.
+- Diese CI-Jobs oder Smoke-Report-Checks sind als Required Checks fuer PRs
+  beziehungsweise als nicht ueberspringbare Release-Gates fuer Tags
+  konfiguriert.
 - Smoke-Report-Artefakte enthalten Host, Toolchain, CMake-Version,
   ausgefuehrte Kommandos, Exit-Codes und Checksummen erzeugter Reports.
 - CI-Logs zeigen CMake- und Compiler-Versionen oder machen sie aus
@@ -539,6 +565,9 @@ CI- und Build-Tests:
 - CMake-Versionen werden pro Plattform gegen die dokumentierte
   Mindestversion geprueft; Unterschreitung fuehrt vor dem Build zu nonzero
   Exit.
+- Compiler-Versionen werden pro Plattform gegen die dokumentierte
+  Mindestversion fuer den jeweiligen Compiler geprueft; Unterschreitung
+  fuehrt vor dem Build zu nonzero Exit.
 - `fail-fast: false` bleibt fuer Plattformmatrizen gesetzt.
 - Fehlende Python-Validator-Abhaengigkeit fuehrt zu konkretem Fehler statt zu
   stillem Skip.
@@ -647,7 +676,9 @@ AP 1.7 ist abnahmefaehig, wenn:
   ist.
 - CRLF keine Golden-Scheindifferenzen erzeugt.
 - CMake- und Compiler-Mindestversionen in Doku und CI konsistent sind und die
-  CI bei zu alter CMake-Version vor dem Build abbricht.
+  CI bei zu alter CMake- oder Compiler-Version vor dem Build abbricht.
+- `validated_smoke`-Nachweise fuer macOS und Windows als Required Checks oder
+  nicht ueberspringbare Release-Gates konfiguriert sind.
 - CMake-File-API-Einschraenkungen aus M4/M5 weiterhin dokumentiert sind.
 - `docs/quality.md` die Plattform-Gates und Smoke-Abdeckung beschreibt.
 - `docs/releasing.md` die Release- und Preview-Grenzen beschreibt.
