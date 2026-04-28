@@ -704,7 +704,15 @@ CliAdapter::CliAdapter(
 
 int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
                     std::ostream& err) const {
-    CLI::App app{"cmake-xray - build dependency analysis for CMake projects"};
+    // AP M5-1.6 Tranche A: app description plus an explicit app name so the
+    // Usage line in `--help` is always "cmake-xray [OPTIONS] [SUBCOMMAND]"
+    // regardless of how argv[0] arrives. Without an explicit name CLI11 falls
+    // back to argv[0] verbatim; on the GitHub-Actions Linux runner the
+    // Native CI shell smoke observed an argv[0] that did not survive into the
+    // help output, while macOS and Windows runners did. Setting the name
+    // upfront makes the help-text contract independent of that detail.
+    CLI::App app{"cmake-xray - build dependency analysis for CMake projects",
+                  "cmake-xray"};
     app.require_subcommand(0, 1);
     // AP M5-1.6 Tranche A: global --version flag handled by CLI11 before
     // subcommand dispatch; CLI::CallForVersion is caught as success below.
