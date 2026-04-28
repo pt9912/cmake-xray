@@ -19,25 +19,49 @@ env:
   XRAY_OCI_PUBLISH_ENABLED: "true"
 
 jobs:
-  verify:
-    name: Verify (Docker)
+  # AP M5-1.6 Tranche G.1: harte Pre-Build-Gate-Stage. plan-M5-1-6.md
+  # SemVer-Tag-Muster verlangt "Die Tag-Pruefung muss vor Build/Publish
+  # laufen und den Workflow mit nonzero Ergebnis beenden". Vor Tranche G
+  # leitete jeder Job seinen `version`-String selbst per `${tag#v}` ab,
+  # ohne das Validator-Skript zu konsultieren; ein malformierter Tag wie
+  # `vfoo` oder `v01.2.3` haette die Build- und Publish-Steps trotzdem
+  # erreicht. validate-release-tag.sh ist nun die einzige Quelle fuer
+  # `version`; alle anderen Jobs lesen den Wert aus den Job-Outputs.
+  validate-tag:
+    name: Validate release tag
     runs-on: ubuntu-latest
-
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      image_repo: ${{ steps.meta.outputs.image_repo }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Derive release metadata
+      - name: Validate tag and derive metadata
         id: meta
         run: |
           set -eu
           tag="${GITHUB_REF_NAME}"
-          version="${tag#v}"
+          version=$(bash scripts/validate-release-tag.sh "$tag")
+          if [ -z "$version" ]; then
+            echo "error: validate-release-tag.sh produced empty version for $tag" >&2
+            exit 1
+          fi
           image_repo="ghcr.io/${GITHUB_REPOSITORY,,}"
 
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "image_repo=${image_repo}" >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Verify (Docker)
+    needs: validate-tag
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
 
       - name: Verify test image
         run: docker build --target test -t cmake-xray:test .
@@ -55,23 +79,23 @@ jobs:
       - name: Build OCI runtime image
         run: |
           bash scripts/oci-image-publish.sh \
-            "${{ steps.meta.outputs.image_repo }}" \
-            "${{ steps.meta.outputs.version }}" \
+            "${{ needs.validate-tag.outputs.image_repo }}" \
+            "${{ needs.validate-tag.outputs.version }}" \
             build
 
       - name: Smoke test OCI image (--help)
         run: |
           docker run --rm \
-            "${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.version }}" \
+            "${{ needs.validate-tag.outputs.image_repo }}:${{ needs.validate-tag.outputs.version }}" \
             --help > /dev/null
 
       - name: Smoke test OCI image (--version matches tag)
         run: |
           set -eu
           extracted=$(docker run --rm \
-            "${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.version }}" \
+            "${{ needs.validate-tag.outputs.image_repo }}:${{ needs.validate-tag.outputs.version }}" \
             --version)
-          expected="${{ steps.meta.outputs.version }}"
+          expected="${{ needs.validate-tag.outputs.version }}"
           if [ "$extracted" != "$expected" ]; then
             echo "error: OCI --version='${extracted}' does not match expected '${expected}'" >&2
             exit 1
@@ -81,7 +105,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$PWD/tests/e2e/testdata/m3:/data:ro" \
-            "${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.version }}" \
+            "${{ needs.validate-tag.outputs.image_repo }}:${{ needs.validate-tag.outputs.version }}" \
             analyze \
             --compile-commands /data/report_project/compile_commands.json \
             --format markdown
@@ -90,7 +114,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$PWD/tests/e2e/testdata/m3:/data:ro" \
-            "${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.version }}" \
+            "${{ needs.validate-tag.outputs.image_repo }}:${{ needs.validate-tag.outputs.version }}" \
             impact \
             --compile-commands /data/report_impact_header/compile_commands.json \
             --changed-file include/common/config.h \
@@ -105,8 +129,8 @@ jobs:
       - name: Build and smoke test linux release archive
         run: |
           set -eu
-          version="${{ steps.meta.outputs.version }}"
-          tag="${{ steps.meta.outputs.tag }}"
+          version="${{ needs.validate-tag.outputs.version }}"
+          tag="${{ needs.validate-tag.outputs.tag }}"
           source_date_epoch=$(git log -1 --pretty=%ct "$tag")
 
           docker build --target release-archive \
@@ -142,26 +166,27 @@ jobs:
         if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
         run: |
           bash scripts/oci-image-publish.sh \
-            "${{ steps.meta.outputs.image_repo }}" \
-            "${{ steps.meta.outputs.version }}" \
+            "${{ needs.validate-tag.outputs.image_repo }}" \
+            "${{ needs.validate-tag.outputs.version }}" \
             push
 
       - name: Publish OCI image (latest tag for stable releases)
         if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
         run: |
           set -eu
-          version="${{ steps.meta.outputs.version }}"
+          version="${{ needs.validate-tag.outputs.version }}"
           if [[ "$version" == *-* ]]; then
             echo "skipping latest update for prerelease ${version}"
             exit 0
           fi
           bash scripts/oci-image-publish.sh \
-            "${{ steps.meta.outputs.image_repo }}" \
+            "${{ needs.validate-tag.outputs.image_repo }}" \
             "$version" \
             latest
 
   build:
     name: Build (${{ matrix.name }})
+    needs: validate-tag
     runs-on: ${{ matrix.os }}
 
     # AP M5-1.6 Tranche E: macOS-/Windows-Plattform-Jobs sind aus dem
@@ -210,10 +235,8 @@ jobs:
         id: meta
         shell: bash
         run: |
-          tag="${GITHUB_REF_NAME}"
-          version="${tag#v}"
+          version="${{ needs.validate-tag.outputs.version }}"
           archive="cmake-xray_${version}_${{ matrix.artifact }}.${{ matrix.archive_ext }}"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "archive=${archive}" >> "$GITHUB_OUTPUT"
 
       # AP M5-1.6 Tranche F.2: nach dem Tranche-E-Refactor ist die
@@ -241,24 +264,12 @@ jobs:
 
   release:
     name: Publish Release
-    needs: [verify, build]
+    needs: [validate-tag, verify, build]
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
-
-      - name: Derive release metadata
-        id: meta
-        run: |
-          set -eu
-          tag="${GITHUB_REF_NAME}"
-          version="${tag#v}"
-          image_repo="ghcr.io/${GITHUB_REPOSITORY,,}"
-
-          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "image_repo=${image_repo}" >> "$GITHUB_OUTPUT"
 
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
@@ -273,19 +284,19 @@ jobs:
       - name: Prepare release notes
         run: |
           set -eu
-          ver_esc=$(printf '%s' "${{ steps.meta.outputs.version }}" | sed 's/\./\\./g')
+          ver_esc=$(printf '%s' "${{ needs.validate-tag.outputs.version }}" | sed 's/\./\\./g')
           notes_path="release-assets/release-notes.md"
           sed -n "/^## \\[$ver_esc\\]/,/^## \\[/{/^## \\[$ver_esc\\]/!{/^## \\[/!p}}" \
             CHANGELOG.md > "$notes_path"
 
           if [ ! -s "$notes_path" ]; then
             {
-              echo "Release ${{ steps.meta.outputs.tag }}"
+              echo "Release ${{ needs.validate-tag.outputs.tag }}"
               echo
-              echo "Automated release for ${{ steps.meta.outputs.tag }}."
+              echo "Automated release for ${{ needs.validate-tag.outputs.tag }}."
               echo
               echo "Assets:"
-              echo "- OCI image: ${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.version }}"
+              echo "- OCI image: ${{ needs.validate-tag.outputs.image_repo }}:${{ needs.validate-tag.outputs.version }}"
             } > "$notes_path"
           fi
 
@@ -298,7 +309,7 @@ jobs:
       - name: Allowlist guard for release assets
         run: |
           set -eu
-          version="${{ steps.meta.outputs.version }}"
+          version="${{ needs.validate-tag.outputs.version }}"
           assets=()
           for f in release-assets/cmake-xray_*; do
             assets+=("$f")
@@ -313,9 +324,9 @@ jobs:
       - name: Three-way version consistency check
         run: |
           set -eu
-          tag="${{ steps.meta.outputs.tag }}"
-          version="${{ steps.meta.outputs.version }}"
-          image_repo="${{ steps.meta.outputs.image_repo }}"
+          tag="${{ needs.validate-tag.outputs.tag }}"
+          version="${{ needs.validate-tag.outputs.version }}"
+          image_repo="${{ needs.validate-tag.outputs.image_repo }}"
 
           if [ "$tag" != "v${version}" ]; then
             echo "error: tag '$tag' does not match v${version}" >&2
@@ -360,7 +371,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          tag="${{ steps.meta.outputs.tag }}"
+          tag="${{ needs.validate-tag.outputs.tag }}"
           notes="release-assets/release-notes.md"
 
           # Collect all archives and checksums (exclude release-notes.md);
