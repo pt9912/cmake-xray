@@ -175,9 +175,12 @@ Regeln:
 - Fehlt dieser Nachweispfad, darf die Plattform nur als `known_limited`
   dokumentiert werden.
 
-### CLI-Smokes
+### Normative CLI-Smokes
 
-Auf macOS und Windows muessen mindestens folgende echte Binary-Aufrufe laufen:
+Auf macOS und Windows muessen mindestens folgende echte Binary-Aufrufe laufen.
+Diese Liste ist die einzige normative Pflichtkommandoliste fuer AP 1.7; Tests,
+Smoke-Reports und Doku verweisen auf diese Liste statt eigene Kurzformen zu
+definieren.
 
 - `cmake-xray --help`
 - `cmake-xray analyze --compile-commands <fixture> --format console`
@@ -190,14 +193,14 @@ Auf macOS und Windows muessen mindestens folgende echte Binary-Aufrufe laufen:
 Soweit AP 1.3 und AP 1.4 abgeschlossen sind, werden DOT und HTML in denselben
 Smoke-Pfad aufgenommen:
 
-- `analyze --format dot`
-- `impact --format dot`
-- `analyze --format html`
-- `impact --format html`
-- `analyze --format dot --output <path>`
-- `impact --format dot --output <path>`
-- `analyze --format html --output <path>`
-- `impact --format html --output <path>`
+- `cmake-xray analyze --compile-commands <fixture> --format dot`
+- `cmake-xray impact --compile-commands <fixture> --changed-file <path> --format dot`
+- `cmake-xray analyze --compile-commands <fixture> --format html`
+- `cmake-xray impact --compile-commands <fixture> --changed-file <path> --format html`
+- `cmake-xray analyze --compile-commands <fixture> --format dot --output <path>`
+- `cmake-xray impact --compile-commands <fixture> --changed-file <path> --format dot --output <path>`
+- `cmake-xray analyze --compile-commands <fixture> --format html --output <path>`
+- `cmake-xray impact --compile-commands <fixture> --changed-file <path> --format html --output <path>`
 
 Die Smokes duerfen stdout/stderr nur nach den dokumentierten Report- und
 Verbosity-Vertraegen bewerten. Zeilenenden werden fuer Golden-Vergleiche
@@ -239,7 +242,7 @@ wird.
 Pflichtfelder:
 
 - `format`: fester Wert `cmake-xray.platform-smoke`.
-- `format_version`: fester Wert fuer den M5-Reportvertrag.
+- `format_version`: Integer `1`.
 - `commit_sha`: exakt der gepruefte Commit.
 - `platform`: `macos` oder `windows`.
 - `runner_image`, `architecture`, `generator`, `build_type`.
@@ -257,6 +260,7 @@ Pflichtfelder:
 Validierungsregeln:
 
 - Schema-Verletzungen fuehren zu nonzero Exit.
+- `format_version` muss exakt `1` sein.
 - `commit_sha` muss zum CI-Checkout passen.
 - `cmake.minimum_satisfied`, `compiler.minimum_satisfied`,
   `required_commands_satisfied`, `atomic_replace_satisfied` und
@@ -272,6 +276,15 @@ Ein Smoke-Report darf einen direkten Matrix-Smoke nur ersetzen, wenn derselbe
 Workflow den Report erzeugt, validiert und als Artefakt hochlaedt. Vorgefertigte
 Reports aus frueheren Runs oder manuell hochgeladene Dateien sind fuer
 `validated_smoke` nicht zulaessig.
+
+Versionierungspolitik:
+
+- `format_version=1` bleibt fuer M5 stabil.
+- Pflichtfeldentfernung, Pflichtfeldumbenennung oder inkompatible
+  Bedeutungswechsel erfordern eine neue Major-Version.
+- Additive optionale Felder duerfen in Version `1` eingefuehrt werden, solange
+  der Verifier unbekannte optionale Felder ignoriert und alle Pflichtregeln
+  unveraendert bleiben.
 
 ## Atomic-Replace-Matrix
 
@@ -384,10 +397,16 @@ Regeln:
   (`\\?\C:\...`) sind verpflichtende Windows-Testfaelle fuer Pfadanzeige,
   Escaping und mindestens einen CLI- oder Golden-Pfad.
 - UNC-Tests duerfen in GitHub-hosted Windows-Runs nicht von externer
-  Netzwerkfreigabe abhaengen. Sie nutzen entweder rein synthetische
-  Display-/Adapter-Fixtures oder eine im Job lokal provisionierte Freigabe
-  wie `\\localhost\cmake-xray-smoke`, deren Einrichtung und Cleanup Teil des
-  Jobs ist.
+  Netzwerkfreigabe abhaengen. Ein synthetischer UNC-Pfadfall fuer Display-,
+  Escape- und Normalisierungslogik ist immer verpflichtend und kommt ohne
+  SMB-Share aus.
+- Ein echter lokaler UNC-Dateisystem-Smoke nutzt nur eine im Job provisionierte
+  Freigabe wie `\\localhost\cmake-xray-smoke`; Einrichtung und Cleanup sind
+  Teil des Jobs.
+- Wenn die lokale `\\localhost\...`-Freigabe auf dem GitHub-Runner wegen
+  Rechte- oder Policy-Limits nicht anlegbar ist, wird nur der echte
+  Dateisystem-Smoke als `known_limited` markiert. Der synthetische UNC-
+  Pflichtfall bleibt required und muss gruen sein.
 - Extended-Length-Tests verwenden ein lokal erzeugtes Temp-Verzeichnis unter
   dem Runner-Workspace und pruefen vorab die Windows-Long-Path-Faehigkeit.
   Wenn der Host Extended-Length-Dateiziele nicht zulaesst, wird der konkrete
@@ -659,22 +678,12 @@ Atomic-Writer-Tests:
 
 CLI-Smoke-Tests:
 
-- `cmake-xray --help` laeuft auf macOS.
-- `cmake-xray --help` laeuft auf Windows.
-- `analyze --format console` laeuft auf macOS und Windows.
-- `impact --format console` laeuft auf macOS und Windows.
-- `analyze --format json` laeuft auf macOS und Windows und erzeugt gueltiges
-  JSON.
-- `impact --format json` laeuft auf macOS und Windows und erzeugt gueltiges
-  JSON.
-- `analyze --format json --output <path>` laeuft auf macOS und Windows, laesst
-  stdout leer und schreibt gueltiges JSON.
-- `impact --format json --output <path>` laeuft auf macOS und Windows, laesst
-  stdout leer und schreibt gueltiges JSON.
-- DOT-Smokes laufen auf macOS und Windows, sobald AP 1.3 produktiv ist.
-- HTML-Smokes laufen auf macOS und Windows, sobald AP 1.4 produktiv ist.
-- DOT-/HTML-`--output`-Smokes laufen auf macOS und Windows, sobald AP 1.3
-  beziehungsweise AP 1.4 produktiv ist.
+- Alle Kommandos aus `Normative CLI-Smokes` laufen auf macOS und Windows.
+- JSON-Kommandos aus `Normative CLI-Smokes` erzeugen gueltiges JSON.
+- `--output`-Kommandos aus `Normative CLI-Smokes` lassen stdout leer und
+  schreiben gueltigen Dateiinhalt.
+- DOT-Smokes aus `Normative CLI-Smokes` laufen, sobald AP 1.3 produktiv ist.
+- HTML-Smokes aus `Normative CLI-Smokes` laufen, sobald AP 1.4 produktiv ist.
 - `--quiet` und `--verbose`-Smokes laufen auf macOS und Windows, sobald
   AP 1.5 produktiv ist.
 
@@ -684,6 +693,9 @@ Pfad- und Golden-Tests:
   getestet.
 - Windows-UNC-Pfade wie `\\server\share\project\src\main.cpp` werden in
   mindestens einem Adapter-, CLI- oder Golden-Test abgedeckt.
+- Ein synthetischer UNC-Pfadfall ist required; ein echter lokaler
+  `\\localhost\...`-Share-Smoke ist nur required, wenn die Runner-Policy seine
+  Provisionierung erlaubt.
 - Windows-Extended-Length-Pfade wie `\\?\C:\project\src\main.cpp` werden in
   mindestens einem Pfad- oder Atomic-Writer-Test abgedeckt.
 - Windows-UNC-Tests nutzen keine externe Netzwerkabhaengigkeit; sie sind
