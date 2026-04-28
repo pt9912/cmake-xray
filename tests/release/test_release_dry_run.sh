@@ -331,6 +331,47 @@ rm -f "$state7_dir/state/release_published"
 assert_dry_run_aborts "scenario 7 extra-remote-asset aborts before release_published" \
     v0.0.0-dryrun-s7 "$state7_dir" "" "release_published"
 
+# ---- Scenario 8: Non-localhost XRAY_DRY_RUN_REGISTRY -> early abort ----
+#
+# AP M5-1.6 Tranche H.4: plan-Vertrag verlangt Fake-Publisher und
+# lokale Registry; eine versehentlich auf ghcr.io zeigende
+# XRAY_DRY_RUN_REGISTRY haette den Dry-Run an einen echten
+# Registry-Endpunkt geschickt. Der Guard greift vor jedem anderen
+# Setup, deshalb kein State-Dir und keine Registry-/fake-gh-
+# Vorbereitung noetig. Wir umgehen die `run_dry_run`-Wrapper, die
+# selbst `XRAY_DRY_RUN_REGISTRY=localhost:...` setzt, und ueberschreiben
+# es absichtlich mit einer ghcr.io-Form.
+state8_dir="$(mktemp -d -t cmake-xray-dry-run-s8.XXXXXX)"
+state_dirs+=("$state8_dir")
+mkdir -p "$state8_dir/state"
+out8_rc=0
+out8=$(docker run --rm \
+    -v "$repo_root:/workspace" \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v "$state8_dir:/state" \
+    --network host \
+    -e "XRAY_DRY_RUN_REGISTRY=ghcr.io/intentional-typo" \
+    -e "XRAY_DRY_RUN_KEEP_STATE=true" \
+    "$image" \
+    bash scripts/release-dry-run.sh v0.0.0-dryrun-s8 --state-dir /state 2>&1) || out8_rc=$?
+if [ "$out8_rc" -eq 0 ]; then
+    echo "FAIL: scenario 8 non-localhost registry should abort, dry-run succeeded" >&2
+    failures=$((failures + 1))
+elif printf '%s' "$out8" | grep -F -q "is not a localhost-form"; then
+    if [ -f "$state8_dir/state/draft_release_created" ] \
+       || [ -f "$state8_dir/state/oci_image_published" ] \
+       || [ -f "$state8_dir/state/release_published" ]; then
+        echo "FAIL: scenario 8 registry guard fired but state markers present" >&2
+        failures=$((failures + 1))
+    else
+        echo "PASS: scenario 8 non-localhost registry aborts before any state transition"
+    fi
+else
+    echo "FAIL: scenario 8 dry-run aborted but did not mention registry guard" >&2
+    printf '%s\n' "$out8" | tail -5 >&2 || true
+    failures=$((failures + 1))
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "$failures release dry-run check(s) FAILED" >&2

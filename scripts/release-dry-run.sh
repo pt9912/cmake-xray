@@ -22,7 +22,17 @@
 #   XRAY_DRY_RUN_REGISTRY    pre-existing local registry host:port; the
 #                            script skips the registry-start/stop logic
 #                            and uses this one. Tests share one registry
-#                            across scenarios via this variable.
+#                            across scenarios via this variable. Plan-
+#                            Vertrag (Tranche H.4): only `localhost:PORT`
+#                            or `127.0.0.1:PORT` are accepted; any other
+#                            form aborts unless XRAY_DRY_RUN_ALLOW_REMOTE_REGISTRY
+#                            is set, mirroring the GH_TOKEN-override
+#                            shape.
+#   XRAY_DRY_RUN_ALLOW_REMOTE_REGISTRY
+#                            set to '1' (or any non-empty value) to
+#                            override the localhost-form check on
+#                            XRAY_DRY_RUN_REGISTRY. Refuse to use this
+#                            outside test-infrastructure exercises.
 #   XRAY_DRY_RUN_KEEP_STATE  set to 'true' to skip state-dir cleanup so
 #                            the test harness can inspect the disposition
 #                            after the orchestrator returns.
@@ -121,9 +131,30 @@ export DRY_RUN="true"
 export FAKE_PUBLISHER="true"
 
 # 4. Local registry: reuse an existing one or start a fresh container.
+# AP M5-1.6 Tranche H.4: plan-Vertrag verlangt Fake-Publisher und
+# lokale Registry; ein versehentliches Setzen von
+# XRAY_DRY_RUN_REGISTRY=ghcr.io/foo wuerde den Dry-Run an einen
+# echten Registry-Endpunkt schicken. Vor Tranche H wurde der Wert
+# ungeprueft uebernommen. Akzeptable Formen sind localhost:PORT
+# und 127.0.0.1:PORT (mit Pfad-Suffix, da das Test-Setup
+# `localhost:15000/cmake-xray` nutzt). Ein Override existiert
+# symmetrisch zu GH_TOKEN ueber XRAY_DRY_RUN_ALLOW_REMOTE_REGISTRY.
 managed_registry=""
 if [ -n "${XRAY_DRY_RUN_REGISTRY:-}" ]; then
     registry="$XRAY_DRY_RUN_REGISTRY"
+    if [ -z "${XRAY_DRY_RUN_ALLOW_REMOTE_REGISTRY:-}" ]; then
+        case "$registry" in
+            localhost:*|127.0.0.1:*) ;;
+            *)
+                echo "error: XRAY_DRY_RUN_REGISTRY='$registry' is not a localhost-form" >&2
+                echo "       only 'localhost:PORT' or '127.0.0.1:PORT' is permitted; the" >&2
+                echo "       dry-run refuses to push to non-local registries" >&2
+                echo "hint:  unset XRAY_DRY_RUN_REGISTRY or set" >&2
+                echo "       XRAY_DRY_RUN_ALLOW_REMOTE_REGISTRY=1 if intentional" >&2
+                exit 1
+                ;;
+        esac
+    fi
     echo "[dry-run] using pre-existing registry at $registry"
 else
     # Pick a free port; default 15000 keeps off macOS AirPlay's :5000.
