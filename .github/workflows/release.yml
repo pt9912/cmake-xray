@@ -153,36 +153,15 @@ jobs:
             exit 1
           fi
 
-      # AP M5-1.6 Tranche C: gated OCI publish. Tranche-E will move this
-      # to a dedicated publish job; for now the steps stay in the Verify-
-      # Job behind an env-flag (XRAY_OCI_PUBLISH_ENABLED), so a re-run of
-      # this workflow with the flag still 'false' performs build+smoke
-      # without ever pushing to GHCR.
-      - name: Log in to GHCR
-        if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
-        run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Publish OCI image (versioned tag)
-        if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
-        run: |
-          bash scripts/oci-image-publish.sh \
-            "${{ needs.validate-tag.outputs.image_repo }}" \
-            "${{ needs.validate-tag.outputs.version }}" \
-            push
-
-      - name: Publish OCI image (latest tag for stable releases)
-        if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
-        run: |
-          set -eu
-          version="${{ needs.validate-tag.outputs.version }}"
-          if [[ "$version" == *-* ]]; then
-            echo "skipping latest update for prerelease ${version}"
-            exit 0
-          fi
-          bash scripts/oci-image-publish.sh \
-            "${{ needs.validate-tag.outputs.image_repo }}" \
-            "$version" \
-            latest
+      # AP M5-1.6 Tranche H.1: der OCI-Push lebt nicht mehr im Verify-
+      # Job. plan-M5-1-6.md "Veroeffentlichungskette" verlangt, dass
+      # Publish-Steps ausschliesslich im finalen Release-Job laufen,
+      # *nachdem* Verify und Build beide green sind. Vor Tranche H lief
+      # der OCI-Push aus Verify heraus, parallel zu Build -- ein
+      # gebrochener Build-Job haette einen bereits gepushten OCI-Tag
+      # ohne dazugehoerigen GitHub-Release hinterlassen. Die Push-,
+      # Login- und latest-Schritte sind in den `release`-Job
+      # umgezogen; der Verify-Job baut und smoket nur noch lokal.
 
   build:
     name: Build (${{ matrix.name }})
@@ -308,11 +287,46 @@ jobs:
           done
           bash scripts/release-allowlist.sh "$version" "${assets[@]}"
 
+      # AP M5-1.6 Tranche H.1: OCI-Push lebt jetzt im Release-Job.
+      # plan-M5-1-6.md "Veroeffentlichungskette" verlangt, dass jeder
+      # Publish-Step ausschliesslich nach erfolgreichem Verify *und*
+      # erfolgreichem Build laeuft. Vor Tranche H lief der Push aus
+      # dem Verify-Job parallel zum Build; ein gebrochener Build
+      # haette einen bereits gepushten OCI-Tag ohne dazugehoerige
+      # GitHub-Release-Assets hinterlassen. Der Versions-Tag-Push
+      # muss laut Plan vor `latest` laufen und beide muessen vor dem
+      # finalen `release_published` greifen.
+      - name: Log in to GHCR
+        if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
+        run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Publish OCI image (versioned tag)
+        if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
+        run: |
+          bash scripts/oci-image-publish.sh \
+            "${{ needs.validate-tag.outputs.image_repo }}" \
+            "${{ needs.validate-tag.outputs.version }}" \
+            push
+
+      - name: Publish OCI image (latest tag for stable releases)
+        if: env.XRAY_OCI_PUBLISH_ENABLED == 'true'
+        run: |
+          set -eu
+          version="${{ needs.validate-tag.outputs.version }}"
+          if [[ "$version" == *-* ]]; then
+            echo "skipping latest update for prerelease ${version}"
+            exit 0
+          fi
+          bash scripts/oci-image-publish.sh \
+            "${{ needs.validate-tag.outputs.image_repo }}" \
+            "$version" \
+            latest
+
       # AP M5-1.6 Tranche E: three-way version-consistency check pinned
       # against the canonical sources. Tag, --version output (from the
-      # OCI image tag pushed earlier in the verify job), and the asset
-      # naming convention must agree exactly; otherwise we abort before
-      # the GitHub-Release publish step.
+      # OCI image tag we just pushed above), and the asset naming
+      # convention must agree exactly; otherwise we abort before the
+      # GitHub-Release publish step.
       - name: Three-way version consistency check
         run: |
           set -eu
@@ -337,7 +351,7 @@ jobs:
 
           if ! docker buildx imagetools inspect "${image_repo}:${version}" \
                  --format '{{.Manifest.Digest}}' >/dev/null 2>&1; then
-            echo "error: OCI image ${image_repo}:${version} is not reachable; verify-job push must precede the release-job" >&2
+            echo "error: OCI image ${image_repo}:${version} is not reachable; the publish step earlier in this job must succeed first" >&2
             exit 1
           fi
 
