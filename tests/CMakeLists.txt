@@ -95,6 +95,20 @@ if(BASH_PROGRAM)
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     )
 
+    # AP M5-1.6 Tranche D.1: release dry-run smoke. Drives the full
+    # release sequence (archive + OCI + GitHub release) against fake
+    # publishers (local registry:2 container plus the fake-gh wrapper).
+    # Runs the orchestrator inside the cmake-xray:release-dry-run image
+    # so cmake/jq/curl/docker-cli are available; SKIPs cleanly when
+    # docker is missing on the host or the host is not Linux.
+    add_test(
+        NAME release_dry_run
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/release/test_release_dry_run.sh
+    )
+    set_tests_properties(release_dry_run PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
+
     # AP M5-1.5 Tranche D Folge-Refactor: split the monolithic run_e2e.sh
     # into focused sub-suites and register each as its own CTest entry so
     # `ctest --parallel` schedules them concurrently. run_e2e_lib.sh holds

@@ -176,6 +176,34 @@ RUN if [ -z "$XRAY_APP_VERSION" ]; then \
 
 ENTRYPOINT ["bash", "/workspace/scripts/release-archive-entrypoint.sh"]
 
+FROM toolchain AS release-dry-run
+
+# AP M5-1.6 Tranche D: stage that runs scripts/release-dry-run.sh end-to-end
+# inside a container with cmake (from toolchain), the docker CLI plus the
+# buildx plugin (so the dry-run can speak to a host-side daemon via the
+# bind-mounted docker.sock), jq for the fake-gh state JSON, and curl for
+# registry-readiness probes. Callers invoke the stage like:
+#
+#   docker build --target release-dry-run -t cmake-xray:release-dry-run .
+#   docker run --rm \
+#       -v "$PWD:/workspace" \
+#       -v /var/run/docker.sock:/var/run/docker.sock \
+#       --network host \
+#       cmake-xray:release-dry-run \
+#       bash scripts/release-dry-run.sh v0.0.0-test
+#
+# `--network host` lets the dry-run script reach the registry:2 container
+# it spawns on the host (localhost:<port>) without docker network mapping
+# tricks; the docker.sock mount routes `docker build/run/push` to the
+# host daemon so docker-in-docker is avoided entirely.
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        curl \
+        docker.io \
+        docker-buildx \
+        jq \
+    && rm -rf /var/lib/apt/lists/*
+
 FROM ubuntu:24.04 AS runtime
 
 # AP M5-1.6 Tranche C: OCI runtime image. The XRAY_APP_VERSION build-arg
