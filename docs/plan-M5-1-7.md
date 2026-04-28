@@ -80,6 +80,7 @@ Voraussichtlich zu aendern:
 - `tests/e2e/test_cli_verbosity.cpp`
 - `docs/quality.md`
 - `docs/releasing.md`
+- `docs/guide.md`
 - `README.md`
 
 Neue Dateien, falls die bestehende Struktur nicht ausreicht:
@@ -144,8 +145,10 @@ Auf macOS und Windows muessen mindestens folgende echte Binary-Aufrufe laufen:
 - `cmake-xray --help`
 - `cmake-xray analyze --compile-commands <fixture> --format console`
 - `cmake-xray analyze --compile-commands <fixture> --format json`
+- `cmake-xray analyze --compile-commands <fixture> --format json --output <path>`
 - `cmake-xray impact --compile-commands <fixture> --changed-file <path> --format console`
 - `cmake-xray impact --compile-commands <fixture> --changed-file <path> --format json`
+- `cmake-xray impact --compile-commands <fixture> --changed-file <path> --format json --output <path>`
 
 Soweit AP 1.3 und AP 1.4 abgeschlossen sind, werden DOT und HTML in denselben
 Smoke-Pfad aufgenommen:
@@ -154,11 +157,20 @@ Smoke-Pfad aufgenommen:
 - `impact --format dot`
 - `analyze --format html`
 - `impact --format html`
+- `analyze --format dot|html --output <path>`
+- `impact --format dot|html --output <path>`
 
 Die Smokes duerfen stdout/stderr nur nach den dokumentierten Report- und
 Verbosity-Vertraegen bewerten. Zeilenenden werden fuer Golden-Vergleiche
 normalisiert, aber die fachliche Ausgabe darf nicht plattformspezifisch
 umgeschrieben werden.
+
+Die `--output`-Smokes sind bewusst Teil des Plattformvertrags: Sie muessen auf
+macOS und Windows eine echte Datei im Zielverzeichnis schreiben, leeres stdout
+bei erfolgreicher Dateiausgabe pruefen und den geschriebenen Report gegen das
+jeweilige Formatgate oder Golden validieren. Sie ersetzen nicht die
+Atomic-Writer-Unit-Tests, sondern sichern den End-to-End-Pfad durch die echte
+CLI-Binary.
 
 ### Smoke-Skripte
 
@@ -338,6 +350,13 @@ Regeln:
 - Wenn bestehende Workflows macOS-/Windows-Pakete erzeugen, werden sie
   entweder deaktiviert, als Preview separiert oder ueber die Allowlist aus
   AP 1.6 vom finalen Publish ausgeschlossen.
+- Der finale Release-Publish-Pfad braucht einen expliziten Guard, der die
+  heruntergeladene Assetliste vor `gh release upload` gegen die erlaubten
+  offiziellen M5-Assetnamen prueft und bei jedem macOS-/Windows-Archiv ohne
+  Preview-Klassifizierung nonzero abbricht.
+- Der Guard muss als automatisierter Workflow-Schritt oder lokaler
+  Release-Dry-Run-Test abdeckbar sein; reine Review- oder Dokumentationspflicht
+  reicht nicht.
 
 ## Dokumentation
 
@@ -362,6 +381,16 @@ Regeln:
 - Mindestversionen fuer CMake und Compiler bleiben sichtbar,
 - Plattformstatus wird kurz und konsistent beschrieben,
 - detaillierte Gate-Erklaerungen verweisen auf `docs/quality.md` und
+  `docs/releasing.md`.
+
+`docs/guide.md` wird mitgepflegt, sobald AP 1.7 Mindestversions- oder
+Plattformvoraussetzungen beruehrt:
+
+- CMake-Mindestversion ist identisch zu `README.md` und
+  `cmake_minimum_required`,
+- lokale Plattform-Smokes oder Verweise darauf widersprechen nicht
+  `docs/quality.md`,
+- Beispiele versprechen keine weitergehende macOS-/Windows-Freigabe als
   `docs/releasing.md`.
 
 ## Implementierungsreihenfolge
@@ -403,6 +432,10 @@ CI-Job bricht.
 4. Laufwerksbuchstaben-, Backslash- und absolute-Pfad-Faelle pruefen.
 5. `docs/releasing.md` und `README.md` mit finalem Plattformstatus fuer M5
    aktualisieren.
+6. `docs/guide.md` gegen README, CMake-Mindestversion und Plattformstatus
+   abgleichen.
+7. Release-Asset-Allowlist-Guard oder Dry-Run-Test fuer macOS-/Windows-
+   Preview-Abgrenzung ergaenzen.
 
 Tranche C ist fertig, wenn macOS-/Windows-Risiken aus den Hauptplanpunkten
 konkret gruen, rot oder dokumentiert begrenzt sind.
@@ -479,8 +512,14 @@ CLI-Smoke-Tests:
   JSON.
 - `impact --format json` laeuft auf macOS und Windows und erzeugt gueltiges
   JSON.
+- `analyze --format json --output <path>` laeuft auf macOS und Windows, laesst
+  stdout leer und schreibt gueltiges JSON.
+- `impact --format json --output <path>` laeuft auf macOS und Windows, laesst
+  stdout leer und schreibt gueltiges JSON.
 - DOT-Smokes laufen auf macOS und Windows, sobald AP 1.3 produktiv ist.
 - HTML-Smokes laufen auf macOS und Windows, sobald AP 1.4 produktiv ist.
+- DOT-/HTML-`--output`-Smokes laufen auf macOS und Windows, sobald AP 1.3
+  beziehungsweise AP 1.4 produktiv ist.
 - `--quiet` und `--verbose`-Smokes laufen auf macOS und Windows, sobald
   AP 1.5 produktiv ist.
 
@@ -504,8 +543,12 @@ Dokumentationstests oder Review-Gates:
 - `docs/releasing.md` nennt offiziellen und nicht offiziellen
   Plattformstatus.
 - `README.md` widerspricht `docs/releasing.md` nicht.
+- `docs/guide.md` nennt dieselbe CMake-Mindestversion wie `README.md` und
+  `cmake_minimum_required`.
 - Release-Workflow veroeffentlicht keine unmarkierten macOS-/Windows-Artefakte
   als offizielle M5-Assets.
+- Ein automatisierter Allowlist-Check oder Release-Dry-Run-Test bricht ab,
+  wenn ein macOS-/Windows-Archiv in der offiziellen M5-Assetliste auftaucht.
 
 Rueckwaertskompatibilitaets-Tests:
 
@@ -534,6 +577,8 @@ AP 1.7 ist abnahmefaehig, wenn:
   dokumentiert ist.
 - CLI-Smokes fuer `--help`, `analyze` und `impact` auf macOS und Windows
   laufen oder als `known_limited` mit konkretem Fehler dokumentiert sind.
+- CLI-`--output`-Smokes fuer mindestens JSON laufen auf macOS und Windows und
+  pruefen leeres stdout sowie gueltigen Dateiinhalt.
 - Pfadnormalisierung fuer Laufwerksbuchstaben, Backslashes und POSIX-absolute
   Testpfade abgesichert ist.
 - CRLF keine Golden-Scheindifferenzen erzeugt.
@@ -543,8 +588,12 @@ AP 1.7 ist abnahmefaehig, wenn:
 - `docs/releasing.md` die Release- und Preview-Grenzen beschreibt.
 - `README.md` keine weitergehende Plattformfreigabe verspricht als
   `docs/releasing.md`.
+- `docs/guide.md` dieselbe CMake-Mindestversion und denselben Plattformstatus
+  wie README, Quality- und Release-Dokumentation verwendet.
 - Release-Workflow und Release-Doku keine unmarkierten macOS-/Windows-
   Artefakte in den offiziellen M5-Releaseumfang aufnehmen.
+- ein automatisierter Release-Asset-Allowlist-Guard oder Release-Dry-Run-Test
+  unmarkierte macOS-/Windows-Artefakte vor der Veroeffentlichung blockiert.
 - Coverage-, Lizard-, Clang-Tidy- und bestehende Docker-Gates nach AP 1.7
   gruen bleiben.
 
