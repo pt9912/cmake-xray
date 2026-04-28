@@ -16,6 +16,8 @@ add_executable(
     adapters/test_markdown_report_adapter.cpp
     adapters/test_source_parsing_include_adapter.cpp
     e2e/test_cli.cpp
+    e2e/test_cli_render_errors.cpp
+    e2e/test_cli_verbosity.cpp
 )
 
 target_link_libraries(
@@ -57,9 +59,28 @@ if(BASH_PROGRAM)
         COMMAND bash ${PROJECT_SOURCE_DIR}/cmake/check_hexagon_boundary.sh ${PROJECT_SOURCE_DIR}/src/hexagon
     )
 
+    # AP M5-1.5 Tranche D Folge-Refactor: split the monolithic run_e2e.sh
+    # into focused sub-suites and register each as its own CTest entry so
+    # `ctest --parallel` schedules them concurrently. run_e2e_lib.sh holds
+    # the shared assert_* and validator helpers; each sub-script sources it
+    # before running its own subset and reports its own failure count.
     add_test(
-        NAME e2e_binary
-        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/e2e/run_e2e.sh
+        NAME e2e_binary_smoke
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/e2e/run_e2e_smoke.sh
+                $<TARGET_FILE:cmake-xray>
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata
+    )
+
+    add_test(
+        NAME e2e_binary_artifacts
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/e2e/run_e2e_artifacts.sh
+                $<TARGET_FILE:cmake-xray>
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata
+    )
+
+    add_test(
+        NAME e2e_binary_verbosity
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/e2e/run_e2e_verbosity.sh
                 $<TARGET_FILE:cmake-xray>
                 ${PROJECT_SOURCE_DIR}/tests/e2e/testdata
     )
