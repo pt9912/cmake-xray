@@ -109,9 +109,16 @@ Fuer M5 gilt:
 - `validated_smoke` fuer macOS oder Windows ist nur zulaessig, wenn alle in
   AP 1.7 als Pflicht definierten Build-, Atomic-Replace- und CLI-Smoke-Gates
   auf dieser Plattform gruen sind.
+- `validated_smoke` braucht einen objektiven Nachweis im PR- oder Release-
+  Kontext: entweder verpflichtende CI-Jobs pro Plattform oder ein
+  reproduzierbarer Smoke-Report als verpflichtendes Review-Artefakt mit
+  nonzero Fail-Verhalten bei Abweichungen.
 - `known_limited` ist zu verwenden, sobald ein Pflichtgate rot ist, nur
   manuell statt in CI laeuft, bewusst uebersprungen wird oder nur mit einer
   dokumentierten Einschraenkung aussagekraeftig ist.
+- Ein nur lokal ausgefuehrtes oder frei editierbares Smoke-Protokoll reicht
+  nicht fuer `validated_smoke`; ohne automatischen oder artefaktbasiert
+  verifizierbaren Nachweis bleibt der Status `known_limited`.
 - Jeder Status muss in `docs/releasing.md` und `docs/quality.md` konsistent
   benannt werden.
 - Ein roter macOS- oder Windows-Job darf nicht durch implizites Ignorieren zu
@@ -144,6 +151,15 @@ Regeln:
   Doku diesen Preview-/Smoke-Status ausdruecken.
 - Native CI darf nicht auf Docker als Ersatz fuer macOS-/Windows-Aussagen
   verweisen.
+- Fuer `validated_smoke` muss pro macOS-/Windows-Plattform mindestens einer
+  dieser Nachweispfade verpflichtend sein:
+  - ein nicht ueberspringbarer Matrixjob, der Build, Atomic-Replace-Tests und
+    CLI-Smokes ausfuehrt;
+  - ein reproduzierbarer Smoke-Report-Upload mit Host-, Toolchain-,
+    CMake-Version, Kommando-Log, Exit-Codes und Checksummen der erzeugten
+    Reports, der als verpflichtender Review-Check ausgewertet wird.
+- Fehlt dieser Nachweispfad, darf die Plattform nur als `known_limited`
+  dokumentiert werden.
 
 ### CLI-Smokes
 
@@ -192,6 +208,9 @@ plattformfaehiges Smoke-Skript existieren:
 - Nonzero Exit bei fehlgeschlagenem Build, fehlgeschlagener CLI-Ausfuehrung
   oder fehlender Testfixture.
 - Keine Netzwerknutzung zur Laufzeit.
+- Wenn Smoke-Skripte statt direkter Matrixschritte den Plattformstatus
+  begruenden, muessen sie einen maschinenlesbaren Report erzeugen, der in CI
+  hochgeladen und durch einen verpflichtenden Check validiert wird.
 
 ## Atomic-Replace-Matrix
 
@@ -293,6 +312,11 @@ Regeln:
   Windows-Semantik fachlich verschieden sind.
 - Laufwerksbuchstaben werden in Display-Pfaden stabil und dokumentiert
   behandelt.
+- UNC-Pfade (`\\server\share\...`) und Extended-Length-Pfade
+  (`\\?\C:\...`) sind verpflichtende Windows-Testfaelle fuer Pfadanzeige,
+  Escaping und mindestens einen CLI- oder Golden-Pfad.
+- Atomic-Writer-Tests muessen mindestens einen Extended-Length-Zielpfad oder
+  einen dokumentierten Windows-API-Skip mit `known_limited`-Folge pruefen.
 - Test-Helfer muessen Pfade ueber `native_path` oder einen aequivalenten
   Mechanismus an Windows-native Tools uebergeben.
 - CRLF wird in Vergleichen normalisiert, ohne Report-Adapter zu
@@ -310,8 +334,14 @@ M5 haelt die dokumentierte Mindestversion:
 
 Kompatibilitaetsregeln:
 
-- Eine aktuelle CMake-Version wird in der nativen Matrix oder einem
-  Smoke-Check ausgefuehrt.
+- Die native Matrix legt pro Host eine erwartete CMake-Mindestversion fest,
+  zum Beispiel als `CMAKE_MIN_VERSION` oder explizite Matrixspalte.
+- Jeder Plattformjob protokolliert `cmake --version` vor der Konfiguration und
+  bricht vor dem Build ab, wenn die gefundene Version unter der dokumentierten
+  Mindestversion liegt.
+- Mindestens ein Matrixjob pro Hostfamilie nutzt eine explizit eingerichtete
+  aktuelle CMake-Version statt nur implizit vorinstallierter Runner-Defaults;
+  die konkrete Version wird in `docs/quality.md` dokumentiert.
 - Compiler-Mindestanforderungen werden nicht implizit angehoben.
 - Falls ein Plattformfix eine neuere C++- oder CMake-Funktion braucht, wird die
   Mindestversion bewusst angepasst und in Doku, CI und Changelog nachgezogen.
@@ -366,9 +396,14 @@ Regeln:
 - Der Guard muss unabhaengig vom konkreten Upload-Mechanismus gelten, also
   sowohl fuer `gh release upload` als auch fuer GitHub Actions, eigene
   Workflow-Schritte oder spaetere Publisher-Skripte.
-- Der Guard muss als automatisierter Workflow-Schritt oder lokaler
-  Release-Dry-Run-Test abdeckbar sein; reine Review- oder Dokumentationspflicht
-  reicht nicht.
+- Der Guard ist ein nicht ueberspringbarer Release-Job oder ein verpflichtender
+  Schritt im finalen Release-Job und muss vor jedem extern sichtbaren
+  Release-Upload laufen.
+- Der Release-Dry-Run muss denselben Guard ausfuehren und einen Negativfall
+  enthalten, in dem ein macOS-/Windows-Archiv in der offiziellen Assetliste
+  den Publish-Pfad vor Upload abbricht.
+- Ein lokaler Ad-hoc-Check ohne Einbindung in den Release-Lauf reicht nicht;
+  reine Review- oder Dokumentationspflicht reicht ebenfalls nicht.
 
 ## Dokumentation
 
@@ -411,10 +446,10 @@ Plattformvoraussetzungen beruehrt:
 
 1. Bestehende `build.yml`- und `release.yml`-Matrizen gegen den
    Plattformstatusvertrag pruefen.
-2. CMake-, Compiler- und Runner-Versionen in CI-Ausgaben sichtbar machen, falls
-   sie nicht ohnehin eindeutig aus den Logs hervorgehen.
-3. Entscheiden, ob macOS-/Windows-Jobs verpflichtende Gates oder dokumentierte
-   Smokes sind.
+2. CMake-, Compiler- und Runner-Versionen in CI-Ausgaben sichtbar machen und
+   CMake-Versionen gegen die dokumentierte Mindestversion fail-fast pruefen.
+3. Entscheiden, ob macOS-/Windows-Jobs verpflichtende Gates sind oder ob ein
+   verpflichtend validierter Smoke-Report-Upload den Nachweis liefert.
 4. `docs/quality.md` mit dem vorlaeufigen Plattformstatus ergaenzen.
 
 Tranche A ist fertig, wenn Build- und Testjobs fuer alle vorgesehenen Hosts
@@ -440,13 +475,15 @@ CI-Job bricht.
 2. `native_path`, CRLF-Normalisierung und per-Plattform-Golden-Auswahl fuer
    alle M5-Artefaktformate absichern.
 3. CLI-Smokes fuer `--help`, `analyze` und `impact` auf macOS und Windows in
-   CI oder dokumentierte Smoke-Skripte aufnehmen.
-4. Laufwerksbuchstaben-, Backslash- und absolute-Pfad-Faelle pruefen.
+   CI oder verpflichtend validierte Smoke-Report-Skripte aufnehmen.
+4. Laufwerksbuchstaben-, UNC-, Extended-Length-, Backslash- und absolute-Pfad-
+   Faelle pruefen.
 5. `docs/releasing.md` und `README.md` mit finalem Plattformstatus fuer M5
    aktualisieren.
 6. `docs/guide.md` gegen README, CMake-Mindestversion und Plattformstatus
    abgleichen.
-7. Release-Asset-Allowlist-Guard oder Dry-Run-Test fuer macOS-/Windows-
+7. Nicht ueberspringbaren Release-Asset-Allowlist-Guard im finalen
+   Release-Lauf und passenden Dry-Run-Negativtest fuer macOS-/Windows-
    Preview-Abgrenzung ergaenzen.
 
 Tranche C ist fertig, wenn macOS-/Windows-Risiken aus den Hauptplanpunkten
@@ -493,8 +530,15 @@ CI- und Build-Tests:
 
 - Native Matrix baut Linux, macOS und Windows.
 - Native Matrix fuehrt `ctest` auf allen drei Plattformen aus.
+- `validated_smoke` fuer macOS oder Windows ist durch verpflichtende CI-Jobs
+  oder durch einen verpflichtend validierten Smoke-Report-Upload belegt.
+- Smoke-Report-Artefakte enthalten Host, Toolchain, CMake-Version,
+  ausgefuehrte Kommandos, Exit-Codes und Checksummen erzeugter Reports.
 - CI-Logs zeigen CMake- und Compiler-Versionen oder machen sie aus
   Workflow-Kontext eindeutig nachvollziehbar.
+- CMake-Versionen werden pro Plattform gegen die dokumentierte
+  Mindestversion geprueft; Unterschreitung fuehrt vor dem Build zu nonzero
+  Exit.
 - `fail-fast: false` bleibt fuer Plattformmatrizen gesetzt.
 - Fehlende Python-Validator-Abhaengigkeit fuehrt zu konkretem Fehler statt zu
   stillem Skip.
@@ -539,6 +583,10 @@ Pfad- und Golden-Tests:
 
 - Windows-absolute `--changed-file`-Pfade mit Laufwerksbuchstaben werden
   getestet.
+- Windows-UNC-Pfade wie `\\server\share\project\src\main.cpp` werden in
+  mindestens einem Adapter-, CLI- oder Golden-Test abgedeckt.
+- Windows-Extended-Length-Pfade wie `\\?\C:\project\src\main.cpp` werden in
+  mindestens einem Pfad- oder Atomic-Writer-Test abgedeckt.
 - POSIX-absolute Pfade werden auf Windows nicht faelschlich als absoluter
   Windows-Pfad erwartet.
 - Backslash-Faelle werden in DOT, HTML und JSON stabil behandelt.
@@ -559,8 +607,9 @@ Dokumentationstests oder Review-Gates:
   `cmake_minimum_required`.
 - Release-Workflow veroeffentlicht keine unmarkierten macOS-/Windows-Artefakte
   als offizielle M5-Assets.
-- Ein automatisierter Allowlist-Check oder Release-Dry-Run-Test bricht ab,
+- Ein nicht ueberspringbarer Release-Guard im finalen Release-Lauf bricht ab,
   wenn ein macOS-/Windows-Archiv in der offiziellen M5-Assetliste auftaucht.
+- Der Release-Dry-Run deckt denselben Guard mit einem Negativfall ab.
 
 Rueckwaertskompatibilitaets-Tests:
 
@@ -575,10 +624,12 @@ Rueckwaertskompatibilitaets-Tests:
 
 AP 1.7 ist abnahmefaehig, wenn:
 
-- Linux, macOS und Windows in der nativen CI-Matrix oder in dokumentierten
-  Smoke-Checks sichtbar bewertet sind.
+- Linux, macOS und Windows in der nativen CI-Matrix oder ueber verpflichtend
+  validierte Smoke-Report-Artefakte sichtbar bewertet sind.
 - Der M5-Plattformstatus fuer Linux, macOS und Windows eindeutig dokumentiert
   ist.
+- `validated_smoke` fuer macOS oder Windows nur vergeben wird, wenn der
+  zugehoerige CI-Job oder Smoke-Report-Check gruen ist.
 - macOS und Windows nicht stillschweigend als offiziell freigegebene
   Releaseplattformen erscheinen.
 - Atomic-Replace-Tests auf Linux, macOS und Windows laufen.
@@ -591,10 +642,12 @@ AP 1.7 ist abnahmefaehig, wenn:
   laufen oder als `known_limited` mit konkretem Fehler dokumentiert sind.
 - CLI-`--output`-Smokes fuer mindestens JSON laufen auf macOS und Windows und
   pruefen leeres stdout sowie gueltigen Dateiinhalt.
-- Pfadnormalisierung fuer Laufwerksbuchstaben, Backslashes und POSIX-absolute
-  Testpfade abgesichert ist.
+- Pfadnormalisierung fuer Laufwerksbuchstaben, UNC-Pfade,
+  Extended-Length-Pfade, Backslashes und POSIX-absolute Testpfade abgesichert
+  ist.
 - CRLF keine Golden-Scheindifferenzen erzeugt.
-- CMake- und Compiler-Mindestversionen in Doku und CI konsistent sind.
+- CMake- und Compiler-Mindestversionen in Doku und CI konsistent sind und die
+  CI bei zu alter CMake-Version vor dem Build abbricht.
 - CMake-File-API-Einschraenkungen aus M4/M5 weiterhin dokumentiert sind.
 - `docs/quality.md` die Plattform-Gates und Smoke-Abdeckung beschreibt.
 - `docs/releasing.md` die Release- und Preview-Grenzen beschreibt.
@@ -604,8 +657,9 @@ AP 1.7 ist abnahmefaehig, wenn:
   wie README, Quality- und Release-Dokumentation verwendet.
 - Release-Workflow und Release-Doku keine unmarkierten macOS-/Windows-
   Artefakte in den offiziellen M5-Releaseumfang aufnehmen.
-- ein automatisierter Release-Asset-Allowlist-Guard oder Release-Dry-Run-Test
-  unmarkierte macOS-/Windows-Artefakte vor der Veroeffentlichung blockiert.
+- ein nicht ueberspringbarer Release-Asset-Allowlist-Guard im finalen
+  Release-Lauf unmarkierte macOS-/Windows-Artefakte vor der Veroeffentlichung
+  blockiert.
 - Coverage-, Lizard-, Clang-Tidy- und bestehende Docker-Gates nach AP 1.7
   gruen bleiben.
 
