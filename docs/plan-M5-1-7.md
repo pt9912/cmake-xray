@@ -122,6 +122,10 @@ Fuer M5 gilt:
 - Der Nachweispfad muss als Required Check in der Branch-Protection oder als
   nicht ueberspringbares Release-Gate konfiguriert sein, bevor
   `validated_smoke` dokumentiert werden darf.
+- Branch-Protection und Required-Check-Auswahl sind externe
+  Repository-Konfiguration; AP 1.7 dokumentiert den erwarteten Check-Namen,
+  die betroffene Plattform und den Zeitpunkt der Konfigurationspruefung in
+  `docs/quality.md`.
 - `known_limited` ist zu verwenden, sobald ein Pflichtgate rot ist, nur
   manuell statt in CI laeuft, bewusst uebersprungen wird oder nur mit einer
   dokumentierten Einschraenkung aussagekraeftig ist.
@@ -255,8 +259,9 @@ Pflichtfelder:
 - `cmake.version`, `cmake.minimum_version`, `cmake.minimum_satisfied`.
 - `compiler.id`, `compiler.version`, `compiler.minimum_version`,
   `compiler.minimum_satisfied`.
-- `msys_path_mode` fuer Windows: `disabled`, `native_powershell`,
-  `conversion_enabled_control`, oder `not_applicable`.
+- `msys_path_mode`: fuer Windows nur `disabled`, `native_powershell` oder
+  `conversion_enabled_control`; `not_applicable` ist ausschliesslich fuer
+  Nicht-Windows-Reports zulaessig.
 - `commands[]` mit Name, Argumentliste, Exit-Code, stdout-/stderr-Checksumme
   und erzeugten Report-Checksummen.
 - `required_commands_satisfied`: Boolean.
@@ -405,6 +410,8 @@ Regeln:
   nicht die konvertierungsfreien Pflicht-Smokes ersetzen.
 - Jeder Windows-Smoke dokumentiert im Log und, falls genutzt, im Smoke-Report
   den Modus `disabled`, `native_powershell` oder `conversion_enabled_control`.
+- `not_applicable` ist in Windows-Smoke-Reports ungueltig und wird vom
+  Smoke-Report-Verifier abgelehnt.
 - Windows-Goldens fuer absolute Pfade sind eigene Varianten, wenn POSIX- und
   Windows-Semantik fachlich verschieden sind.
 - Laufwerksbuchstaben werden in Display-Pfaden stabil und dokumentiert
@@ -664,6 +671,9 @@ CI- und Build-Tests:
 - Diese CI-Jobs oder Smoke-Report-Checks sind als Required Checks fuer PRs
   beziehungsweise als nicht ueberspringbare Release-Gates fuer Tags
   konfiguriert.
+- Da Branch-Protection nicht im Workflow selbst versioniert ist, muss die
+  Umsetzung mit Screenshot, `gh`-API-Auszug oder gleichwertigem Audit-Hinweis
+  in `docs/quality.md` referenziert werden.
 - Smoke-Report-Artefakte enthalten Host, Toolchain, CMake-Version,
   ausgefuehrte Kommandos, Exit-Codes und Checksummen erzeugter Reports.
 - Smoke-Report-Artefakte validieren gegen das versionierte JSON-Schema und
