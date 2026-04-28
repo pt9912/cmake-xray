@@ -95,16 +95,23 @@ Neue Dateien, falls die bestehende Struktur nicht ausreicht:
 M5 unterscheidet drei Statusklassen:
 
 - `supported`: offiziell freigegeben, dokumentiert und releasefaehig.
-- `validated_smoke`: Build und definierte Smokes laufen, aber ohne
-  vollstaendige Releasefreigabe.
-- `known_limited`: Build oder Smokes sind nur teilweise gruen; Einschraenkungen
-  sind dokumentiert und priorisierbar.
+- `validated_smoke`: Build, Pflicht-Smokes und verpflichtende Plattformgates
+  laufen gruen, aber ohne vollstaendige Releasefreigabe.
+- `known_limited`: Build, Pflicht-Smokes oder Plattformgates sind nicht
+  vollstaendig gruen; die akzeptierten Ausfaelle, Umgehungen oder nicht
+  abgedeckten Flaechen sind dokumentiert und priorisierbar.
 
 Fuer M5 gilt:
 
 - Linux ist `supported`.
 - macOS darf hoechstens `validated_smoke` erreichen.
 - Windows darf hoechstens `validated_smoke` erreichen.
+- `validated_smoke` fuer macOS oder Windows ist nur zulaessig, wenn alle in
+  AP 1.7 als Pflicht definierten Build-, Atomic-Replace- und CLI-Smoke-Gates
+  auf dieser Plattform gruen sind.
+- `known_limited` ist zu verwenden, sobald ein Pflichtgate rot ist, nur
+  manuell statt in CI laeuft, bewusst uebersprungen wird oder nur mit einer
+  dokumentierten Einschraenkung aussagekraeftig ist.
 - Jeder Status muss in `docs/releasing.md` und `docs/quality.md` konsistent
   benannt werden.
 - Ein roter macOS- oder Windows-Job darf nicht durch implizites Ignorieren zu
@@ -157,8 +164,10 @@ Smoke-Pfad aufgenommen:
 - `impact --format dot`
 - `analyze --format html`
 - `impact --format html`
-- `analyze --format dot|html --output <path>`
-- `impact --format dot|html --output <path>`
+- `analyze --format dot --output <path>`
+- `impact --format dot --output <path>`
+- `analyze --format html --output <path>`
+- `impact --format html --output <path>`
 
 Die Smokes duerfen stdout/stderr nur nach den dokumentierten Report- und
 Verbosity-Vertraegen bewerten. Zeilenenden werden fuer Golden-Vergleiche
@@ -351,9 +360,12 @@ Regeln:
   entweder deaktiviert, als Preview separiert oder ueber die Allowlist aus
   AP 1.6 vom finalen Publish ausgeschlossen.
 - Der finale Release-Publish-Pfad braucht einen expliziten Guard, der die
-  heruntergeladene Assetliste vor `gh release upload` gegen die erlaubten
-  offiziellen M5-Assetnamen prueft und bei jedem macOS-/Windows-Archiv ohne
-  Preview-Klassifizierung nonzero abbricht.
+  heruntergeladene oder erzeugte Assetliste vor dem finalen Release-Upload
+  gegen die erlaubten offiziellen M5-Assetnamen prueft und bei jedem macOS-/
+  Windows-Archiv ohne Preview-Klassifizierung nonzero abbricht.
+- Der Guard muss unabhaengig vom konkreten Upload-Mechanismus gelten, also
+  sowohl fuer `gh release upload` als auch fuer GitHub Actions, eigene
+  Workflow-Schritte oder spaetere Publisher-Skripte.
 - Der Guard muss als automatisierter Workflow-Schritt oder lokaler
   Release-Dry-Run-Test abdeckbar sein; reine Review- oder Dokumentationspflicht
   reicht nicht.
