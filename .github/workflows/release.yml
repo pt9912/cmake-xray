@@ -287,6 +287,35 @@ jobs:
           done
           bash scripts/release-allowlist.sh "$version" "${assets[@]}"
 
+      # AP M5-1.6 Tranche H.2: erster Schritt der Plan-Sequenz
+      # `draft_release_created -> oci_image_published ->
+      # release_published`. Vor Tranche H rief der Workflow den
+      # Idempotency-Helper *ohne* `--draft` und erstellte einen
+      # public Release direkt -- das umgeht den Plan-Vertrag (plan-
+      # M5-1-6.md "Veroeffentlichungskette") und macht eine partielle
+      # OCI-Publish-Failure ueber Endnutzer sichtbar. Der Helper
+      # erstellt jetzt einen Draft-Release; `--draft` wirkt nur am
+      # `gh release create`-Pfad. Re-Runs eines bereits public
+      # Release durchlaufen den Validate-und-Upload-Missing-Pfad
+      # ohne den Draft-Status zu modifizieren.
+      - name: Create draft GitHub release (manifest idempotency)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          tag="${{ needs.validate-tag.outputs.tag }}"
+          notes="release-assets/release-notes.md"
+
+          # Collect all archives and checksums (exclude release-notes.md);
+          # the Allowlist guard above has already verified the basenames.
+          assets=()
+          for f in release-assets/cmake-xray_*; do
+            assets+=("$f")
+          done
+
+          bash scripts/release-publish-idempotency.sh --draft \
+            "$tag" "$notes" "${assets[@]}"
+
       # AP M5-1.6 Tranche H.1: OCI-Push lebt jetzt im Release-Job.
       # plan-M5-1-6.md "Veroeffentlichungskette" verlangt, dass jeder
       # Publish-Step ausschliesslich nach erfolgreichem Verify *und*
@@ -372,28 +401,19 @@ jobs:
 
           echo "version consistency check passed: tag=$tag version=$version"
 
-      # AP M5-1.6 Tranche G.3: Manifest-/Checksum-Idempotenz vor jeder
-      # Mutation. Vor Tranche G rief der Workflow `gh release upload
-      # --clobber` ohne Pruefung, sodass ein divergenter Remote-Asset
-      # still ueberschrieben worden waere -- plan-M5-1-6.md
-      # "Veroeffentlichungskette" verbietet das. Die Idempotenz-Logik
-      # steht in scripts/release-publish-idempotency.sh und wird vom
-      # Dry-Run-Orchestrator (scripts/release-dry-run.sh) byte-gleich
-      # aufgerufen, sodass Dry-Run und Real-Workflow nicht voneinander
-      # divergieren koennen.
-      - name: Create or update GitHub release
+      # AP M5-1.6 Tranche H.2: finaler Plan-Schritt `release_published`.
+      # Erst wenn Allowlist, Idempotenz, OCI-Push und Drei-Wege-
+      # Versionscheck alle gruen sind, wird der Draft public. Eine
+      # Failure in einem der vorherigen Steps laesst den Draft im
+      # nicht-publishten Zustand zurueck, sodass Endnutzer keinen
+      # halb-publishten Release sehen. Re-Runs eines bereits public
+      # Release sind no-op (`--draft=false` auf einem nicht-Draft
+      # ist idempotent).
+      - name: Promote draft release to public
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
           tag="${{ needs.validate-tag.outputs.tag }}"
-          notes="release-assets/release-notes.md"
-
-          # Collect all archives and checksums (exclude release-notes.md);
-          # the Allowlist guard above has already verified the basenames.
-          assets=()
-          for f in release-assets/cmake-xray_*; do
-            assets+=("$f")
-          done
-
-          bash scripts/release-publish-idempotency.sh "$tag" "$notes" "${assets[@]}"
+          gh release edit "$tag" --draft=false >/dev/null
+          echo "release '$tag' promoted to public"
