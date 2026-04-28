@@ -86,6 +86,12 @@ jobs:
             ccache-linux-x86_64-
 
       - name: Configure CMake
+        # AP M5-1.6 Tranche G fixup: ohne `shell: bash` waehlt
+        # GitHub Actions auf windows-latest die PowerShell als Default
+        # und parst das `if [ "$x" = "$y" ]; then`-Pattern als
+        # PowerShell, was mit `Missing '(' after 'if'` abbricht.
+        # `shell: bash` zwingt git-bash auf dem Windows-Runner.
+        shell: bash
         run: |
           if [ "${{ matrix.name }}" = "linux-x86_64" ]; then
             export CCACHE_BASEDIR="$GITHUB_WORKSPACE"
