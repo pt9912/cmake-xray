@@ -65,9 +65,11 @@ build_archive_script="$repo_root/scripts/build-release-archive.sh"
 oci_publish_script="$repo_root/scripts/oci-image-publish.sh"
 fake_gh_script="$repo_root/scripts/release-fake-gh.sh"
 allowlist_script="$repo_root/scripts/release-allowlist.sh"
+idempotency_script="$repo_root/scripts/release-publish-idempotency.sh"
 
 for required in "$validate_tag_script" "$build_archive_script" \
-                "$oci_publish_script" "$fake_gh_script" "$allowlist_script"; do
+                "$oci_publish_script" "$fake_gh_script" "$allowlist_script" \
+                "$idempotency_script"; do
     if ! [ -x "$required" ]; then
         echo "error: required script $required missing or not executable" >&2
         exit 2
@@ -188,61 +190,12 @@ notes_file="$state_dir/release-notes.md"
 } > "$notes_file"
 
 # 7. Create or reuse the draft GitHub release.
-if gh release view "$tag" >/dev/null 2>&1; then
-    existing_meta="$(gh release view "$tag")"
-    existing_draft_flag="$(jq -r '.draft' <<<"$existing_meta")"
-    echo "[dry-run] release '$tag' already exists (draft=$existing_draft_flag); reusing"
-
-    # Compare each existing asset's sha256 against what we just built.
-    expected_archive_sha="$(awk '{print $1}' "$sha_path")"
-    existing_archive_sha="$(jq -r --arg name "$archive_basename" \
-        '.assets[] | select(.name == $name) | .sha256' <<<"$existing_meta")"
-    if [ -n "$existing_archive_sha" ] && [ "$existing_archive_sha" != "$expected_archive_sha" ]; then
-        echo "error: existing release asset $archive_basename sha256 ($existing_archive_sha)" \
-             "does not match local build ($expected_archive_sha)" >&2
-        echo "       aborting before any release_published transition" >&2
-        exit 1
-    fi
-
-    sidecar_basename="${archive_basename}.sha256"
-    expected_sidecar_sha="$(sha256sum "$sha_path" | awk '{print $1}')"
-    existing_sidecar_sha="$(jq -r --arg name "$sidecar_basename" \
-        '.assets[] | select(.name == $name) | .sha256' <<<"$existing_meta")"
-    if [ -n "$existing_sidecar_sha" ] && [ "$existing_sidecar_sha" != "$expected_sidecar_sha" ]; then
-        echo "error: existing release sidecar $sidecar_basename sha256 ($existing_sidecar_sha)" \
-             "does not match local build ($expected_sidecar_sha)" >&2
-        exit 1
-    fi
-
-    # AP M5-1.6 Tranche D.2: manifest-mismatch detection. plan-M5-1-6.md
-    # "Veroeffentlichungskette" requires that an existing public release
-    # only be confirmed when "Release Notes, Asset-Liste und Checksums
-    # exakt zum erwarteten Manifest passen". The asset/sha checks above
-    # cover the asset list; the comparison below catches divergent notes
-    # (e.g. a manually edited release with extra information that the
-    # automated re-run would otherwise overwrite).
-    expected_notes="$(cat "$notes_file")"
-    existing_notes="$(jq -r '.notes' <<<"$existing_meta")"
-    if [ -n "$existing_notes" ] && [ "$existing_notes" != "$expected_notes" ]; then
-        echo "error: existing release notes for '$tag' differ from the expected manifest" >&2
-        echo "       this is a manifest-mismatch and must be resolved manually before re-run" >&2
-        echo "       aborting before any release_published transition" >&2
-        exit 1
-    fi
-
-    # Re-upload only the missing assets. --clobber is intentionally omitted
-    # so a divergent asset would have failed the sha256 check above.
-    if [ -z "$existing_archive_sha" ]; then
-        gh release upload "$tag" "$archive_path"
-    fi
-    if [ -z "$existing_sidecar_sha" ]; then
-        gh release upload "$tag" "$sha_path"
-    fi
-    gh release edit "$tag" --notes-file "$notes_file" >/dev/null
-else
-    gh release create "$tag" --draft --title "$tag" --notes-file "$notes_file" \
-        "$archive_path" "$sha_path" >/dev/null
-fi
+# AP M5-1.6 Tranche G.3: die Asset-/Notes-/SHA-Idempotenz-Logik liegt
+# nun in scripts/release-publish-idempotency.sh, sodass Dry-Run und
+# echter Release-Workflow byte-gleiche Asserts fahren. Vor Tranche G
+# war die Logik nur hier inline.
+bash "$idempotency_script" --draft "$tag" "$notes_file" \
+    "$archive_path" "$sha_path"
 date > "$state_dir/state/draft_release_created"
 echo "[dry-run] draft_release_created"
 

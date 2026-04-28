@@ -358,6 +358,15 @@ jobs:
 
           echo "version consistency check passed: tag=$tag version=$version"
 
+      # AP M5-1.6 Tranche G.3: Manifest-/Checksum-Idempotenz vor jeder
+      # Mutation. Vor Tranche G rief der Workflow `gh release upload
+      # --clobber` ohne Pruefung, sodass ein divergenter Remote-Asset
+      # still ueberschrieben worden waere -- plan-M5-1-6.md
+      # "Veroeffentlichungskette" verbietet das. Die Idempotenz-Logik
+      # steht in scripts/release-publish-idempotency.sh und wird vom
+      # Dry-Run-Orchestrator (scripts/release-dry-run.sh) byte-gleich
+      # aufgerufen, sodass Dry-Run und Real-Workflow nicht voneinander
+      # divergieren koennen.
       - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -373,13 +382,4 @@ jobs:
             assets+=("$f")
           done
 
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release edit "$tag" --notes-file "$notes"
-            gh release upload "$tag" "${assets[@]}" --clobber
-          else
-            gh release create "$tag" \
-              --verify-tag \
-              --title "$tag" \
-              --notes-file "$notes" \
-              "${assets[@]}"
-          fi
+          bash scripts/release-publish-idempotency.sh "$tag" "$notes" "${assets[@]}"
