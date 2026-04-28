@@ -21,8 +21,18 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build runtime image
-        run: docker build --target runtime -t cmake-xray .
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: runtime
+          tags: cmake-xray
+          load: true
+          cache-from: type=gha,scope=cmake-xray-runtime
+          cache-to: type=gha,scope=cmake-xray-runtime,mode=max
 
       - name: Smoke test runtime image
         run: docker run --rm cmake-xray --help
@@ -50,15 +60,42 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.x"
+          cache: "pip"
+          cache-dependency-path: tests/requirements-json-schema.txt
 
       - name: Install JSON schema validator dependency
         # Required by tests/validate_json_schema.py (AP M5-1.2 Tranche A gate).
         # --require-hashes refuses to install if any wheel hash drifts from
         # the lockfile; CTest fails loud if the dependency is missing.
-        run: python -m pip install --upgrade pip && python -m pip install --require-hashes -r tests/requirements-json-schema.txt
+        run: python -m pip install --disable-pip-version-check --require-hashes -r tests/requirements-json-schema.txt
+
+      - name: Install ccache for Linux native builds
+        if: matrix.name == 'linux-x86_64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ccache
+
+      - name: Restore ccache
+        if: matrix.name == 'linux-x86_64'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ccache
+          key: ccache-linux-x86_64-${{ hashFiles('CMakeLists.txt', 'src/**/*', 'tests/**/*', 'cmake/**', 'include/**/*') }}
+          restore-keys: |
+            ccache-linux-x86_64-
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: |
+          if [ "${{ matrix.name }}" = "linux-x86_64" ]; then
+            export CCACHE_BASEDIR="$GITHUB_WORKSPACE"
+            export CCACHE_DIR="$HOME/.cache/ccache"
+            cmake -B build -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          else
+            cmake -B build -DCMAKE_BUILD_TYPE=Release
+          fi
 
       - name: Build
         run: cmake --build build --config Release --parallel
