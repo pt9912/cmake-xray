@@ -195,6 +195,22 @@ if gh release view "$tag" >/dev/null 2>&1; then
         exit 1
     fi
 
+    # AP M5-1.6 Tranche D.2: manifest-mismatch detection. plan-M5-1-6.md
+    # "Veroeffentlichungskette" requires that an existing public release
+    # only be confirmed when "Release Notes, Asset-Liste und Checksums
+    # exakt zum erwarteten Manifest passen". The asset/sha checks above
+    # cover the asset list; the comparison below catches divergent notes
+    # (e.g. a manually edited release with extra information that the
+    # automated re-run would otherwise overwrite).
+    expected_notes="$(cat "$notes_file")"
+    existing_notes="$(jq -r '.notes' <<<"$existing_meta")"
+    if [ -n "$existing_notes" ] && [ "$existing_notes" != "$expected_notes" ]; then
+        echo "error: existing release notes for '$tag' differ from the expected manifest" >&2
+        echo "       this is a manifest-mismatch and must be resolved manually before re-run" >&2
+        echo "       aborting before any release_published transition" >&2
+        exit 1
+    fi
+
     # Re-upload only the missing assets. --clobber is intentionally omitted
     # so a divergent asset would have failed the sha256 check above.
     if [ -z "$existing_archive_sha" ]; then

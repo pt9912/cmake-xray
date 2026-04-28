@@ -133,6 +133,115 @@ fi
 
 Falls kein Asset-Upload erforderlich ist, koennen die `./release-assets/*`-Argumente weggelassen werden.
 
+## Recovery-Runbook (AP M5-1.6 Tranche D.2)
+
+Der automatisierte Release-Workflow folgt der Plan-Reihenfolge
+
+```
+draft_release_created -> oci_image_published -> release_published
+```
+
+und verlangt Idempotenz auf jeder Stufe (siehe `docs/plan-M5-1-6.md` Sektionen "Veroeffentlichungskette" und "Recovery- und Rollback-Vertrag"). Wenn ein Run an einer Stufe abbricht, ist der Tag-Stand nicht halb-publik: einer der vier folgenden Faelle trifft zu. Jeder Fall hat einen festen Recovery-Pfad. Wenn ein erneuter Workflow-Run die Symptome nicht aufloesen kann (z. B. weil Plan-Praezedenz die Mutation verbietet), ist der manuelle Pfad der einzige zulaessige Fortgang.
+
+Vor jedem Recovery-Schritt: aktuellen Zustand erfassen. Ohne `Ist-Stand` keine `Soll-Stand`-Korrektur.
+
+```bash
+TAG=v1.2.3
+VERSION="${TAG#v}"
+IMAGE_REPO=ghcr.io/<owner>/cmake-xray
+
+# GitHub-Release-Zustand
+gh release view "$TAG" --json tag,name,isDraft,assets
+
+# OCI-Tag-Digests (Versions-Tag plus latest)
+docker buildx imagetools inspect "${IMAGE_REPO}:${VERSION}" --format '{{.Manifest.Digest}}'
+docker buildx imagetools inspect "${IMAGE_REPO}:latest"     --format '{{.Manifest.Digest}}'
+```
+
+### Fall 1: Draft existiert, OCI-Push fehlgeschlagen
+
+Erkennen: `gh release view` zeigt einen Release fuer `$TAG` mit `isDraft=true`. `docker buildx imagetools inspect ${IMAGE_REPO}:${VERSION}` schlaegt mit `manifest unknown` fehl.
+
+Recovery: Draft loeschen, OCI-Push erneut anstossen, dann den vollen Workflow neu auf den Tag laufen lassen.
+
+```bash
+gh release delete "$TAG" --yes
+# Danach den Release-Workflow erneut starten oder lokal die Push-Sequenz nachholen:
+docker buildx imagetools inspect "${IMAGE_REPO}:${VERSION}" >/dev/null 2>&1 \
+    || bash scripts/oci-image-publish.sh "$IMAGE_REPO" "$VERSION" build \
+    && bash scripts/oci-image-publish.sh "$IMAGE_REPO" "$VERSION" push
+```
+
+Begruendung: ohne OCI ist der Release nicht freigegeben; den Draft zu behalten waere irrefuehrend, weil ein nachfolgender Workflow-Run den Draft beim erneuten Asset-Vergleich akzeptieren und zum Public-Release befoerdern wuerde, ohne dass der OCI-Tag jemals existierte.
+
+### Fall 2: Release publik, OCI-Push fehlgeschlagen
+
+Erkennen: `gh release view` zeigt `isDraft=false`. OCI-Versions-Tag fehlt remote. Das ist die kritischste Variante, weil Endnutzer den Release sehen.
+
+Recovery: Release sichtbar als fehlerhaft markieren, OCI-Push nachholen, Release-Notes nachfuehren. Der Release wird *nicht* zurueckgezogen; das verletzt das Publish-Versprechen.
+
+```bash
+gh release edit "$TAG" --notes-file - <<EOF
+Release $TAG (RECOVERY IN PROGRESS)
+
+Original-Release-Notes folgen unten. Der versionierte OCI-Tag
+${IMAGE_REPO}:${VERSION} wurde nach dem GitHub-Release-Publish nicht
+fertig gestellt; die OCI-Veroeffentlichung wird nachgereicht.
+EOF
+bash scripts/oci-image-publish.sh "$IMAGE_REPO" "$VERSION" build
+bash scripts/oci-image-publish.sh "$IMAGE_REPO" "$VERSION" push
+case "$VERSION" in *-*) ;; *) bash scripts/oci-image-publish.sh "$IMAGE_REPO" "$VERSION" latest ;; esac
+gh release edit "$TAG" --notes-file release-assets/release-notes.md
+```
+
+Die "RECOVERY IN PROGRESS"-Notiz ist Pflicht: ohne sie sehen Endnutzer einen Release, der OCI-Pull-Befehle verspricht, die nicht funktionieren. Nach erfolgreichem Push und Original-Notes-Nachfuehrung ist der Recovery-Pfad abgeschlossen.
+
+### Fall 3: OCI publik, GitHub-Release fehlt
+
+Erkennen: `docker buildx imagetools inspect ${IMAGE_REPO}:${VERSION}` zeigt einen gueltigen Digest. `gh release view "$TAG"` schlaegt mit `release not found` fehl.
+
+Recovery: Release lokal aus den validierten Artefakten neu erstellen.
+
+```bash
+mkdir -p release-assets
+bash scripts/build-release-archive.sh "$VERSION" release-assets
+gh release create "$TAG" \
+    --verify-tag \
+    --title "$TAG" \
+    --notes-file release-assets/release-notes.md \
+    "release-assets/cmake-xray_${VERSION}_linux_x86_64.tar.gz" \
+    "release-assets/cmake-xray_${VERSION}_linux_x86_64.tar.gz.sha256"
+```
+
+Begruendung: die OCI-Veroeffentlichung ist bereits sichtbar; ein Public-Release fehlt nur. Die Asset-Liste muss byte-stabil zur OCI-Version passen — `scripts/build-release-archive.sh` mit dem gleichen Tag-Commit-Zeitstempel (`SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct $TAG)`) garantiert das.
+
+### Fall 4: OCI publik, `latest` zeigt auf falschen Digest
+
+Erkennen: `docker buildx imagetools inspect ${IMAGE_REPO}:${VERSION} --format '{{.Manifest.Digest}}'` und `... ${IMAGE_REPO}:latest --format '{{.Manifest.Digest}}'` liefern unterschiedliche Werte, obwohl `$VERSION` der zuletzt veroeffentlichte stable Release ist.
+
+Recovery: `latest` manuell auf den korrekten Digest umsetzen. Plan-Vertrag verlangt, dass automatisierte Re-Runs einen `latest`-Digest-Mismatch hart abbrechen; der manuelle Pfad ist die einzige zulaessige Korrektur.
+
+```bash
+docker buildx imagetools create \
+    --tag "${IMAGE_REPO}:latest" \
+    "${IMAGE_REPO}:${VERSION}"
+
+# Verifikation: beide Tags muessen jetzt denselben Digest tragen.
+diff <(docker buildx imagetools inspect "${IMAGE_REPO}:${VERSION}" --format '{{.Manifest.Digest}}') \
+     <(docker buildx imagetools inspect "${IMAGE_REPO}:latest"     --format '{{.Manifest.Digest}}')
+```
+
+Begruendung: `latest`-Mismatch ist der einzige Fall, in dem Plan-Vertrag explizit "manuelle Recovery-Sequenz" verlangt. Der `imagetools create`-Pfad re-tagged remote, ohne neu zu pushen, sodass kein zusaetzlicher Build-Cache-Konsistenz-Pfad gebraucht wird. Die `diff`-Verifikation am Schluss schliesst die Recovery ab.
+
+### Audit-Trail
+
+Jeder Recovery-Schritt ist im finalen Release-Commit oder einem Folge-Commit zu dokumentieren. Mindestbestandteile:
+
+- Auslesen-Befehle aus dem Vor-Recovery-Zustand (mit Output).
+- Die ausgefuehrten Recovery-Befehle (mit Output).
+- Verifikations-Befehle nach dem Recovery (Tag, Digest, Asset-Liste).
+- Die betroffenen Release-, Asset- und Digest-IDs, sodass spaetere Re-Runs den Zustand auditieren koennen.
+
 ## Hinweise
 
 - Tags sollen auf den Commit zeigen, der die finalen Release-Artefakte enthaelt.

@@ -202,8 +202,8 @@ DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert 
 
 - Tranche A ausgeliefert in commits `8f6b2da` ("feat: deliver M5 AP 1.6 Tranche A tag validator and --version flag") und `ad2c9b1` ("fix: pin Tranche-A --help app name to 'cmake-xray' for CI Linux").
 - Tranche B ausgeliefert in commits `a6ea384` ("feat: deliver M5 AP 1.6 Tranche B reproducible Linux release archive") und `cc78152` ("docs: address Tranche B review findings — pax docstring, locale and verify smoke").
-- Tranche C ausgeliefert in vorliegendem Commit-Set (Hash siehe `git log` nach Commit; OCI-Build via publish-Skript, Container-Smoke, Idempotenz-Logik und gegate-ter Push fuer Tranche E stehen).
-- Tranche D offen.
+- Tranche C ausgeliefert in commits `cfb5b4c` ("feat: deliver M5 AP 1.6 Tranche C OCI image idempotency and gated publish") und `790a120` ("docs: address Tranche C review findings — manifest digest semantics").
+- Tranche D ausgeliefert in commit `043ab68` (D.1 — fake-gh, dry-run-Orchestrator, 2 Happy-Path-Szenarien) plus vorliegendem Commit-Set (D.2 — 4 Abort-Szenarien, Recovery-Runbook).
 - Tranche E offen.
 - Tranche F offen.
 
@@ -363,12 +363,12 @@ Sub-Risiken Tranche D:
 
 Definition of Done Tranche D:
 
-- [ ] `scripts/release-dry-run.sh` aktiviert `DRY_RUN`/`FAKE_PUBLISHER` und weigert sich gegen echte GitHub- oder Registry-Endpunkte.
-- [ ] Lokale OCI-Registry und Fake-GitHub-API werden vom Skript hochgefahren und beim Beenden geraeumt.
-- [ ] Die State-Transitions `draft_release_created` -> `oci_image_published` -> `release_published` sind als beobachtbare Asserts gepinnt.
-- [ ] Sechs Re-Run-Szenarien aus dem Plan-Smoke-Vertrag laufen als Tests; jedes Szenario hat einen klaren Pass-/Abbruch-Pfad.
-- [ ] `docs/releasing.md` enthaelt einen Recovery-Runbook-Abschnitt mit konkreten `gh api`- und `docker buildx imagetools`-Befehlen.
-- [ ] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
+- [x] `scripts/release-dry-run.sh` aktiviert `DRY_RUN`/`FAKE_PUBLISHER` und weigert sich gegen echte GitHub- oder Registry-Endpunkte (GH_TOKEN-Sperre mit explizitem Opt-in via `XRAY_DRY_RUN_ALLOW_GH_TOKEN`).
+- [x] Lokale OCI-Registry (registry:2 Container) und Fake-GitHub-API (`scripts/release-fake-gh.sh` mit JSON-State unter `$XRAY_FAKE_GH_DIR`) werden vom Skript hochgefahren und beim Beenden geraeumt.
+- [x] Die State-Transitions `draft_release_created` -> `oci_image_published` -> `release_published` sind als Markerdateien unter `<state-dir>/state/` gepinnt; Tests greifen die Marker direkt ab.
+- [x] Sechs Re-Run-Szenarien aus dem Plan-Smoke-Vertrag laufen als Tests in `tests/release/test_release_dry_run.sh`: vorhandener Draft + unveraenderte Assets, vorhandener oeffentlicher Release + unveraendertes Manifest, geaendertes Asset, geaenderte Checksumme, Manifest-Mismatch (Notes), OCI-Digest-Mismatch. Jedes Szenario hat einen Pass-/Abbruch-Pfad inklusive Marker-Verifikation.
+- [x] `docs/releasing.md` enthaelt einen Recovery-Runbook-Abschnitt mit konkreten `gh release`- und `docker buildx imagetools`-Befehlen fuer vier Failure-Klassen (Draft+OCI fehlt, Public+OCI fehlt, OCI+Release fehlt, latest-Digest-Mismatch) sowie einem Audit-Trail-Schema.
+- [x] Docker-Gates aus `README.md` und `docs/quality.md` sind gruen.
 
 ### Tranche E - Plattformartefakt-Allowlist und Preview-Sperre
 

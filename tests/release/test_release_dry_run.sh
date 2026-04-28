@@ -164,6 +164,151 @@ assert_output_contains "scenario 2 second run treats public release as reusable"
 assert_output_contains "scenario 2 second run reaches release_published" \
     "$second2_output" "[dry-run] release_published"
 
+# Helpers for tampering with state from inside an alpine container so we
+# do not need root on the host. The fake-gh state files are root-owned
+# (created by the in-container root user during the first run), and the
+# scenarios below need to either rewrite a metadata.json or replace an
+# asset's bytes before the second run.
+
+run_in_alpine() {
+    local dir="$1"
+    shift
+    docker run --rm -v "${dir}:/state" alpine:3.21 sh -c "$*"
+}
+
+assert_dry_run_aborts() {
+    local description="$1" tag="$2" state_dir="$3" expected_marker_present="$4" \
+          expected_marker_absent="$5"
+    local out rc=0
+    out=$(run_dry_run "$tag" "$state_dir" 2>&1) || rc=$?
+    if [ "$rc" -eq 0 ]; then
+        echo "FAIL: $description -- dry-run unexpectedly succeeded" >&2
+        printf '%s\n' "$out" | tail -5 >&2 || true
+        failures=$((failures + 1))
+        return
+    fi
+    if [ -n "$expected_marker_present" ] && [ ! -f "$state_dir/state/$expected_marker_present" ]; then
+        echo "FAIL: $description -- expected marker '$expected_marker_present' missing" >&2
+        failures=$((failures + 1))
+        return
+    fi
+    if [ -n "$expected_marker_absent" ] && [ -f "$state_dir/state/$expected_marker_absent" ]; then
+        echo "FAIL: $description -- forbidden marker '$expected_marker_absent' is present" >&2
+        failures=$((failures + 1))
+        return
+    fi
+    echo "PASS: $description"
+}
+
+# ---- Scenario 3: Re-Run mit geaendertem Asset -> abort ----
+#
+# Pre-seed: run dry-run once. Then overwrite the archive asset in fake-gh
+# with different bytes (simulating a third party uploading a different
+# tarball). Re-run must abort before release_published.
+state3_dir="$(mktemp -d -t cmake-xray-dry-run-s3.XXXXXX)"
+state_dirs+=("$state3_dir")
+mkdir -p "$state3_dir/state"
+run_dry_run v0.0.0-dryrun-s3 "$state3_dir" >/dev/null 2>&1
+archive_basename_s3="cmake-xray_0.0.0-dryrun-s3_linux_x86_64.tar.gz"
+asset_path_s3="$state3_dir/fake-gh/releases/v0.0.0-dryrun-s3/assets/$archive_basename_s3"
+run_in_alpine "$state3_dir" \
+    "echo 'tampered-archive-content' > /state/fake-gh/releases/v0.0.0-dryrun-s3/assets/$archive_basename_s3"
+# Update metadata.json so the recorded sha256 matches the tampered file
+# (simulating a bona-fide divergent upload, not a corrupted state).
+run_in_alpine "$state3_dir" "
+    apk add --no-cache jq >/dev/null 2>&1
+    new_sha=\$(sha256sum /state/fake-gh/releases/v0.0.0-dryrun-s3/assets/$archive_basename_s3 | awk '{print \$1}')
+    meta=/state/fake-gh/releases/v0.0.0-dryrun-s3/metadata.json
+    jq --arg name '$archive_basename_s3' --arg sha \"\$new_sha\" \
+       '.assets = (.assets | map(if .name == \$name then .sha256 = \$sha else . end))' \
+       \$meta > \$meta.new && mv \$meta.new \$meta
+"
+# Remove the release_published marker so we can detect that the re-run
+# does NOT recreate it.
+rm -f "$state3_dir/state/release_published"
+assert_dry_run_aborts "scenario 3 changed-asset re-run aborts before release_published" \
+    v0.0.0-dryrun-s3 "$state3_dir" "" "release_published"
+
+# ---- Scenario 4: Re-Run mit geaenderter Checksumme -> abort ----
+#
+# Same setup as scenario 3 but tamper with the *.sha256 sidecar instead
+# of the archive itself. The dry-run rebuilds the sidecar and detects
+# the divergent recorded checksum.
+state4_dir="$(mktemp -d -t cmake-xray-dry-run-s4.XXXXXX)"
+state_dirs+=("$state4_dir")
+mkdir -p "$state4_dir/state"
+run_dry_run v0.0.0-dryrun-s4 "$state4_dir" >/dev/null 2>&1
+sidecar_basename_s4="cmake-xray_0.0.0-dryrun-s4_linux_x86_64.tar.gz.sha256"
+run_in_alpine "$state4_dir" "
+    apk add --no-cache jq >/dev/null 2>&1
+    echo 'corrupted sidecar payload' > /state/fake-gh/releases/v0.0.0-dryrun-s4/assets/$sidecar_basename_s4
+    new_sha=\$(sha256sum /state/fake-gh/releases/v0.0.0-dryrun-s4/assets/$sidecar_basename_s4 | awk '{print \$1}')
+    meta=/state/fake-gh/releases/v0.0.0-dryrun-s4/metadata.json
+    jq --arg name '$sidecar_basename_s4' --arg sha \"\$new_sha\" \
+       '.assets = (.assets | map(if .name == \$name then .sha256 = \$sha else . end))' \
+       \$meta > \$meta.new && mv \$meta.new \$meta
+"
+rm -f "$state4_dir/state/release_published"
+assert_dry_run_aborts "scenario 4 changed-checksum re-run aborts before release_published" \
+    v0.0.0-dryrun-s4 "$state4_dir" "" "release_published"
+
+# ---- Scenario 5: Manifest-Mismatch (notes) -> abort ----
+#
+# Pre-seed an existing release with deliberately divergent notes. The
+# dry-run regenerates canonical notes; comparing them with the stored
+# manifest must trip the manifest-mismatch guard.
+state5_dir="$(mktemp -d -t cmake-xray-dry-run-s5.XXXXXX)"
+state_dirs+=("$state5_dir")
+mkdir -p "$state5_dir/state"
+run_dry_run v0.0.0-dryrun-s5 "$state5_dir" >/dev/null 2>&1
+run_in_alpine "$state5_dir" "
+    apk add --no-cache jq >/dev/null 2>&1
+    meta=/state/fake-gh/releases/v0.0.0-dryrun-s5/metadata.json
+    jq '.notes = \"manually edited release notes\"' \$meta > \$meta.new && mv \$meta.new \$meta
+"
+rm -f "$state5_dir/state/release_published"
+assert_dry_run_aborts "scenario 5 manifest-mismatch (notes) aborts before release_published" \
+    v0.0.0-dryrun-s5 "$state5_dir" "" "release_published"
+
+# ---- Scenario 6: OCI-Digest-Mismatch -> abort vor latest ----
+#
+# Pre-seed the registry with a different image at the version tag, then
+# run dry-run. The publish-script's push path observes the digest
+# mismatch and aborts before any latest-tag update. release_published
+# must NOT be set.
+state6_dir="$(mktemp -d -t cmake-xray-dry-run-s6.XXXXXX)"
+state_dirs+=("$state6_dir")
+mkdir -p "$state6_dir/state"
+
+# Build a deliberately different image (alpine with a marker file) and
+# push it under the version tag the dry-run will use. Because the
+# version is non-prerelease this will also exercise the latest-update
+# path, where the abort matters most.
+mismatch_repo="localhost:${registry_port}/cmake-xray"
+mismatch_version="0.0.0-mismatch"
+mismatch_tag="${mismatch_repo}:${mismatch_version}"
+docker rmi -f "$mismatch_tag" >/dev/null 2>&1 || true
+docker pull alpine:3.21 >/dev/null 2>&1 || true
+docker tag alpine:3.21 "$mismatch_tag"
+docker push "$mismatch_tag" >/dev/null
+
+assert_dry_run_aborts "scenario 6 oci-digest-mismatch aborts before release_published" \
+    v0.0.0-mismatch "$state6_dir" "" "release_published"
+
+# Belt-and-braces: latest must not have been updated to the dry-run's
+# new image either. The publish-script logic refuses to touch latest
+# when the version-tag digest does not match the dry-run's push.
+latest_digest=$(docker buildx imagetools inspect "${mismatch_repo}:latest" \
+    --format '{{.Manifest.Digest}}' 2>/dev/null || true)
+versioned_digest=$(docker buildx imagetools inspect "$mismatch_tag" \
+    --format '{{.Manifest.Digest}}' 2>/dev/null || true)
+if [ -n "$latest_digest" ] && [ "$latest_digest" = "$versioned_digest" ]; then
+    echo "FAIL: scenario 6 latest tag was updated despite digest mismatch" >&2
+    failures=$((failures + 1))
+else
+    echo "PASS: scenario 6 latest tag stays out of the picture (digest=${latest_digest:-<unset>})"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "$failures release dry-run check(s) FAILED" >&2
