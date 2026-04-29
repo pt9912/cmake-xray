@@ -148,6 +148,18 @@ Tests und Abnahme muessen mindestens abdecken:
 7. Release-Dry-Run- und Packaging-Nachweise verifizieren
 8. Abnahmedokumente und `docs/quality.md` auf finalen Status aktualisieren
 
+### Liefer-Stand
+
+Die AP-1.8-Auslieferung ist in fuenf Sub-Tranchen A.1 bis A.5 geschnitten,
+analog zum Liefer-Stand-Vertrag aus `docs/plan-M5-1-6.md` und
+`docs/plan-M5-1-7.md`:
+
+- A.1 ausgeliefert in commit `d0100d3` ("feat: deliver M5 AP 1.8 A.1 bump root project version to 1.2.0"): Root-`CMakeLists.txt` meldet `project(cmake-xray VERSION 1.2.0 LANGUAGES CXX)`; Tests ziehen automatisch nach via `XRAY_APP_VERSION_STRING`-Define; Runtime-Image meldet `1.2.0` per `cmake-xray --version`.
+- A.2 ausgeliefert in commit `2480ae5` ("feat: deliver M5 AP 1.8 A.2 doc-examples drift gate"): `docs/examples/manifest.txt` mit `sha256sum`-Eintraegen, `tests/validate_doc_examples.py` fuer Paritaet-/Hash-/Format-Validierung, CTest-Eintrag `doc_examples_validation` (Test #25 in der Suite).
+- A.3 ausgeliefert in commit `2835017` ("feat: deliver M5 AP 1.8 A.3 versioned File-API performance fixtures"): `tests/reference/scale_*/CMakeLists.txt` plus versionierte Reply-Daten unter `build/.cmake/api/v1/reply/`, `tests/reference/generate_file_api_fixtures.sh` als Regenerator, `tests/reference/file-api-performance-manifest.json` mit CMake-Version, Generator und Reply-Pfaden, neue File-API-Baseline-Sektion in `docs/performance.md`.
+- A.4 ausgeliefert in commit `d310d1d` ("feat: deliver M5 AP 1.8 A.4 v1.2.0 docs sweep and changelog"): `CHANGELOG.md` v1.2.0-Sektion mit Added/Changed/Fixed-Gruppen plus Plattformstatus-Tabelle und expliziter "no breaking changes"-Kennzeichnung; README-Intro entwirrt (HTML in der Format-Liste); `docs/releasing.md` Recovery-only-Framing fuer manuelle `gh`-Aufrufe mit Ist-/Soll-Abgleich-Pflicht.
+- A.5 (Audit-Pass): Plan-Test-Liste aus `1.8 Scope` (46 Bullets) gegen Ist-Stand verifiziert. Alle 45 implementierungsbezogenen Bullets sind durch APs 1.1-1.7 plus A.1-A.4 abgedeckt; Bullet 42 (Plattformstatus-Hochstufung auf `validated_smoke` fuer macOS/Windows) bleibt plan-konform `known_limited`, weil die externe Branch-Protection-Verankerung und der auditierte gruene CI-Lauf Repo-Konfiguration sind und nicht innerhalb von AP 1.8 hergestellt werden koennen. Die externen Bedingungen sind in `README.md`, `docs/quality.md` und `docs/releasing.md` als verbleibende Hochstufungs-Voraussetzung dokumentiert.
+
 ## Abnahmekriterien
 
 - Alle in diesem AP genannten Format- und Dokumentationsfälle sind mit Tests oder Goldens belegt
