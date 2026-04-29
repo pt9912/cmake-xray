@@ -63,10 +63,18 @@ AP 1.7 baut auf folgenden M5-Vertraegen auf:
 - command-lokaler `--quiet`-/`--verbose`-Vertrag aus AP 1.5,
 - Release-Plattformklassifizierung und Preview-Sperren aus AP 1.6.
 
-Falls AP 1.1 den Atomic-Replace-Wrapper nicht plattformspezifisch trennt, ist
-AP 1.7 fuer die Windows-Aussage blockiert. Falls AP 1.6 macOS-/Windows-Artefakte
-als Preview klassifiziert, darf AP 1.7 diese Klassifizierung nur bestaetigen
-oder enger fassen, aber nicht stillschweigend zur offiziellen Freigabe erweitern.
+Konkret pruefbar: `src/adapters/cli/atomic_report_writer.{h,cpp}` muss eine
+`AtomicFilePlatformOps`-Schnittstelle und je eine `PosixAtomicFilePlatformOps`-
+und `WindowsAtomicFilePlatformOps`-Implementierung mit `create_temp_exclusive`,
+`replace_existing` und `move_new` exportieren, und `DefaultAtomicFilePlatformOps`
+muss per `#ifdef _WIN32` auf die Windows-Implementierung mit `ReplaceFileW` /
+`MoveFileExW` umschalten. Stand 2026-04-29 (Plan-Schreibzeitpunkt) ist diese
+Voraussetzung erfuellt; ein Refactor, der die Plattformtrennung wieder
+zurueckdreht, blockiert AP 1.7 fuer die Windows-Aussage.
+
+Falls AP 1.6 macOS-/Windows-Artefakte als Preview klassifiziert, darf AP 1.7
+diese Klassifizierung nur bestaetigen oder enger fassen, aber nicht
+stillschweigend zur offiziellen Freigabe erweitern.
 
 ## Dateien
 
@@ -126,6 +134,33 @@ Fuer M5 gilt:
   Repository-Konfiguration; AP 1.7 dokumentiert den erwarteten Check-Namen,
   die betroffene Plattform und den Zeitpunkt der Konfigurationspruefung in
   `docs/quality.md`.
+- Die Required-Check-Namen sind in AP 1.7 verbindlich festgelegt, damit
+  Workflow-Joberzeugung, Smoke-Report-Verifier-Konfiguration und Branch-
+  Protection-Eintrag denselben Bezeichner verwenden. Geltende Namen:
+  - `Native (linux-x86_64)` — Required Check fuer alle PRs. Deckt Linux
+    `supported`, sobald der Job `cmake configure | build | ctest` plus die
+    Atomic-Replace-Pflicht-Tests ausfuehrt; CLI-Pflicht-Smokes laufen fuer
+    Linux ueber die bestehenden E2E-Suites.
+  - `Native (macos-arm64)` — Required Check fuer alle PRs. Deckt macOS
+    `validated_smoke` **nur**, wenn der Job zusaetzlich zu `ctest` die
+    Atomic-Replace-Pflicht-Tests **und** alle Pflichtkommandos aus
+    `Normative CLI-Smokes` ausfuehrt; bis Tranche B und C diese Bestandteile
+    eingehaengt haben, gilt der Job nur als Build-Gate und macOS bleibt
+    `known_limited`.
+  - `Native (windows-x86_64)` — Required Check fuer alle PRs. Gleiche Regel
+    wie macOS: ohne Atomic-Replace- und CLI-Pflicht-Smokes deckt der Job
+    nur den Build-Gate-Anteil; Windows bleibt bis dahin `known_limited`.
+  - `Platform Smoke Report (macos-arm64)` und
+    `Platform Smoke Report (windows-x86_64)` — Required Checks fuer den
+    alternativen Nachweispfad. Mindestens einer der beiden Pfade pro
+    Plattform (`Native (...)` mit eingehaengten Pflicht-Smokes oder
+    `Platform Smoke Report (...)`) muss required sein, bevor die Plattform
+    `validated_smoke` dokumentieren darf.
+  - `Release Asset Allowlist Guard` — nicht ueberspringbares Release-Gate
+    aus AP 1.6, von AP 1.7 unveraendert vorausgesetzt.
+  Aenderungen an diesen Namen sind in `build.yml`, `release.yml`,
+  `docs/quality.md` und der Branch-Protection-Konfiguration synchron
+  nachzuziehen.
 - `known_limited` ist zu verwenden, sobald ein Pflichtgate rot ist, nur
   manuell statt in CI laeuft, bewusst uebersprungen wird oder nur mit einer
   dokumentierten Einschraenkung aussagekraeftig ist.
@@ -158,8 +193,11 @@ Die native CI-Matrix prueft mindestens:
 Regeln:
 
 - `fail-fast: false` bleibt gesetzt, damit Plattformfehler sichtbar bleiben.
-- Platform-Jobs muessen sprechende Namen tragen, zum Beispiel
-  `linux-x86_64`, `macos-arm64`, `windows-x86_64`.
+- Platform-Jobs muessen die in `Plattformstatus-Vertrag` festgelegten
+  Required-Check-Namen tragen: `Native (linux-x86_64)`,
+  `Native (macos-arm64)`, `Native (windows-x86_64)`. Andere `matrix.name`-
+  Werte sind nicht zulaessig, sonst weichen Branch-Protection und Workflow
+  auseinander.
 - Wenn ein Plattformjob bewusst nicht als Gate gilt, muss der Jobname oder die
   Doku diesen Preview-/Smoke-Status ausdruecken.
 - Native CI darf nicht auf Docker als Ersatz fuer macOS-/Windows-Aussagen
@@ -176,6 +214,19 @@ Regeln:
   `tests/platform/validate_platform_smoke_report.py` fachlich gegen erwartete
   Plattform, `checkout_sha`, `head_sha`, Pflichtkommandos und Checksummen
   geprueft werden.
+- Die Schema-Datei ist ein JSON-Schema-Draft-2020-12-Dokument; der Verifier
+  nutzt `jsonschema.Draft202012Validator` und ist damit konsistent zu
+  `tests/validate_json_schema.py`. Eine andere Draft-Version ist nicht
+  zulaessig, ohne den Vertrag explizit nachzuziehen.
+- Die Python-Abhaengigkeit (`jsonschema`) wird ueber die bereits bestehende
+  hash-pinned Lockfile `tests/requirements-json-schema.txt` (Quelle:
+  `tests/requirements-json-schema.in`) installiert. AP 1.7 fuehrt keine
+  zweite Lockfile ein; bei zusaetzlichen Validator-Abhaengigkeiten werden sie
+  in die `.in` aufgenommen und die `.txt` per `pip-compile --generate-hashes`
+  neu erzeugt.
+- Eine fehlende `jsonschema`-Installation fuehrt im Verifier zu nonzero Exit
+  mit konkretem Fehlermeldungs-Wortlaut (analog zu
+  `tests/validate_json_schema.py`); ein stiller Skip ist nicht zulaessig.
 - Der gewaehlte Nachweispfad ist fuer PRs ein Required Check und fuer
   taggesteuerte Releases ein zwingendes `needs`-Gate vor Publish-Jobs.
 - Fehlt dieser Nachweispfad, darf die Plattform nur als `known_limited`
@@ -196,8 +247,9 @@ definieren.
 - `cmake-xray impact --compile-commands <fixture> --changed-file <path> --format json`
 - `cmake-xray impact --compile-commands <fixture> --changed-file <path> --format json --output <path>`
 
-Soweit AP 1.3 und AP 1.4 abgeschlossen sind, werden DOT und HTML in denselben
-Smoke-Pfad aufgenommen:
+AP 1.3 (DOT) und AP 1.4 (HTML) sind zum AP-1.7-Schreibzeitpunkt abgeschlossen;
+DOT- und HTML-Smokes sind damit unbedingter Bestandteil der Pflichtkommandos
+und werden auf macOS und Windows verpflichtend ausgefuehrt:
 
 - `cmake-xray analyze --compile-commands <fixture> --format dot`
 - `cmake-xray impact --compile-commands <fixture> --changed-file <path> --format dot`
@@ -244,6 +296,28 @@ plattformfaehiges Smoke-Skript existieren:
 Der maschinenlesbare Smoke-Report ist nur dann ein zulaessiger Nachweis fuer
 `validated_smoke`, wenn sein Format versioniert und automatisiert validiert
 wird.
+
+Geltungsbereich: Der Smoke-Report-Vertrag gilt ausschliesslich fuer macOS und
+Windows. Linux ist `supported` und wird ueber den direkten Matrixjob
+`Native (linux-x86_64)` plus Docker-Gates aus `README.md`/`docs/quality.md`
+nachgewiesen; ein Linux-Smoke-Report wird nicht erzeugt und vom Verifier
+nicht akzeptiert (`platform: linux` ist ein Validierungsfehler).
+
+Ablage und Artefaktnamen sind verbindlich, damit Workflow, Verifier und
+Review-Artefakt deterministisch zusammenpassen:
+
+- Erzeugungspfad im CI-Arbeitsverzeichnis:
+  `build/platform-smoke/platform-smoke-report-<platform>.json`, wobei
+  `<platform>` exakt der Wert des `platform`-Felds ist (`macos` oder
+  `windows`).
+- GitHub-Actions-Artifact-Name pro Plattform:
+  `platform-smoke-report-<platform>` (kein gemeinsames Multi-Plattform-
+  Artefakt).
+- Dateiname im Artefakt: identisch zum Erzeugungspfad-Basename, also
+  `platform-smoke-report-<platform>.json`.
+- Der Verifier liest Reports nur aus diesem Pfad oder aus dem entpackten
+  Artefakt; abweichend benannte oder zusaetzliche Dateien fuehren zu nonzero
+  Exit.
 
 Pflichtfelder:
 
@@ -302,7 +376,9 @@ Versionierungspolitik:
 
 - `format_version=1` bleibt fuer M5 stabil.
 - Pflichtfeldentfernung, Pflichtfeldumbenennung oder inkompatible
-  Bedeutungswechsel erfordern eine neue Major-Version.
+  Bedeutungswechsel erfordern einen neuen Integer-Wert (`format_version: 2`,
+  dann `3` und so weiter); eine Erhoehung fuehrt der Verifier nicht implizit
+  mit, sondern verlangt einen expliziten Schema- und Verifier-Update.
 - Additive optionale Felder duerfen in Version `1` eingefuehrt werden, solange
   der Verifier unbekannte optionale Felder ignoriert und alle Pflichtregeln
   unveraendert bleiben.
@@ -459,6 +535,13 @@ Kompatibilitaetsregeln:
 - Die Datei enthaelt mindestens `cmake.minimum_version` sowie je Compiler-ID
   `compiler_minimums.MSVC`, `compiler_minimums.AppleClang`,
   `compiler_minimums.Clang` und `compiler_minimums.GNU`.
+- ClangCL meldet sich gegenueber CMake je nach Setup als `Clang` (mit
+  simulierter MSVC-ABI) oder als `MSVC`. Fuer AP 1.7 gilt: der Fail-Fast-Check
+  liest `CMAKE_CXX_COMPILER_ID` und vergleicht gegen den dazu passenden
+  Eintrag in `compiler_minimums`. Eine separate `ClangCL`-Schluesselung wird
+  nicht eingefuehrt, damit `compiler_minimums` deckungsgleich zu
+  `CMAKE_CXX_COMPILER_ID` bleibt; abweichende Mapping-Annahmen sind ein
+  Bug im Smoke-Skript, nicht in `toolchain-minimums.json`.
 - Native Matrix, Smoke-Skripte, Smoke-Report-Verifier und Dokumentationschecks
   duerfen Mindestversionen nicht duplizieren, sondern muessen diese Datei lesen
   oder aus ihr generierte CI-Outputs verwenden.
@@ -576,17 +659,47 @@ Plattformvoraussetzungen beruehrt:
 
 ## Implementierungsreihenfolge
 
+Die Umsetzung erfolgt in vier Tranchen A bis D. Jede Tranche endet mit einem
+vollstaendigen Lauf der Docker-Gates aus `README.md` und `docs/quality.md`.
+Tranche A bis C sind verbindlicher Teil der AP-1.7-Abnahme; Tranche D darf nur
+laufen, wenn A bis C nicht verzoegert werden.
+
+DoD-Checkboxen in diesem Plan tracken den Liefer-/Abnahmestatus: `[x]` markiert
+eine in einem konkreten Commit ausgelieferte Anforderung, `[ ]` markiert eine
+offene Anforderung. Liefer-Stand zum Zeitpunkt der Tranche-A-Vorbereitung
+(2026-04-29):
+
+- Tranche A — offen.
+- Tranche B — offen.
+- Tranche C — offen.
+- Tranche D — offen, nur nach gruener A bis C zulaessig.
+
+Backfill-Regel: Sobald eine Tranche ausgeliefert ist, wird der zugehoerige
+Eintrag um den Liefer-Commit ergaenzt (analog zu `docs/plan-M5-1-6.md`),
+damit Liefer-Stand und Workflow-Verdrahtung zusammen pruefbar bleiben.
+
 ### Tranche A - Ist-Zustand erfassen und Matrix festziehen
 
 1. Bestehende `build.yml`- und `release.yml`-Matrizen gegen den
-   Plattformstatusvertrag pruefen.
+   Plattformstatusvertrag pruefen. Die Job- und `matrix.name`-Bezeichner
+   muessen den Required-Check-Namen aus `Plattformstatus-Vertrag` exakt
+   entsprechen (`Native (linux-x86_64)`, `Native (macos-arm64)`,
+   `Native (windows-x86_64)`); abweichende historische Namen werden in
+   diesem Schritt umbenannt.
 2. CMake-, Compiler- und Runner-Versionen in CI-Ausgaben sichtbar machen und
    CMake-/Compiler-Versionen gegen `tests/platform/toolchain-minimums.json`
-   fail-fast pruefen.
+   fail-fast pruefen. `tests/requirements-json-schema.in/.txt` deckt die
+   `jsonschema`-Abhaengigkeit fuer den spaeteren Smoke-Report-Verifier
+   bereits ab; eine eigene Lockfile wird nicht angelegt.
 3. Entscheiden, ob macOS-/Windows-Jobs verpflichtende Gates sind oder ob ein
-   verpflichtend validierter Smoke-Report-Upload den Nachweis liefert; dieser
-   Nachweis wird als Required Check oder Release-`needs`-Gate verankert.
-4. `docs/quality.md` mit dem vorlaeufigen Plattformstatus ergaenzen.
+   verpflichtend validierter Smoke-Report-Upload den Nachweis liefert; der
+   gewaehlte Nachweispfad wird unter dem festgelegten Required-Check-Namen
+   (`Native (...)` oder `Platform Smoke Report (...)`) als Required Check
+   bzw. Release-`needs`-Gate verankert. Bis Tranche B und C die Pflicht-
+   Smokes eingehaengt haben, deckt der `Native (...)`-Job nur den Build-
+   Anteil; macOS und Windows bleiben in Tranche A noch `known_limited`.
+4. `docs/quality.md` mit dem vorlaeufigen Plattformstatus ergaenzen
+   (inklusive der Required-Check-Namen aus dem `Plattformstatus-Vertrag`).
 
 Tranche A ist fertig, wenn Build- und Testjobs fuer alle vorgesehenen Hosts
 sichtbar laufen oder ihre Einschraenkung explizit dokumentiert ist.
@@ -713,10 +826,12 @@ CLI-Smoke-Tests:
 - JSON-Kommandos aus `Normative CLI-Smokes` erzeugen gueltiges JSON.
 - `--output`-Kommandos aus `Normative CLI-Smokes` lassen stdout leer und
   schreiben gueltigen Dateiinhalt.
-- DOT-Smokes aus `Normative CLI-Smokes` laufen, sobald AP 1.3 produktiv ist.
-- HTML-Smokes aus `Normative CLI-Smokes` laufen, sobald AP 1.4 produktiv ist.
-- `--quiet` und `--verbose`-Smokes laufen auf macOS und Windows, sobald
-  AP 1.5 produktiv ist.
+- DOT-Smokes aus `Normative CLI-Smokes` laufen verpflichtend (AP 1.3 ist
+  produktiv).
+- HTML-Smokes aus `Normative CLI-Smokes` laufen verpflichtend (AP 1.4 ist
+  produktiv).
+- `--quiet` und `--verbose`-Smokes laufen auf macOS und Windows
+  verpflichtend (AP 1.5 ist produktiv).
 
 Pfad- und Golden-Tests:
 
