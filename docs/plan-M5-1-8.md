@@ -60,11 +60,11 @@ Tests und Abnahme muessen mindestens abdecken:
 - automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt: `scripts/release-dry-run.sh` und ein gleichnamiger bzw. eindeutig benannter Workflow-Job muessen GitHub-Schritte mit einem Fake-Publisher samt Assertions fuer Zustandsuebergaenge und Reihenfolge sowie OCI-Schritte mit lokaler Test-Registry fuer Tagging, `latest`-Regel, Push und Manifest-Pruefung ausfuehren, ohne externe Veroeffentlichung
 - dokumentierter manueller Dry-Run nur fuer Recovery-Pfade, die echte externe Publish-Zustaende in GitHub Releases oder GHCR voraussetzen
 - Performance-Messung fuer den CMake-File-API-Pfad auf reproduzierbaren Referenzgroessen und Dokumentation der M5-Baseline in `docs/performance.md`: AP 1.8 erzeugt oder versioniert die fuer `scale_*` noetigen CMake-File-API-Reply-Fixtures ueber `tests/reference/generate_reference_projects.py` oder ein explizites File-API-Fixture-Skript, dokumentiert Generator, CMake-Version, Fixture-Manifest, Reply-Verzeichnis und Erzeugungskommando in `tests/reference/file-api-performance-manifest.json`, und verhindert, dass compile-db-only Referenzdaten als File-API-Baseline missverstanden werden
-- Plattform-Abnahme fuer Linux, macOS und Windows gemaess AP 1.7: jede Plattform ist in `docs/quality.md` und `docs/releasing.md` mit Status `supported`, `validated_smoke` oder `known_limited` dokumentiert; macOS und Windows erreichen `validated_smoke` nur mit verpflichtendem CI-Required-Check oder schema-validiertem Smoke-Report fuer Build, Atomic-Replace und normative CLI-Smokes, andernfalls werden konkrete Einschraenkungen als `known_limited` dokumentiert
+- Plattform-Abnahme fuer Linux, macOS und Windows gemaess AP 1.7: Linux ist als `supported` dokumentiert; macOS und Windows duerfen hoechstens `validated_smoke` erreichen und muessen andernfalls als `known_limited` dokumentiert sein; `validated_smoke` fuer macOS oder Windows ist nur mit verpflichtendem CI-Required-Check oder schema-validiertem Smoke-Report fuer Build, Atomic-Replace und normative CLI-Smokes zulaessig
 - Doku-Gate fuer Nutzeraufrufe: `README.md`, `docs/guide.md`, `docs/releasing.md` und `docs/examples/` duerfen keine interne Build-Pfad-Nutzung wie `./build/cmake-xray` voraussetzen und beschreiben Release-Artefakte, Container oder installierte Binary-Pfade als regulaere Nutzerwege; `docs/performance.md` ist als Entwickler- und Messdokument ausgenommen, muss interne Build-Pfade aber als reproduzierbare Messkommandos kennzeichnen und darf sie nicht als normale Nutzeraufrufe darstellen
 - Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt, den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht und gegen `docs/report-json.schema.json` validiert
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
-- Validierung, dass `docs/examples/` keine driftenden Kopien enthaelt: Markdown-, HTML-, JSON- und DOT-Beispiele werden entweder aus den validierten Goldens generiert und in CI gegen den aktuellen Generatorausgang verglichen oder ueber ein CTest-Gate wie `tests/validate_doc_examples.py` und `docs/examples/manifest.txt` selbst validiert; Markdown-Beispiele brauchen dabei einen expliziten Bytevergleich gegen Golden-Outputs oder ein eigenes Markdown-/Doc-Example-Manifest, waehrend JSON, DOT und HTML zusaetzlich in die jeweiligen Schema-, Syntax- und Struktur-Manifeste aufgenommen werden
+- Validierung, dass `docs/examples/` keine driftenden Kopien enthaelt: Markdown-, HTML-, JSON- und DOT-Beispiele werden entweder aus den validierten Goldens generiert und in CI gegen den aktuellen Generatorausgang verglichen oder ueber das in `tests/CMakeLists.txt` registrierte CTest-Gate `doc_examples_validation` mit `tests/validate_doc_examples.py` und `docs/examples/manifest.txt` selbst validiert; Markdown-Beispiele brauchen dabei einen expliziten Bytevergleich gegen Golden-Outputs oder ein eigenes Markdown-/Doc-Example-Manifest, waehrend JSON, DOT und HTML zusaetzlich in die jeweiligen Schema-, Syntax- und Struktur-Manifeste aufgenommen werden
 
 **Ergebnis**: M5 ist nicht nur implementiert, sondern ueber Beispiele, Referenzdaten und Release-Dokumentation nachvollziehbar abnehmbar.
 
@@ -99,6 +99,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - `docs/quality.md`
 - `docs/performance.md`
 - `CHANGELOG.md`
+- `tests/CMakeLists.txt`
 - `tests/e2e/test_cli.cpp`
 - `tests/e2e/run_e2e_lib.sh`
 - `tests/e2e/run_e2e_artifacts.sh`
@@ -156,11 +157,13 @@ Tests und Abnahme muessen mindestens abdecken:
 - JSON- und DOT-Goldens entsprechen `docs/report-json.md` bzw. `docs/report-dot.md` sowie den validierten Schema-/Syntax-Gates
 - Release-Scope und Versionierung sind dokumentiert und in Smoke/Dry-Run nachweislich konsistent
 - Root-`CMakeLists.txt` meldet fuer M5 exakt `project(... VERSION 1.2.0)`; ein verbleibender `1.1.0`-Basiswert ist nicht abnahmefaehig
-- Plattformstatus fuer Linux, macOS und Windows ist nach AP 1.7 dokumentiert und ueber Required Checks oder validierte Smoke-Reports belegt; rote, fehlende oder freiwillige macOS-/Windows-Gates fuehren zu `known_limited`, nicht zu `validated_smoke`
+- Plattformstatus ist nach AP 1.7 dokumentiert: Linux ist `supported`, macOS und Windows sind hoechstens `validated_smoke`; rote, fehlende oder freiwillige macOS-/Windows-Gates fuehren zu `known_limited`, nicht zu `validated_smoke` oder `supported`
 - README, Guide, Releasing-Doku und Beispiele beschreiben Nutzeraufrufe ohne interne Build-Pfade wie `./build/cmake-xray`; `docs/performance.md` ist als Entwickler- und Messdokument ausgenommen, muss interne Build-Pfade aber als reproduzierbare Messkommandos kennzeichnen und darf sie nicht als normale Nutzeraufrufe darstellen
 - File-API-Performance-Baseline ist ueber versionierte oder reproduzierbar generierte File-API-Reply-Fixtures, `tests/reference/file-api-performance-manifest.json`, konkrete Reply-Verzeichnisse, Generator/CMake-Angaben und dokumentierte Messkommandos nachvollziehbar
 - Release-Archiv-Abnahme deckt den vollstaendigen AP-1.6-Vertrag ab: SHA-256-Sidecar, Archivinhalt, Binary-Checksumme und reproduzierbarer Doppelbuild sind automatisiert geprueft
 - Markdown-Beispiele in `docs/examples/` sind ueber Generatorvergleich, Bytevergleich gegen Goldens oder ein explizites Markdown-/Doc-Example-Manifest gegen Drift abgesichert
+- `tests/CMakeLists.txt` registriert das CTest-Ziel `doc_examples_validation`, sodass `tests/validate_doc_examples.py` in CI laeuft und nicht nur als loses Skript existiert
+- `docs/releasing.md` enthaelt im Normalpfad kein `gh release upload --clobber` und keinen Wildcard-Asset-Upload; manuelle externe Publikation ist nur als Recovery-Pfad mit vorherigem Ist-/Soll-Abgleich von Release, Assets, Checksums und OCI-Digests dokumentiert
 - `--top`-, `changed_file_source`-, und Provenienzregeln sind in Goldens und Schema-Tests belegt
 - `release`-, `releasing`- und `quality`-Dokumentation sind auf den finalen M5-Ablauf abgeglichen
 
