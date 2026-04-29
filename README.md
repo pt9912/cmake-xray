@@ -1,6 +1,6 @@
 # cmake-xray
 
-`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Ab `v1.1.0` liest `cmake-xray` `compile_commands.json` und optional CMake-File-API-Reply-Daten, rankt auffaellige Translation Units, leitet heuristische Include-Hotspots ab, analysiert Datei-Impact und zeigt betroffene Targets an. Ergebnisse werden als Konsolen-, Markdown-, JSON- oder Graphviz-DOT-Report ausgegeben; der JSON-Report folgt dem versionierten Vertrag in [docs/report-json.md](./docs/report-json.md), der DOT-Report dem Vertrag in [docs/report-dot.md](./docs/report-dot.md). Die genau ausgegebene App-Version ist via `cmake-xray --version` einzusehen.
+`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Es liest `compile_commands.json` und optional CMake-File-API-Reply-Daten, rankt auffaellige Translation Units, leitet heuristische Include-Hotspots ab, analysiert Datei-Impact und zeigt betroffene Targets an. Ergebnisse werden als Konsolen-, Markdown-, JSON-, Graphviz-DOT- oder eigenstaendiger HTML-Report ausgegeben; JSON, DOT und HTML folgen den versionierten Vertraegen in [docs/report-json.md](./docs/report-json.md), [docs/report-dot.md](./docs/report-dot.md) und [docs/report-html.md](./docs/report-html.md). Die ausgegebene App-Version ist via `cmake-xray --version` einzusehen; der historische Funktionsverlauf je Releaselinie steht in [CHANGELOG.md](./CHANGELOG.md).
 
 ## Status
 

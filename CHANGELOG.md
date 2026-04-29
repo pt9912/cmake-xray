@@ -13,6 +13,121 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [1.2.0] - 2026-04-29
+
+M5 hardens the report formats, ships a reproducible release pipeline and
+documents the platform support boundary. No breaking changes for users on
+the v1.1.0 contract: every new flag and report format is opt-in, the JSON
+schema is a fresh `format_version=1` (no prior v1 promise to break), and
+existing console/markdown goldens stay byte-stable in normal mode.
+
+### Added
+
+- HTML report format (`--format html`) — self-contained HTML5 document
+  with inline CSS, no external resources or JavaScript; contract pinned
+  in `docs/report-html.md` and validated via
+  `tests/validate_html_reports.py`.
+- JSON report format (`--format json`) with versioned schema
+  (`docs/report-json.schema.json`, Draft 2020-12, `format_version: 1`)
+  and a per-report manifest under `tests/e2e/testdata/m5/json-reports/`.
+- Graphviz DOT report format (`--format dot`) for visualising
+  top-rankings, hotspots and impact relationships; contract pinned in
+  `docs/report-dot.md`, validated via `tests/validate_dot_reports.py`
+  plus optional `dot -Tsvg`/`-Tplain`/`-Tjson` gates when Graphviz is
+  installed.
+- Atomic file output via `--output <path>` for `markdown`, `json`,
+  `dot` and `html`; existing target files survive render, write and
+  replace failures. POSIX uses `rename`/`renameat`; Windows uses
+  `ReplaceFileW`/`MoveFileExW` with `MOVEFILE_WRITE_THROUGH`.
+- Command-local `--quiet` and `--verbose` flags on `analyze` and
+  `impact` (mutually exclusive); contract pinned in
+  `docs/plan-M5-1-5.md` and validated via
+  `tests/validate_verbosity_reports.py`.
+- Top-level `--version` flag that prints the resolved app version
+  without subcommand initialisation.
+- Linux release archive
+  (`cmake-xray_<version>_linux_x86_64.tar.gz` plus `*.sha256` sidecar),
+  reproducibly built via `scripts/build-release-archive.sh` with a
+  fixed `SOURCE_DATE_EPOCH`.
+- OCI runtime image published to GHCR (`ghcr.io/<owner>/cmake-xray`)
+  with versioned tag plus `:latest` for non-prerelease versions, built
+  and pushed via `scripts/oci-image-publish.sh`.
+- Release tag validator (`scripts/validate-release-tag.sh`) for the
+  SemVer + prerelease-suffix tag pattern; build metadata (`+...`) is
+  rejected.
+- Release-asset allowlist guard (`scripts/release-allowlist.sh`)
+  blocking macOS/Windows preview artefacts in the official Linux
+  release-asset list.
+- Release dry-run orchestrator (`scripts/release-dry-run.sh`) using a
+  fake `gh` and a local `registry:2` container; covers nine scenarios
+  including the AP 1.7 negative case for a darwin/windows archive in
+  the asset path.
+- Native CI matrix in `.github/workflows/build.yml` for
+  `linux-x86_64`, `macos-arm64` and `windows-x86_64`; Windows
+  additionally runs `scripts/platform-smoke.ps1` as the
+  `native_powershell` Pflichtmodus next to the MSYS-Bash path.
+- Toolchain fail-fast gate (`cmake/ToolchainMinimums.cmake`) backed by
+  `tests/platform/toolchain-minimums.json` (CMake 3.20, GCC 10,
+  Clang 12, AppleClang 13, MSVC 19.29) plus three CTest smokes
+  (`toolchain_minimums_accepts_current_gnu` and two `WILL_FAIL`
+  negatives).
+- Plattformstatus classification (`supported` / `validated_smoke` /
+  `known_limited`) consistently in README, `docs/quality.md`,
+  `docs/releasing.md` and `docs/guide.md`. Linux x86_64 is
+  `supported`; macOS arm64 and Windows x86_64 are `known_limited`
+  pending external Branch-Protection and a green CI audit.
+- Synthetic UNC and Extended-Length path tests across DOT, HTML, JSON
+  adapters and atomic-writer (Windows-conditional via `#ifdef _WIN32`).
+- `docs/examples/` drift gate
+  (CTest `doc_examples_validation` via
+  `tests/validate_doc_examples.py` against
+  `docs/examples/manifest.txt` SHA-256 hashes plus per-format
+  validators).
+- File-API performance baseline in `docs/performance.md` plus
+  versioned reply fixtures under
+  `tests/reference/scale_*/build/.cmake/api/v1/reply/`. Regenerate
+  via `tests/reference/generate_file_api_fixtures.sh`; the manifest
+  `tests/reference/file-api-performance-manifest.json` documents
+  CMake version, generator and reply paths.
+- Manual platform smoke checklist
+  ([`docs/platform-smoke-checklist.md`](docs/platform-smoke-checklist.md))
+  mirroring the Required-Check sequence for local platform
+  verification.
+
+### Changed
+
+- Project and application version bumped to `1.2.0`. Release builds
+  resolve `XRAY_APP_VERSION` from the validated tag without a leading
+  `v`; `XRAY_VERSION_SUFFIX` stays available for local non-release
+  builds, and setting both at once is rejected at configure time.
+- Console and markdown reporters keep their byte-stable v1.1.0 output
+  in normal mode; AP M5-1.1 input-provenance fields surface only in
+  JSON, DOT and HTML.
+- README, `docs/guide.md` and `docs/releasing.md` describe user
+  invocations via released artefacts and the OCI image; internal
+  build paths (`./build/cmake-xray`) are reserved for `docs/performance.md`
+  measurement commands.
+
+### Fixed
+
+(none specific to this release — see commit history for individual
+review-fixup commits absorbed into AP M5-1.2 through AP M5-1.8.)
+
+### Platform status (M5)
+
+| Platform | Status |
+|---|---|
+| Linux x86_64 | `supported` |
+| macOS arm64 | `known_limited` |
+| Windows x86_64 | `known_limited` |
+
+`known_limited` rests on two external preconditions per
+[`docs/quality.md`](docs/quality.md) "Plattformstatus (AP M5-1.7)":
+the Branch-Protection of the repository must pin the
+`Native (...)`-Required-Checks for the affected platforms, and the
+green CI run on those platforms must be auditable. Both conditions
+are external to this repository and not gated by AP 1.8.
+
 ## [1.1.0] - 2026-04-24
 
 ### Added

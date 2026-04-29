@@ -114,9 +114,28 @@ fi
 
 ## GitHub-Release
 
-Der Standardpfad ist der automatisierte Release-Workflow beim Tag-Push. Die folgenden Befehle sind als manueller Fallback gedacht, falls die Workflow-Ausfuehrung absichtlich ueberschrieben oder nach einer fehlgeschlagenen Veroeffentlichung gezielt repariert werden soll.
+Der Normalpfad ist der automatisierte Release-Workflow beim Tag-Push.
+Er erstellt das Release als Draft, laeuft Tag-Validator, Allowlist-Guard,
+Drei-Wege-Versionscheck und OCI-Push durch und veroeffentlicht das
+Release nur, wenn alle Gates gruen sind. Manuelle `gh`-Aufrufe gehoeren
+ausschliesslich in den Recovery-Pfad und nicht in den Normalbetrieb;
+plan-M5-1-8.md "docs/releasing.md ... im Normalpfad kein
+`gh release upload --clobber` und keinen Wildcard-Asset-Upload" ist
+hier verbindlich.
+
+Recovery-Voraussetzung: Vor jedem manuellen `gh`-Aufruf muss ein
+Ist-/Soll-Abgleich von Release-Status, Asset-Liste, Checksums und
+OCI-Digest erfolgen. Die konkreten Recovery-Faelle und ihre
+Abgleich-Schritte stehen im Abschnitt
+"[Recovery-Runbook (AP M5-1.6 Tranche D.2)](#recovery-runbook-ap-m5-16-tranche-d2)"
+unten; das untenstehende Snippet ist nur die rohe Befehlsvorlage fuer
+den Fall "Release existiert bereits, Asset-Liste muss nach
+erfolgreichem Ist-/Soll-Abgleich abgeglichen werden":
 
 ```bash
+# RECOVERY ONLY -- nicht im Normalpfad ausfuehren. Ist-/Soll-Abgleich
+# muss vorher gegen Allowlist (scripts/release-allowlist.sh),
+# bekannten Asset-Checksumme und OCI-Digest gelaufen sein.
 if gh release view "$TAG" >/dev/null 2>&1; then
   echo "Release $TAG existiert bereits — Notes aktualisieren und Assets hochladen"
   gh release edit "$TAG" --notes-file /tmp/release-notes.md
