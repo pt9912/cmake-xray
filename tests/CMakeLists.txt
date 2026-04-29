@@ -52,6 +52,33 @@ xray_enable_coverage(xray_tests)
 add_test(NAME xray_tests COMMAND xray_tests)
 set_tests_properties(xray_tests PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
+# AP M5-1.7 Tranche A follow-up: positive plus negative smokes for the
+# toolchain-minimums fail-fast gate in cmake/ToolchainMinimums.cmake. The
+# wrapper scripts run cmake -P in script mode, fake CMAKE_CXX_COMPILER_ID
+# and CMAKE_CXX_COMPILER_VERSION, and include the production module so a
+# regression in the gate logic (silent skip, wrong key, broken JSON path
+# resolution) surfaces in CI instead of only when a real host falls
+# below the minimum.
+add_test(
+    NAME toolchain_minimums_accepts_current_gnu
+    COMMAND ${CMAKE_COMMAND} -P
+            ${PROJECT_SOURCE_DIR}/tests/platform/cmake/test_toolchain_minimums_accepts_current_gnu.cmake
+)
+
+add_test(
+    NAME toolchain_minimums_rejects_old_gnu
+    COMMAND ${CMAKE_COMMAND} -P
+            ${PROJECT_SOURCE_DIR}/tests/platform/cmake/test_toolchain_minimums_rejects_old_gnu.cmake
+)
+set_tests_properties(toolchain_minimums_rejects_old_gnu PROPERTIES WILL_FAIL TRUE)
+
+add_test(
+    NAME toolchain_minimums_rejects_unknown_compiler_id
+    COMMAND ${CMAKE_COMMAND} -P
+            ${PROJECT_SOURCE_DIR}/tests/platform/cmake/test_toolchain_minimums_rejects_unknown_compiler_id.cmake
+)
+set_tests_properties(toolchain_minimums_rejects_unknown_compiler_id PROPERTIES WILL_FAIL TRUE)
+
 find_program(BASH_PROGRAM bash)
 if(BASH_PROGRAM)
     add_test(

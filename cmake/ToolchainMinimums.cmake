@@ -9,7 +9,7 @@
 # "CMake-/Compiler-Kompatibilitaet".
 
 set(_xray_toolchain_minimums_json
-    "${CMAKE_SOURCE_DIR}/tests/platform/toolchain-minimums.json")
+    "${CMAKE_CURRENT_LIST_DIR}/../tests/platform/toolchain-minimums.json")
 
 if(NOT EXISTS "${_xray_toolchain_minimums_json}")
     message(FATAL_ERROR

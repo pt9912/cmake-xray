@@ -69,6 +69,19 @@ jobs:
         # the lockfile; CTest fails loud if the dependency is missing.
         run: python -m pip install --disable-pip-version-check --require-hashes -r tests/requirements-json-schema.txt
 
+      - name: Install pinned CMake
+        # AP M5-1.7 Tranche A follow-up to the Kompatibilitaetsregel
+        # "Mindestens ein Matrixjob pro Hostfamilie nutzt eine explizit
+        # eingerichtete aktuelle CMake-/Compiler-Kombination statt nur
+        # implizit vorinstallierter Runner-Defaults". The pip-installed
+        # CMake from PyPI shadows the runner-default cmake on PATH (the
+        # actions/setup-python venv prepends to PATH). The pinned version
+        # is documented in docs/quality.md "Plattformstatus (AP M5-1.7)";
+        # bumps go through the same review path as cmake/compiler
+        # minimum bumps.
+        shell: bash
+        run: python -m pip install --disable-pip-version-check cmake==3.30.5
+
       - name: Install ccache for Linux native builds
         if: matrix.name == 'linux-x86_64'
         run: |

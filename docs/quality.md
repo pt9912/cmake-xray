@@ -347,6 +347,36 @@ Der Fail-Fast-Check liest `CMAKE_CXX_COMPILER_ID` und vergleicht gegen den
 dazu passenden Eintrag in `compiler_minimums`; eine separate `ClangCL`-
 Schluesselung wird nicht eingefuehrt.
 
+Drei CTest-Smokes pinnen das Gate-Verhalten unabhaengig davon, ob die
+echte Host-Toolchain je unter das Minimum faellt:
+
+- `toolchain_minimums_accepts_current_gnu` (Positivpfad, GNU 13.3.0).
+- `toolchain_minimums_rejects_old_gnu` (Negativpfad, GNU 9 < Minimum 10;
+  `WILL_FAIL` invertiert).
+- `toolchain_minimums_rejects_unknown_compiler_id` (Negativpfad, ID `Foo`
+  fehlt in `compiler_minimums`; `WILL_FAIL` invertiert).
+
+Die Smokes laufen `cmake -P` gegen Wrapper-Skripte unter
+[tests/platform/cmake/](../tests/platform/cmake/) und decken Pfad-Resolve,
+JSON-Lookup und FATAL_ERROR-Pfad ab. Ein stiller Skip oder eine
+Pfad-Regression im Modul faellt damit in CI auf statt nur dann, wenn ein
+realer Host das Minimum unterschreitet.
+
+### Explizite CMake-Plattform-Pin
+
+Die Plan-Pflicht "Mindestens ein Matrixjob pro Hostfamilie nutzt eine
+explizit eingerichtete aktuelle CMake-/Compiler-Kombination statt nur
+implizit vorinstallierter Runner-Defaults"
+([plan-M5-1-7.md](./plan-M5-1-7.md) "CMake-/Compiler-Kompatibilitaet")
+ist in `.github/workflows/build.yml` ueber den Step
+`Install pinned CMake` umgesetzt: `python -m pip install cmake==3.30.5`
+schiebt eine versionsgepinnte CMake-Installation aus PyPI vor den
+Runner-Default auf `PATH`. Aktueller Pin: **CMake 3.30.5**. Anhebungen
+folgen dem gleichen Reviewpfad wie Mindestversions-Bumps in
+`tests/platform/toolchain-minimums.json`. Compiler-Versionen bleiben
+Runner-Default; ihre konkreten Werte loggt der Step `Show toolchain
+versions` plus der Configure-Status `AP M5-1.7 toolchain check: ...`.
+
 ## Zusammenhang mit Releasing
 
 Fuer M3 und spaetere Releases sind mindestens diese Docker-Pfade massgeblich:
