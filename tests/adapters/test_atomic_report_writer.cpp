@@ -261,6 +261,51 @@ TEST_CASE("atomic writer surfaces stream write failures and removes the temp") {
     CHECK(calls_contain_prefix(ops.calls, "remove:"));
 }
 
+// AP M5-1.7 Tranche B Atomic-Replace-Matrix item 7: keine Implementierung
+// darf den Zielpfad vor dem Replace-Schritt loeschen. Der Recording-Mock
+// schreibt jeden remove_temp_quiet-Aufruf in `calls`; der Test pinnt, dass
+// der Writer auf Erfolgs- und Fehlerpfaden ausschliesslich den temporaeren
+// Pfad entfernt und den Zielpfad nie berührt.
+TEST_CASE("atomic writer never deletes the target path before the replace step") {
+    const TempDir dir;
+    const auto target = dir.path() / "report.md";
+
+    SUBCASE("success path leaves the target untouched outside replace_existing") {
+        RecordingPlatformOps ops;
+        AtomicReportWriter writer{ops};
+        {
+            std::ofstream existing(target);
+            existing << "kept";
+        }
+
+        const auto failure = writer.write_atomic(target, "fresh");
+        REQUIRE_FALSE(failure.has_value());
+
+        const std::string target_remove_prefix = "remove:" + target.string();
+        for (const auto& call : ops.calls) {
+            CHECK(call.rfind(target_remove_prefix, 0) != 0);
+        }
+    }
+
+    SUBCASE("replace failure path removes only the temp, never the target") {
+        RecordingPlatformOps ops;
+        ops.replace_error = AtomicFileError{"simulated replace failure"};
+        AtomicReportWriter writer{ops};
+        {
+            std::ofstream existing(target);
+            existing << "kept";
+        }
+
+        const auto failure = writer.write_atomic(target, "should not land");
+        REQUIRE(failure.has_value());
+
+        const std::string target_remove_prefix = "remove:" + target.string();
+        for (const auto& call : ops.calls) {
+            CHECK(call.rfind(target_remove_prefix, 0) != 0);
+        }
+    }
+}
+
 TEST_CASE("default platform ops create_temp_exclusive succeeds for a fresh path") {
     const TempDir dir;
     DefaultAtomicFilePlatformOps ops;
@@ -313,6 +358,28 @@ TEST_CASE("default platform ops replace_existing fails when the temp does not ex
     const auto error =
         ops.replace_existing(dir.path() / "missing.tmp", dir.path() / "target.md");
     REQUIRE(error.has_value());
+}
+
+// AP M5-1.7 Tranche B Atomic-Replace-Matrix item 4: bei einem realen
+// Replace-Fehler auf der Host-Plattform (POSIX rename / Windows ReplaceFileW)
+// muss der vorhandene Zielinhalt unveraendert bleiben. Der Test setzt einen
+// echten Zielinhalt auf, ruft replace_existing mit fehlendem Temp-Pfad auf
+// (dadurch scheitert die Plattform-API ohne Seiteneffekt am Ziel) und
+// vergleicht die Zielbytes vor und nach dem fehlgeschlagenen Replace.
+TEST_CASE("default platform ops replace_existing preserves target bytes when the temp is missing") {
+    const TempDir dir;
+    DefaultAtomicFilePlatformOps ops;
+    const auto target = dir.path() / "report.md";
+    const std::string target_content = "kept across replace failure";
+    {
+        std::ofstream existing(target);
+        existing << target_content;
+    }
+
+    const auto error = ops.replace_existing(dir.path() / "missing.tmp", target);
+
+    REQUIRE(error.has_value());
+    CHECK(read_file(target) == target_content);
 }
 
 TEST_CASE("default platform ops move_new renames temp into a fresh target") {

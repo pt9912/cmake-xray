@@ -281,6 +281,45 @@ versioniert; ein `gh api repos/<owner>/<repo>/branches/main/protection`-Auszug
 beim Setzen oder Aendern der Required Checks ist als Audit-Hinweis im
 PR-Beschreibungstext zu hinterlegen.
 
+### Atomic-Replace-Matrix (AP M5-1.7 Tranche B)
+
+`--output` schreibt jeden Report ueber den Atomic-Writer in
+[src/adapters/cli/atomic_report_writer.cpp](../src/adapters/cli/atomic_report_writer.cpp).
+Der Vertrag pinnt sieben Invarianten plattformverbindlich:
+
+1. neue Zieldatei wird vollstaendig geschrieben,
+2. vorhandene Zieldatei wird bei Erfolg ersetzt,
+3. vorhandene Zieldatei bleibt bei Renderfehler unveraendert,
+4. vorhandene Zieldatei bleibt bei Schreib-/Replace-Fehler unveraendert,
+5. temporaere Datei wird im Zielverzeichnis exklusiv reserviert
+   (POSIX `O_CREAT | O_EXCL`, Windows `CreateFileW` mit `CREATE_NEW`),
+6. Kollisionen bei temporaeren Dateinamen werden bis zu 64 Mal mit
+   inkrementiertem Attempt-Counter wiederholt; danach Abbruch mit
+   sprechender Fehlermeldung,
+7. keine Implementierung loescht den Zielpfad vor dem Replace-Schritt; der
+   Swap erfolgt atomar via POSIX `rename`/`renameat` oder Windows
+   `ReplaceFileW` mit `REPLACEFILE_WRITE_THROUGH` (Replace) bzw.
+   `MoveFileExW` mit `MOVEFILE_WRITE_THROUGH` (Move-New).
+
+Pinning-Tests in `tests/adapters/test_atomic_report_writer.cpp` (CTest-Anker
+`xray_tests`) decken alle sieben Invarianten ab und mischen Mock-Pfade
+(`RecordingPlatformOps`) mit Host-Pfaden (`DefaultAtomicFilePlatformOps`).
+Die Host-Pfade sind verbindlich: auf Linux laeuft der POSIX-Pfad, auf macOS
+ebenfalls, auf Windows der `WindowsAtomicFilePlatformOps`-Pfad mit
+`ReplaceFileW`/`MoveFileExW`. Renderfehler-Pinning fuer alle Reportformate
+liegt in [tests/e2e/test_cli_render_errors.cpp](../tests/e2e/test_cli_render_errors.cpp).
+
+Plattform-Coverage:
+
+| Plattform | Replace-Implementierung | CTest-Lauf |
+|---|---|---|
+| Linux x86_64 | POSIX `rename` ueber `PosixAtomicFilePlatformOps` | Docker `test`-Stage plus `Native (linux-x86_64)` |
+| macOS arm64 | POSIX `rename` ueber `PosixAtomicFilePlatformOps` | `Native (macos-arm64)` |
+| Windows x86_64 | `ReplaceFileW` / `MoveFileExW` ueber `WindowsAtomicFilePlatformOps` | `Native (windows-x86_64)` |
+
+Ein roter Atomic-Writer-Test bricht den jeweiligen Required Check und damit
+AP 1.7 unabhaengig davon, ob die restlichen CLI-Smokes gruen sind.
+
 ### Mindestversionen fuer CMake und Compiler
 
 Mindestversionen sind in [tests/platform/toolchain-minimums.json](../tests/platform/toolchain-minimums.json)
