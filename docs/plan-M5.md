@@ -449,6 +449,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt, den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht und gegen `docs/report-json.schema.json` validiert
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
 - Validierung, dass `docs/examples/` keine driftenden Kopien enthaelt: Markdown-, HTML-, JSON- und DOT-Beispiele werden entweder aus den validierten Goldens generiert und in CI gegen den aktuellen Generatorausgang verglichen oder ueber das in `tests/CMakeLists.txt` registrierte CTest-Gate `doc_examples_validation` mit `tests/validate_doc_examples.py` und `docs/examples/manifest.txt` selbst validiert; Markdown-Beispiele brauchen dabei einen expliziten Bytevergleich gegen Golden-Outputs oder ein eigenes Markdown-/Doc-Example-Manifest, waehrend JSON, DOT und HTML zusaetzlich in die jeweiligen Schema-, Syntax- und Struktur-Manifeste aufgenommen werden
+- `CHANGELOG.md` enthaelt einen finalen `v1.2.0`-Abschnitt mit den neuen Formaten, Release-/Container-Aenderungen, Plattformstatus sowie Breaking- oder Migrationshinweisen; wenn keine Breaking Changes vorliegen, wird das explizit vermerkt
 
 **Ergebnis**: M5 ist nicht nur implementiert, sondern ueber Beispiele, Referenzdaten und Release-Dokumentation nachvollziehbar abnehmbar.
 

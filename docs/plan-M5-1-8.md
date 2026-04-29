@@ -162,7 +162,8 @@ Tests und Abnahme muessen mindestens abdecken:
 - File-API-Performance-Baseline ist ueber versionierte oder reproduzierbar generierte File-API-Reply-Fixtures, `tests/reference/file-api-performance-manifest.json`, konkrete Reply-Verzeichnisse, Generator/CMake-Angaben und dokumentierte Messkommandos nachvollziehbar
 - Release-Archiv-Abnahme deckt den vollstaendigen AP-1.6-Vertrag ab: SHA-256-Sidecar, Archivinhalt, Binary-Checksumme und reproduzierbarer Doppelbuild sind automatisiert geprueft
 - Markdown-Beispiele in `docs/examples/` sind ueber Generatorvergleich, Bytevergleich gegen Goldens oder ein explizites Markdown-/Doc-Example-Manifest gegen Drift abgesichert
-- `tests/CMakeLists.txt` registriert das CTest-Ziel `doc_examples_validation`, sodass `tests/validate_doc_examples.py` in CI laeuft und nicht nur als loses Skript existiert
+- `docs/examples/` ist ueber genau einen verbindlichen CI-Pfad gegen Drift abgesichert: entweder vergleicht CI generierte Beispiele gegen den aktuellen Generatorausgang, oder `tests/CMakeLists.txt` registriert das CTest-Ziel `doc_examples_validation`, sodass `tests/validate_doc_examples.py` in CI laeuft und nicht nur als loses Skript existiert
+- `CHANGELOG.md` enthaelt einen finalen `v1.2.0`-Abschnitt mit den neuen Formaten, Release-/Container-Aenderungen, Plattformstatus sowie Breaking- oder Migrationshinweisen; wenn keine Breaking Changes vorliegen, wird das explizit vermerkt
 - `docs/releasing.md` enthaelt im Normalpfad kein `gh release upload --clobber` und keinen Wildcard-Asset-Upload; manuelle externe Publikation ist nur als Recovery-Pfad mit vorherigem Ist-/Soll-Abgleich von Release, Assets, Checksums und OCI-Digests dokumentiert
 - `--top`-, `changed_file_source`-, und Provenienzregeln sind in Goldens und Schema-Tests belegt
 - `release`-, `releasing`- und `quality`-Dokumentation sind auf den finalen M5-Ablauf abgeglichen
