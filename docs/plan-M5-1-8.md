@@ -27,7 +27,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - Unit-/Integrationstests fuer den Atomic-Replace-Wrapper, die existierende Ziele ohne vorheriges Loeschen ersetzen, simulierte Fehlerpfade mit intakter alter Datei pruefen und unter Windows die gewaehlte `ReplaceFileW`-/`MoveFileExW`-Semantik abdecken
 - CLI-Tests, dass `--quiet` und `--verbose` command-lokal nach `analyze` bzw. `impact` akzeptiert werden und globale Positionen vor dem Subcommand nicht Teil des M5-Vertrags sind
 - CLI-Tests fuer `--verbose`, `--quiet` und gegenseitigen Ausschluss
-- CLI-Golden-Tests, dass `--quiet --format json|dot|html|markdown` ohne `--output` denselben stdout-Report wie der Normalmodus ausgibt und keine Erfolgsmeldungen in stdout mischt; mit `--output` muss stdout fuer alle Reportformate auch im Normal- und Quiet-Modus leer bleiben
+- CLI-Golden-Tests, dass `--quiet --format json|dot|html|markdown` ohne `--output` denselben stdout-Report wie der Normalmodus ausgibt und keine Erfolgsmeldungen in stdout mischt; mit `--output` muss stdout fuer alle Reportformate im Normal-, Quiet- und Verbose-Modus leer bleiben, waehrend Verbose-Zusatzdiagnostik ausschliesslich auf `stderr` erscheinen darf
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
 - Regressionstests, dass bestehende Console-/Markdown-Goldens fuer Compile-Database-only-, File-API- und Mixed-Input-Laeufe im Normalmodus byte-stabil bleiben und `ReportInputs` in AP 1.1 nicht neu in diesen bestehenden Formaten sichtbar wird
 - Golden- und CLI-Tests, dass `--top` bei `analyze` fuer Markdown, HTML, JSON und DOT konsistent wirkt und kein Artefaktformat implizit vollstaendige Listen ausgibt
@@ -56,11 +56,12 @@ Tests und Abnahme muessen mindestens abdecken:
 - automatisierter Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
 - automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt: `scripts/release-dry-run.sh` und ein gleichnamiger bzw. eindeutig benannter Workflow-Job muessen GitHub-Schritte mit einem Fake-Publisher samt Assertions fuer Zustandsuebergaenge und Reihenfolge sowie OCI-Schritte mit lokaler Test-Registry fuer Tagging, `latest`-Regel, Push und Manifest-Pruefung ausfuehren, ohne externe Veroeffentlichung
 - dokumentierter manueller Dry-Run nur fuer Recovery-Pfade, die echte externe Publish-Zustaende in GitHub Releases oder GHCR voraussetzen
-- Performance-Messung fuer den CMake-File-API-Pfad auf den bestehenden Referenzgroessen und Dokumentation der M5-Baseline in `docs/performance.md`
+- Performance-Messung fuer den CMake-File-API-Pfad auf reproduzierbaren Referenzgroessen und Dokumentation der M5-Baseline in `docs/performance.md`: AP 1.8 erzeugt oder versioniert die fuer `scale_*` noetigen CMake-File-API-Reply-Fixtures, dokumentiert Generator, CMake-Version, Fixture-Manifest und Erzeugungskommando, und verhindert, dass compile-db-only Referenzdaten als File-API-Baseline missverstanden werden
 - Plattform-Abnahme fuer Linux, macOS und Windows gemaess AP 1.7: jede Plattform ist in `docs/quality.md` und `docs/releasing.md` mit Status `supported`, `validated_smoke` oder `known_limited` dokumentiert; macOS und Windows erreichen `validated_smoke` nur mit verpflichtendem CI-Required-Check oder schema-validiertem Smoke-Report fuer Build, Atomic-Replace und normative CLI-Smokes, andernfalls werden konkrete Einschraenkungen als `known_limited` dokumentiert
 - Doku-Gate fuer Nutzeraufrufe: `README.md`, `docs/guide.md`, `docs/releasing.md` und `docs/examples/` duerfen keine interne Build-Pfad-Nutzung wie `./build/cmake-xray` voraussetzen und beschreiben Release-Artefakte, Container oder installierte Binary-Pfade als regulaere Nutzerwege
 - Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt, den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht und gegen `docs/report-json.schema.json` validiert
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
+- Validierung, dass `docs/examples/` keine driftenden Kopien enthaelt: Markdown-, HTML-, JSON- und DOT-Beispiele werden entweder aus den validierten Goldens generiert oder selbst in die jeweiligen JSON-Schema-, DOT-Syntax-, HTML-Struktur- und Golden-Manifeste aufgenommen
 
 **Ergebnis**: M5 ist nicht nur implementiert, sondern ueber Beispiele, Referenzdaten und Release-Dokumentation nachvollziehbar abnehmbar.
 
@@ -86,6 +87,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - `docs/examples/`
 - `docs/report-html.md`
 - `docs/report-json.md`
+- `docs/report-json.schema.json`
 - `docs/report-dot.md`
 - `docs/guide.md`
 - `README.md`
@@ -100,6 +102,10 @@ Tests und Abnahme muessen mindestens abdecken:
 - `tests/e2e/run_e2e_verbosity.sh`
 - `tests/e2e/test_cli_verbosity.cpp`
 - `tests/e2e/testdata/m5/`
+- `tests/validate_json_schema.py`
+- `tests/e2e/testdata/m5/json-reports/manifest.txt`
+- `tests/e2e/testdata/m5/dot-reports/manifest.txt`
+- `tests/e2e/testdata/m5/html-reports/manifest.txt`
 - `tests/adapters/test_port_wiring.cpp`
 - `tests/adapters/test_json_report_adapter.cpp`
 - `tests/adapters/test_dot_report_adapter.cpp`
@@ -126,13 +132,15 @@ Tests und Abnahme muessen mindestens abdecken:
 ## Abnahmekriterien
 
 - Alle in diesem AP genannten Format- und Dokumentationsfälle sind mit Tests oder Goldens belegt
-- Neue Formatausgaben sind in Dokumentation und Praxisbeispielen verlinkt und reproduzierbar
+- Neue Formatausgaben sind in Dokumentation und Praxisbeispielen verlinkt, reproduzierbar und ueber dieselben Validierungsmanifeste wie Goldens abgesichert
 - `--output` funktioniert mit `markdown`, `html`, `json`, `dot` auf allen Plattformen als Atomic-Write inkl. Fehlererhaltung
 - Quiet-/Verbose-Verhalten ist in CLI-Goldens für alle Ausgabeformate stabil und regressionsgesichert
+- `--verbose --output <path>` ist fuer Markdown, HTML, JSON und DOT mit leerem stdout und Zusatzdiagnostik nur auf `stderr` golden-getestet
 - JSON- und DOT-Goldens entsprechen `docs/report-json.md` bzw. `docs/report-dot.md` sowie den validierten Schema-/Syntax-Gates
 - Release-Scope und Versionierung sind dokumentiert und in Smoke/Dry-Run nachweislich konsistent
 - Plattformstatus fuer Linux, macOS und Windows ist nach AP 1.7 dokumentiert und ueber Required Checks oder validierte Smoke-Reports belegt; rote, fehlende oder freiwillige macOS-/Windows-Gates fuehren zu `known_limited`, nicht zu `validated_smoke`
 - README, Guide, Releasing-Doku und Beispiele beschreiben Nutzeraufrufe ohne interne Build-Pfade wie `./build/cmake-xray`
+- File-API-Performance-Baseline ist ueber versionierte oder reproduzierbar generierte File-API-Reply-Fixtures, Fixture-Manifest, Generator/CMake-Angaben und dokumentierte Messkommandos nachvollziehbar
 - `--top`-, `changed_file_source`-, und Provenienzregeln sind in Goldens und Schema-Tests belegt
 - `release`-, `releasing`- und `quality`-Dokumentation sind auf den finalen M5-Ablauf abgeglichen
 

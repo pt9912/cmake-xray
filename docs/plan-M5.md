@@ -393,7 +393,7 @@ Die neuen Formate und Release-Pfade sind nur dann nutzbar, wenn Beispiele, Golde
 M5 aktualisiert mindestens:
 
 - Versionsquellen fuer `v1.2.0`: Root-`CMakeLists.txt` bleibt numerische Projektversion; Release-Builds verwenden `XRAY_APP_VERSION` aus dem validierten Tag ohne fuehrendes `v` als kanonische App-/Package-Version fuer `ApplicationInfo`, Paketmetadaten und `--version`, waehrend `XRAY_VERSION_SUFFIX` nur fuer lokale oder nicht veroeffentlichende Builds zulaessig ist und gleichzeitiges Setzen beider Quellen fail-fast abbricht
-- `docs/examples/` mit repraesentativen HTML-, JSON- und DOT-Ausgaben
+- `docs/examples/` mit repraesentativen Markdown-, HTML-, JSON- und DOT-Ausgaben, die entweder aus validierten Goldens generiert oder selbst in die jeweiligen Validierungsmanifeste aufgenommen werden
 - `README.md` mit Formatwahl, quiet/verbose und Release-/Container-Nutzung
 - `docs/guide.md` mit praktischen Aufrufen fuer alle M5-Formate
 - `docs/releasing.md` mit finalem Artefaktumfang und Release-Verifikation
@@ -405,13 +405,13 @@ Tests und Abnahme muessen mindestens abdecken:
 
 - Adapter-Unit-Tests fuer HTML, JSON und DOT
 - HTML-Adapter-/Golden-Tests mit Sonderzeichen in Pfaden und Diagnostics, mindestens `<`, `>`, `&`, Anfuehrungszeichen und Backslashes, und Assertions auf korrekt escaped HTML ohne Rohinjektion
-- CLI-Tests fuer Formatwahl, ungueltige Formatwerte und `--format html|json|dot --output <path>` fuer `analyze` und `impact`
+- CLI-Tests fuer Formatwahl, ungueltige Formatwerte und `--format markdown|html|json|dot --output <path>` fuer `analyze` und `impact`
 - CLI-Negativtest, dass `--format console --output <path>` abgelehnt wird, weil `--output` auf artefaktorientierte Formate begrenzt bleibt
 - CLI-Tests fuer atomare Dateiausgabe: erfolgreiche Writes erzeugen vollstaendige Reports, vorhandene Zieldateien werden bei Erfolg ersetzt, und Fehlerfaelle lassen vorhandene Zieldateien auf Linux, macOS und Windows unveraendert
 - Unit-/Integrationstests fuer den Atomic-Replace-Wrapper, die existierende Ziele ohne vorheriges Loeschen ersetzen, simulierte Fehlerpfade mit intakter alter Datei pruefen und unter Windows die gewaehlte `ReplaceFileW`-/`MoveFileExW`-Semantik abdecken
 - CLI-Tests, dass `--quiet` und `--verbose` command-lokal nach `analyze` bzw. `impact` akzeptiert werden und globale Positionen vor dem Subcommand nicht Teil des M5-Vertrags sind
 - CLI-Tests fuer `--verbose`, `--quiet` und gegenseitigen Ausschluss
-- CLI-Golden-Tests, dass `--quiet --format json|dot|html|markdown` ohne `--output` denselben stdout-Report wie der Normalmodus ausgibt und keine Erfolgsmeldungen in stdout mischt; mit `--output` muss stdout fuer alle Reportformate auch im Normal- und Quiet-Modus leer bleiben
+- CLI-Golden-Tests, dass `--quiet --format json|dot|html|markdown` ohne `--output` denselben stdout-Report wie der Normalmodus ausgibt und keine Erfolgsmeldungen in stdout mischt; mit `--output` muss stdout fuer alle Reportformate im Normal-, Quiet- und Verbose-Modus leer bleiben, waehrend Verbose-Zusatzdiagnostik ausschliesslich auf `stderr` erscheinen darf
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
 - Regressionstests, dass bestehende Console-/Markdown-Goldens fuer Compile-Database-only-, File-API- und Mixed-Input-Laeufe im Normalmodus byte-stabil bleiben und `ReportInputs` in AP 1.1 nicht neu in diesen bestehenden Formaten sichtbar wird
 - Golden- und CLI-Tests, dass `--top` bei `analyze` fuer Markdown, HTML, JSON und DOT konsistent wirkt und kein Artefaktformat implizit vollstaendige Listen ausgibt
@@ -440,11 +440,12 @@ Tests und Abnahme muessen mindestens abdecken:
 - automatisierter Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
 - automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt: `scripts/release-dry-run.sh` und ein gleichnamiger bzw. eindeutig benannter Workflow-Job muessen GitHub-Schritte mit einem Fake-Publisher samt Assertions fuer Zustandsuebergaenge und Reihenfolge sowie OCI-Schritte mit lokaler Test-Registry fuer Tagging, `latest`-Regel, Push und Manifest-Pruefung ausfuehren, ohne externe Veroeffentlichung
 - dokumentierter manueller Dry-Run nur fuer Recovery-Pfade, die echte externe Publish-Zustaende in GitHub Releases oder GHCR voraussetzen
-- Performance-Messung fuer den CMake-File-API-Pfad auf den bestehenden Referenzgroessen und Dokumentation der M5-Baseline in `docs/performance.md`
+- Performance-Messung fuer den CMake-File-API-Pfad auf reproduzierbaren Referenzgroessen und Dokumentation der M5-Baseline in `docs/performance.md`: AP 1.8 erzeugt oder versioniert die fuer `scale_*` noetigen CMake-File-API-Reply-Fixtures, dokumentiert Generator, CMake-Version, Fixture-Manifest und Erzeugungskommando, und verhindert, dass compile-db-only Referenzdaten als File-API-Baseline missverstanden werden
 - Plattform-Abnahme fuer Linux, macOS und Windows gemaess AP 1.7: jede Plattform ist in `docs/quality.md` und `docs/releasing.md` mit Status `supported`, `validated_smoke` oder `known_limited` dokumentiert; macOS und Windows erreichen `validated_smoke` nur mit verpflichtendem CI-Required-Check oder schema-validiertem Smoke-Report fuer Build, Atomic-Replace und normative CLI-Smokes, andernfalls werden konkrete Einschraenkungen als `known_limited` dokumentiert
 - Doku-Gate fuer Nutzeraufrufe: `README.md`, `docs/guide.md`, `docs/releasing.md` und `docs/examples/` duerfen keine interne Build-Pfad-Nutzung wie `./build/cmake-xray` voraussetzen und beschreiben Release-Artefakte, Container oder installierte Binary-Pfade als regulaere Nutzerwege
 - Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt, den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht und gegen `docs/report-json.schema.json` validiert
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
+- Validierung, dass `docs/examples/` keine driftenden Kopien enthaelt: Markdown-, HTML-, JSON- und DOT-Beispiele werden entweder aus den validierten Goldens generiert oder selbst in die jeweiligen JSON-Schema-, DOT-Syntax-, HTML-Struktur- und Golden-Manifeste aufgenommen
 
 **Ergebnis**: M5 ist nicht nur implementiert, sondern ueber Beispiele, Referenzdaten und Release-Dokumentation nachvollziehbar abnehmbar.
 
@@ -504,7 +505,7 @@ Abhaengigkeiten:
 | GHCR-Image wird vor Abschluss aller Release-Gates gepusht | Teilveroeffentlichung ohne passenden GitHub Release bleibt zurueck | GHCR-Push erst nach Build- und Smoke-Gates ausfuehren, aber vor finaler oeffentlicher Release-Publikation |
 | Oeffentlicher GitHub Release entsteht vor erfolgreichem OCI-Publish | Release zeigt ein fehlendes Container-Artefakt oder falsche Installationshinweise | GitHub Release zuerst als Draft vorbereiten, OCI-Image veroeffentlichen und erst danach den Release oeffentlich machen |
 | Release-Workflow funktioniert nur fuer lokale Pfade | Artefakte sind nicht real nutzbar | entpacktes Linux-Archiv und Container-Image separat smoke-testen |
-| File-API-Pfad hat keine Performance-Baseline | der erste Folge-Meilenstein nach M4 erfuellt die Performance-Dokumentation nicht | M5 misst den CMake-File-API-Pfad auf Referenzgroessen und aktualisiert `docs/performance.md` |
+| File-API-Pfad hat keine Performance-Baseline | der erste Folge-Meilenstein nach M4 erfuellt die Performance-Dokumentation nicht | M5 misst den CMake-File-API-Pfad auf versionierten oder reproduzierbar generierten File-API-Reply-Fixtures fuer die Referenzgroessen und dokumentiert Generator, CMake-Version, Fixture-Manifest und Messkommando in `docs/performance.md` |
 | Versionsquellen bleiben auf `1.1.0` | ein `v1.2.0`-Release meldet intern die alte Version | numerische CMake-Projektversion, kompilierte bzw. generierte `ApplicationInfo`-Version, App-/Package-Version-Quelle, `--version` und Release-Tag gemeinsam pruefen |
 | Windows-Pfade brechen Golden-Tests | Portabilitaetsziel bleibt theoretisch | Pfadanzeige und Normalisierung explizit testen; Goldens plattformrobust gestalten |
 
