@@ -257,6 +257,57 @@ Diese Gates sind verpflichtend; ein roter Pfad bricht die Veroeffentlichung
 ab, bevor irgendein extern sichtbarer Zustand (Draft, OCI-Push, Public-
 Release) entsteht.
 
+## Plattformstatus (AP M5-1.7)
+
+Der Plattformstatus-Vertrag aus [docs/plan-M5-1-7.md](./plan-M5-1-7.md)
+unterscheidet drei Statusklassen: `supported` (offiziell freigegeben),
+`validated_smoke` (Build, Pflicht-Smokes und Plattformgates gruen, aber
+ohne Releasefreigabe) und `known_limited` (Pflichtgate fehlt oder ist nicht
+vollstaendig gruen, akzeptierte Einschraenkung dokumentiert).
+
+Aktueller Stand zum Ende von Tranche A:
+
+| Plattform | Status | Required Check | Hinweis |
+|---|---|---|---|
+| Linux x86_64 | `supported` | `Native (linux-x86_64)` plus die Docker-Gates oben | offizielle M5-Releaseplattform; Atomic-Replace-/CLI-Pflicht-Smokes laufen ueber bestehende E2E-Suites |
+| macOS arm64 | `known_limited` | `Native (macos-arm64)` (Build-Gate) | Atomic-Replace-Pflicht-Tests und CLI-Pflicht-Smokes folgen in Tranche B/C; bis dahin nur Build/`ctest`-Gate |
+| Windows x86_64 | `known_limited` | `Native (windows-x86_64)` (Build-Gate) | Atomic-Replace-Pflicht-Tests und CLI-Pflicht-Smokes folgen in Tranche B/C; bis dahin nur Build/`ctest`-Gate |
+
+Die Required-Check-Namen sind in
+[docs/plan-M5-1-7.md](./plan-M5-1-7.md) "Plattformstatus-Vertrag" verbindlich
+festgelegt; Branch-Protection-Konfiguration und Workflow-Jobnamen muessen
+deckungsgleich bleiben. Die Branch-Protection ist nicht im Workflow
+versioniert; ein `gh api repos/<owner>/<repo>/branches/main/protection`-Auszug
+beim Setzen oder Aendern der Required Checks ist als Audit-Hinweis im
+PR-Beschreibungstext zu hinterlegen.
+
+### Mindestversionen fuer CMake und Compiler
+
+Mindestversionen sind in [tests/platform/toolchain-minimums.json](../tests/platform/toolchain-minimums.json)
+versioniert und werden durch [cmake/ToolchainMinimums.cmake](../cmake/ToolchainMinimums.cmake)
+beim Configure jeder Plattform fail-fast geprueft (`FATAL_ERROR` bei
+Unterschreitung). Aktueller Stand:
+
+| Quelle | Mindestversion |
+|---|---|
+| CMake | `3.20` |
+| GCC (`GNU`) | `10` |
+| Clang | `12` |
+| AppleClang | `13` |
+| MSVC | `19.29` |
+
+Eine Anhebung dieser Werte erfolgt ausschliesslich ueber
+`tests/platform/toolchain-minimums.json`; CMakeLists.txt
+(`cmake_minimum_required`), README, `docs/guide.md` und dieser Abschnitt
+muessen synchron nachgezogen werden. Das Modul querchecked
+`CMAKE_MINIMUM_REQUIRED_VERSION` gegen die JSON-Datei und bricht ab, wenn
+beide auseinanderlaufen.
+
+ClangCL meldet sich gegenueber CMake je nach Setup als `Clang` oder `MSVC`.
+Der Fail-Fast-Check liest `CMAKE_CXX_COMPILER_ID` und vergleicht gegen den
+dazu passenden Eintrag in `compiler_minimums`; eine separate `ClangCL`-
+Schluesselung wird nicht eingefuehrt.
+
 ## Zusammenhang mit Releasing
 
 Fuer M3 und spaetere Releases sind mindestens diese Docker-Pfade massgeblich:

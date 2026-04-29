@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.20)
 
 project(cmake-xray VERSION 1.1.0 LANGUAGES CXX)
 
+# AP M5-1.7 Tranche A: fail-fast against tests/platform/toolchain-minimums.json
+# (single source of truth for CMake and compiler minimum versions). Runs after
+# project() so CMAKE_CXX_COMPILER_ID/VERSION are populated.
+include(${CMAKE_SOURCE_DIR}/cmake/ToolchainMinimums.cmake)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)

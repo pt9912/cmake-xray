@@ -1,0 +1,12 @@
+{
+  "$comment": "Single source of truth for cmake-xray's CMake and compiler minimum versions per AP M5-1.7. cmake/ToolchainMinimums.cmake reads this file during configure and fails fast if the host toolchain is below any of these values. Workflows, smoke scripts and docs MUST NOT duplicate the values; they read this file or CI outputs derived from it.",
+  "cmake": {
+    "minimum_version": "3.20"
+  },
+  "compiler_minimums": {
+    "GNU": "10",
+    "Clang": "12",
+    "AppleClang": "13",
+    "MSVC": "19.29"
+  }
+}

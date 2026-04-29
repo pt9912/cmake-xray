@@ -85,6 +85,27 @@ jobs:
           restore-keys: |
             ccache-linux-x86_64-
 
+      - name: Show toolchain versions
+        # AP M5-1.7 Tranche A: log host toolchain versions before
+        # configure so PR reviewers and the Required-Check audit trail
+        # always see which CMake/Python the platform job actually ran.
+        # The Compiler-ID/Version fail-fast lives in
+        # cmake/ToolchainMinimums.cmake and runs during Configure CMake
+        # below; an under-minimum CMake or compiler will FATAL_ERROR
+        # there before any build step starts.
+        shell: bash
+        run: |
+          set -eu
+          echo "::group::cmake --version"
+          cmake --version
+          echo "::endgroup::"
+          echo "::group::python --version"
+          python --version
+          echo "::endgroup::"
+          echo "::group::host info"
+          uname -a || true
+          echo "::endgroup::"
+
       - name: Configure CMake
         # AP M5-1.6 Tranche G fixup: ohne `shell: bash` waehlt
         # GitHub Actions auf windows-latest die PowerShell als Default
