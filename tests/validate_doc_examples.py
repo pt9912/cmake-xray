@@ -1,39 +1,50 @@
 #!/usr/bin/env python3
-"""Doc-examples drift gate (AP M5-1.8 A.2).
+"""Doc-examples drift gate (AP M5-1.8 A.2 + A.5 fixup).
 
-Validates that docs/examples/ stays in sync with docs/examples/manifest.txt:
+Validates that docs/examples/ stays in sync with docs/examples/manifest.txt
+and -- when invoked with --binary -- that the committed example bytes match
+the cmake-xray binary's current output for the args recorded in
+docs/examples/generation-spec.json:
 
   1. manifest entries match directory contents (no extras, no missing);
   2. each example's SHA-256 matches the manifest hash byte-for-byte;
   3. per-format validation for *.json, *.dot and *.html examples by
      dispatching to tests/validate_json_schema.py, tests/validate_dot_reports.py
-     and tests/validate_html_reports.py respectively.
+     and tests/validate_html_reports.py respectively;
+  4. (with --binary) regenerate each example via the supplied cmake-xray
+     binary using the generation-spec args and byte-diff the captured
+     stdout against the committed example file. plan-M5-1-8.md
+     "Validierung, dass docs/examples/ keine driftenden Kopien enthaelt"
+     accepts either CI-vs-generator drift compare OR golden-byte compare;
+     this implements the generator-output path so a binary change that
+     drifts an example surfaces in the doc_examples_validation CTest entry.
 
 Pure stdlib for the parity/hash check; the format-validation chain shells
 out to the existing per-format validators so a docs/examples/ file with
 the wrong schema, broken DOT syntax or a forbidden HTML element fails the
-gate the same way the goldens-side gates do. plan-M5-1-8.md
-"Validierung, dass docs/examples/ keine driftenden Kopien enthaelt"
-explicitly states that format validation does not replace the drift
-compare; both run.
+gate the same way the goldens-side gates do. plan-M5-1-8.md states that
+format validation does not replace the drift compare; both run.
 
 Usage:
     python3 tests/validate_doc_examples.py \\
         --repo-root <path-to-repo>          # optional, default CWD
         --manifest docs/examples/manifest.txt
         --examples-dir docs/examples
+        [--binary <path-to-cmake-xray>]     # optional, enables drift step
+        [--generation-spec docs/examples/generation-spec.json]
 
 Exit codes:
     0  All checks passed.
-    1  Drift detected (parity, hash, or format).
+    1  Drift detected (parity, hash, format, or binary-vs-file diff).
     2  Environment error (missing manifest, unreadable file, missing
-       per-format validator script).
+       per-format validator script, missing generation-spec).
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -43,6 +54,8 @@ EXIT_VALIDATION_FAILED = 1
 EXIT_ENVIRONMENT_ERROR = 2
 
 MANIFEST_BASENAME = "manifest.txt"
+GENERATION_SPEC_BASENAME = "generation-spec.json"
+INFRA_BASENAMES = frozenset((MANIFEST_BASENAME, GENERATION_SPEC_BASENAME))
 
 
 def parse_args() -> argparse.Namespace:
@@ -56,6 +69,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--examples-dir", type=Path,
                         default=Path("docs/examples"),
                         help="Examples directory relative to --repo-root.")
+    parser.add_argument("--binary", type=Path, default=None,
+                        help="Path to the cmake-xray binary. When set, the "
+                             "validator regenerates each example via the "
+                             "generation-spec.json args and byte-diffs the "
+                             "captured stdout against the committed file.")
+    parser.add_argument("--generation-spec", type=Path,
+                        default=Path("docs/examples/generation-spec.json"),
+                        help="Generation-spec path relative to --repo-root. "
+                             "Only consulted when --binary is set.")
     return parser.parse_args()
 
 
@@ -93,7 +115,7 @@ def list_directory(examples_dir: Path) -> set[str]:
     for entry in examples_dir.iterdir():
         if not entry.is_file():
             continue
-        if entry.name == MANIFEST_BASENAME:
+        if entry.name in INFRA_BASENAMES:
             continue
         files.add(entry.name)
     return files
@@ -202,11 +224,96 @@ def check_formats(manifest: dict[str, str], examples_dir: Path,
     return final_status
 
 
+def check_binary_drift(spec_path: Path, examples_dir: Path,
+                       binary_path: Path, repo_root: Path) -> int:
+    if not binary_path.is_file():
+        sys.stderr.write(f"error: --binary path does not exist: {binary_path}\n")
+        return EXIT_ENVIRONMENT_ERROR
+    if not spec_path.is_file():
+        sys.stderr.write(f"error: generation spec not found: {spec_path}\n")
+        return EXIT_ENVIRONMENT_ERROR
+    try:
+        spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        sys.stderr.write(f"error: cannot parse generation spec: {exc}\n")
+        return EXIT_ENVIRONMENT_ERROR
+    entries = spec.get("examples")
+    if not isinstance(entries, list):
+        sys.stderr.write("error: generation spec missing 'examples' array\n")
+        return EXIT_ENVIRONMENT_ERROR
+
+    failed = 0
+    seen: set[str] = set()
+    for entry in entries:
+        name = entry.get("file")
+        args_list = entry.get("args")
+        if not isinstance(name, str) or not isinstance(args_list, list):
+            sys.stderr.write(f"error: malformed spec entry: {entry!r}\n")
+            failed += 1
+            continue
+        seen.add(name)
+        target_path = examples_dir / name
+        if not target_path.is_file():
+            sys.stderr.write(
+                f"error: spec references missing example {name}\n")
+            failed += 1
+            continue
+        try:
+            completed = subprocess.run(
+                [str(binary_path)] + [str(a) for a in args_list],
+                capture_output=True, cwd=repo_root, check=False)
+        except FileNotFoundError as exc:
+            sys.stderr.write(
+                f"error: cannot run {binary_path} for {name}: {exc}\n")
+            return EXIT_ENVIRONMENT_ERROR
+        if completed.returncode != 0:
+            sys.stderr.write(
+                f"error: regen failed for {name}: exit {completed.returncode}\n")
+            sys.stderr.write(
+                completed.stderr.decode("utf-8", errors="replace"))
+            failed += 1
+            continue
+        expected = target_path.read_bytes()
+        if completed.stdout != expected:
+            sys.stderr.write(
+                f"error: drift for {name} -- binary stdout "
+                f"({len(completed.stdout)} B) differs from committed file "
+                f"({len(expected)} B)\n")
+            sys.stderr.write(
+                "  rerun docs/examples/ regen via:\n"
+                f"    {binary_path} {' '.join(str(a) for a in args_list)} "
+                f"> docs/examples/{name}\n"
+                "  then update docs/examples/manifest.txt SHA-256 entry.\n")
+            failed += 1
+
+    # Cross-check: every example file must have a spec entry, otherwise it
+    # cannot be drift-detected. This pairs with the manifest parity check
+    # above and prevents a regression where a file is added to the manifest
+    # but forgotten in the spec.
+    missing_in_spec: list[str] = []
+    for path in sorted(examples_dir.iterdir()):
+        if not path.is_file():
+            continue
+        if path.name in INFRA_BASENAMES:
+            continue
+        if path.name not in seen:
+            missing_in_spec.append(path.name)
+    if missing_in_spec:
+        sys.stderr.write(
+            "error: examples missing from docs/examples/generation-spec.json:\n")
+        for name in missing_in_spec:
+            sys.stderr.write(f"  - {name}\n")
+        failed += len(missing_in_spec)
+
+    return EXIT_VALIDATION_FAILED if failed else EXIT_OK
+
+
 def main() -> int:
     args = parse_args()
     repo_root = args.repo_root.resolve()
     manifest_path = (repo_root / args.manifest).resolve()
     examples_dir = (repo_root / args.examples_dir).resolve()
+    spec_path = (repo_root / args.generation_spec).resolve()
 
     manifest = parse_manifest(manifest_path)
     directory = list_directory(examples_dir)
@@ -220,7 +327,13 @@ def main() -> int:
         return hash_status
 
     format_status = check_formats(manifest, examples_dir, repo_root)
-    return format_status
+    if format_status != EXIT_OK:
+        return format_status
+
+    if args.binary is None:
+        return EXIT_OK
+    return check_binary_drift(spec_path, examples_dir,
+                              args.binary.resolve(), repo_root)
 
 
 if __name__ == "__main__":

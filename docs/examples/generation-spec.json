@@ -1,0 +1,86 @@
+{
+  "$comment": "AP M5-1.8 A.5 fixup: each docs/examples/ artefact lists the exact cmake-xray args that produced it. tests/validate_doc_examples.py runs the binary with these args (CWD = repo root) and diffs the captured stdout against the committed example file. plan-M5-1-8.md \"Validierung, dass docs/examples/ keine driftenden Kopien enthaelt\" requires drift detection against current generator output OR golden bytes; this spec implements the generator-output path, so a binary change that drifts the example surfaces in the doc_examples_validation CTest entry.",
+  "format_version": 1,
+  "examples": [
+    {
+      "file": "analyze-console.txt",
+      "args": ["analyze", "--compile-commands", "tests/e2e/testdata/m3/report_top_limit/compile_commands.json", "--format", "console", "--top", "2"]
+    },
+    {
+      "file": "analyze-console-targets.txt",
+      "args": ["analyze", "--cmake-file-api", "tests/e2e/testdata/m4/file_api_only/build", "--format", "console"]
+    },
+    {
+      "file": "analyze-report.md",
+      "args": ["analyze", "--compile-commands", "tests/e2e/testdata/m3/report_project/compile_commands.json", "--format", "markdown", "--top", "2"]
+    },
+    {
+      "file": "analyze-report-targets.md",
+      "args": ["analyze", "--cmake-file-api", "tests/e2e/testdata/m4/file_api_only/build", "--format", "markdown"]
+    },
+    {
+      "file": "analyze-report.html",
+      "args": ["analyze", "--compile-commands", "tests/e2e/testdata/m3/report_project/compile_commands.json", "--format", "html", "--top", "2"]
+    },
+    {
+      "file": "analyze-report-targets.html",
+      "args": ["analyze", "--cmake-file-api", "tests/e2e/testdata/m4/file_api_only/build", "--format", "html"]
+    },
+    {
+      "file": "analyze-report.json",
+      "args": ["analyze", "--compile-commands", "tests/e2e/testdata/m3/report_project/compile_commands.json", "--format", "json", "--top", "2"]
+    },
+    {
+      "file": "analyze-report-targets.json",
+      "args": ["analyze", "--cmake-file-api", "tests/e2e/testdata/m4/file_api_only/build", "--format", "json"]
+    },
+    {
+      "file": "analyze-report.dot",
+      "args": ["analyze", "--compile-commands", "tests/e2e/testdata/m3/report_project/compile_commands.json", "--format", "dot", "--top", "2"]
+    },
+    {
+      "file": "analyze-report-targets.dot",
+      "args": ["analyze", "--cmake-file-api", "tests/e2e/testdata/m4/file_api_only/build", "--format", "dot"]
+    },
+    {
+      "file": "impact-console.txt",
+      "args": ["impact", "--compile-commands", "tests/e2e/testdata/m3/report_impact_header/compile_commands.json", "--changed-file", "include/common/config.h", "--format", "console"]
+    },
+    {
+      "file": "impact-console-targets.txt",
+      "args": ["impact", "--compile-commands", "tests/e2e/testdata/m4/partial_targets/compile_commands.json", "--cmake-file-api", "tests/e2e/testdata/m4/partial_targets/build", "--changed-file", "/project/src/main.cpp", "--format", "console"]
+    },
+    {
+      "file": "impact-report.md",
+      "args": ["impact", "--compile-commands", "tests/e2e/testdata/m3/report_impact_header/compile_commands.json", "--changed-file", "include/common/config.h", "--format", "markdown"]
+    },
+    {
+      "file": "impact-report-targets.md",
+      "args": ["impact", "--compile-commands", "tests/e2e/testdata/m4/partial_targets/compile_commands.json", "--cmake-file-api", "tests/e2e/testdata/m4/partial_targets/build", "--changed-file", "/project/src/main.cpp", "--format", "markdown"]
+    },
+    {
+      "file": "impact-report.html",
+      "args": ["impact", "--compile-commands", "tests/e2e/testdata/m3/report_impact_header/compile_commands.json", "--changed-file", "include/common/config.h", "--format", "html"]
+    },
+    {
+      "file": "impact-report-targets.html",
+      "args": ["impact", "--compile-commands", "tests/e2e/testdata/m4/partial_targets/compile_commands.json", "--cmake-file-api", "tests/e2e/testdata/m4/partial_targets/build", "--changed-file", "/project/src/main.cpp", "--format", "html"]
+    },
+    {
+      "file": "impact-report.json",
+      "args": ["impact", "--compile-commands", "tests/e2e/testdata/m3/report_impact_header/compile_commands.json", "--changed-file", "include/common/config.h", "--format", "json"]
+    },
+    {
+      "file": "impact-report-targets.json",
+      "args": ["impact", "--compile-commands", "tests/e2e/testdata/m4/partial_targets/compile_commands.json", "--cmake-file-api", "tests/e2e/testdata/m4/partial_targets/build", "--changed-file", "/project/src/main.cpp", "--format", "json"]
+    },
+    {
+      "file": "impact-report.dot",
+      "args": ["impact", "--compile-commands", "tests/e2e/testdata/m3/report_impact_header/compile_commands.json", "--changed-file", "include/common/config.h", "--format", "dot"]
+    },
+    {
+      "file": "impact-report-targets.dot",
+      "args": ["impact", "--compile-commands", "tests/e2e/testdata/m4/partial_targets/compile_commands.json", "--cmake-file-api", "tests/e2e/testdata/m4/partial_targets/build", "--changed-file", "/project/src/main.cpp", "--format", "dot"]
+    }
+  ]
+}

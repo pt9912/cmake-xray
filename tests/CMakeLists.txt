@@ -301,15 +301,21 @@ add_test(
 )
 set_tests_properties(verbosity_manifest_validation_rejects_broken_sample PROPERTIES WILL_FAIL TRUE)
 
-# AP M5-1.8 A.2: doc-examples drift gate. plan-M5-1-8.md
+# AP M5-1.8 A.2 + A.5 fixup: doc-examples drift gate. plan-M5-1-8.md
 # "Validierung, dass docs/examples/ keine driftenden Kopien enthaelt"
-# verlangt einen verbindlichen CI-Pfad gegen Drift in docs/examples/.
-# tests/validate_doc_examples.py prueft Manifest-Paritaet, SHA-256-
-# Stabilitaet und ruft fuer json/dot/html zusaetzlich die jeweiligen
-# Format-Validatoren auf.
+# verlangt einen verbindlichen CI-Pfad gegen Drift in docs/examples/,
+# entweder via Vergleich gegen den aktuellen Generatorausgang oder
+# via Bytevergleich gegen Goldens. tests/validate_doc_examples.py
+# prueft Manifest-Paritaet, SHA-256-Stabilitaet, ruft fuer json/dot/
+# html die jeweiligen Format-Validatoren auf und faehrt mit
+# --binary zusaetzlich den Generator-Drift-Check: jedes Beispiel
+# wird via cmake-xray + den in docs/examples/generation-spec.json
+# fixierten Args neu erzeugt und gegen die committete Datei
+# byte-genau verglichen.
 add_test(
     NAME doc_examples_validation
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_doc_examples.py
             --repo-root ${PROJECT_SOURCE_DIR}
+            --binary $<TARGET_FILE:cmake-xray>
 )
