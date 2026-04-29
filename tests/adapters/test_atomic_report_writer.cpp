@@ -131,6 +131,32 @@ TEST_CASE("atomic temp path uses report when target has no filename") {
     CHECK(temp.filename().string().find(".cmake-xray-report.") != std::string::npos);
 }
 
+// AP M5-1.7 Tranche C.2: synthetic Windows path-shape Pflichttests fuer
+// atomic_report_temp_path. POSIX std::filesystem::path parst weder
+// `\\server\share\...` noch `\\?\C:\...` als zusammengesetzten Pfad — der
+// Backslash ist auf POSIX kein Pfadtrenner. Der Plan-Pflicht-Skip
+// "dokumentierter Windows-API-Skip mit known_limited-Folge" ist in
+// docs/quality.md unter Plattformstatus dokumentiert; die Tests selbst
+// laufen nur auf Windows-Hosts und decken dort den Pfad-Splitting-Vertrag
+// (parent_path + filename) fuer UNC und Extended-Length ab.
+#ifdef _WIN32
+TEST_CASE("atomic temp path keeps the parent UNC root on Windows hosts") {
+    const std::filesystem::path target{"\\\\server\\share\\dir\\report.md"};
+    const auto temp = atomic_report_temp_path(target, 0);
+    CHECK(temp.parent_path() == target.parent_path());
+    CHECK(temp.filename().string().rfind(".cmake-xray-report.md.", 0) == 0);
+    CHECK(temp.extension() == ".tmp");
+}
+
+TEST_CASE("atomic temp path keeps the extended-length parent on Windows hosts") {
+    const std::filesystem::path target{"\\\\?\\C:\\very\\long\\path\\report.md"};
+    const auto temp = atomic_report_temp_path(target, 0);
+    CHECK(temp.parent_path() == target.parent_path());
+    CHECK(temp.filename().string().rfind(".cmake-xray-report.md.", 0) == 0);
+    CHECK(temp.extension() == ".tmp");
+}
+#endif
+
 TEST_CASE("atomic writer moves a new target into place via move_new") {
     const TempDir dir;
     RecordingPlatformOps ops;

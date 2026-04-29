@@ -320,6 +320,43 @@ Plattform-Coverage:
 Ein roter Atomic-Writer-Test bricht den jeweiligen Required Check und damit
 AP 1.7 unabhaengig davon, ob die restlichen CLI-Smokes gruen sind.
 
+#### Synthetische UNC- und Extended-Length-Pfadfaelle (Tranche C.2)
+
+Plan-M5-1-7.md "Windows-Bewertung" verlangt synthetische UNC- und
+Extended-Length-Pfadfaelle in mindestens einem Adapter-, CLI- oder
+Golden-Pfad. Die Coverage in `xray_tests`:
+
+- **DOT-Adapter** ([tests/adapters/test_dot_report_adapter.cpp](../tests/adapters/test_dot_report_adapter.cpp)):
+  Tests "DOT label peels UNC paths down to the basename" und "DOT label
+  peels Windows extended-length paths down to the basename" pinnen
+  Label-Peeling plus Backslash-Escape im `path`-Attribut.
+- **HTML-Adapter** ([tests/adapters/test_html_report_adapter.cpp](../tests/adapters/test_html_report_adapter.cpp)):
+  Tests "HTML render_text passes UNC paths through verbatim", "HTML
+  render_attribute escapes UNC paths in attributes" und "HTML render_text
+  and render_attribute pass extended-length paths through verbatim"
+  pinnen Text- und Attribut-Render fuer beide Pfadshapes.
+- **JSON-Adapter** ([tests/adapters/test_json_report_adapter.cpp](../tests/adapters/test_json_report_adapter.cpp)):
+  Tests "json output preserves UNC paths verbatim through escape and
+  round-trip" und "json output preserves extended-length paths verbatim
+  through escape and round-trip" pruefen Round-Trip via `nlohmann::json`
+  plus Wire-Format-Escape (jeder rohe `\` wird `\\` im JSON-Output).
+- **Atomic-Writer**
+  ([tests/adapters/test_atomic_report_writer.cpp](../tests/adapters/test_atomic_report_writer.cpp)):
+  Windows-Host-conditional Tests "atomic temp path keeps the parent UNC
+  root on Windows hosts" und "atomic temp path keeps the extended-length
+  parent on Windows hosts" sind via `#ifdef _WIN32` aktiv und decken
+  `parent_path()`-/`filename()`-Splitting fuer UNC und Extended-Length
+  ab. Auf Linux/macOS-Hosts sind diese Tests dokumentiert geskippt
+  (`std::filesystem::path` parst Backslashes auf POSIX nicht als
+  Pfadtrenner) — Plan-konform als "dokumentierter Windows-API-Skip mit
+  `known_limited`-Folge". Der Skip betrifft nur den Atomic-Writer-Splitting-
+  Pfadtest; die Adapter-Display-Tests (DOT/HTML/JSON oben) laufen
+  unabhaengig vom Host.
+
+Echte UNC-Dateisystem-Smokes (`\\localhost\...`-Share) und echte
+Extended-Length-Dateiziele bleiben optionale Folgehaertung; die
+Required-Pflichtfaelle sind ueber die synthetischen Tests oben abgedeckt.
+
 ### Mindestversionen fuer CMake und Compiler
 
 Mindestversionen sind in [tests/platform/toolchain-minimums.json](../tests/platform/toolchain-minimums.json)

@@ -568,6 +568,95 @@ TEST_CASE("json output preserves UTF-8 in paths, diagnostics, and target names")
     CHECK(rendered.find("\xc3\xa4\xc3\xb6\xc3\xbc") != std::string::npos);
 }
 
+// AP M5-1.7 Tranche C.2: synthetic UNC/Extended-Length-Pflichtfaelle fuer
+// JSON-Render. Plan-M5-1-7.md "Pfad- und Zeilenenden-Vertrag" verlangt,
+// dass UNC- und Extended-Length-Pfade in mindestens einem Adapter-, CLI-
+// oder Golden-Test abgedeckt sind. Die Tests stellen Round-Trip-Treue
+// (nlohmann::json parst die JSON-escapten Backslashes wieder zu raw
+// backslashes) und JSON-Escape-Korrektheit (raw `\` wird zu `\\` im Wire-
+// Format) sicher; die rohen JSON-Bytes pruefen wir zusaetzlich, damit ein
+// versehentliches Re-Quote (z. B. `\\\\\\\\` statt `\\\\`) auffaellt.
+TEST_CASE("json output preserves UNC paths verbatim through escape and round-trip") {
+    ImpactResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.target_metadata = TargetMetadataStatus::loaded;
+    const std::string unc_path = "\\\\server\\share\\dir\\foo.cpp";
+    const std::string unc_directory = "\\\\server\\share\\build";
+    const std::string unc_unique_key = "\\\\server\\share\\dir|build";
+    result.affected_translation_units = {
+        ImpactedTranslationUnit{
+            reference(unc_path, unc_directory, unc_unique_key),
+            ImpactKind::direct,
+            {},
+        },
+    };
+    result.inputs = ReportInputs{
+        std::nullopt, ReportInputSource::not_provided,
+        std::nullopt, std::nullopt, ReportInputSource::not_provided,
+        std::optional<std::string>{unc_path},
+        std::optional<ChangedFileSource>{ChangedFileSource::cli_absolute},
+    };
+    result.changed_file = unc_path;
+    result.heuristic = false;
+
+    const JsonReportAdapter adapter;
+    const auto rendered = adapter.write_impact_report(result);
+
+    const auto doc = parse(rendered);
+    CHECK(doc["inputs"]["changed_file"] == unc_path);
+    REQUIRE(doc["directly_affected_translation_units"].size() == 1);
+    CHECK(doc["directly_affected_translation_units"][0]["reference"]["source_path"]
+          == unc_path);
+    CHECK(doc["directly_affected_translation_units"][0]["reference"]["directory"]
+          == unc_directory);
+
+    // Wire-format check: each raw backslash escapes to \\ in JSON, so the
+    // leading double backslash of an UNC path appears as four backslash
+    // characters in the rendered string (each `\\` here is one raw byte).
+    CHECK(rendered.find("\\\\\\\\server\\\\share\\\\dir\\\\foo.cpp") != std::string::npos);
+}
+
+TEST_CASE("json output preserves extended-length paths verbatim through escape and round-trip") {
+    ImpactResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.target_metadata = TargetMetadataStatus::loaded;
+    const std::string el_path = "\\\\?\\C:\\very\\long\\path\\foo.cpp";
+    const std::string el_directory = "\\\\?\\C:\\very\\long\\build";
+    const std::string el_unique_key = "\\\\?\\C:\\very\\long\\path|build";
+    result.affected_translation_units = {
+        ImpactedTranslationUnit{
+            reference(el_path, el_directory, el_unique_key),
+            ImpactKind::direct,
+            {},
+        },
+    };
+    result.inputs = ReportInputs{
+        std::nullopt, ReportInputSource::not_provided,
+        std::nullopt, std::nullopt, ReportInputSource::not_provided,
+        std::optional<std::string>{el_path},
+        std::optional<ChangedFileSource>{ChangedFileSource::cli_absolute},
+    };
+    result.changed_file = el_path;
+    result.heuristic = false;
+
+    const JsonReportAdapter adapter;
+    const auto rendered = adapter.write_impact_report(result);
+
+    const auto doc = parse(rendered);
+    CHECK(doc["inputs"]["changed_file"] == el_path);
+    REQUIRE(doc["directly_affected_translation_units"].size() == 1);
+    CHECK(doc["directly_affected_translation_units"][0]["reference"]["source_path"]
+          == el_path);
+    CHECK(doc["directly_affected_translation_units"][0]["reference"]["directory"]
+          == el_directory);
+
+    // The literal `?` survives unchanged (it is not a JSON special), and
+    // each backslash escapes to \\ on the wire.
+    CHECK(rendered.find("\\\\\\\\?\\\\C:\\\\very\\\\long\\\\path\\\\foo.cpp") != std::string::npos);
+}
+
 TEST_CASE("schema rejects rendered JSON whose changed_file_source is unresolved_file_api_source_root") {
     // The unresolved_file_api_source_root model value is an internal AP 1.1
     // error provenance. JSON v1 deliberately excludes it; the CLI emits a

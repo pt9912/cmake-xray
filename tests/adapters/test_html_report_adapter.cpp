@@ -836,6 +836,41 @@ TEST_CASE("HTML render_text handles mixed-slash paths without collapsing them") 
           "\\\\server/share\\folder/file.cpp");
 }
 
+// AP M5-1.7 Tranche C.2: synthetic UNC/Extended-Length-Pflichtfaelle fuer
+// HTML-Render. Plan-M5-1-7.md "Windows-Bewertung" verlangt mindestens einen
+// Adapter-, CLI- oder Golden-Pfadfall fuer UNC und Extended-Length; der
+// synthetische Fall ist ohne SMB-Share oder Long-Path-Provisionierung
+// pflichtbar und deckt Anzeige- plus Escape-Logik ab.
+TEST_CASE("HTML render_attribute escapes UNC paths in attributes") {
+    // Attribute-context counterpart to "render_text passes UNC paths
+    // through verbatim". Backslash itself is not an attribute special, but
+    // any HTML special inside the share or directory name must escape
+    // while the leading double backslash survives.
+    CHECK(render_attribute("\\\\server\\share\\folder\\file.cpp") ==
+          "\\\\server\\share\\folder\\file.cpp");
+    CHECK(render_attribute("\\\\srv\\<share>\\file.cpp") ==
+          "\\\\srv\\&lt;share&gt;\\file.cpp");
+    CHECK(render_attribute("\\\\srv\\share\\with \"quote\".cpp") ==
+          "\\\\srv\\share\\with &quot;quote&quot;.cpp");
+}
+
+TEST_CASE("HTML render_text and render_attribute pass extended-length paths through verbatim") {
+    // Extended-length paths use the \\?\ namespace prefix on Windows. The
+    // HTML adapter must not collapse the leading backslashes, must not
+    // strip the literal `?`, and must keep the rest of the path intact in
+    // both text and attribute contexts.
+    CHECK(render_text("\\\\?\\C:\\very\\long\\path\\file.cpp") ==
+          "\\\\?\\C:\\very\\long\\path\\file.cpp");
+    CHECK(render_attribute("\\\\?\\C:\\very\\long\\path\\file.cpp") ==
+          "\\\\?\\C:\\very\\long\\path\\file.cpp");
+    // \\?\UNC\ form addresses an extended-length UNC path; the same rules
+    // apply, leaving every character including the embedded `?` intact.
+    CHECK(render_text("\\\\?\\UNC\\server\\share\\folder\\file.cpp") ==
+          "\\\\?\\UNC\\server\\share\\folder\\file.cpp");
+    CHECK(render_attribute("\\\\?\\UNC\\server\\share\\folder\\file.cpp") ==
+          "\\\\?\\UNC\\server\\share\\folder\\file.cpp");
+}
+
 // ---- Tranche D: ASCII escaping edge cases -------------------------------
 
 TEST_CASE("normalize_html_whitespace turns every ASCII control byte 0x00..0x1F into a space") {
