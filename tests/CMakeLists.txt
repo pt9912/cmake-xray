@@ -321,23 +321,18 @@ add_test(
 )
 
 # AP M5-1.8 A.5 follow-up: host-portability gate for the docs/examples
-# drift check. Runs scripts/verify-doc-examples-portability.sh which
-# bind-mounts the repo at /alt-mount instead of /workspace inside the
-# cmake-xray:test image; the binary's DOT unique_key stdout then
-# carries the /alt-mount prefix, divergent from the committed file's
-# /workspace/... bytes. validate_doc_examples' normaliser must reduce
-# both sides to HOSTPATH for the diff to pass. The smoke skips
-# cleanly when docker is unavailable (e.g. inside the
-# `docker build --target test` ctest run) and greens whenever a host
-# with docker exercises ctest manually -- mirroring the
-# release_dry_run pattern. This is the gate that would have caught
-# GHA Build run #25123025175 before push.
-if(BASH_PROGRAM)
-    add_test(
-        NAME doc_examples_host_portability
-        COMMAND bash ${PROJECT_SOURCE_DIR}/scripts/verify-doc-examples-portability.sh
-    )
-    set_tests_properties(doc_examples_host_portability PROPERTIES
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-    )
-endif()
+# drift check is wired exclusively via the docs-examples-portability
+# job in .github/workflows/build.yml. An earlier iteration registered
+# scripts/verify-doc-examples-portability.sh as a CTest entry too,
+# but that put a third docker-heavy test (alongside release_dry_run
+# and oci_image_smoke) on the same Linux native matrix runner via
+# `ctest --parallel`, which produced silent failures in
+# release_dry_run scenario 2 due to docker resource contention
+# (GHA Build run #25126107438). The standalone workflow job runs on
+# its own runner without that contention.
+#
+# Locally the dev still runs the portability script directly via
+# `bash scripts/verify-doc-examples-portability.sh`; the
+# docs/platform-smoke-checklist.md "docs/examples Host-
+# Portabilitaet" section documents this as the explicit step before
+# claiming "lokal gruen".

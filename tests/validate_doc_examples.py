@@ -360,8 +360,24 @@ def main() -> int:
 
     if args.binary is None:
         return EXIT_OK
-    return check_binary_drift(spec_path, examples_dir,
-                              args.binary.resolve(), repo_root)
+    binary_path = args.binary.resolve()
+    # Windows binaries embed host paths with backslashes and host-specific
+    # absolute prefixes (e.g. resolving "/project/src/main.cpp" against the
+    # current drive). The committed examples are Linux-generated with
+    # forward slashes and synthetic /project/... prefixes; per-platform
+    # variants would double the doc-maintenance load. The drift step
+    # instead skips on Windows binaries; Linux native and the
+    # docs-examples-portability workflow job give the drift coverage.
+    # Parity, SHA-256 and format validators above still run on every
+    # platform.
+    if sys.platform.startswith("win") or binary_path.suffix.lower() == ".exe":
+        sys.stderr.write(
+            "note: skipping doc-examples drift step on Windows; "
+            "the binary's path-display semantics diverge from the "
+            "Linux-generated example bytes. Drift coverage runs on "
+            "Linux native plus the docs-examples-portability job.\n")
+        return EXIT_OK
+    return check_binary_drift(spec_path, examples_dir, binary_path, repo_root)
 
 
 if __name__ == "__main__":
