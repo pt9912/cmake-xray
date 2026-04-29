@@ -276,7 +276,8 @@ Aktueller Stand zum Ende von Tranche A:
 |---|---|---|---|
 | Linux x86_64 | `supported` | `Native (linux-x86_64)` plus die Docker-Gates oben | offizielle M5-Releaseplattform; Atomic-Replace-/CLI-Pflicht-Smokes laufen ueber bestehende E2E-Suites |
 | macOS arm64 | `known_limited` | `Native (macos-arm64)` (Build-Gate) | Atomic-Replace-Pflicht-Tests und CLI-Pflicht-Smokes folgen in Tranche B/C; bis dahin nur Build/`ctest`-Gate |
-| Windows x86_64 | `known_limited` | `Native (windows-x86_64)` (Build-Gate) | Atomic-Replace-Pflicht-Tests und CLI-Pflicht-Smokes folgen in Tranche B/C; bis dahin nur Build/`ctest`-Gate |
+| macOS x86_64 | `known_limited` | `Native (macos-x86_64)` (Build-Gate, Tranche D.3) | Intel-Repraesentativitaets-Smoke neben arm64; selbe `known_limited`-Begruendung wie arm64 |
+| Windows x86_64 | `known_limited` | `Native (windows-x86_64)` (Build-Gate plus Tranche-D.1-PowerShell-Smoke und Tranche-D.2-Ninja-Smoke) | Atomic-Replace-Pflicht-Tests und CLI-Pflicht-Smokes folgen in Tranche B/C; PowerShell- und Ninja-Smokes laufen unabhaengig vom MSYS-Bash-Pfad |
 
 Die Required-Check-Namen sind in
 [docs/plan-M5-1-7.md](./plan-M5-1-7.md) "Plattformstatus-Vertrag" verbindlich
@@ -361,6 +362,33 @@ Golden-Pfad. Die Coverage in `xray_tests`:
 Echte UNC-Dateisystem-Smokes (`\\localhost\...`-Share) und echte
 Extended-Length-Dateiziele bleiben optionale Folgehaertung; die
 Required-Pflichtfaelle sind ueber die synthetischen Tests oben abgedeckt.
+
+#### Optionale Plattform-Haertungen (Tranche D)
+
+Vier optionale Tranche-D-Schritte ergaenzen die A-C-Pflichtbasis ohne den
+offiziellen Plattformstatus zu aendern:
+
+- **D.1 — PowerShell-Smoke ([scripts/platform-smoke.ps1](../scripts/platform-smoke.ps1))**:
+  konvertierungsfreier Pflichtmodus `native_powershell` neben dem
+  MSYS-Bash-Pfad. Der Smoke laeuft im `Native (windows-x86_64)`-Job nach
+  `ctest` und treibt alle Pflichtkommandos plus `--output`-Smokes mit
+  nativen Windows-Pfaden, ohne dass MSYS dazwischensteht.
+- **D.2 — Ninja-/clang-cl-Generator-Smoke**: zweite Build-Variante neben
+  dem Visual-Studio-Multi-Config-Default. Konfiguriert `cmake -G Ninja`
+  mit `clang-cl` (in GHA-windows-latest direkt verfuegbar), baut und ruft
+  die so erzeugte Binary mit `--help` auf. Generator-Bruechige Aenderungen
+  (z. B. fehlende Ninja-Dependency-Edge) werden so gefangen, ohne dass der
+  MSVC-Default-Build betroffen ware.
+- **D.3 — `macos-x86_64`-Matrix-Entry**: zusaetzlicher Intel-macOS-Smoke
+  (`os: macos-13`) neben `macos-arm64`. Plattformstatus bleibt
+  `known_limited` wie bei arm64, bis Pflicht-Smokes als Required Check
+  eingehaengt sind.
+- **D.4 — Manuelle Smoke-Checkliste**:
+  [docs/platform-smoke-checklist.md](./platform-smoke-checklist.md)
+  spiegelt die Required-Check-Schritte fuer lokale Plattformnachweise.
+  Ein erfolgreicher manueller Lauf begruendet *keine* Statushaerung;
+  `validated_smoke` braucht den automatisierten, Branch-Protection-
+  verankerten Nachweis.
 
 ### Mindestversionen fuer CMake und Compiler
 

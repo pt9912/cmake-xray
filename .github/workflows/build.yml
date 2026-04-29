@@ -49,6 +49,14 @@ jobs:
             os: ubuntu-latest
           - name: macos-arm64
             os: macos-latest
+          # AP M5-1.7 Tranche D.3: zusaetzlicher Intel-macOS-Smoke neben
+          # arm64. Plan-M5-1-7.md "Tranche D - Optionale Haertung" erlaubt
+          # diesen Job als Repraesentativitaets-Check, falls macos-arm64
+          # nicht reicht. Status bleibt `known_limited` wie macos-arm64,
+          # bis die Atomic-Replace-/CLI-Pflicht-Smokes als Required-Check
+          # eingehaengt sind.
+          - name: macos-x86_64
+            os: macos-13
           - name: windows-x86_64
             os: windows-latest
 
@@ -142,3 +150,31 @@ jobs:
 
       - name: Run tests
         run: ctest --test-dir build --output-on-failure -C Release --parallel
+
+      - name: PowerShell platform smoke (Windows only)
+        # AP M5-1.7 Tranche D.1: konvertierungsfreier zweiter Pflicht-
+        # modus neben MSYS-Bash. Der Smoke umgeht MSYS und treibt die
+        # echte cmake-xray.exe mit nativen Windows-Pfaden ueber alle
+        # Pflichtkommandos aus plan-M5-1-7.md "Normative CLI-Smokes",
+        # inklusive der --output-Smokes aus Tranche C.1. Ein roter
+        # Smoke bricht den Required Check ohne dass MSYS-Bash-Magie
+        # die Ursache verdecken koennte.
+        if: matrix.name == 'windows-x86_64'
+        shell: pwsh
+        run: pwsh -File scripts/platform-smoke.ps1 -Binary build/Release/cmake-xray.exe
+
+      - name: Ninja generator smoke (Windows only)
+        # AP M5-1.7 Tranche D.1+D.2: zweite Build-Variante neben dem
+        # Visual-Studio-Multi-Config-Default. Ninja + clang-cl ist in
+        # GHA-windows-latest direkt verfuegbar (LLVM/Ninja praeinstalliert,
+        # kein vcvars-Setup noetig). Smoke laeuft als sequentieller
+        # Configure+Build aus und ruft die so gebaute Binary mit --help
+        # auf, damit ein Generator-Bruch sichtbar wird.
+        if: matrix.name == 'windows-x86_64'
+        shell: bash
+        run: |
+          set -eu
+          cmake -B build-ninja -G Ninja -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
+          cmake --build build-ninja --parallel
+          ./build-ninja/cmake-xray.exe --help > /dev/null

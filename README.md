@@ -62,6 +62,7 @@ Aktueller M5-Stand:
 |---|---|
 | Linux x86_64 | `supported` |
 | macOS arm64 | `known_limited` |
+| macOS x86_64 | `known_limited` |
 | Windows x86_64 | `known_limited` |
 
 Linux ist die einzige offizielle Releaseplattform; macOS und Windows bleiben

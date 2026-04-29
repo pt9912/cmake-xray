@@ -190,6 +190,7 @@ Aktueller M5-Stand:
 |---|---|---|
 | Linux x86_64 | `supported` | Linux-CLI-Archiv (`.tar.gz`) plus OCI-Image |
 | macOS arm64 | `known_limited` | kein offizielles Release-Artefakt |
+| macOS x86_64 | `known_limited` | kein offizielles Release-Artefakt |
 | Windows x86_64 | `known_limited` | kein offizielles Release-Artefakt |
 
 `validated_smoke` darf erst dokumentiert werden, wenn pro Plattform der
