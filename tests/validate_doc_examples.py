@@ -45,6 +45,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -56,6 +57,20 @@ EXIT_ENVIRONMENT_ERROR = 2
 MANIFEST_BASENAME = "manifest.txt"
 GENERATION_SPEC_BASENAME = "generation-spec.json"
 INFRA_BASENAMES = frozenset((MANIFEST_BASENAME, GENERATION_SPEC_BASENAME))
+
+# DOT reports embed the absolute source/build directory in TU `unique_key`
+# attributes (`unique_key="<src>|<build>"`). On hosts where those absolute
+# paths differ -- developer machine, GHA runner, Docker bind-mount -- the
+# bytes drift even though the report content is otherwise stable. The
+# drift step normalises both sides to the same HOSTPATH placeholder before
+# diff, mirroring tests/e2e/run_e2e_lib.sh's `normalize_dot_unique_keys`
+# helper. SHA-256 hashing in check_hashes() still pins the committed file
+# byte-for-byte, so an in-place edit is still caught.
+DOT_UNIQUE_KEY_PATTERN = re.compile(rb'unique_key="[^"]*\|[^"]*"')
+
+
+def normalize_dot_unique_keys(content: bytes) -> bytes:
+    return DOT_UNIQUE_KEY_PATTERN.sub(b'unique_key="HOSTPATH"', content)
 
 
 def parse_args() -> argparse.Namespace:
@@ -274,7 +289,13 @@ def check_binary_drift(spec_path: Path, examples_dir: Path,
             failed += 1
             continue
         expected = target_path.read_bytes()
-        if completed.stdout != expected:
+        if target_path.suffix.lower() == ".dot":
+            actual_for_diff = normalize_dot_unique_keys(completed.stdout)
+            expected_for_diff = normalize_dot_unique_keys(expected)
+        else:
+            actual_for_diff = completed.stdout
+            expected_for_diff = expected
+        if actual_for_diff != expected_for_diff:
             sys.stderr.write(
                 f"error: drift for {name} -- binary stdout "
                 f"({len(completed.stdout)} B) differs from committed file "
