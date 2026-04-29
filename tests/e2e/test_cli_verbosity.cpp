@@ -840,12 +840,14 @@ TEST_CASE_FIXTURE(CliFixture,
 }
 
 // Synthesised stub paths: drive the changed_file_source label branches that
-// real fixtures cannot reproduce (unresolved_file_api_source_root for json
-// and the nullopt fallback). For unresolved we use a non-html format so the
-// render-precondition predicate does not reject the result before stderr
-// emission.
+// real fixtures cannot reproduce (unresolved_file_api_source_root for the
+// only non-rejecting artifact format and the nullopt fallback). After the
+// AP M5-1.8 A.5 fixup, JSON joins DOT and HTML in the
+// format_rejects_unresolved_file_api list, so markdown is now the only
+// artifact format that still reaches emit_artifact_verbose_stderr_impact
+// when changed_file_source=unresolved_file_api_source_root.
 
-TEST_CASE("verbose impact stderr labels unresolved_file_api_source_root for non-html artifact paths") {
+TEST_CASE("verbose impact stderr labels unresolved_file_api_source_root for markdown artifact paths") {
     ImpactResult unresolved_result{};
     unresolved_result.application = xray::hexagon::model::application_info();
     unresolved_result.compile_database =
@@ -888,7 +890,7 @@ TEST_CASE("verbose impact stderr labels unresolved_file_api_source_root for non-
     std::ostringstream err;
     const char* argv[] = {"cmake-xray",     "impact",         "--cmake-file-api",
                           "/tmp/empty",     "--changed-file", "src/missing.cpp",
-                          "--verbose",      "--format",       "json"};
+                          "--verbose",      "--format",       "markdown"};
 
     const int exit_code = cli.run(9, argv, out, err);
     CHECK(exit_code == ExitCode::success);

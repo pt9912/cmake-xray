@@ -577,6 +577,134 @@ TEST_CASE("html impact refuses to render when changed_file_source is unresolved_
     CHECK(err.str().find("<html") == std::string::npos);
 }
 
+// AP M5-1.8 A.5 audit fixup: plan-M5-1-8.md "1.8 Scope" Bullet 22
+// (CLI-/E2E-Negativtests fuer File-API-only-Impact-Laeufe mit
+// changed_file_source=unresolved_file_api_source_root) verlangt
+// `impact --format json` und `impact --format json --output <path>`
+// ausdruecklich auf CLI-Ebene, "damit der JSON-v1-Vertrag 'Textfehler ohne
+// JSON-Report' nicht nur auf Schema-/Adapterebene abgesichert ist". Die
+// Schema-Negativtests in test_json_report_adapter.cpp pinnen das Verhalten
+// auf Adapterebene; diese zwei Tests pinnen es jetzt auch auf CLI-Ebene
+// (parallel zur DOT- und HTML-Coverage oben).
+TEST_CASE("json impact refuses to render when changed_file_source is unresolved_file_api_source_root") {
+    ImpactResult unresolved_result{};
+    unresolved_result.application = xray::hexagon::model::application_info();
+    unresolved_result.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    unresolved_result.inputs.changed_file = std::string{"src/missing.cpp"};
+    unresolved_result.inputs.changed_file_source =
+        xray::hexagon::model::ChangedFileSource::unresolved_file_api_source_root;
+
+    class FixedImpactPort final : public xray::hexagon::ports::driving::AnalyzeImpactPort {
+    public:
+        explicit FixedImpactPort(ImpactResult result) : result_(std::move(result)) {}
+        ImpactResult analyze_impact(
+            xray::hexagon::ports::driving::AnalyzeImpactRequest /*request*/) const override {
+            return result_;
+        }
+
+    private:
+        ImpactResult result_;
+    };
+
+    const StubAnalyzeProjectPort analyze_project_port{AnalysisResult{}};
+    const FixedImpactPort impact_port{unresolved_result};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray",     "impact",         "--cmake-file-api",
+                          "/tmp/empty",     "--changed-file", "src/missing.cpp",
+                          "--format",       "json"};
+
+    const int exit_code = cli.run(8, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("file-api source root is unresolved") != std::string::npos);
+    // No JSON document should leak into stderr either.
+    CHECK(err.str().find("\"format\":") == std::string::npos);
+    CHECK(err.str().find("\"format_version\":") == std::string::npos);
+}
+
+TEST_CASE("json impact --output refuses to render when changed_file_source is unresolved_file_api_source_root") {
+    ImpactResult unresolved_result{};
+    unresolved_result.application = xray::hexagon::model::application_info();
+    unresolved_result.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    unresolved_result.inputs.changed_file = std::string{"src/missing.cpp"};
+    unresolved_result.inputs.changed_file_source =
+        xray::hexagon::model::ChangedFileSource::unresolved_file_api_source_root;
+
+    class FixedImpactPort final : public xray::hexagon::ports::driving::AnalyzeImpactPort {
+    public:
+        explicit FixedImpactPort(ImpactResult result) : result_(std::move(result)) {}
+        ImpactResult analyze_impact(
+            xray::hexagon::ports::driving::AnalyzeImpactRequest /*request*/) const override {
+            return result_;
+        }
+
+    private:
+        ImpactResult result_;
+    };
+
+    const StubAnalyzeProjectPort analyze_project_port{AnalysisResult{}};
+    const FixedImpactPort impact_port{unresolved_result};
+    const StubGenerateReportPort console_report_port;
+    const StubGenerateReportPort markdown_report_port;
+    const StubGenerateReportPort json_report_port;
+    const StubGenerateReportPort dot_report_port;
+    const StubGenerateReportPort html_report_port;
+    const xray::adapters::cli::ReportPorts report_ports{console_report_port,
+                                                        markdown_report_port,
+                                                        json_report_port,
+                                                        dot_report_port,
+                                                        html_report_port};
+    const CliAdapter cli{analyze_project_port, impact_port, report_ports};
+
+    // Use a per-test temp dir so we can assert "no target file was
+    // created". The test-stage filesystem is per-container; we wipe any
+    // leftover dir from a previous run before asserting the target does
+    // not exist.
+    const auto target_dir = std::filesystem::temp_directory_path() /
+                            "cmake-xray-json-unresolved-output";
+    std::error_code wipe_ec;
+    std::filesystem::remove_all(target_dir, wipe_ec);
+    std::filesystem::create_directories(target_dir);
+    const auto target = target_dir / "impact.json";
+    REQUIRE_FALSE(std::filesystem::exists(target));
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const std::string target_arg = target.string();
+    const char* argv[] = {"cmake-xray",     "impact",         "--cmake-file-api",
+                          "/tmp/empty",     "--changed-file", "src/missing.cpp",
+                          "--format",       "json",
+                          "--output",       target_arg.c_str()};
+
+    const int exit_code = cli.run(10, argv, out, err);
+
+    CHECK(exit_code != ExitCode::success);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("file-api source root is unresolved") != std::string::npos);
+    // The render precondition fires before the writer is invoked, so the
+    // target file must not exist after the call.
+    CHECK_FALSE(std::filesystem::exists(target));
+
+    std::error_code ec;
+    std::filesystem::remove_all(target_dir, ec);
+}
+
 // AP M5-1.4 Tranche C.2 Impact-Negativfall-Matrix line 550: an ImpactResult
 // whose changed_file is std::nullopt must not produce HTML. The CLI usage
 // validator rejects --changed-file=missing before analysis, so this exercises

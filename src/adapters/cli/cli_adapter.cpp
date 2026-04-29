@@ -510,7 +510,18 @@ std::string format_label_for_render_error(ReportFormat format, OutputVerbosity v
 }
 
 bool format_rejects_unresolved_file_api(ReportFormat format, OutputVerbosity verbosity) {
-    if (format == ReportFormat::dot || format == ReportFormat::html) return true;
+    // AP M5-1.8 A.5 audit fixup: plan-M5-1-8.md "1.8 Scope" bullet 43
+    // pins JSON v1 to "Textfehler ohne JSON-Report" for the
+    // unresolved_file_api_source_root model state, and bullet 22 demands
+    // a CLI-level negative test for impact --format json (with and
+    // without --output). Adding JSON to the precondition list keeps
+    // the JSON-stdout and JSON-file paths aligned with the existing
+    // DOT and HTML behaviour: render aborts before stdout or the
+    // target file is touched.
+    if (format == ReportFormat::dot || format == ReportFormat::html ||
+        format == ReportFormat::json) {
+        return true;
+    }
     return format == ReportFormat::console && verbosity != OutputVerbosity::normal;
 }
 
