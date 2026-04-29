@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(cmake-xray VERSION 1.1.0 LANGUAGES CXX)
+project(cmake-xray VERSION 1.2.0 LANGUAGES CXX)
 
 # AP M5-1.7 Tranche A: fail-fast against tests/platform/toolchain-minimums.json
 # (single source of truth for CMake and compiler minimum versions). Runs after
