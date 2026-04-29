@@ -174,21 +174,68 @@ gleichzeitiges Setzen beider Cache-Variablen ist `FATAL_ERROR`.
 
 ## Plattformartefakte macOS und Windows
 
-Im aktuellen M5-Stand gilt:
+### Plattformstatus (AP M5-1.7)
 
-- Linux ist die einzige offiziell freigegebene Plattform fuer
-  CLI-Artefakt und OCI-Image.
-- macOS und Windows sind aus der M5-Build-Matrix entfernt; weder ein
-  CLI-Archiv noch ein Image fuer diese Plattformen wird automatisch
-  publiziert.
-- `scripts/release-allowlist.sh` setzt diese Sperre technisch durch:
-  jeder Asset-Name, der nicht zur fixen Linux-Allowlist passt (Linux-
-  Archiv plus `*.sha256`-Sidecar), bricht den finalen Publish-Job ab.
+M5 unterscheidet drei Statusklassen:
 
-Eine spaetere Tranche kann einen separaten Preview-Job mit eigener
-Allowlist, eigener Tag-Konvention und Prerelease-Markierung anlegen,
-sobald die macOS-/Windows-Pfade einen reproduzierbaren Build-Vertrag
-haben (heute noch nicht der Fall).
+- `supported` — offiziell freigegeben, dokumentiert und releasefaehig.
+- `validated_smoke` — Build-, Atomic-Replace- und CLI-Pflicht-Smokes laufen
+  gruen, aber ohne offizielle Releasefreigabe.
+- `known_limited` — ein Pflichtgate ist nicht vollstaendig gruen, fehlt
+  oder der Status wird nur ueber dokumentierte Einschraenkungen erreicht.
+
+Aktueller M5-Stand:
+
+| Plattform | Status | Release-Artefakt |
+|---|---|---|
+| Linux x86_64 | `supported` | Linux-CLI-Archiv (`.tar.gz`) plus OCI-Image |
+| macOS arm64 | `known_limited` | kein offizielles Release-Artefakt |
+| Windows x86_64 | `known_limited` | kein offizielles Release-Artefakt |
+
+`validated_smoke` darf erst dokumentiert werden, wenn pro Plattform der
+zugehoerige Required Check (`Native (macos-arm64)` bzw.
+`Native (windows-x86_64)` mit eingehaengten Atomic-Replace- und CLI-Pflicht-
+Smokes, oder `Platform Smoke Report (...)` mit verpflichtend validiertem
+Smoke-Report) gruen ist; der heutige M5-Stand erreicht diese Schwelle
+explizit nicht. Das Plattformstatus-Vokabular und die Required-Check-
+Namen sind in [docs/plan-M5-1-7.md](./plan-M5-1-7.md) verbindlich
+festgelegt; per-Adapter-Coverage und Atomic-Replace-Matrix in
+[docs/quality.md](./quality.md) "Plattformstatus (AP M5-1.7)".
+
+### Build-Matrix vs. Release-Matrix
+
+- Die native CI-Build-Matrix in [`.github/workflows/build.yml`](../.github/workflows/build.yml)
+  laeuft auf Linux, macOS und Windows; alle drei Hosts bauen, fuehren
+  `ctest` aus und pruefen Toolchain-Mindestversionen ueber
+  [`cmake/ToolchainMinimums.cmake`](../cmake/ToolchainMinimums.cmake)
+  fail-fast.
+- Die Release-Pipeline in [`.github/workflows/release.yml`](../.github/workflows/release.yml)
+  ist Linux-only: weder das Linux-CLI-Archiv noch das OCI-Image kennt eine
+  macOS-/Windows-Variante; macOS- und Windows-Build-Steps sind in
+  `release.yml` bewusst nicht vorhanden.
+- [`scripts/release-allowlist.sh`](../scripts/release-allowlist.sh) setzt
+  die Linux-Sperre technisch durch: jeder Asset-Name ausserhalb der
+  fixen Linux-Allowlist (`cmake-xray_<version>_linux_x86_64.tar.gz` plus
+  `*.sha256`-Sidecar) bricht den finalen Publish-Job vor
+  `release_published` ab. Der Guard ist aus AP M5-1.6 unveraendert
+  uebernommen und in
+  [docs/quality.md](./quality.md) "Release-Pipeline-Gates" verlinkt.
+
+### Bekannte Einschraenkungen
+
+- macOS-/Windows-Native-Jobs sind aktuell Build- und `ctest`-Gates, ohne
+  eingehaengte Atomic-Replace- oder CLI-Pflicht-Smokes; deshalb der
+  `known_limited`-Status. Eine spaetere Tranche kann diese Smokes in den
+  jeweiligen `Native (...)`-Job ziehen oder einen
+  `Platform Smoke Report (...)`-Verifier-Pfad bauen, ohne den
+  Release-Pfad selbst zu beruehren.
+- Der Release-Asset-Allowlist-Guard hat keine macOS-/Windows-Whitelist;
+  ein etwaiger Preview-Pfad mueesste eine eigene, separat versionierte
+  Allowlist und Tag-Konvention mitbringen (heute nicht eingerichtet).
+- Recovery-Pfade aus AP 1.6 (siehe Recovery-Runbook unten) gelten
+  unveraendert nur fuer das Linux-CLI-Archiv plus OCI-Image; macOS-/
+  Windows-Recovery existiert nicht, weil keine offiziellen
+  macOS-/Windows-Artefakte erzeugt werden.
 
 ## Recovery-Runbook (AP M5-1.6 Tranche D.2)
 

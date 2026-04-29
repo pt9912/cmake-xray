@@ -24,8 +24,26 @@ Quellbuild werden benoetigt:
 - ein C++20-faehiger Compiler
 - Git fuer `FetchContent`
 
+CMake- und Compiler-Mindestversionen sind in
+[../tests/platform/toolchain-minimums.json](../tests/platform/toolchain-minimums.json)
+versioniert; das Modul [../cmake/ToolchainMinimums.cmake](../cmake/ToolchainMinimums.cmake)
+prueft sie beim Configure jeder Plattform fail-fast. Anhebungen laufen
+synchron ueber JSON, `cmake_minimum_required`, [README](../README.md) und
+diesen Abschnitt.
+
 Als reproduzierbare Umgebung kann alternativ das Dockerfile im Repository
 verwendet werden.
+
+### Plattformstatus
+
+Linux ist die offizielle Releaseplattform fuer M5; macOS und Windows sind
+`known_limited`. Die Beispiele in diesem Guide setzen Linux voraus, laufen
+mit Anpassungen aber auch auf macOS und Windows lokal. Eine offizielle
+macOS-/Windows-Freigabe ist aus diesem Guide ausdruecklich *nicht*
+abgeleitet — die normative Aussage steht in
+[releasing.md](./releasing.md) "Plattformartefakte macOS und Windows";
+Required-Check-Namen, Atomic-Replace-Matrix und Smoke-Report-Vertrag in
+[quality.md](./quality.md) "Plattformstatus (AP M5-1.7)".
 
 ## Ausfuehrungswege
 

@@ -38,7 +38,39 @@ Referenzplattform ist Linux mit:
 - C++20-faehigem Compiler
 - Git fuer `FetchContent`
 
+Mindestversionen sind in [tests/platform/toolchain-minimums.json](./tests/platform/toolchain-minimums.json)
+versioniert; CMake (3.20), GCC (10), Clang (12), AppleClang (13) und MSVC
+(19.29) werden beim Configure jeder Plattform fail-fast geprueft. Anhebungen
+laufen synchron ueber JSON, `cmake_minimum_required`, README und
+[docs/guide.md](./docs/guide.md).
+
 Als reproduzierbare Referenzumgebung steht das Multi-Stage-[Dockerfile](./Dockerfile) zur Verfuegung.
+
+### Plattformstatus
+
+M5 unterscheidet drei Statusklassen:
+
+- `supported` — offiziell freigegeben, dokumentiert und releasefaehig.
+- `validated_smoke` — Build-, Atomic-Replace- und CLI-Pflicht-Smokes laufen
+  gruen, aber ohne offizielle Releasefreigabe.
+- `known_limited` — ein Pflichtgate ist nicht vollstaendig gruen, fehlt oder
+  der Status wird nur ueber dokumentierte Einschraenkungen erreicht.
+
+Aktueller M5-Stand:
+
+| Plattform | Status |
+|---|---|
+| Linux x86_64 | `supported` |
+| macOS arm64 | `known_limited` |
+| Windows x86_64 | `known_limited` |
+
+Linux ist die einzige offizielle Releaseplattform; macOS und Windows bleiben
+`known_limited`, bis die Atomic-Replace- und CLI-Pflicht-Smokes auf den
+nativen Runnern als Required Checks gefuehrt werden. Detaillierte
+Gate-Erklaerungen, Required-Check-Namen und die Atomic-Replace-Matrix stehen
+in [docs/quality.md](./docs/quality.md) "Plattformstatus (AP M5-1.7)";
+Release- und Preview-Grenzen in [docs/releasing.md](./docs/releasing.md)
+"Plattformartefakte macOS und Windows".
 
 ## Installation und Ausfuehrung
 
