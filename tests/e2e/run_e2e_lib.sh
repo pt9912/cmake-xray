@@ -61,6 +61,35 @@ assert_stdout_equals_file() {
     rm -f "$actual_file" "$actual_clean" "$expected_clean"
 }
 
+# AP M5-1.7 Tranche C.1: --output-Pflicht-Smoke-Helfer. Run a cmake-xray
+# invocation that uses --output <target_path> and assert (1) exit 0, (2)
+# empty stdout, (3) the target file was created. Caller is responsible for
+# the format-specific golden compare and gate validation; the file at
+# <target_path> is left in place for those follow-up assertions.
+assert_output_file_writes_empty_stdout() {
+    local description="$1" target_path="$2"
+    shift 2
+    local stdout_file stderr_file actual_exit=0
+    stdout_file="$(mktemp)"
+    stderr_file="$(mktemp)"
+    "$@" >"$stdout_file" 2>"$stderr_file" || actual_exit=$?
+    if [ "$actual_exit" -ne 0 ]; then
+        echo "FAIL: $description — exit was $actual_exit, expected 0" >&2
+        cat "$stderr_file" >&2
+        failures=$((failures + 1))
+    elif [ -s "$stdout_file" ]; then
+        echo "FAIL: $description — stdout was not empty" >&2
+        head -c 200 "$stdout_file" >&2
+        failures=$((failures + 1))
+    elif ! [ -f "$target_path" ]; then
+        echo "FAIL: $description — output file $target_path was not created" >&2
+        failures=$((failures + 1))
+    else
+        echo "PASS: $description"
+    fi
+    rm -f "$stdout_file" "$stderr_file"
+}
+
 # DOT-aware variant of assert_stdout_equals_file that strips host-dependent
 # absolute paths from TU-style unique_key attributes before the byte compare.
 # Use only for goldens whose backing fixture relies on on-disk source files
@@ -85,6 +114,28 @@ assert_dot_stdout_equals_file() {
         failures=$((failures + 1))
     fi
     rm -f "$actual_file" "$actual_clean" "$expected_clean"
+}
+
+# AP M5-1.7 Tranche C.1: DOT-aware file-vs-golden compare. Same unique_key
+# normalisation rules as assert_dot_stdout_equals_file, but reads the actual
+# DOT bytes from a file (used by --output smokes). Use only for goldens
+# whose backing fixture relies on on-disk source files; synthetic
+# /project/... fixtures keep using assert_file_equals.
+assert_dot_file_equals_file() {
+    local description="$1" actual_file="$2" expected_file="$3"
+    local actual_clean expected_clean
+    actual_clean="$(mktemp)"
+    expected_clean="$(mktemp)"
+    normalize_dot_unique_keys "$actual_file" | tr -d '\r' > "$actual_clean"
+    normalize_line_endings "$expected_file" > "$expected_clean"
+    if cmp -s "$actual_clean" "$expected_clean"; then
+        echo "PASS: $description"
+    else
+        echo "FAIL: $description — file differed from $expected_file" >&2
+        diff -u "$expected_clean" "$actual_clean" >&2 || true
+        failures=$((failures + 1))
+    fi
+    rm -f "$actual_clean" "$expected_clean"
 }
 
 assert_file_equals() {
@@ -305,6 +356,31 @@ assert_stderr_does_not_contain() {
 # assert_json_stdout_validates. Plan ~746: ein neuer
 # assert_html_stdout_validates-Helfer wird in run_e2e.sh ergaenzt.
 html_validator_script="$(native_path "$REPO_ROOT/tests/validate_html_reports.py")"
+
+# AP M5-1.7 Tranche C.1: HTML file validator analog to
+# assert_schema_validates / assert_dot_syntax_validates. Used by --output
+# smokes that need to validate the written file (instead of stdout).
+assert_html_file_validates() {
+    local description="$1" html_file="$2"
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "SKIP: $description (python3 not available)"
+        return
+    fi
+    if ! [ -f "$REPO_ROOT/tests/validate_html_reports.py" ]; then
+        echo "SKIP: $description (validator missing)"
+        return
+    fi
+    local html_file_native
+    html_file_native="$(native_path "$html_file")"
+    if python3 "$html_validator_script" --validate-file "$html_file_native" >/dev/null 2>&1; then
+        echo "PASS: $description"
+    else
+        echo "FAIL: $description — file did not satisfy validate_html_reports.py" >&2
+        python3 "$html_validator_script" --validate-file "$html_file_native" >&2 || true
+        failures=$((failures + 1))
+    fi
+}
+
 assert_html_stdout_validates() {
     local description="$1"
     shift

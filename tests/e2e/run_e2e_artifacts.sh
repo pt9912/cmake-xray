@@ -352,6 +352,78 @@ assert_exit "M5 html impact absolute changed-file exits 0" 0 "$BINARY" impact --
 assert_stdout_equals_file "M5 html impact absolute changed-file matches golden" "$html_impact_absolute_golden" \
     "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file "$html_impact_absolute_arg" --format html
 
+# AP M5-1.7 Tranche C.1: --output-Pflicht-Smokes. Plan-Pflichtkommandoliste
+# verlangt fuer json/dot/html × analyze/impact, dass die echte Binary mit
+# `--output <path>` eine Datei schreibt, leeres stdout liefert und die Datei
+# das jeweilige Formatgate oder Golden erfuellt. Eine Smoke pro
+# (Subcommand, Format)-Kombination reicht; tiefergehende Variantenabdeckung
+# bleibt bei den stdout-Smokes oben. Pfade gehen ueber native_path, damit
+# MSYS-Bash auf Windows den Native-Pfad an die Binary uebergibt.
+output_smoke_dir="$(mktemp -d)"
+
+# JSON --output (analyze + impact)
+json_analyze_target="$output_smoke_dir/analyze_json.out"
+assert_output_file_writes_empty_stdout "M5 --output json analyze writes file with empty stdout" \
+    "$json_analyze_target" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format json --output "$(native_path "$json_analyze_target")"
+assert_file_equals "M5 --output json analyze file matches golden" \
+    "$json_analyze_target" tests/e2e/testdata/m5/json-reports/analyze_compile_db_only.json
+assert_schema_validates "M5 --output json analyze file validates against schema" \
+    "$json_analyze_target"
+
+json_impact_target="$output_smoke_dir/impact_json.out"
+assert_output_file_writes_empty_stdout "M5 --output json impact writes file with empty stdout" \
+    "$json_impact_target" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --format json --output "$(native_path "$json_impact_target")"
+assert_file_equals "M5 --output json impact file matches golden" \
+    "$json_impact_target" tests/e2e/testdata/m5/json-reports/impact_compile_db_relative.json
+assert_schema_validates "M5 --output json impact file validates against schema" \
+    "$json_impact_target"
+
+# DOT --output (analyze + impact). The multi_tu_compile_db fixture is
+# synthetic (/project/... paths), so the DOT goldens are byte-stable across
+# hosts and assert_file_equals is exact. Real-host-path DOT smokes (with
+# unique_key drift) would use assert_dot_file_equals_file from
+# run_e2e_lib.sh, kept as a helper for future Tranche-D additions.
+dot_analyze_target="$output_smoke_dir/analyze_dot.out"
+assert_output_file_writes_empty_stdout "M5 --output dot analyze writes file with empty stdout" \
+    "$dot_analyze_target" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --format dot --top 2 --output "$(native_path "$dot_analyze_target")"
+assert_file_equals "M5 --output dot analyze file matches golden" \
+    "$dot_analyze_target" tests/e2e/testdata/m5/dot-reports/analyze_compile_db_only.dot
+assert_dot_syntax_validates "M5 --output dot analyze file validates against DOT contract" \
+    "$dot_analyze_target"
+
+dot_impact_target="$output_smoke_dir/impact_dot.out"
+assert_output_file_writes_empty_stdout "M5 --output dot impact writes file with empty stdout" \
+    "$dot_impact_target" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --changed-file /project/src/app.cpp --format dot --output "$(native_path "$dot_impact_target")"
+assert_file_equals "M5 --output dot impact file matches golden" \
+    "$dot_impact_target" tests/e2e/testdata/m5/dot-reports/impact_compile_db_direct.dot
+assert_dot_syntax_validates "M5 --output dot impact file validates against DOT contract" \
+    "$dot_impact_target"
+
+# HTML --output (analyze + impact)
+html_analyze_target="$output_smoke_dir/analyze_html.out"
+assert_output_file_writes_empty_stdout "M5 --output html analyze writes file with empty stdout" \
+    "$html_analyze_target" \
+    "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format html --top 2 --output "$(native_path "$html_analyze_target")"
+assert_file_equals "M5 --output html analyze file matches golden" \
+    "$html_analyze_target" tests/e2e/testdata/m5/html-reports/analyze_compile_db_only.html
+assert_html_file_validates "M5 --output html analyze file validates against HTML contract" \
+    "$html_analyze_target"
+
+html_impact_target="$output_smoke_dir/impact_html.out"
+assert_output_file_writes_empty_stdout "M5 --output html impact writes file with empty stdout" \
+    "$html_impact_target" \
+    "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file include/common/shared.h --format html --output "$(native_path "$html_impact_target")"
+assert_file_equals "M5 --output html impact file matches golden" \
+    "$html_impact_target" tests/e2e/testdata/m5/html-reports/impact_compile_db_relative.html
+assert_html_file_validates "M5 --output html impact file validates against HTML contract" \
+    "$html_impact_target"
+
+rm -rf "$output_smoke_dir"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "$failures E2E test(s) FAILED" >&2
