@@ -34,15 +34,15 @@ Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**.
 
 ### 2.1 Milestones
 
-| Milestone    | Version  | Phase   | Pruefkriterium                                                                                                                            |
-| ------------ | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **M0**       | `v0.1.0` | Phase 0 | Projekt baut auf Linux, leerer Testlauf laeuft durch, Dokumentenstruktur steht                                                            |
-| **M1**       | `v0.2.0` | Phase 1 | `AK-01`, `AK-02`, `AK-09` erfuellt                                                                                                        |
-| **M2**       | `v0.3.0` | Phase 2 | `AK-03`, `AK-04`, `AK-05` erfuellt; heuristische Ergebnisse gekennzeichnet                                                                |
-| **M3 (MVP)** | `v1.0.0` | Phase 3 | Alle `AK-01` bis `AK-09` erfuellt; MVP lieferbar                                                                                          |
-| **M4**       | `v1.1.0` | Phase 4 | CMake File API als zweite Eingabequelle, TU-zu-Target-Zuordnung, targetbezogene Impact-Ausgabe; ohne `compile_commands.json` analysierbar |
-| **M5**       | `v1.2.0` | Phase 5 | HTML-Export, JSON-/DOT-Ausgaben, Release-Bereitstellung, Plattformunterstuetzung, Detail- und Quiet-Modi                                  |
-| **M6**       | `tbd`    | Phase 6 | weitere Konfiguration, Vergleichsansichten und verfeinerte Analyse                                                                        |
+| Milestone    | Version  | Phase   | Pruefkriterium                                                                                                                            | Status     |
+| ------------ | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| **M0**       | `v0.1.0` | Phase 0 | Projekt baut auf Linux, leerer Testlauf laeuft durch, Dokumentenstruktur steht                                                            | `erledigt` |
+| **M1**       | `v0.2.0` | Phase 1 | `AK-01`, `AK-02`, `AK-09` erfuellt                                                                                                        | `erledigt` |
+| **M2**       | `v0.3.0` | Phase 2 | `AK-03`, `AK-04`, `AK-05` erfuellt; heuristische Ergebnisse gekennzeichnet                                                                | `erledigt` |
+| **M3 (MVP)** | `v1.0.0` | Phase 3 | Alle `AK-01` bis `AK-09` erfuellt; MVP lieferbar                                                                                          | `erledigt` |
+| **M4**       | `v1.1.0` | Phase 4 | CMake File API als zweite Eingabequelle, TU-zu-Target-Zuordnung, targetbezogene Impact-Ausgabe; ohne `compile_commands.json` analysierbar | `erledigt` |
+| **M5**       | `v1.2.0` | Phase 5 | HTML-Export, JSON-/DOT-Ausgaben, Release-Bereitstellung, Plattformunterstuetzung, Detail- und Quiet-Modi                                  | `erledigt` |
+| **M6**       | `tbd`    | Phase 6 | weitere Konfiguration, Vergleichsansichten und verfeinerte Analyse                                                                        | `tbd`      |
 
 ## 3. Phasen im Detail
 
@@ -50,12 +50,12 @@ Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**.
 
 Ziel: ein baubares und testbares Projekt mit klaren Dokumentationsartefakten.
 
-| Arbeitspaket                                                                             | Relevante Kennungen       |
-| ---------------------------------------------------------------------------------------- | ------------------------- |
-| C++/CMake-Projektgrundgeruest mit hexagonaler Grundstruktur (Kern, Ports, Adapter)       | `RB-01`, `RB-02`, `RB-03` |
-| Linux-Build und Testbasis                                                                | `NF-07`, `AK-07`          |
-| README und Dokumentenstruktur                                                            | `NF-16`, `NF-17`, `AK-08` |
-| Entscheidung und Einbindung externer Abhaengigkeiten (JSON, CLI-Parsing, Test-Framework) | `RB-10`, `RB-06`, `RB-07` |
+| Arbeitspaket                                                                             | Relevante Kennungen       | Status     |
+| ---------------------------------------------------------------------------------------- | ------------------------- | ---------- |
+| C++/CMake-Projektgrundgeruest mit hexagonaler Grundstruktur (Kern, Ports, Adapter)       | `RB-01`, `RB-02`, `RB-03` | `erledigt` |
+| Linux-Build und Testbasis                                                                | `NF-07`, `AK-07`          | `erledigt` |
+| README und Dokumentenstruktur                                                            | `NF-16`, `NF-17`, `AK-08` | `erledigt` |
+| Entscheidung und Einbindung externer Abhaengigkeiten (JSON, CLI-Parsing, Test-Framework) | `RB-10`, `RB-06`, `RB-07` | `erledigt` |
 
 **Milestone M0 (`v0.1.0`)**: Das Projekt baut auf Linux, ein leerer Testlauf laeuft durch und die Dokumentenstruktur steht.
 
@@ -63,11 +63,11 @@ Ziel: ein baubares und testbares Projekt mit klaren Dokumentationsartefakten.
 
 Ziel: das Tool akzeptiert gueltige Eingaben, behandelt Fehlerfaelle sauber und ist nutzbar aufrufbar.
 
-| Arbeitspaket                                                                                                             | Relevante Kennungen                         |
-| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| `CompileCommandsJsonAdapter` (`BuildModelPort`, erster Spezialfall): Einlesen und Validieren von `compile_commands.json` | `F-01` bis `F-05`, `F-41`, `AK-01`, `AK-02` |
-| CLI Adapter: Grundlegende Befehlsstruktur und Verdrahtung der Ports                                                      | `F-31`, `F-32`, `F-33`, `F-34`, `AK-09`     |
-| Konfigurierbare Pfade und Formatauswahl                                                                                  | `F-35`, `F-36`                              |
+| Arbeitspaket                                                                                                             | Relevante Kennungen                         | Status     |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- | ---------- |
+| `CompileCommandsJsonAdapter` (`BuildModelPort`, erster Spezialfall): Einlesen und Validieren von `compile_commands.json` | `F-01` bis `F-05`, `F-41`, `AK-01`, `AK-02` | `erledigt` |
+| CLI Adapter: Grundlegende Befehlsstruktur und Verdrahtung der Ports                                                      | `F-31`, `F-32`, `F-33`, `F-34`, `AK-09`     | `erledigt` |
+| Konfigurierbare Pfade und Formatauswahl                                                                                  | `F-35`, `F-36`                              | `erledigt` |
 
 **Milestone M1 (`v0.2.0`)**: `AK-01`, `AK-02` und `AK-09` sind erfuellt. Eine gueltige `compile_commands.json` wird eingelesen, ungueltige oder leere Eingaben werden mit klarer Meldung und Exit-Code quittiert, `--help` gibt verstaendliche Hilfe aus.
 
@@ -75,13 +75,13 @@ Ziel: das Tool akzeptiert gueltige Eingaben, behandelt Fehlerfaelle sauber und i
 
 Ziel: die fachlich zentralen Analysen des ersten Releases liefern nutzbare Ergebnisse.
 
-| Arbeitspaket                                                                                                  | Relevante Kennungen        |
-| ------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| Application Core: Translation-Unit-Ranking auf Basis von `arg_count`, `include_path_count` und `define_count` | `F-06` bis `F-09`, `AK-03` |
-| `IncludeResolverPort` und MVP-Adapter: Include-Hotspot-Analyse                                                | `F-12` bis `F-15`, `AK-04` |
-| Application Core: Dateibasierte Impact-Analyse                                                                | `F-21` bis `F-23`, `AK-05` |
-| `ConsoleReportAdapter` (`ReportWriterPort`): Konsolenausgabe der Ergebnisse                                   | `F-26`, `AK-03`            |
-| Reproduzierbarkeit der Analyseergebnisse sicherstellen                                                        | `NF-15`                    |
+| Arbeitspaket                                                                                                  | Relevante Kennungen        | Status     |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------- | ---------- |
+| Application Core: Translation-Unit-Ranking auf Basis von `arg_count`, `include_path_count` und `define_count` | `F-06` bis `F-09`, `AK-03` | `erledigt` |
+| `IncludeResolverPort` und MVP-Adapter: Include-Hotspot-Analyse                                                | `F-12` bis `F-15`, `AK-04` | `erledigt` |
+| Application Core: Dateibasierte Impact-Analyse                                                                | `F-21` bis `F-23`, `AK-05` | `erledigt` |
+| `ConsoleReportAdapter` (`ReportWriterPort`): Konsolenausgabe der Ergebnisse                                   | `F-26`, `AK-03`            | `erledigt` |
+| Reproduzierbarkeit der Analyseergebnisse sicherstellen                                                        | `NF-15`                    | `erledigt` |
 
 **Milestone M2 (`v0.3.0`)**: `AK-03`, `AK-04` und `AK-05` sind erfuellt. Das Tool gibt in der Konsole ein TU-Ranking mit Kennzahlen aus, listet Include-Hotspots mit betroffenen TUs, und fuehrt eine Impact-Analyse fuer eine Datei durch. Ergebnisse, die auf der heuristischen Include-Aufloesung basieren, sind als solche gekennzeichnet.
 
@@ -89,21 +89,21 @@ Ziel: die fachlich zentralen Analysen des ersten Releases liefern nutzbare Ergeb
 
 Ziel: Ergebnisse werden fuer reale Nutzung, Dokumentation und Absicherung stabilisiert.
 
-| Arbeitspaket                                                                              | Relevante Kennungen       |
-| ----------------------------------------------------------------------------------------- | ------------------------- |
-| `MarkdownReportAdapter` (`ReportWriterPort`): Markdown-Report                             | `F-27`, `AK-06`           |
-| Referenzdaten und automatisierte Tests                                                    | `NF-10`, `NF-19`          |
-| Performance-Baseline und Referenzumgebung mit versioniertem Referenzprojekt im Repository | `NF-04`, `NF-05`, `NF-06` |
-| Beispielausgaben und Nutzungsdokumentation                                                | `NF-18`, `AK-08`          |
+| Arbeitspaket                                                                              | Relevante Kennungen       | Status     |
+| ----------------------------------------------------------------------------------------- | ------------------------- | ---------- |
+| `MarkdownReportAdapter` (`ReportWriterPort`): Markdown-Report                             | `F-27`, `AK-06`           | `erledigt` |
+| Referenzdaten und automatisierte Tests                                                    | `NF-10`, `NF-19`          | `erledigt` |
+| Performance-Baseline und Referenzumgebung mit versioniertem Referenzprojekt im Repository | `NF-04`, `NF-05`, `NF-06` | `erledigt` |
+| Beispielausgaben und Nutzungsdokumentation                                                | `NF-18`, `AK-08`          | `erledigt` |
 **Milestone M3 / MVP (`v1.0.0`)**: Alle Abnahmekriterien `AK-01` bis `AK-09` sind erfuellt. Ein Markdown-Report kann erzeugt werden, die README enthaelt Installations- und Nutzungsbeispiele, automatisierte Tests laufen gegen Referenzdaten, und die Performance-Baseline ist dokumentiert. Das Produkt ist als MVP lieferbar.
 
 ### 3.5 Phase 4 - Erweiterungen
 
 Ziel: nicht-MVP-Funktionen kontrolliert aufbauen.
 
-| Arbeitspaket                                                                                                                                                                                                                                             | Relevante Kennungen            |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| `CmakeFileApiAdapter` (`BuildModelPort`): zweite primaere Eingabequelle fuer Kernanalysen und initiale Target-Sicht; Einstieg mit Translation-Unit-Beobachtungen ohne `compile_commands.json`, TU-zu-Target-Zuordnung und targetbezogener Impact-Ausgabe | `F-05`, `F-19`, `F-24`, `S-02` |
+| Arbeitspaket                                                                                                                                                                                                                                             | Relevante Kennungen            | Status     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ---------- |
+| `CmakeFileApiAdapter` (`BuildModelPort`): zweite primaere Eingabequelle fuer Kernanalysen und initiale Target-Sicht; Einstieg mit Translation-Unit-Beobachtungen ohne `compile_commands.json`, TU-zu-Target-Zuordnung und targetbezogener Impact-Ausgabe | `F-05`, `F-19`, `F-24`, `S-02` | `erledigt` |
 
 Einzelne Arbeitspakete koennen bei Bedarf eigene Abschlusskriterien erhalten.
 
@@ -111,13 +111,13 @@ Einzelne Arbeitspakete koennen bei Bedarf eigene Abschlusskriterien erhalten.
 
 Ziel: Ausbaupunkte nach dem M4-Plan aufnehmen, ohne den M4-Fokus zu verwischen.
 
-| Arbeitspaket                                                                                                      | Relevante Kennungen                     |
-| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| `HtmlReportAdapter`: HTML-Export                                                                                  | `F-28`                                  |
-| `JsonReportAdapter` und `DotReportAdapter`: JSON- und DOT-Ausgaben                                                | `F-29`, `F-30`, `NF-20`                 |
-| Versionierte Release-Artefakte fuer Linux-CLI, OCI-kompatibles Container-Image und tag-basierter Release-Workflow | `F-43`, `F-44`, `NF-21`, `S-12`, `S-13` |
-| Erweiterte Plattformunterstuetzung                                                                                | `NF-08`, `NF-09`                        |
-| Detail- und Quiet-Modi                                                                                            | `F-39`, `F-40`                          |
+| Arbeitspaket                                                                                                      | Relevante Kennungen                     | Status     |
+| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ---------- |
+| `HtmlReportAdapter`: HTML-Export                                                                                  | `F-28`                                  | `erledigt` |
+| `JsonReportAdapter` und `DotReportAdapter`: JSON- und DOT-Ausgaben                                                | `F-29`, `F-30`, `NF-20`                 | `erledigt` |
+| Versionierte Release-Artefakte fuer Linux-CLI, OCI-kompatibles Container-Image und tag-basierter Release-Workflow | `F-43`, `F-44`, `NF-21`, `S-12`, `S-13` | `erledigt` |
+| Erweiterte Plattformunterstuetzung                                                                                | `NF-08`, `NF-09`                        | `erledigt` |
+| Detail- und Quiet-Modi                                                                                            | `F-39`, `F-40`                          | `erledigt` |
 
 Hinweis: `F-39` (Soll) kann bei Bedarf in Phase 2 oder 3 vorgezogen werden, falls der detailreiche Modus fuer die Diagnose waehrend der MVP-Entwicklung selbst nuetzlich ist.
 
@@ -125,13 +125,15 @@ Hinweis: `F-39` (Soll) kann bei Bedarf in Phase 2 oder 3 vorgezogen werden, fall
 
 Ziel: zusaetzliche Ausbaupunkte nach dem bereits geplanten M5-Umfang aufnehmen, ohne die historische Planung der Phasen 0 bis 5 umzuschreiben.
 
-| Arbeitspaket                                                                            | Relevante Kennungen            |
-| --------------------------------------------------------------------------------------- | ------------------------------ |
-| Direkte Target-Graph-Analysen und textuelle Darstellung direkter Target-Abhaengigkeiten | `F-18`                         |
-| Hervorhebung von Targets mit vielen ein- oder ausgehenden Abhaengigkeiten               | `F-20`                         |
-| Priorisierung betroffener Targets ueber den Target-Graphen hinweg                       | `F-25`                         |
-| Verfeinerte Include-Sicht jenseits des MVP                                              | `F-16`, `F-17`                 |
-| Erweiterte Analysekonfiguration, Schwellenwerte und Vergleichsansichten                 | `F-10`, `F-11`, `F-37`, `F-38` |
+Stand: M6 hat noch kein eigenes Planungsdokument (kein `docs/plan-M6.md`). Die untenstehende Tabelle listet die zukuenftigen Ausbaupunkte als Sammlung; konkrete Schnitt-, Vertrags- und Abnahmedetails werden erst in einem spaeteren M6-Plan festgehalten. Der Status `tbd` spiegelt das.
+
+| Arbeitspaket                                                                            | Relevante Kennungen            | Status |
+| --------------------------------------------------------------------------------------- | ------------------------------ | ------ |
+| Direkte Target-Graph-Analysen und textuelle Darstellung direkter Target-Abhaengigkeiten | `F-18`                         | `tbd`  |
+| Hervorhebung von Targets mit vielen ein- oder ausgehenden Abhaengigkeiten               | `F-20`                         | `tbd`  |
+| Priorisierung betroffener Targets ueber den Target-Graphen hinweg                       | `F-25`                         | `tbd`  |
+| Verfeinerte Include-Sicht jenseits des MVP                                              | `F-16`, `F-17`                 | `tbd`  |
+| Erweiterte Analysekonfiguration, Schwellenwerte und Vergleichsansichten                 | `F-10`, `F-11`, `F-37`, `F-38` | `tbd`  |
 
 ## 4. MVP-Abgrenzung
 
