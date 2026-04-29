@@ -55,9 +55,10 @@ ctest --test-dir build --output-on-failure --parallel
 ```
 
 Hosts:
-- `macos-latest` (arm64, AppleClang) ist der primaere CI-Smoke.
-- `macos-13` (x86_64, AppleClang) ist die Tranche-D.3-Repraesentativitaets-
-  Variante; im CI als `Native (macos-x86_64)` verdrahtet, lokal optional.
+- `macos-latest` (arm64, AppleClang) ist der primaere CI-Smoke. Die
+  optionale Tranche-D.3-Intel-Variante wurde plan-konform ausgelassen,
+  weil arm64 als Repraesentativplattform reicht; ein lokaler Intel-Lauf
+  ist freiwillig moeglich.
 
 `known_limited` bleibt bestehen, bis Atomic-Replace- und CLI-Pflicht-Smokes
 in den jeweiligen Native-Job eingehaengt sind. Die Adapter-Tests (DOT, HTML,

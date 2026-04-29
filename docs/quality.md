@@ -276,7 +276,6 @@ Aktueller Stand nach Abschluss von AP 1.7 (alle Tranchen A–D ausgeliefert):
 |---|---|---|---|
 | Linux x86_64 | `supported` | `Native (linux-x86_64)` plus die Docker-Gates oben | offizielle M5-Releaseplattform; Atomic-Replace-/CLI-Pflicht-Smokes laufen ueber bestehende E2E-Suites |
 | macOS arm64 | `known_limited` | `Native (macos-arm64)` | `ctest` faehrt `xray_tests` (inkl. Atomic-Replace-Tests aus B und UNC/Extended-Length-Tests aus C.2) plus die E2E-Suites `e2e_binary_smoke`/`_artifacts`/`_verbosity` (inkl. der `--output`-Pflicht-Smokes aus C.1). Status bleibt `known_limited`, weil die Branch-Protection den Required Check noch nicht versioniert verankert hat und ein gruener CI-Lauf auf macos-latest noch nicht auditiert ist |
-| macOS x86_64 | `known_limited` | `Native (macos-x86_64)` (Tranche D.3) | Intel-Repraesentativitaets-Smoke neben arm64 mit identischer `ctest`-Suite; selbe `known_limited`-Begruendung wie arm64 |
 | Windows x86_64 | `known_limited` | `Native (windows-x86_64)` plus PowerShell-Smoke (D.1) und Ninja-/clang-cl-Smoke (D.2) | `ctest` faehrt dieselben Pflicht-Suites wie macOS; zusaetzlich laeuft `scripts/platform-smoke.ps1` als konvertierungsfreier `native_powershell`-Pfad und ein Ninja-/clang-cl-Smoke als zweite Build-Variante. Status bleibt `known_limited` aus denselben externen Gruenden wie macOS (Branch-Protection plus Audit) |
 
 Die Required-Check-Namen sind in
@@ -379,10 +378,11 @@ offiziellen Plattformstatus zu aendern:
   die so erzeugte Binary mit `--help` auf. Generator-Bruechige Aenderungen
   (z. B. fehlende Ninja-Dependency-Edge) werden so gefangen, ohne dass der
   MSVC-Default-Build betroffen ware.
-- **D.3 — `macos-x86_64`-Matrix-Entry**: zusaetzlicher Intel-macOS-Smoke
-  (`os: macos-13`) neben `macos-arm64`. Plattformstatus bleibt
-  `known_limited` wie bei arm64, bis Pflicht-Smokes als Required Check
-  eingehaengt sind.
+- **D.3 — zurueckgezogen**: ein zusaetzlicher Intel-`macos-13`-Smoke war
+  in der Plan-Klausel "falls arm64 nicht repraesentativ genug ist"
+  konditional vorgesehen; das Repraesentativitaetsproblem ist heute
+  nicht erkennbar, deshalb verzichten wir auf den zweiten macOS-Job
+  (Plan-konformes Auslassen der optionalen Tranche).
 - **D.4 — Manuelle Smoke-Checkliste**:
   [docs/platform-smoke-checklist.md](./platform-smoke-checklist.md)
   spiegelt die Required-Check-Schritte fuer lokale Plattformnachweise.

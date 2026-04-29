@@ -49,14 +49,6 @@ jobs:
             os: ubuntu-latest
           - name: macos-arm64
             os: macos-latest
-          # AP M5-1.7 Tranche D.3: zusaetzlicher Intel-macOS-Smoke neben
-          # arm64. Plan-M5-1-7.md "Tranche D - Optionale Haertung" erlaubt
-          # diesen Job als Repraesentativitaets-Check, falls macos-arm64
-          # nicht reicht. Status bleibt `known_limited` wie macos-arm64,
-          # bis die Atomic-Replace-/CLI-Pflicht-Smokes als Required-Check
-          # eingehaengt sind.
-          - name: macos-x86_64
-            os: macos-13
           - name: windows-x86_64
             os: windows-latest
 
