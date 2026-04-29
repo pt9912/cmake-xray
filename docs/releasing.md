@@ -193,12 +193,16 @@ Aktueller M5-Stand:
 | macOS x86_64 | `known_limited` | kein offizielles Release-Artefakt |
 | Windows x86_64 | `known_limited` | kein offizielles Release-Artefakt |
 
-`validated_smoke` darf erst dokumentiert werden, wenn pro Plattform der
-zugehoerige Required Check (`Native (macos-arm64)` bzw.
-`Native (windows-x86_64)` mit eingehaengten Atomic-Replace- und CLI-Pflicht-
-Smokes, oder `Platform Smoke Report (...)` mit verpflichtend validiertem
-Smoke-Report) gruen ist; der heutige M5-Stand erreicht diese Schwelle
-explizit nicht. Das Plattformstatus-Vokabular und die Required-Check-
+`validated_smoke` darf erst dokumentiert werden, wenn pro Plattform (a) der
+zugehoerige Required Check in der Branch-Protection verankert ist und (b)
+ein gruener CI-Lauf auf den jeweiligen Plattform-Runnern auditiert ist.
+AP 1.7 hat die workflow-internen Voraussetzungen voll geliefert: `ctest`
+fuehrt auf der Native-Matrix die Atomic-Replace-Tests (B) und die
+CLI-Pflicht-Smokes inklusive `--output` (C.1) aus, plus die
+Adapter-Tests fuer UNC/Extended-Length (C.2) und auf Windows zusaetzlich
+`scripts/platform-smoke.ps1` (D.1) und den Ninja-/clang-cl-Smoke (D.2).
+Beide externen Bedingungen sind aber Repo-Konfiguration bzw. Run-Audit;
+der heutige Stand bleibt deshalb `known_limited`. Das Plattformstatus-Vokabular und die Required-Check-
 Namen sind in [docs/plan-M5-1-7.md](./plan-M5-1-7.md) verbindlich
 festgelegt; per-Adapter-Coverage und Atomic-Replace-Matrix in
 [docs/quality.md](./quality.md) "Plattformstatus (AP M5-1.7)".
@@ -224,12 +228,19 @@ festgelegt; per-Adapter-Coverage und Atomic-Replace-Matrix in
 
 ### Bekannte Einschraenkungen
 
-- macOS-/Windows-Native-Jobs sind aktuell Build- und `ctest`-Gates, ohne
-  eingehaengte Atomic-Replace- oder CLI-Pflicht-Smokes; deshalb der
-  `known_limited`-Status. Eine spaetere Tranche kann diese Smokes in den
-  jeweiligen `Native (...)`-Job ziehen oder einen
-  `Platform Smoke Report (...)`-Verifier-Pfad bauen, ohne den
-  Release-Pfad selbst zu beruehren.
+- macOS-/Windows-Native-Jobs fahren `ctest` ueber alle Pflicht-Suites
+  (`xray_tests` inklusive Atomic-Replace- und UNC/Extended-Length-
+  Adaptertests aus den Tranchen B und C.2, sowie `e2e_binary_smoke`,
+  `e2e_binary_artifacts` (mit den `--output`-Smokes aus C.1) und
+  `e2e_binary_verbosity`). Windows fuegt `scripts/platform-smoke.ps1`
+  (D.1) als konvertierungsfreien `native_powershell`-Pflichtmodus
+  hinzu sowie einen Ninja-/clang-cl-Generator-Smoke (D.2). Der
+  `known_limited`-Status haengt deshalb nur noch an zwei *externen*
+  Bedingungen: die Branch-Protection muss den jeweiligen
+  `Native (...)`-Check als Required Check verankern, und ein gruener
+  CI-Lauf auf den Plattform-Runnern muss auditiert sein. Eine spaetere
+  Tranche kann zusaetzlich einen `Platform Smoke Report (...)`-Verifier-
+  Pfad bauen, ohne den Release-Pfad selbst zu beruehren.
 - Der Release-Asset-Allowlist-Guard hat keine macOS-/Windows-Whitelist;
   ein etwaiger Preview-Pfad mueesste eine eigene, separat versionierte
   Allowlist und Tag-Konvention mitbringen (heute nicht eingerichtet).

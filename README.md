@@ -65,11 +65,16 @@ Aktueller M5-Stand:
 | macOS x86_64 | `known_limited` |
 | Windows x86_64 | `known_limited` |
 
-Linux ist die einzige offizielle Releaseplattform; macOS und Windows bleiben
-`known_limited`, bis die Atomic-Replace- und CLI-Pflicht-Smokes auf den
-nativen Runnern als Required Checks gefuehrt werden. Detaillierte
-Gate-Erklaerungen, Required-Check-Namen und die Atomic-Replace-Matrix stehen
-in [docs/quality.md](./docs/quality.md) "Plattformstatus (AP M5-1.7)";
+Linux ist die einzige offizielle Releaseplattform; die nativen
+macOS-/Windows-Jobs fahren via `ctest` bereits die Atomic-Replace- und
+CLI-Pflicht-Smokes (Tranchen B und C.1), die UNC/Extended-Length-
+Adaptertests (C.2) und auf Windows zusaetzlich den PowerShell-Pflicht-
+Smoke (D.1) plus Ninja-Generator-Smoke (D.2). `known_limited` bleibt
+bestehen, bis externe Branch-Protection den jeweiligen `Native (...)`-
+Check als Required Check verankert und ein gruener CI-Lauf auf den
+Plattform-Runnern auditiert ist. Detaillierte Gate-Erklaerungen,
+Required-Check-Namen und die Atomic-Replace-Matrix stehen in
+[docs/quality.md](./docs/quality.md) "Plattformstatus (AP M5-1.7)";
 Release- und Preview-Grenzen in [docs/releasing.md](./docs/releasing.md)
 "Plattformartefakte macOS und Windows".
 
