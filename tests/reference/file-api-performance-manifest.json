@@ -1,0 +1,36 @@
+{
+  "$comment": "AP M5-1.8 A.3 File-API performance baseline manifest. Fixtures are versioned reply directories under tests/reference/scale_*/build/.cmake/api/v1/reply/. Regenerate via tests/reference/generate_file_api_fixtures.sh; review the diff to absorb host-path or CMake-version drift.",
+  "format_version": 1,
+  "regeneration_command": "tests/reference/generate_file_api_fixtures.sh",
+  "regenerated_at_policy": "host-local at regeneration time; not asserted in CI",
+  "cmake_version": "3.28.3",
+  "fixtures": [
+    {
+      "fixture": "scale_250",
+      "scale": 250,
+      "source_dir": "tests/reference/scale_250",
+      "build_dir": "tests/reference/scale_250/build",
+      "reply_dir": "tests/reference/scale_250/build/.cmake/api/v1/reply",
+      "generator": "Unix Makefiles",
+      "reply_file_count": 4
+    },
+    {
+      "fixture": "scale_500",
+      "scale": 500,
+      "source_dir": "tests/reference/scale_500",
+      "build_dir": "tests/reference/scale_500/build",
+      "reply_dir": "tests/reference/scale_500/build/.cmake/api/v1/reply",
+      "generator": "Unix Makefiles",
+      "reply_file_count": 4
+    },
+    {
+      "fixture": "scale_1000",
+      "scale": 1000,
+      "source_dir": "tests/reference/scale_1000",
+      "build_dir": "tests/reference/scale_1000/build",
+      "reply_dir": "tests/reference/scale_1000/build/.cmake/api/v1/reply",
+      "generator": "Unix Makefiles",
+      "reply_file_count": 4
+    }
+  ]
+}

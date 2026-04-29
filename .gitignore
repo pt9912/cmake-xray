@@ -11,3 +11,17 @@ tests/e2e/testdata/m4/**/build/.cmake/api/*
 tests/e2e/testdata/m4/**/build/.cmake/api/v1/*
 !tests/e2e/testdata/m4/**/build/.cmake/api/v1/reply/
 !tests/e2e/testdata/m4/**/build/.cmake/api/v1/reply/**
+# AP M5-1.8 A.3: versionierte File-API-Reply-Fixtures fuer
+# tests/reference/scale_*/build/.cmake/api/v1/reply/. Selbe Praezedenz-
+# Logik wie der m4-Block oben: erst alle build/-Inhalte ignorieren, dann
+# das reply/-Verzeichnis explizit wieder einschliessen.
+!tests/reference/scale_*/build/
+tests/reference/scale_*/build/*
+!tests/reference/scale_*/build/.cmake/
+tests/reference/scale_*/build/.cmake/*
+!tests/reference/scale_*/build/.cmake/api/
+tests/reference/scale_*/build/.cmake/api/*
+!tests/reference/scale_*/build/.cmake/api/v1/
+tests/reference/scale_*/build/.cmake/api/v1/*
+!tests/reference/scale_*/build/.cmake/api/v1/reply/
+!tests/reference/scale_*/build/.cmake/api/v1/reply/**

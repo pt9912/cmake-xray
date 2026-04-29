@@ -2,7 +2,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt die Referenzumgebung, die versionierten Referenzprojekte und die gemessene M3-Baseline fuer `cmake-xray`. Die Baseline wurde im MVP-Stand `v1.0.0` erhoben und gilt unveraendert fuer `v1.1.0`, da der bestehende Compile-Database-Pfad rueckwaertskompatibel geblieben ist. Der neue File-API-Pfad hat laut Plan-M4 keine eigene Performance-Baseline; diese wird im ersten Folge-Meilenstein eingefuehrt.
+Dieses Dokument beschreibt die Referenzumgebung, die versionierten Referenzprojekte und die gemessenen Baselines fuer `cmake-xray`. Die MVP-Baseline (Compile-Database-Pfad) wurde im Stand `v1.0.0` erhoben und gilt unveraendert fuer `v1.1.0` und `v1.2.0`. M5 (`v1.2.0`) ergaenzt die im AP M5-1.8 A.3 versionierten File-API-Reply-Fixtures plus eine getrennte Baseline fuer den CMake-File-API-Pfad; CMake-Configure-Zeit ist nicht Teil der gemessenen Laufzeit, weil die Reply-Daten unter `tests/reference/scale_*/build/.cmake/api/v1/reply/` versioniert sind.
 
 ## Referenzdaten
 
@@ -14,11 +14,13 @@ Versionierte Referenzprojekte:
 
 Jede Groessenstufe enthaelt:
 
-- `compile_commands.json`
+- `compile_commands.json` (Compile-Database-Pfad, MVP-Baseline)
+- `CMakeLists.txt` (Quelle fuer den File-API-Pfad, AP M5-1.8 A.3)
 - die referenzierten Quelldateien unter `src/`
 - die benoetigten Header unter `include/common/`
+- versionierte CMake-File-API-Reply-Daten unter `build/.cmake/api/v1/reply/`
 
-Die Referenzdaten werden ueber [tests/reference/generate_reference_projects.py](../tests/reference/generate_reference_projects.py) erzeugt und zusammen mit dem Generator versioniert.
+Die Referenzdaten werden ueber [tests/reference/generate_reference_projects.py](../tests/reference/generate_reference_projects.py) erzeugt und zusammen mit dem Generator versioniert. Die File-API-Reply-Verzeichnisse werden ueber [tests/reference/generate_file_api_fixtures.sh](../tests/reference/generate_file_api_fixtures.sh) regeneriert; das Skript fuehrt `cmake -S ... -B ...` ohne Compile-Schritt aus und schreibt zusaetzlich [tests/reference/file-api-performance-manifest.json](../tests/reference/file-api-performance-manifest.json) mit Fixture-Liste, CMake-Version, Generator und Reply-Pfad. Plan-M5-1-8.md verlangt explizit, dass Compile-DB-only-Daten nicht als File-API-Baseline missverstanden werden — die Trennung ist sowohl im Verzeichnislayout als auch im Manifest gefuehrt.
 
 Zusatzstichprobe fuer den separaten Impact-Pfad:
 
@@ -97,6 +99,46 @@ docker run --rm -v "$PWD/build/reports/performance:/out" cmake-xray:test \
 | Szenario | Wall time | Max RSS | Artefakte |
 |---|---:|---:|---|
 | `report_impact_header` mit `include/common/config.h` | `0.00 s` | `4,480 KB` | `xray-impact-markdown-sample.stdout.md`, `xray-impact-markdown-sample.time.txt` |
+
+### `analyze --cmake-file-api ... --top 10` (M5-File-API-Baseline)
+
+Messdatum: `2026-04-29`
+
+Vorbedingung: das Test-Image enthaelt die AP-1.8-A.3-Reply-Fixtures
+(`docker build --target test -t cmake-xray:test .` re-baut das Image,
+nachdem `tests/reference/generate_file_api_fixtures.sh` lokal lief).
+Die Messlaeufe greifen auf die im Image gebackenen Reply-Verzeichnisse
+und die im Image gebackene Binary zu, sodass weder CMake-Configure noch
+ein Volume-Bindmount in die Wall-Time eingeht.
+
+Referenzaufrufe:
+
+```bash
+docker run --rm cmake-xray:test bash -lc \
+  '/usr/bin/time -v /workspace/build/cmake-xray analyze --cmake-file-api /workspace/tests/reference/scale_250/build --format console --top 10'
+docker run --rm cmake-xray:test bash -lc \
+  '/usr/bin/time -v /workspace/build/cmake-xray analyze --cmake-file-api /workspace/tests/reference/scale_250/build --format markdown --top 10'
+# scale_500 und scale_1000 analog
+```
+
+Beobachtungen aus einer warmen Messreihe (Image und Reply-Daten in der
+Image-Filesystem-Cache-Schicht):
+
+| Szenario | Ausgabeformat | Wall time | Max RSS |
+|---|---|---:|---:|
+| `scale_250` (File-API) | `console` | `0.11 s` | `5,760 KB` |
+| `scale_250` (File-API) | `markdown` | `0.09 s` | `5,760 KB` |
+| `scale_500` (File-API) | `console` | `0.18 s` | `6,880 KB` |
+| `scale_500` (File-API) | `markdown` | `0.20 s` | `6,880 KB` |
+| `scale_1000` (File-API) | `console` | `0.38 s` | `8,640 KB` |
+| `scale_1000` (File-API) | `markdown` | `0.47 s` | `8,480 KB` |
+
+Die Werte liegen in derselben Groessenordnung wie die Compile-Database-
+Baseline oben — der File-API-Pfad bringt zusaetzliche
+Target-Metadaten-Aufloesung mit, die fuer `scale_1000` rund `0.05–0.15 s`
+und `~1 MB` zusaetzliches Maximum-RSS kostet. Die NF-04-Schwelle
+(`60 s` fuer `1.000` TUs) und die NF-05-Schwelle (`2 GB`) bleiben
+zwei Groessenordnungen entfernt.
 
 ## Bewertung gegen NF-04 und NF-05
 
