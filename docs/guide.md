@@ -81,11 +81,13 @@ Das Runtime-Image fuehrt `cmake-xray` als Entrypoint aus. Fuer lokale Daten wird
 das Projektverzeichnis oder ein Teil davon in den Container gemountet:
 
 ```bash
-docker run --rm ghcr.io/pt9912/cmake-xray:vX.Y.Z --help
+docker run --rm ghcr.io/pt9912/cmake-xray:X.Y.Z --help
 ```
 
-Dabei bezeichnet `X.Y.Z` die Release-Version ohne fuehrendes `v`; Container
-werden mit dem Git-Tag wie `vX.Y.Z` markiert.
+Dabei bezeichnet `X.Y.Z` die Release-Version ohne fuehrendes `v`; der OCI-Tag
+spiegelt die App-Version, der Git-Tag den Release-Anker (`vX.Y.Z`). Beide
+Werte werden ueber den AP-1.6-Drei-Wege-Versionscheck gegeneinander
+abgesichert (siehe `docs/releasing.md`).
 
 Mit lokal gebautem Runtime-Image:
 
@@ -134,7 +136,7 @@ Dieselbe Projektanalyse ueber das Runtime-Image:
 ```bash
 docker run --rm \
   -v "$PWD/tests/e2e/testdata/m3:/data:ro" \
-  ghcr.io/pt9912/cmake-xray:vX.Y.Z \
+  ghcr.io/pt9912/cmake-xray:X.Y.Z \
   analyze --compile-commands /data/report_project/compile_commands.json --top 10
 ```
 
@@ -582,7 +584,7 @@ Ohne lokale Installation kann das Runtime-Image verwendet werden:
 
 ```bash
 docker run --rm -v "$PWD/build:/data:ro" \
-  ghcr.io/pt9912/cmake-xray:vX.Y.Z \
+  ghcr.io/pt9912/cmake-xray:X.Y.Z \
   analyze --compile-commands /data/compile_commands.json --cmake-file-api /data
 ```
 
