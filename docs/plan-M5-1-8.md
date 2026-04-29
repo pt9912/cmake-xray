@@ -25,7 +25,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - CLI-Negativtest, dass `--format console --output <path>` abgelehnt wird, weil `--output` auf artefaktorientierte Formate begrenzt bleibt
 - CLI-Tests fuer atomare Dateiausgabe: erfolgreiche Writes erzeugen vollstaendige Reports, vorhandene Zieldateien werden bei Erfolg ersetzt, und Fehlerfaelle lassen vorhandene Zieldateien auf Linux, macOS und Windows unveraendert
 - Unit-/Integrationstests fuer den Atomic-Replace-Wrapper, die existierende Ziele ohne vorheriges Loeschen ersetzen, simulierte Fehlerpfade mit intakter alter Datei pruefen und unter Windows die gewaehlte `ReplaceFileW`-/`MoveFileExW`-Semantik abdecken
-- CLI-Tests, dass `--quiet` und `--verbose` command-lokal nach `analyze` bzw. `impact` akzeptiert werden und globale Positionen vor dem Subcommand nicht Teil des M5-Vertrags sind
+- CLI-Tests, dass `--quiet` und `--verbose` command-lokal nach `analyze` bzw. `impact` akzeptiert werden und globale Positionen vor dem Subcommand weiterhin als Usage-Fehler abgelehnt werden: nonzero Exit, Text auf `stderr`, kein stdout-Report und keine Zieldatei
 - CLI-Tests fuer `--verbose`, `--quiet` und gegenseitigen Ausschluss
 - CLI-Golden-Tests, dass `--quiet --format json|dot|html|markdown` ohne `--output` denselben stdout-Report wie der Normalmodus ausgibt und keine Erfolgsmeldungen in stdout mischt; mit `--output` muss stdout fuer alle Reportformate im Normal-, Quiet- und Verbose-Modus leer bleiben, waehrend Verbose-Zusatzdiagnostik ausschliesslich auf `stderr` erscheinen darf
 - Golden-Output-Tests fuer `analyze` und `impact` in allen neuen Formaten
@@ -56,12 +56,12 @@ Tests und Abnahme muessen mindestens abdecken:
 - automatisierter Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
 - automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt: `scripts/release-dry-run.sh` und ein gleichnamiger bzw. eindeutig benannter Workflow-Job muessen GitHub-Schritte mit einem Fake-Publisher samt Assertions fuer Zustandsuebergaenge und Reihenfolge sowie OCI-Schritte mit lokaler Test-Registry fuer Tagging, `latest`-Regel, Push und Manifest-Pruefung ausfuehren, ohne externe Veroeffentlichung
 - dokumentierter manueller Dry-Run nur fuer Recovery-Pfade, die echte externe Publish-Zustaende in GitHub Releases oder GHCR voraussetzen
-- Performance-Messung fuer den CMake-File-API-Pfad auf reproduzierbaren Referenzgroessen und Dokumentation der M5-Baseline in `docs/performance.md`: AP 1.8 erzeugt oder versioniert die fuer `scale_*` noetigen CMake-File-API-Reply-Fixtures, dokumentiert Generator, CMake-Version, Fixture-Manifest und Erzeugungskommando, und verhindert, dass compile-db-only Referenzdaten als File-API-Baseline missverstanden werden
+- Performance-Messung fuer den CMake-File-API-Pfad auf reproduzierbaren Referenzgroessen und Dokumentation der M5-Baseline in `docs/performance.md`: AP 1.8 erzeugt oder versioniert die fuer `scale_*` noetigen CMake-File-API-Reply-Fixtures ueber `tests/reference/generate_reference_projects.py` oder ein explizites File-API-Fixture-Skript, dokumentiert Generator, CMake-Version, Fixture-Manifest, Reply-Verzeichnis und Erzeugungskommando in `tests/reference/file-api-performance-manifest.json`, und verhindert, dass compile-db-only Referenzdaten als File-API-Baseline missverstanden werden
 - Plattform-Abnahme fuer Linux, macOS und Windows gemaess AP 1.7: jede Plattform ist in `docs/quality.md` und `docs/releasing.md` mit Status `supported`, `validated_smoke` oder `known_limited` dokumentiert; macOS und Windows erreichen `validated_smoke` nur mit verpflichtendem CI-Required-Check oder schema-validiertem Smoke-Report fuer Build, Atomic-Replace und normative CLI-Smokes, andernfalls werden konkrete Einschraenkungen als `known_limited` dokumentiert
 - Doku-Gate fuer Nutzeraufrufe: `README.md`, `docs/guide.md`, `docs/releasing.md` und `docs/examples/` duerfen keine interne Build-Pfad-Nutzung wie `./build/cmake-xray` voraussetzen und beschreiben Release-Artefakte, Container oder installierte Binary-Pfade als regulaere Nutzerwege
 - Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt, den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht und gegen `docs/report-json.schema.json` validiert
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
-- Validierung, dass `docs/examples/` keine driftenden Kopien enthaelt: Markdown-, HTML-, JSON- und DOT-Beispiele werden entweder aus den validierten Goldens generiert oder selbst in die jeweiligen JSON-Schema-, DOT-Syntax-, HTML-Struktur- und Golden-Manifeste aufgenommen
+- Validierung, dass `docs/examples/` keine driftenden Kopien enthaelt: Markdown-, HTML-, JSON- und DOT-Beispiele werden entweder aus den validierten Goldens generiert oder ueber ein CTest-Gate wie `tests/validate_doc_examples.py` und `docs/examples/manifest.txt` selbst in die jeweiligen JSON-Schema-, DOT-Syntax-, HTML-Struktur- und Golden-Manifeste aufgenommen
 
 **Ergebnis**: M5 ist nicht nur implementiert, sondern ueber Beispiele, Referenzdaten und Release-Dokumentation nachvollziehbar abnehmbar.
 
@@ -89,6 +89,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - `docs/report-json.md`
 - `docs/report-json.schema.json`
 - `docs/report-dot.md`
+- `docs/examples/manifest.txt`
 - `docs/guide.md`
 - `README.md`
 - `docs/releasing.md`
@@ -103,9 +104,13 @@ Tests und Abnahme muessen mindestens abdecken:
 - `tests/e2e/test_cli_verbosity.cpp`
 - `tests/e2e/testdata/m5/`
 - `tests/validate_json_schema.py`
+- `tests/validate_doc_examples.py`
 - `tests/e2e/testdata/m5/json-reports/manifest.txt`
 - `tests/e2e/testdata/m5/dot-reports/manifest.txt`
 - `tests/e2e/testdata/m5/html-reports/manifest.txt`
+- `tests/reference/generate_reference_projects.py`
+- `tests/reference/file-api-performance-manifest.json`
+- `tests/reference/scale_*/build/.cmake/api/v1/reply/`, falls AP 1.8 versionierte Reply-Fixtures statt rein reproduzierbarer Generierung waehlt
 - `tests/adapters/test_port_wiring.cpp`
 - `tests/adapters/test_json_report_adapter.cpp`
 - `tests/adapters/test_dot_report_adapter.cpp`
@@ -140,7 +145,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - Release-Scope und Versionierung sind dokumentiert und in Smoke/Dry-Run nachweislich konsistent
 - Plattformstatus fuer Linux, macOS und Windows ist nach AP 1.7 dokumentiert und ueber Required Checks oder validierte Smoke-Reports belegt; rote, fehlende oder freiwillige macOS-/Windows-Gates fuehren zu `known_limited`, nicht zu `validated_smoke`
 - README, Guide, Releasing-Doku und Beispiele beschreiben Nutzeraufrufe ohne interne Build-Pfade wie `./build/cmake-xray`
-- File-API-Performance-Baseline ist ueber versionierte oder reproduzierbar generierte File-API-Reply-Fixtures, Fixture-Manifest, Generator/CMake-Angaben und dokumentierte Messkommandos nachvollziehbar
+- File-API-Performance-Baseline ist ueber versionierte oder reproduzierbar generierte File-API-Reply-Fixtures, `tests/reference/file-api-performance-manifest.json`, konkrete Reply-Verzeichnisse, Generator/CMake-Angaben und dokumentierte Messkommandos nachvollziehbar
 - `--top`-, `changed_file_source`-, und Provenienzregeln sind in Goldens und Schema-Tests belegt
 - `release`-, `releasing`- und `quality`-Dokumentation sind auf den finalen M5-Ablauf abgeglichen
 
