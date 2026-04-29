@@ -73,6 +73,14 @@ def normalize_dot_unique_keys(content: bytes) -> bytes:
     return DOT_UNIQUE_KEY_PATTERN.sub(b'unique_key="HOSTPATH"', content)
 
 
+def normalize_line_endings(content: bytes) -> bytes:
+    # Windows binaries emit CRLF; committed examples ship with LF. The drift
+    # check needs to compare report content, not host text-mode quirks. Mirrors
+    # tests/e2e/run_e2e_lib.sh's normalize_line_endings helper that the m5
+    # JSON/DOT/HTML goldens already rely on for cross-platform stability.
+    return content.replace(b"\r\n", b"\n").replace(b"\r", b"")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate docs/examples/ against its manifest plus format gates.")
@@ -289,12 +297,11 @@ def check_binary_drift(spec_path: Path, examples_dir: Path,
             failed += 1
             continue
         expected = target_path.read_bytes()
+        actual_for_diff = normalize_line_endings(completed.stdout)
+        expected_for_diff = normalize_line_endings(expected)
         if target_path.suffix.lower() == ".dot":
-            actual_for_diff = normalize_dot_unique_keys(completed.stdout)
-            expected_for_diff = normalize_dot_unique_keys(expected)
-        else:
-            actual_for_diff = completed.stdout
-            expected_for_diff = expected
+            actual_for_diff = normalize_dot_unique_keys(actual_for_diff)
+            expected_for_diff = normalize_dot_unique_keys(expected_for_diff)
         if actual_for_diff != expected_for_diff:
             sys.stderr.write(
                 f"error: drift for {name} -- binary stdout "
