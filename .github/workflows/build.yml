@@ -37,6 +37,38 @@ jobs:
       - name: Smoke test runtime image
         run: docker run --rm cmake-xray --help
 
+  docs-examples-portability:
+    # AP M5-1.8 A.5 follow-up: catch docs/examples DOT host-path drift
+    # before the native matrix runs. GHA Build run #25123025175 surfaced
+    # the bug in the linux-x86_64 native job after ~3 min of build +
+    # ctest; this dedicated job uses the cached cmake-xray:test image,
+    # bind-mounts the repo at /alt-mount instead of /workspace and
+    # invokes scripts/verify-doc-examples-portability.sh, so the
+    # divergent-prefix regression fails fast in under a minute (image
+    # build cached) instead of waiting for the full native job.
+    name: docs/examples Host-Portability
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: test
+          tags: cmake-xray:test
+          load: true
+          cache-from: type=gha,scope=cmake-xray-test
+          cache-to: type=gha,scope=cmake-xray-test,mode=max
+
+      - name: Verify docs/examples host portability
+        run: bash scripts/verify-doc-examples-portability.sh
+
   native:
     name: Native (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
