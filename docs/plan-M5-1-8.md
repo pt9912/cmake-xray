@@ -39,7 +39,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - JSON-Schema-/Golden-Tests fuer `inputs.cmake_file_api_path` und `inputs.cmake_file_api_resolved_path` bei File-API- und Mixed-Input-Laeufen sowie fuer `limit`, `total_count`, `returned_count` und `truncated` bei gekuerzten und ungekuerzten `analyze`-Listen
 - JSON-Schema-/Golden-Tests fuer `ReportInputs`-Pfad-Provenienz: CLI-relative Pfade, absolute Pfade, Build-Dir-vs.-Reply-Dir bei `--cmake-file-api` und relative `--changed-file` muessen stabile Display-Pfade und passende `*_source`-Enums liefern
 - JSON-Schema-/Golden-Tests fuer feste JSON-`format`-Werte `cmake-xray.analysis` und `cmake-xray.impact`
-- JSON-Schema-/Golden-Tests fuer alle in JSON v1 erlaubten `*_source`-Enums: `compile_database_source=cli|not_provided`, `cmake_file_api_source=cli|not_provided` und `changed_file_source=compile_database_directory|file_api_source_root|cli_absolute`; absolute-Pfad-Goldens muessen synthetische, fixture-stabile Pfade verwenden. `changed_file_source=unresolved_file_api_source_root` bleibt ein Modellwert fuer File-API-Fehlerergebnisse und wird in JSON v1 per Schema-/Adapter-Negativtest abgelehnt, weil nicht wiederherstellbare File-API-Ladefehler als Textfehler ohne JSON-Report enden.
+- JSON-Schema-/Golden-Tests fuer alle in JSON v1 erlaubten `*_source`-Werte und Nullability-Regeln: `compile_database_source=cli|null`, `cmake_file_api_source=cli|null` und `changed_file_source=compile_database_directory|file_api_source_root|cli_absolute`; absolute-Pfad-Goldens muessen synthetische, fixture-stabile Pfade verwenden. `changed_file_source=unresolved_file_api_source_root` bleibt ein Modellwert fuer File-API-Fehlerergebnisse und wird in JSON v1 per Schema-/Adapter-Negativtest abgelehnt, weil nicht wiederherstellbare File-API-Ladefehler als Textfehler ohne JSON-Report enden.
 - JSON-Schema-/Golden-Tests fuer Mixed-Input-Impact-Laeufe, dass relative `changed_file`-Pfade auf Basis der `compile_commands.json`-Directory interpretiert werden und `inputs.changed_file_source=compile_database_directory` ausgeben; File-API-only-Laeufe verwenden `file_api_source_root`, absolute CLI-Pfade verwenden `cli_absolute`
 - Adapter-/Service-Tests, dass der vom `CmakeFileApiAdapter` aufgeloeste Build-/Reply-Pfad als roher lexikalischer Pfad ueber `BuildModelResult` transportiert wird, `ProjectAnalyzer`/`ImpactAnalyzer` daraus relativ zur `report_display_base` den Display-Pfad fuer `ReportInputs.cmake_file_api_resolved_path` erzeugen und kein CLI-Zustand in Adapter nachgereicht wird
 - Port-/Service-Tests fuer `AnalyzeImpactRequest`, damit `compile_commands_path`, `changed_file_path`, `cmake_file_api_path` und `report_display_base` explizit transportiert und fuer `ReportInputs` genutzt werden
@@ -92,18 +92,20 @@ Tests und Abnahme muessen mindestens abdecken:
 - `docs/performance.md`
 - `CHANGELOG.md`
 - `tests/e2e/test_cli.cpp`
-- `tests/e2e/run_e2e.sh`
 - `tests/e2e/run_e2e_lib.sh`
 - `tests/e2e/run_e2e_artifacts.sh`
 - `tests/e2e/run_e2e_smoke.sh`
+- `tests/e2e/run_e2e_verbosity.sh`
+- `tests/e2e/test_cli_verbosity.cpp`
 - `tests/e2e/testdata/m5/`
+- `tests/adapters/test_port_wiring.cpp`
 - `tests/adapters/test_json_report_adapter.cpp`
 - `tests/adapters/test_dot_report_adapter.cpp`
 - `tests/adapters/test_html_report_adapter.cpp`
 - `tests/adapters/test_atomic_report_writer.cpp`
 - `tests/hexagon/test_project_analyzer.cpp`
 - `tests/hexagon/test_impact_analyzer.cpp`
-- `tests/release/test-release_dry_run.sh`
+- `tests/release/test_release_dry_run.sh`
 - `scripts/release-dry-run.sh`
 - `.github/workflows/release.yml`
 - `.github/workflows/test.yml`
