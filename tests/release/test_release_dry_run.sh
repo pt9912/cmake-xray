@@ -397,6 +397,63 @@ else
     failures=$((failures + 1))
 fi
 
+# ---- Scenario 9: macOS-/Windows-Archiv im Asset-Pfad -> abort vor release_published ----
+#
+# AP M5-1.7 Tranche C.4: plan-M5-1-7.md "Release- und Artefaktgrenzen"
+# verlangt einen Dry-Run-Negativfall, in dem ein macOS-/Windows-Archiv
+# in der offiziellen Asset-Liste den Publish-Pfad vor Upload abbricht.
+# Der existierende Allowlist-Guard aus AP M5-1.6 (release-allowlist.sh,
+# zeile 207 in release-dry-run.sh) ist die einzige Stelle, an der die
+# offizielle Linux-Allowlist den finalen Publish blockiert; dieses
+# Szenario haengt einen darwin-Asset ueber den neuen --extra-asset-Flag
+# in den Asset-Pfad ein und prueft, dass der Dry-Run vor jedem
+# state-changing Schritt (kein draft_release_created, kein
+# oci_image_published, kein release_published) abbricht und der Fehler
+# auf die Allowlist-Verletzung verweist.
+state9_dir="$(mktemp -d -t cmake-xray-dry-run-s9.XXXXXX)"
+state_dirs+=("$state9_dir")
+mkdir -p "$state9_dir/state" "$state9_dir/extra-assets"
+
+# Synthetic darwin archive in the host-side state dir; mounts in at
+# /state/extra-assets when the dry-run container runs. File contents do
+# not matter -- the allowlist guard inspects basenames only.
+darwin_basename_s9="cmake-xray_0.0.0-dryrun-s9_darwin_arm64.tar.gz"
+touch "$state9_dir/extra-assets/$darwin_basename_s9"
+
+out9_rc=0
+out9=$(docker run --rm \
+    -v "$repo_root:/workspace" \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v "$state9_dir:/state" \
+    --network host \
+    -e "XRAY_DRY_RUN_REGISTRY=localhost:${registry_port}" \
+    -e "XRAY_DRY_RUN_KEEP_STATE=true" \
+    "$image" \
+    bash scripts/release-dry-run.sh v0.0.0-dryrun-s9 \
+        --state-dir /state \
+        --extra-asset "/state/extra-assets/$darwin_basename_s9" \
+        2>&1) || out9_rc=$?
+
+if [ "$out9_rc" -eq 0 ]; then
+    echo "FAIL: scenario 9 macos/windows archive should abort, dry-run succeeded" >&2
+    failures=$((failures + 1))
+elif ! printf '%s' "$out9" | grep -F -q "M5 release allowlist"; then
+    echo "FAIL: scenario 9 dry-run aborted but did not mention M5 release allowlist" >&2
+    printf '%s\n' "$out9" | tail -10 >&2 || true
+    failures=$((failures + 1))
+elif ! printf '%s' "$out9" | grep -F -q "$darwin_basename_s9"; then
+    echo "FAIL: scenario 9 allowlist error did not name the darwin asset" >&2
+    printf '%s\n' "$out9" | tail -10 >&2 || true
+    failures=$((failures + 1))
+elif [ -f "$state9_dir/state/draft_release_created" ] \
+     || [ -f "$state9_dir/state/oci_image_published" ] \
+     || [ -f "$state9_dir/state/release_published" ]; then
+    echo "FAIL: scenario 9 allowlist guard fired but state markers present" >&2
+    failures=$((failures + 1))
+else
+    echo "PASS: scenario 9 macos/windows archive aborts before any state transition"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "$failures release dry-run check(s) FAILED" >&2

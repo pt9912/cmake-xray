@@ -7,7 +7,7 @@
 #   draft_release_created -> oci_image_published -> release_published
 #
 # Usage:
-#   scripts/release-dry-run.sh <tag> [--state-dir <dir>]
+#   scripts/release-dry-run.sh <tag> [--state-dir <dir>] [--extra-asset <path>]...
 #
 #   <tag> is the SemVer release tag with leading 'v' (e.g. v1.2.3 or
 #   v1.2.3-rc.1); the script validates it via scripts/validate-release-tag.sh.
@@ -17,6 +17,13 @@
 #   Used by tests/release/test_release_dry_run.sh to share state across
 #   sequential dry-run invocations (so re-run scenarios can pre-seed the
 #   directory and observe the second run).
+#
+#   --extra-asset <path> adds <path> to the asset list the allowlist guard
+#   sees alongside the canonical Linux archive plus sidecar. Repeatable.
+#   Used by tests/release/test_release_dry_run.sh to pin the AP M5-1.7
+#   Tranche C.4 negative case: a macOS- or Windows-Archiv im Asset-Pfad
+#   muss den Publish-Pfad vor `release_published` abbrechen. Real release
+#   pipelines never set this flag.
 #
 # Environment:
 #   XRAY_DRY_RUN_REGISTRY    pre-existing local registry host:port; the
@@ -55,10 +62,13 @@ tag="$1"
 shift
 
 state_dir=""
+extra_assets=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --state-dir) state_dir="$2"; shift 2 ;;
         --state-dir=*) state_dir="${1#--state-dir=}"; shift ;;
+        --extra-asset) extra_assets+=("$2"); shift 2 ;;
+        --extra-asset=*) extra_assets+=("${1#--extra-asset=}"); shift ;;
         *) echo "error: unknown flag '$1'" >&2; exit 2 ;;
     esac
 done
@@ -204,8 +214,16 @@ fi
 # zum Abbruch statt zu Upload oder implizitem Ignorieren." The dry-run
 # triggers the same guard so divergence between dry-run and the real
 # release.yml stays impossible.
-bash "$allowlist_script" "$version" "$archive_path" "$sha_path"
-echo "[dry-run] allowlist accepted ${archive_basename} and sidecar"
+allowlist_args=("$version" "$archive_path" "$sha_path")
+if [ "${#extra_assets[@]}" -gt 0 ]; then
+    allowlist_args+=("${extra_assets[@]}")
+fi
+bash "$allowlist_script" "${allowlist_args[@]}"
+if [ "${#extra_assets[@]}" -eq 0 ]; then
+    echo "[dry-run] allowlist accepted ${archive_basename} and sidecar"
+else
+    echo "[dry-run] allowlist accepted ${archive_basename}, sidecar plus ${#extra_assets[@]} extra asset path argument(s)"
+fi
 
 # 6. Generate a release-notes file (kept minimal; Tranche E will source
 # the canonical CHANGELOG).

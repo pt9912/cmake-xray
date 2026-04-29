@@ -250,8 +250,13 @@ bleiben:
   release_published`. Refusal-Pfade bei realen Endpunkten (`GH_TOKEN` ohne
   Override) und Manifest-Mismatch-Erkennung sind verbindlich gepinnt.
   CTest-Anker: `release_dry_run` ueber
-  `tests/release/test_release_dry_run.sh` (zwei Happy-Path- plus vier
-  Abort-Szenarien).
+  `tests/release/test_release_dry_run.sh` (zwei Happy-Path-, sechs Abort-
+  und ein AP M5-1.7-Tranche-C.4-Plattform-Negativ-Szenario). Szenario 9
+  haengt ueber den `--extra-asset`-Flag des Orchestrators ein synthetisches
+  `*_darwin_arm64.tar.gz` in den Allowlist-Aufruf und prueft, dass der
+  Dry-Run vor `draft_release_created` mit Bezug auf die "M5 release
+  allowlist" abbricht. Ohne `--extra-asset` (real-Release-Pfad) bleibt
+  das Verhalten unveraendert.
 
 Diese Gates sind verpflichtend; ein roter Pfad bricht die Veroeffentlichung
 ab, bevor irgendein extern sichtbarer Zustand (Draft, OCI-Push, Public-
