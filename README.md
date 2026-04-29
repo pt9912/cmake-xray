@@ -269,18 +269,26 @@ Ohne Target-Sicht (nur `compile_commands.json`):
 - [docs/examples/analyze-console.txt](./docs/examples/analyze-console.txt)
 - [docs/examples/analyze-report.md](./docs/examples/analyze-report.md)
 - [docs/examples/analyze-report.html](./docs/examples/analyze-report.html)
+- [docs/examples/analyze-report.json](./docs/examples/analyze-report.json)
+- [docs/examples/analyze-report.dot](./docs/examples/analyze-report.dot)
 - [docs/examples/impact-console.txt](./docs/examples/impact-console.txt)
 - [docs/examples/impact-report.md](./docs/examples/impact-report.md)
 - [docs/examples/impact-report.html](./docs/examples/impact-report.html)
+- [docs/examples/impact-report.json](./docs/examples/impact-report.json)
+- [docs/examples/impact-report.dot](./docs/examples/impact-report.dot)
 
 Mit Target-Sicht (File API):
 
 - [docs/examples/analyze-console-targets.txt](./docs/examples/analyze-console-targets.txt)
 - [docs/examples/analyze-report-targets.md](./docs/examples/analyze-report-targets.md)
 - [docs/examples/analyze-report-targets.html](./docs/examples/analyze-report-targets.html)
+- [docs/examples/analyze-report-targets.json](./docs/examples/analyze-report-targets.json)
+- [docs/examples/analyze-report-targets.dot](./docs/examples/analyze-report-targets.dot)
 - [docs/examples/impact-console-targets.txt](./docs/examples/impact-console-targets.txt)
 - [docs/examples/impact-report-targets.md](./docs/examples/impact-report-targets.md)
 - [docs/examples/impact-report-targets.html](./docs/examples/impact-report-targets.html)
+- [docs/examples/impact-report-targets.json](./docs/examples/impact-report-targets.json)
+- [docs/examples/impact-report-targets.dot](./docs/examples/impact-report-targets.dot)
 
 ## Exit-Codes
 

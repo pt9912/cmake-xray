@@ -1,0 +1,92 @@
+{
+  "format": "cmake-xray.analysis",
+  "format_version": 1,
+  "report_type": "analyze",
+  "inputs": {
+    "compile_database_path": null,
+    "compile_database_source": null,
+    "cmake_file_api_path": "tests/e2e/testdata/m4/file_api_only/build",
+    "cmake_file_api_resolved_path": "tests/e2e/testdata/m4/file_api_only/build/.cmake/api/v1/reply",
+    "cmake_file_api_source": "cli"
+  },
+  "summary": {
+    "translation_unit_count": 2,
+    "ranking_total_count": 2,
+    "hotspot_total_count": 0,
+    "top_limit": 10,
+    "include_analysis_heuristic": true,
+    "observation_source": "derived",
+    "target_metadata": "loaded"
+  },
+  "translation_unit_ranking": {
+    "limit": 10,
+    "total_count": 2,
+    "returned_count": 2,
+    "truncated": false,
+    "items": [
+      {
+        "rank": 1,
+        "reference": {
+          "source_path": "src/main.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 8,
+          "include_path_count": 2,
+          "define_count": 1,
+          "score": 11
+        },
+        "targets": [
+          {
+            "display_name": "app",
+            "type": "EXECUTABLE"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/main.cpp"
+          }
+        ]
+      },
+      {
+        "rank": 2,
+        "reference": {
+          "source_path": "src/core.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 5,
+          "include_path_count": 1,
+          "define_count": 0,
+          "score": 6
+        },
+        "targets": [
+          {
+            "display_name": "core",
+            "type": "STATIC_LIBRARY"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/core.cpp"
+          }
+        ]
+      }
+    ]
+  },
+  "include_hotspots": {
+    "limit": 10,
+    "total_count": 0,
+    "returned_count": 0,
+    "truncated": false,
+    "items": []
+  },
+  "diagnostics": [
+    {
+      "severity": "note",
+      "message": "include-based results are heuristic; conditional or generated includes may be missing"
+    }
+  ]
+}
