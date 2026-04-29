@@ -6,7 +6,7 @@ Die neuen Formate und Release-Pfade sind nur dann nutzbar, wenn Beispiele, Golde
 
 M5 aktualisiert mindestens:
 
-- Versionsquellen fuer `v1.2.0`: Root-`CMakeLists.txt` bleibt numerische Projektversion; Release-Builds verwenden `XRAY_APP_VERSION` aus dem validierten Tag ohne fuehrendes `v` als kanonische App-/Package-Version fuer `ApplicationInfo`, Paketmetadaten und `--version`, waehrend `XRAY_VERSION_SUFFIX` nur fuer lokale oder nicht veroeffentlichende Builds zulaessig ist und gleichzeitiges Setzen beider Quellen fail-fast abbricht
+- Versionsquellen fuer `v1.2.0`: Root-`CMakeLists.txt` meldet fuer M5 exakt `project(... VERSION 1.2.0)` als numerische Projektversion; Release-Builds verwenden `XRAY_APP_VERSION` aus dem validierten Tag ohne fuehrendes `v` als kanonische App-/Package-Version fuer `ApplicationInfo`, Paketmetadaten und `--version`, waehrend `XRAY_VERSION_SUFFIX` nur fuer lokale oder nicht veroeffentlichende Builds zulaessig ist und gleichzeitiges Setzen beider Quellen fail-fast abbricht
 - `docs/examples/` mit repraesentativen Markdown-, HTML-, JSON- und DOT-Ausgaben
 - `README.md` mit Formatwahl, quiet/verbose und Release-/Container-Nutzung
 - `docs/guide.md` mit praktischen Aufrufen fuer alle M5-Formate
@@ -23,7 +23,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - HTML-Adapter-/Golden-Tests mit Sonderzeichen in Pfaden und Diagnostics, mindestens `<`, `>`, `&`, Anfuehrungszeichen und Backslashes, und Assertions auf korrekt escaped HTML ohne Rohinjektion
 - CLI-Tests fuer Formatwahl, ungueltige Formatwerte und `--format markdown|html|json|dot --output <path>` fuer `analyze` und `impact`
 - CLI-Negativtest, dass `--format console --output <path>` abgelehnt wird, weil `--output` auf artefaktorientierte Formate begrenzt bleibt
-- CLI-Tests fuer atomare Dateiausgabe: erfolgreiche Writes erzeugen vollstaendige Reports, vorhandene Zieldateien werden bei Erfolg ersetzt, und Fehlerfaelle lassen vorhandene Zieldateien auf Linux, macOS und Windows unveraendert
+- CLI-Tests fuer atomare Dateiausgabe: auf Linux erzeugen erfolgreiche Writes vollstaendige Reports, vorhandene Zieldateien werden bei Erfolg ersetzt, und Fehlerfaelle lassen vorhandene Zieldateien unveraendert; auf macOS und Windows ist derselbe Nachweis verpflichtend, wenn die Plattform in AP 1.7 `validated_smoke` erreicht, andernfalls werden fehlende oder rote Atomic-Write-/CLI-Gates konkret als `known_limited` dokumentiert
 - Unit-/Integrationstests fuer den Atomic-Replace-Wrapper, die existierende Ziele ohne vorheriges Loeschen ersetzen, simulierte Fehlerpfade mit intakter alter Datei pruefen und unter Windows die gewaehlte `ReplaceFileW`-/`MoveFileExW`-Semantik abdecken
 - CLI-Tests, dass `--quiet` und `--verbose` command-lokal nach `analyze` bzw. `impact` akzeptiert werden und globale Positionen vor dem Subcommand weiterhin als Usage-Fehler abgelehnt werden: nonzero Exit, Text auf `stderr`, kein stdout-Report und keine Zieldatei
 - CLI-Tests fuer `--verbose`, `--quiet` und gegenseitigen Ausschluss
@@ -54,7 +54,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
 - Pruefsummen-Test, dass die SHA-256-Datei existiert, den richtigen Linux-Archivnamen referenziert, gegen das erzeugte Archiv erfolgreich validiert und die enthaltene Binary-Checksumme beziehungsweise dokumentierte Binary-Pruefsumme mit dem entpackten Artefakt abgleicht
 - Reproduzierbarkeits-Smoke fuer das Linux-Archiv: zwei Builds aus gleichem Commit und gleicher Version muessen Archiv-Checksumme, entpackte Dateiliste, Dateimodi und Binary-Checksumme stabil vergleichen
-- Versionscheck, dass Root-`CMakeLists.txt` die numerische Basisversion meldet, Release-Builds `XRAY_APP_VERSION` aus dem validierten Tag ohne fuehrendes `v` verwenden, `XRAY_VERSION_SUFFIX` nur fuer lokale oder nicht veroeffentlichende Builds zulaessig ist, gleichzeitiges Setzen beider Quellen fail-fast abbricht und `cmake-xray --version`, die kompilierte bzw. generierte `ApplicationInfo`-Version, App-/Package-Version-Quelle und Release-Tag dieselbe veroeffentlichte Semver-Version ohne fuehrendes `v` melden, inklusive Prerelease-Suffix bei Tags wie `v1.2.0-rc.1`
+- Versionscheck, dass Root-`CMakeLists.txt` fuer M5 exakt `project(... VERSION 1.2.0)` meldet, Release-Builds `XRAY_APP_VERSION` aus dem validierten Tag ohne fuehrendes `v` verwenden, `XRAY_VERSION_SUFFIX` nur fuer lokale oder nicht veroeffentlichende Builds zulaessig ist, gleichzeitiges Setzen beider Quellen fail-fast abbricht und `cmake-xray --version`, die kompilierte bzw. generierte `ApplicationInfo`-Version, App-/Package-Version-Quelle und Release-Tag dieselbe veroeffentlichte Semver-Version ohne fuehrendes `v` melden, inklusive Prerelease-Suffix bei Tags wie `v1.2.0-rc.1`
 - CLI-Test, dass `cmake-xray --version` ohne Subcommand funktioniert, ausschliesslich die App-Version ohne fuehrendes `v` nach stdout schreibt und keine Analyse-/Report-Pfade initialisiert
 - automatisierter Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
 - automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt: `scripts/release-dry-run.sh` und ein gleichnamiger bzw. eindeutig benannter Workflow-Job muessen GitHub-Schritte mit einem Fake-Publisher samt Assertions fuer Zustandsuebergaenge und Reihenfolge sowie OCI-Schritte mit lokaler Test-Registry fuer Tagging, `latest`-Regel, Push und Manifest-Pruefung ausfuehren, ohne externe Veroeffentlichung
@@ -64,7 +64,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - Doku-Gate fuer Nutzeraufrufe: `README.md`, `docs/guide.md`, `docs/releasing.md` und `docs/examples/` duerfen keine interne Build-Pfad-Nutzung wie `./build/cmake-xray` voraussetzen und beschreiben Release-Artefakte, Container oder installierte Binary-Pfade als regulaere Nutzerwege; `docs/performance.md` ist als Entwickler- und Messdokument ausgenommen, muss interne Build-Pfade aber als reproduzierbare Messkommandos kennzeichnen und darf sie nicht als normale Nutzeraufrufe darstellen
 - Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt, den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht und gegen `docs/report-json.schema.json` validiert
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
-- Validierung, dass `docs/examples/` keine driftenden Kopien enthaelt: Markdown-, HTML-, JSON- und DOT-Beispiele werden entweder aus den validierten Goldens generiert und in CI gegen den aktuellen Generatorausgang verglichen oder ueber ein CTest-Gate wie `tests/validate_doc_examples.py` und `docs/examples/manifest.txt` selbst in die jeweiligen JSON-Schema-, DOT-Syntax-, HTML-Struktur- und Golden-Manifeste aufgenommen
+- Validierung, dass `docs/examples/` keine driftenden Kopien enthaelt: Markdown-, HTML-, JSON- und DOT-Beispiele werden entweder aus den validierten Goldens generiert und in CI gegen den aktuellen Generatorausgang verglichen oder ueber ein CTest-Gate wie `tests/validate_doc_examples.py` und `docs/examples/manifest.txt` selbst validiert; Markdown-Beispiele brauchen dabei einen expliziten Bytevergleich gegen Golden-Outputs oder ein eigenes Markdown-/Doc-Example-Manifest, waehrend JSON, DOT und HTML zusaetzlich in die jeweiligen Schema-, Syntax- und Struktur-Manifeste aufgenommen werden
 
 **Ergebnis**: M5 ist nicht nur implementiert, sondern ueber Beispiele, Referenzdaten und Release-Dokumentation nachvollziehbar abnehmbar.
 
@@ -111,6 +111,7 @@ Tests und Abnahme muessen mindestens abdecken:
 - `tests/e2e/testdata/m5/json-reports/manifest.txt`
 - `tests/e2e/testdata/m5/dot-reports/manifest.txt`
 - `tests/e2e/testdata/m5/html-reports/manifest.txt`
+- `tests/e2e/testdata/m5/markdown-reports/manifest.txt` oder ein gleichwertiger Markdown-Eintrag in `docs/examples/manifest.txt`
 - `tests/validate_dot_reports.py`
 - `tests/validate_html_reports.py`
 - `tests/validate_verbosity_reports.py`
@@ -154,10 +155,12 @@ Tests und Abnahme muessen mindestens abdecken:
 - `--verbose --output <path>` ist fuer Markdown, HTML, JSON und DOT mit leerem stdout und Zusatzdiagnostik nur auf `stderr` golden-getestet
 - JSON- und DOT-Goldens entsprechen `docs/report-json.md` bzw. `docs/report-dot.md` sowie den validierten Schema-/Syntax-Gates
 - Release-Scope und Versionierung sind dokumentiert und in Smoke/Dry-Run nachweislich konsistent
+- Root-`CMakeLists.txt` meldet fuer M5 exakt `project(... VERSION 1.2.0)`; ein verbleibender `1.1.0`-Basiswert ist nicht abnahmefaehig
 - Plattformstatus fuer Linux, macOS und Windows ist nach AP 1.7 dokumentiert und ueber Required Checks oder validierte Smoke-Reports belegt; rote, fehlende oder freiwillige macOS-/Windows-Gates fuehren zu `known_limited`, nicht zu `validated_smoke`
 - README, Guide, Releasing-Doku und Beispiele beschreiben Nutzeraufrufe ohne interne Build-Pfade wie `./build/cmake-xray`; `docs/performance.md` ist als Entwickler- und Messdokument ausgenommen, muss interne Build-Pfade aber als reproduzierbare Messkommandos kennzeichnen und darf sie nicht als normale Nutzeraufrufe darstellen
 - File-API-Performance-Baseline ist ueber versionierte oder reproduzierbar generierte File-API-Reply-Fixtures, `tests/reference/file-api-performance-manifest.json`, konkrete Reply-Verzeichnisse, Generator/CMake-Angaben und dokumentierte Messkommandos nachvollziehbar
 - Release-Archiv-Abnahme deckt den vollstaendigen AP-1.6-Vertrag ab: SHA-256-Sidecar, Archivinhalt, Binary-Checksumme und reproduzierbarer Doppelbuild sind automatisiert geprueft
+- Markdown-Beispiele in `docs/examples/` sind ueber Generatorvergleich, Bytevergleich gegen Goldens oder ein explizites Markdown-/Doc-Example-Manifest gegen Drift abgesichert
 - `--top`-, `changed_file_source`-, und Provenienzregeln sind in Goldens und Schema-Tests belegt
 - `release`-, `releasing`- und `quality`-Dokumentation sind auf den finalen M5-Ablauf abgeglichen
 
