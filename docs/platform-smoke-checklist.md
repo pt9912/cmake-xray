@@ -92,7 +92,14 @@ Der Smoke faehrt alle Pflichtkommandos aus
 `--output`-Smokes aus Tranche C.1 mit nativen Windows-Pfaden ohne
 MSYS-Magie ab (`msys_path_mode=native_powershell`).
 
-### Ninja-/clang-cl-Generator-Smoke (Tranche D.2)
+### Optionaler lokaler Ninja-/clang-cl-Smoke
+
+Ein zweiter Generator-Pfad neben dem Visual-Studio-Default war als
+Tranche D.2 vorgesehen, wurde aber zurueckgezogen, weil GHA-windows-
+latest ohne vcvars `mt.exe` nicht findet (`CMAKE_MT-NOTFOUND`) und der
+Workaround eine Drittanbieter-Action oder brittle vcvars-Pfade
+erfordert. Lokal mit Visual-Studio-Developer-Prompt funktioniert er
+trotzdem:
 
 ```bash
 cmake -B build-ninja -G Ninja -DCMAKE_BUILD_TYPE=Release \
@@ -100,11 +107,6 @@ cmake -B build-ninja -G Ninja -DCMAKE_BUILD_TYPE=Release \
 cmake --build build-ninja --parallel
 ./build-ninja/cmake-xray.exe --help > /dev/null
 ```
-
-Zweite Build-Variante neben dem Visual-Studio-Multi-Config-Default; ein
-Generator-Bruch (z. B. `add_compile_definitions`-Drift, fehlende
-Ninja-Dependency-Edge) faellt hier auf, ohne dass der MSVC-Default-Build
-betroffen ware.
 
 ## Manueller Smoke-Report (optional)
 

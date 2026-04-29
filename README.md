@@ -68,10 +68,10 @@ Linux ist die einzige offizielle Releaseplattform; die nativen
 macOS-/Windows-Jobs fahren via `ctest` bereits die Atomic-Replace- und
 CLI-Pflicht-Smokes (Tranchen B und C.1), die UNC/Extended-Length-
 Adaptertests (C.2) und auf Windows zusaetzlich den PowerShell-Pflicht-
-Smoke (D.1) plus Ninja-Generator-Smoke (D.2). `known_limited` bleibt
-bestehen, bis externe Branch-Protection den jeweiligen `Native (...)`-
-Check als Required Check verankert und ein gruener CI-Lauf auf den
-Plattform-Runnern auditiert ist. Detaillierte Gate-Erklaerungen,
+Smoke (D.1). `known_limited` bleibt bestehen, bis externe
+Branch-Protection den jeweiligen `Native (...)`-Check als Required
+Check verankert und ein gruener CI-Lauf auf den Plattform-Runnern
+auditiert ist. Detaillierte Gate-Erklaerungen,
 Required-Check-Namen und die Atomic-Replace-Matrix stehen in
 [docs/quality.md](./docs/quality.md) "Plattformstatus (AP M5-1.7)";
 Release- und Preview-Grenzen in [docs/releasing.md](./docs/releasing.md)

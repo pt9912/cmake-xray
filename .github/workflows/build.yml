@@ -154,19 +154,3 @@ jobs:
         if: matrix.name == 'windows-x86_64'
         shell: pwsh
         run: pwsh -File scripts/platform-smoke.ps1 -Binary build/Release/cmake-xray.exe
-
-      - name: Ninja generator smoke (Windows only)
-        # AP M5-1.7 Tranche D.1+D.2: zweite Build-Variante neben dem
-        # Visual-Studio-Multi-Config-Default. Ninja + clang-cl ist in
-        # GHA-windows-latest direkt verfuegbar (LLVM/Ninja praeinstalliert,
-        # kein vcvars-Setup noetig). Smoke laeuft als sequentieller
-        # Configure+Build aus und ruft die so gebaute Binary mit --help
-        # auf, damit ein Generator-Bruch sichtbar wird.
-        if: matrix.name == 'windows-x86_64'
-        shell: bash
-        run: |
-          set -eu
-          cmake -B build-ninja -G Ninja -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
-          cmake --build build-ninja --parallel
-          ./build-ninja/cmake-xray.exe --help > /dev/null

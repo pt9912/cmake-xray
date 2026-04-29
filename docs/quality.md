@@ -276,7 +276,7 @@ Aktueller Stand nach Abschluss von AP 1.7 (alle Tranchen A–D ausgeliefert):
 |---|---|---|---|
 | Linux x86_64 | `supported` | `Native (linux-x86_64)` plus die Docker-Gates oben | offizielle M5-Releaseplattform; Atomic-Replace-/CLI-Pflicht-Smokes laufen ueber bestehende E2E-Suites |
 | macOS arm64 | `known_limited` | `Native (macos-arm64)` | `ctest` faehrt `xray_tests` (inkl. Atomic-Replace-Tests aus B und UNC/Extended-Length-Tests aus C.2) plus die E2E-Suites `e2e_binary_smoke`/`_artifacts`/`_verbosity` (inkl. der `--output`-Pflicht-Smokes aus C.1). Status bleibt `known_limited`, weil die Branch-Protection den Required Check noch nicht versioniert verankert hat und ein gruener CI-Lauf auf macos-latest noch nicht auditiert ist |
-| Windows x86_64 | `known_limited` | `Native (windows-x86_64)` plus PowerShell-Smoke (D.1) und Ninja-/clang-cl-Smoke (D.2) | `ctest` faehrt dieselben Pflicht-Suites wie macOS; zusaetzlich laeuft `scripts/platform-smoke.ps1` als konvertierungsfreier `native_powershell`-Pfad und ein Ninja-/clang-cl-Smoke als zweite Build-Variante. Status bleibt `known_limited` aus denselben externen Gruenden wie macOS (Branch-Protection plus Audit) |
+| Windows x86_64 | `known_limited` | `Native (windows-x86_64)` plus PowerShell-Smoke (D.1) | `ctest` faehrt dieselben Pflicht-Suites wie macOS; zusaetzlich laeuft `scripts/platform-smoke.ps1` als konvertierungsfreier `native_powershell`-Pfad. Status bleibt `known_limited` aus denselben externen Gruenden wie macOS (Branch-Protection plus Audit) |
 
 Die Required-Check-Namen sind in
 [docs/plan-M5-1-7.md](./plan-M5-1-7.md) "Plattformstatus-Vertrag" verbindlich
@@ -372,12 +372,15 @@ offiziellen Plattformstatus zu aendern:
   MSYS-Bash-Pfad. Der Smoke laeuft im `Native (windows-x86_64)`-Job nach
   `ctest` und treibt alle Pflichtkommandos plus `--output`-Smokes mit
   nativen Windows-Pfaden, ohne dass MSYS dazwischensteht.
-- **D.2 — Ninja-/clang-cl-Generator-Smoke**: zweite Build-Variante neben
-  dem Visual-Studio-Multi-Config-Default. Konfiguriert `cmake -G Ninja`
-  mit `clang-cl` (in GHA-windows-latest direkt verfuegbar), baut und ruft
-  die so erzeugte Binary mit `--help` auf. Generator-Bruechige Aenderungen
-  (z. B. fehlende Ninja-Dependency-Edge) werden so gefangen, ohne dass der
-  MSVC-Default-Build betroffen ware.
+- **D.2 — zurueckgezogen**: ein zweiter Ninja-/clang-cl-Build-Pfad neben
+  dem Visual-Studio-Default war als optionale Haertung vorgesehen.
+  Erstkontakt auf GHA-windows-latest scheiterte an `CMAKE_MT-NOTFOUND`
+  (mt.exe ohne vcvars-Setup), und ein Workaround haette entweder eine
+  Drittanbieter-Action (`ilammy/msvc-dev-cmd`) oder eine brittle
+  vcvars-Pfad-Hardcoding gebraucht. Da der VS-Multi-Config-Default-Build
+  im selben Job durchlaeuft und die PowerShell-Smoke (D.1) eine
+  generatorunabhaengige Binary-Verifikation liefert, wurde D.2
+  plan-konform ausgelassen.
 - **D.3 — zurueckgezogen**: ein zusaetzlicher Intel-`macos-13`-Smoke war
   in der Plan-Klausel "falls arm64 nicht repraesentativ genug ist"
   konditional vorgesehen; das Repraesentativitaetsproblem ist heute

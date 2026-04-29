@@ -199,9 +199,9 @@ AP 1.7 hat die workflow-internen Voraussetzungen voll geliefert: `ctest`
 fuehrt auf der Native-Matrix die Atomic-Replace-Tests (B) und die
 CLI-Pflicht-Smokes inklusive `--output` (C.1) aus, plus die
 Adapter-Tests fuer UNC/Extended-Length (C.2) und auf Windows zusaetzlich
-`scripts/platform-smoke.ps1` (D.1) und den Ninja-/clang-cl-Smoke (D.2).
-Beide externen Bedingungen sind aber Repo-Konfiguration bzw. Run-Audit;
-der heutige Stand bleibt deshalb `known_limited`. Das Plattformstatus-Vokabular und die Required-Check-
+`scripts/platform-smoke.ps1` (D.1). Beide externen Bedingungen sind aber
+Repo-Konfiguration bzw. Run-Audit; der heutige Stand bleibt deshalb
+`known_limited`. Das Plattformstatus-Vokabular und die Required-Check-
 Namen sind in [docs/plan-M5-1-7.md](./plan-M5-1-7.md) verbindlich
 festgelegt; per-Adapter-Coverage und Atomic-Replace-Matrix in
 [docs/quality.md](./quality.md) "Plattformstatus (AP M5-1.7)".
@@ -233,7 +233,7 @@ festgelegt; per-Adapter-Coverage und Atomic-Replace-Matrix in
   `e2e_binary_artifacts` (mit den `--output`-Smokes aus C.1) und
   `e2e_binary_verbosity`). Windows fuegt `scripts/platform-smoke.ps1`
   (D.1) als konvertierungsfreien `native_powershell`-Pflichtmodus
-  hinzu sowie einen Ninja-/clang-cl-Generator-Smoke (D.2). Der
+  hinzu. Der
   `known_limited`-Status haengt deshalb nur noch an zwei *externen*
   Bedingungen: die Branch-Protection muss den jeweiligen
   `Native (...)`-Check als Required Check verankern, und ein gruener
