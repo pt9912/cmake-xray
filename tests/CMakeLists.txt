@@ -300,3 +300,16 @@ add_test(
             --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/console_quiet_broken_sample.txt
 )
 set_tests_properties(verbosity_manifest_validation_rejects_broken_sample PROPERTIES WILL_FAIL TRUE)
+
+# AP M5-1.8 A.2: doc-examples drift gate. plan-M5-1-8.md
+# "Validierung, dass docs/examples/ keine driftenden Kopien enthaelt"
+# verlangt einen verbindlichen CI-Pfad gegen Drift in docs/examples/.
+# tests/validate_doc_examples.py prueft Manifest-Paritaet, SHA-256-
+# Stabilitaet und ruft fuer json/dot/html zusaetzlich die jeweiligen
+# Format-Validatoren auf.
+add_test(
+    NAME doc_examples_validation
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_doc_examples.py
+            --repo-root ${PROJECT_SOURCE_DIR}
+)

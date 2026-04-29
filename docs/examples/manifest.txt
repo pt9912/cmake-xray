@@ -1,0 +1,33 @@
+# Manifest of cmake-xray docs/examples/ files (AP M5-1.8 A.2).
+#
+# Each non-comment, non-blank line names exactly one example file in this
+# directory followed by its SHA-256 hash, separated by whitespace (the
+# `sha256sum` output convention). tests/validate_doc_examples.py is the
+# CTest-registered drift gate (`doc_examples_validation`):
+#   1. asserts manifest entries match directory contents (no extra files,
+#      no missing entries),
+#   2. recomputes the SHA-256 of each example and verifies it matches the
+#      manifest hash byte-for-byte,
+#   3. runs the per-format validator (JSON via tests/validate_json_schema.py
+#      against docs/report-json.schema.json, DOT via
+#      tests/validate_dot_reports.py, HTML via tests/validate_html_reports.py)
+#      where applicable.
+#
+# Regenerate the hashes when an example is intentionally refreshed:
+#
+#   ( cd docs/examples && sha256sum * ) > docs/examples/manifest.txt.new
+#
+# Then prepend this header back to manifest.txt.new and review the diff.
+
+e6a889aa56a285fee82e074ec32df524e31786f46604f88a68eee5259685cb6f  analyze-console-targets.txt
+8f9697d8e81c0323a606039b4451bb076f661227a7ad4102b37bd43f46a47ac0  analyze-console.txt
+33fc7bf4cec2f6d05867edb2c2ae10f172ba62a23ecd887420c77c3e35d91b3b  analyze-report.html
+a7e71b993a4aa8a0fbfd810980d15e4eab88bbf3a0932b0fd1d3565e768b5314  analyze-report.md
+66d40d5cc59aea73ae4fa1696c33655fc197c71b8a58953824dd73595113d048  analyze-report-targets.html
+3114ed65d18ffe8027e44f6ad3b444d5c3f13e5f21821233dba01567de570657  analyze-report-targets.md
+40a33df71458e7453b3ea35809f36151d1d4c7411f48f601e8e77568d4a36205  impact-console-targets.txt
+2c1724589d6539daad31a574f2fb6c66382187e75f91994a8ed3115db4b38c37  impact-console.txt
+6fa2dcdfe8e7863df68c28be87e1dfbbb0afd51e0da69834285ac2265a52e602  impact-report.html
+0db7b33e12933aaa1dcac4f5232b7f8e19dafaac94e1006fb7c08e7161c0de9d  impact-report.md
+2aa3fdd44ced87499a32150f4e2dac939ecbe409cc4c55366ccce0c3ca6eda2c  impact-report-targets.html
+1e0202582e1c719303499be39fdff9a3998bfa27b10d23668dd72eeeb93795e7  impact-report-targets.md
