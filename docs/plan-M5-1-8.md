@@ -111,6 +111,9 @@ Tests und Abnahme muessen mindestens abdecken:
 - `tests/e2e/testdata/m5/json-reports/manifest.txt`
 - `tests/e2e/testdata/m5/dot-reports/manifest.txt`
 - `tests/e2e/testdata/m5/html-reports/manifest.txt`
+- `tests/validate_dot_reports.py`
+- `tests/validate_html_reports.py`
+- `tests/validate_verbosity_reports.py`
 - `tests/reference/generate_reference_projects.py`
 - `tests/reference/file-api-performance-manifest.json`
 - `tests/reference/scale_*/build/.cmake/api/v1/reply/`, falls AP 1.8 versionierte Reply-Fixtures statt rein reproduzierbarer Generierung waehlt
@@ -122,26 +125,31 @@ Tests und Abnahme muessen mindestens abdecken:
 - `tests/hexagon/test_project_analyzer.cpp`
 - `tests/hexagon/test_impact_analyzer.cpp`
 - `tests/release/test_release_dry_run.sh`
+- `tests/release/test_release_archive_repro.sh`
+- `tests/release/test_validate_release_tag.sh`
+- `scripts/build-release-archive.sh`
 - `scripts/release-dry-run.sh`
+- `scripts/validate-release-tag.sh`
 - `.github/workflows/release.yml`
 - `.github/workflows/test.yml`
 - `.github/workflows/build.yml`
 
 ## Implementierungsreihenfolge
 
-1. Referenzbeispiele und Formatdokumentation abschliessen
-2. Dokumentation- und Changelog-Aktualisierung auf aktuellen M5-Vertrag bringen
-3. E2E- und Adapter-Goldens konsolidieren, inklusive Sonderzeichen-, Top-Limit- und Atomic-Writer-Szenarien
-4. CLI-Goldens fuer Formatwahl, `--output`, `--quiet`, `--verbose` und `--version` finalisieren
-5. Release- und Plattform-Tests finalisieren und Smoke-/Pruefungsartefakte einbinden
-6. Release-Dry-Run- und Packaging-Nachweise verifizieren
-7. Abnahmedokumente und `docs/quality.md` auf finalen Status aktualisieren
+1. E2E- und Adapter-Goldens konsolidieren, inklusive Sonderzeichen-, Top-Limit- und Atomic-Writer-Szenarien
+2. Validator- und Golden-Manifeste finalisieren, inklusive JSON, DOT, HTML, Verbosity und `docs/examples/`
+3. Referenzbeispiele aus Goldens generieren oder an die Manifeste anbinden und Formatdokumentation abschliessen
+4. Dokumentation- und Changelog-Aktualisierung auf aktuellen M5-Vertrag bringen
+5. CLI-Goldens fuer Formatwahl, `--output`, `--quiet`, `--verbose` und `--version` finalisieren
+6. Release- und Plattform-Tests finalisieren und Smoke-/Pruefungsartefakte einbinden
+7. Release-Dry-Run- und Packaging-Nachweise verifizieren
+8. Abnahmedokumente und `docs/quality.md` auf finalen Status aktualisieren
 
 ## Abnahmekriterien
 
 - Alle in diesem AP genannten Format- und Dokumentationsfälle sind mit Tests oder Goldens belegt
 - Neue Formatausgaben sind in Dokumentation und Praxisbeispielen verlinkt, reproduzierbar und ueber dieselben Validierungsmanifeste wie Goldens abgesichert
-- `--output` funktioniert mit `markdown`, `html`, `json`, `dot` auf allen Plattformen als Atomic-Write inkl. Fehlererhaltung
+- `--output` funktioniert auf Linux mit `markdown`, `html`, `json`, `dot` als Atomic-Write inkl. Fehlererhaltung; fuer macOS und Windows gilt derselbe Nachweis nur bei Plattformstatus `validated_smoke`, andernfalls muessen die fehlenden oder roten Atomic-Write-/CLI-Gates als konkrete `known_limited`-Einschraenkung dokumentiert sein
 - Quiet-/Verbose-Verhalten ist in CLI-Goldens für alle Ausgabeformate stabil und regressionsgesichert
 - `--verbose --output <path>` ist fuer Markdown, HTML, JSON und DOT mit leerem stdout und Zusatzdiagnostik nur auf `stderr` golden-getestet
 - JSON- und DOT-Goldens entsprechen `docs/report-json.md` bzw. `docs/report-dot.md` sowie den validierten Schema-/Syntax-Gates

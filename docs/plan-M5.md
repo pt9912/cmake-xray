@@ -461,7 +461,7 @@ Empfohlene Reihenfolge:
 3. DOT-Adapter auf Basis der vorhandenen Ergebnisdaten umsetzen
 4. HTML-Adapter umsetzen
 5. CLI-Formatwahl und quiet/verbose final verdrahten
-6. Golden-Outputs und Beispiele fuer neue Formate erzeugen
+6. Golden-Outputs, Validator-Manifeste und Beispiel-Gates finalisieren; Beispiele erst danach aus Goldens generieren oder an Manifeste anbinden
 7. Release-Workflow und Container-Verifikation absichern
 8. macOS-/Windows-Smokes einrichten oder dokumentiert ausfuehren
 9. README, Guide, Releasing, Quality und Changelog finalisieren
