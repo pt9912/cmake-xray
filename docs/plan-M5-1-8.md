@@ -6,7 +6,7 @@ Die neuen Formate und Release-Pfade sind nur dann nutzbar, wenn Beispiele, Golde
 
 M5 aktualisiert mindestens:
 
-- Versionsquellen fuer `v1.2.0`: Root-`CMakeLists.txt` fuer die numerische Projektversion sowie eine kompilierte oder generierte App-/Package-Version-Quelle wie `XRAY_APP_VERSION` oder `XRAY_VERSION_SUFFIX`, die von `ApplicationInfo` und Paketmetadaten fuer `--version` inklusive Prerelease-Suffix verwendet wird
+- Versionsquellen fuer `v1.2.0`: Root-`CMakeLists.txt` bleibt numerische Projektversion; Release-Builds verwenden `XRAY_APP_VERSION` aus dem validierten Tag ohne fuehrendes `v` als kanonische App-/Package-Version fuer `ApplicationInfo`, Paketmetadaten und `--version`, waehrend `XRAY_VERSION_SUFFIX` nur fuer lokale oder nicht veroeffentlichende Builds zulaessig ist und gleichzeitiges Setzen beider Quellen fail-fast abbricht
 - `docs/examples/` mit repraesentativen Markdown-, HTML-, JSON- und DOT-Ausgaben
 - `README.md` mit Formatwahl, quiet/verbose und Release-/Container-Nutzung
 - `docs/guide.md` mit praktischen Aufrufen fuer alle M5-Formate
@@ -51,12 +51,14 @@ Tests und Abnahme muessen mindestens abdecken:
 - Smoke-Test fuer Docker-Runtime-Image
 - Smoke-Test fuer Linux-Release-Artefakt nach Entpacken
 - Pruefsummen-Test, dass die SHA-256-Datei existiert, den richtigen Linux-Archivnamen referenziert und gegen das erzeugte Archiv erfolgreich validiert
-- Versionscheck, dass Root-`CMakeLists.txt` die numerische Basisversion meldet und `cmake-xray --version`, die kompilierte bzw. generierte `ApplicationInfo`-Version, App-/Package-Version-Quelle und Release-Tag dieselbe veroeffentlichte Semver-Version ohne fuehrendes `v` melden, inklusive Prerelease-Suffix bei Tags wie `v1.2.0-rc.1`
+- Versionscheck, dass Root-`CMakeLists.txt` die numerische Basisversion meldet, Release-Builds `XRAY_APP_VERSION` aus dem validierten Tag ohne fuehrendes `v` verwenden, `XRAY_VERSION_SUFFIX` nur fuer lokale oder nicht veroeffentlichende Builds zulaessig ist, gleichzeitiges Setzen beider Quellen fail-fast abbricht und `cmake-xray --version`, die kompilierte bzw. generierte `ApplicationInfo`-Version, App-/Package-Version-Quelle und Release-Tag dieselbe veroeffentlichte Semver-Version ohne fuehrendes `v` melden, inklusive Prerelease-Suffix bei Tags wie `v1.2.0-rc.1`
 - CLI-Test, dass `cmake-xray --version` ohne Subcommand funktioniert, ausschliesslich die App-Version ohne fuehrendes `v` nach stdout schreibt und keine Analyse-/Report-Pfade initialisiert
 - automatisierter Release-Test oder Workflow-Schritt fuer erlaubte Semver-Tags, Prerelease-Tags und Ablehnung ungueltiger Tags
 - automatisierter Release-Dry-Run fuer Draft-Release, OCI-Image-Publish und finale oeffentliche Release-Publikation als letzten Schritt: `scripts/release-dry-run.sh` und ein gleichnamiger bzw. eindeutig benannter Workflow-Job muessen GitHub-Schritte mit einem Fake-Publisher samt Assertions fuer Zustandsuebergaenge und Reihenfolge sowie OCI-Schritte mit lokaler Test-Registry fuer Tagging, `latest`-Regel, Push und Manifest-Pruefung ausfuehren, ohne externe Veroeffentlichung
 - dokumentierter manueller Dry-Run nur fuer Recovery-Pfade, die echte externe Publish-Zustaende in GitHub Releases oder GHCR voraussetzen
 - Performance-Messung fuer den CMake-File-API-Pfad auf den bestehenden Referenzgroessen und Dokumentation der M5-Baseline in `docs/performance.md`
+- Plattform-Abnahme fuer Linux, macOS und Windows gemaess AP 1.7: jede Plattform ist in `docs/quality.md` und `docs/releasing.md` mit Status `supported`, `validated_smoke` oder `known_limited` dokumentiert; macOS und Windows erreichen `validated_smoke` nur mit verpflichtendem CI-Required-Check oder schema-validiertem Smoke-Report fuer Build, Atomic-Replace und normative CLI-Smokes, andernfalls werden konkrete Einschraenkungen als `known_limited` dokumentiert
+- Doku-Gate fuer Nutzeraufrufe: `README.md`, `docs/guide.md`, `docs/releasing.md` und `docs/examples/` duerfen keine interne Build-Pfad-Nutzung wie `./build/cmake-xray` voraussetzen und beschreiben Release-Artefakte, Container oder installierte Binary-Pfade als regulaere Nutzerwege
 - Validierung, dass JSON syntaktisch gueltig ist, `format_version` enthaelt, den Pflichtfeld-, Typ-, Enum-, Nullability- und Array-Regeln aus `docs/report-json.md` entspricht und gegen `docs/report-json.schema.json` validiert
 - Validierung, dass DOT syntaktisch durch Graphviz `dot -Tsvg` oder einen gleichwertigen DOT-Parser akzeptiert wird und Escaping-Goldens korrekt verarbeitet werden
 
@@ -129,6 +131,8 @@ Tests und Abnahme muessen mindestens abdecken:
 - Quiet-/Verbose-Verhalten ist in CLI-Goldens für alle Ausgabeformate stabil und regressionsgesichert
 - JSON- und DOT-Goldens entsprechen `docs/report-json.md` bzw. `docs/report-dot.md` sowie den validierten Schema-/Syntax-Gates
 - Release-Scope und Versionierung sind dokumentiert und in Smoke/Dry-Run nachweislich konsistent
+- Plattformstatus fuer Linux, macOS und Windows ist nach AP 1.7 dokumentiert und ueber Required Checks oder validierte Smoke-Reports belegt; rote, fehlende oder freiwillige macOS-/Windows-Gates fuehren zu `known_limited`, nicht zu `validated_smoke`
+- README, Guide, Releasing-Doku und Beispiele beschreiben Nutzeraufrufe ohne interne Build-Pfade wie `./build/cmake-xray`
 - `--top`-, `changed_file_source`-, und Provenienzregeln sind in Goldens und Schema-Tests belegt
 - `release`-, `releasing`- und `quality`-Dokumentation sind auf den finalen M5-Ablauf abgeglichen
 
