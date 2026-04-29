@@ -671,7 +671,11 @@ offene Anforderung. Liefer-Stand zum Zeitpunkt der Tranche-A-Vorbereitung
 
 - Tranche A ausgeliefert in commit `815959e` ("feat: deliver M5 AP 1.7 Tranche A toolchain-minimums fail-fast gate"): `tests/platform/toolchain-minimums.json` als Single Source, `cmake/ToolchainMinimums.cmake` als Configure-Time-Gate, Toolchain-Logging-Step in `build.yml` vor `Configure CMake`, Plattformstatus-Tabelle und Mindestversionen in `docs/quality.md`. Vorbereitende Plan-Verfeinerung in commit `470857b` ("docs: refine M5 AP 1.7 plan with explicit Required Check names and validator contracts").
 - Tranche B ausgeliefert in commit `0cb414f` ("feat: deliver M5 AP 1.7 Tranche B atomic-replace platform contract pinning"): expliziter Mock-Test "no preemptive delete of the target" und Host-Test "replace_existing preserves target bytes when the temp is missing" in `tests/adapters/test_atomic_report_writer.cpp` (Matrix-Items 4 und 7); neue Sektion "Atomic-Replace-Matrix (AP M5-1.7 Tranche B)" in `docs/quality.md` mit Vertragsuebersicht und Plattform-Coverage. macOS/Windows bleiben `known_limited`, weil CLI-Pflicht-Smokes in C folgen.
-- Tranche C — offen.
+- Tranche A-Folgehaertung in commit `541382f` ("fix: harden M5 AP 1.7 Tranche A follow-ups before Tranche C"): `cmake/ToolchainMinimums.cmake` nutzt `CMAKE_CURRENT_LIST_DIR` (subprojection-fest), drei neue CTest-Smokes (`toolchain_minimums_accepts_current_gnu` plus zwei `WILL_FAIL`-Negative) im Skriptmodus, und expliziter `pip install cmake==3.30.5`-Step pro Native-Job in `build.yml` plus Doku-Eintrag in `docs/quality.md`.
+- Tranche C.1 ausgeliefert in commit `f725c68` ("feat: deliver M5 AP 1.7 Tranche C.1 --output Pflicht-Smokes for json/dot/html"): sechs neue `--output`-Smokes in `tests/e2e/run_e2e_artifacts.sh` (analyze/impact x json/dot/html) plus drei Helfer in `tests/e2e/run_e2e_lib.sh` (`assert_output_file_writes_empty_stdout`, `assert_dot_file_equals_file`, `assert_html_file_validates`). 18 neue Assertions auf der echten Binary, keine neuen Goldens.
+- Tranche C.2 — offen (synthetische UNC- und Extended-Length-Pfad-Pflicht-Tests).
+- Tranche C.3 — offen (`supported`/`validated_smoke`/`known_limited`-Klassifikation in README, releasing.md, guide.md).
+- Tranche C.4 — offen (Release-Asset-Allowlist-Dry-Run-Negativtest fuer macOS/Windows-Archiv).
 - Tranche D — offen, nur nach gruener A bis C zulaessig.
 
 Backfill-Regel: Sobald eine Tranche ausgeliefert ist, wird der zugehoerige
