@@ -319,3 +319,25 @@ add_test(
             --repo-root ${PROJECT_SOURCE_DIR}
             --binary $<TARGET_FILE:cmake-xray>
 )
+
+# AP M5-1.8 A.5 follow-up: host-portability gate for the docs/examples
+# drift check. Runs scripts/verify-doc-examples-portability.sh which
+# bind-mounts the repo at /alt-mount instead of /workspace inside the
+# cmake-xray:test image; the binary's DOT unique_key stdout then
+# carries the /alt-mount prefix, divergent from the committed file's
+# /workspace/... bytes. validate_doc_examples' normaliser must reduce
+# both sides to HOSTPATH for the diff to pass. The smoke skips
+# cleanly when docker is unavailable (e.g. inside the
+# `docker build --target test` ctest run) and greens whenever a host
+# with docker exercises ctest manually -- mirroring the
+# release_dry_run pattern. This is the gate that would have caught
+# GHA Build run #25123025175 before push.
+if(BASH_PROGRAM)
+    add_test(
+        NAME doc_examples_host_portability
+        COMMAND bash ${PROJECT_SOURCE_DIR}/scripts/verify-doc-examples-portability.sh
+    )
+    set_tests_properties(doc_examples_host_portability PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
+endif()

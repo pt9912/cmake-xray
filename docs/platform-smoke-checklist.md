@@ -108,6 +108,31 @@ cmake --build build-ninja --parallel
 ./build-ninja/cmake-xray.exe --help > /dev/null
 ```
 
+## docs/examples Host-Portabilitaet (vor "lokal gruen")
+
+`docs/examples/` enthaelt DOT-Beispiele, die absolute Source-/Build-
+Pfade in `unique_key`-Attributen einbetten. Lokale Test-Laeufe via
+`docker build --target test` arbeiten unter `/workspace/...` und
+maskieren damit Host-Pfad-Drift, die auf einem CI-Runner mit
+`/home/runner/...` (oder einem anderen Host-Layout) auftaucht.
+
+Vor jeder "lokal gruen"-Aussage zur `docs/examples`-Drift einmal
+explizit unter einem alternativen Mount-Pfad pruefen:
+
+```bash
+bash scripts/verify-doc-examples-portability.sh
+```
+
+Das Skript baut `cmake-xray:test`, mountet das Repo unter
+`/alt-mount` (statt `/workspace`) und faehrt
+`tests/validate_doc_examples.py --binary ...` mit dieser Pfad-
+Geometrie. Wenn die DOT-`unique_key`-Normalisierung im Validator
+korrekt ist, geht der Lauf gruen trotz divergentem Praefix; wenn
+nicht, bricht er mit derselben Fehlermeldung ab, die ein nativer
+GHA-Linux-Lauf produzieren wuerde. Der CTest-Eintrag
+`doc_examples_host_portability` ruft dasselbe Skript auf und
+skippt sauber, wenn `ctest` ohne Host-Docker laeuft.
+
 ## Manueller Smoke-Report (optional)
 
 Ein automatisierter Smoke-Report-Verifier ist bewusst nicht Teil von AP 1.7
