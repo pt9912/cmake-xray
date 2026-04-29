@@ -670,7 +670,7 @@ offene Anforderung. Liefer-Stand zum Zeitpunkt der Tranche-A-Vorbereitung
 (2026-04-29):
 
 - Tranche A ausgeliefert in commit `815959e` ("feat: deliver M5 AP 1.7 Tranche A toolchain-minimums fail-fast gate"): `tests/platform/toolchain-minimums.json` als Single Source, `cmake/ToolchainMinimums.cmake` als Configure-Time-Gate, Toolchain-Logging-Step in `build.yml` vor `Configure CMake`, Plattformstatus-Tabelle und Mindestversionen in `docs/quality.md`. Vorbereitende Plan-Verfeinerung in commit `470857b` ("docs: refine M5 AP 1.7 plan with explicit Required Check names and validator contracts").
-- Tranche B — offen.
+- Tranche B ausgeliefert in commit `0cb414f` ("feat: deliver M5 AP 1.7 Tranche B atomic-replace platform contract pinning"): expliziter Mock-Test "no preemptive delete of the target" und Host-Test "replace_existing preserves target bytes when the temp is missing" in `tests/adapters/test_atomic_report_writer.cpp` (Matrix-Items 4 und 7); neue Sektion "Atomic-Replace-Matrix (AP M5-1.7 Tranche B)" in `docs/quality.md` mit Vertragsuebersicht und Plattform-Coverage. macOS/Windows bleiben `known_limited`, weil CLI-Pflicht-Smokes in C folgen.
 - Tranche C — offen.
 - Tranche D — offen, nur nach gruener A bis C zulaessig.
 
