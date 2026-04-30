@@ -276,6 +276,19 @@ Teil-Output):
 - `"compare: project identity differs (baseline='<bp>', current='<cp>'); pass --allow-project-identity-drift to override (only valid for fallback_compile_database_fingerprint)"`
   bei abweichender `project_identity` ohne Drift-Option.
 
+Validierungsreihenfolge:
+
+1. Datei lesen.
+2. JSON parsen.
+3. `report_type` und `format_version` lesen und die
+   Kompatibilitaetsmatrix pruefen.
+4. Analyze-JSON-Schema validieren, aber die Felder
+   `inputs.project_identity` und `inputs.project_identity_source`
+   zusaetzlich fachlich pruefen, damit die spezifischen
+   `invalid project identity source`-/`project identity is empty`-
+   Fehlerphrasen erreichbar und stabil bleiben.
+5. Projektidentitaets-Source, Identitaet und Drift-Regeln pruefen.
+
 ### Atomarer Schreibvertrag
 
 `--output` fuer Compare folgt demselben atomaren Schreibvertrag wie
@@ -505,6 +518,22 @@ Vergleichswertige Felder pro Diff-Gruppe:
   Diff-Gruppen dieselbe `added`/`removed`/`changed`-Form behalten; der
   Wert ist in M6 immer ein leeres Array.
 
+Listen-Normalisierung:
+
+- Listenfelder werden vor dem `changed`-Vergleich als ungeordnete
+  Mengen behandelt und in kanonischer Reihenfolge verglichen.
+- `translation_units[].targets`: sortiert nach normalisiertem
+  Target-Identitaetsschluessel.
+- `translation_units[].diagnostics` und
+  `include_hotspots[].diagnostics`: sortiert nach
+  `(severity, code/message, normalized_location)`; gleiche Eintraege
+  werden dedupliziert.
+- `include_hotspots[].affected_translation_units`: sortiert nach
+  normalisiertem TU-Vergleichsschluessel.
+- Reine Reihenfolgeaenderungen in diesen Listen erzeugen keinen
+  `changed`-Diff und duerfen die Ausgabe-Reihenfolge nicht
+  nondeterministisch machen.
+
 Sortierung der Diff-Eintraege:
 
 - Reihenfolge der Diff-Gruppen: `added`, `removed`, `changed`.
@@ -524,8 +553,8 @@ Felder:
 | Feld | Typ | Pflicht | Werte |
 | --- | --- | --- | --- |
 | `field` | string | ja | Punkt-getrennte Pfad-Notation, z. B. `analysis_configuration.tu_thresholds.include_path_count`. |
-| `baseline_value` | string\|integer\|boolean\|null | ja | Wert in baseline. |
-| `current_value` | string\|integer\|boolean\|null | ja | Wert in current. |
+| `baseline_value` | JSON value | ja | Wert in baseline; erlaubt sind string, integer, boolean, null und Arrays dieser skalaren Werte. |
+| `current_value` | JSON value | ja | Wert in current; gleicher Typumfang wie `baseline_value`. |
 | `severity` | string | ja | `warning` in M6. |
 | `ci_policy_hint` | string | ja | `review_required` in M6. |
 
@@ -583,6 +612,10 @@ Verhalten:
   ist UND beide Berichte
   `project_identity_source=fallback_compile_database_fingerprint`
   haben UND `project_identity` sich unterscheidet.
+- Die drei Source-Path-Zaehler basieren auf demselben normalisierten,
+  deduplizierten und sortierten Source-Path-Satz wie der
+  Compile-DB-Fingerprint. Rohpfad-Duplikate oder Schreibvarianten
+  duerfen die Zaehler nicht erhoehen.
 - KEIN Abbruchgrund (in diesem speziellen Pfad).
 
 ### CLI-Fehler `incompatible_format_version`
@@ -606,8 +639,8 @@ enum class CompareDiffKind {
 
 struct CompareDiagnosticConfigurationDrift {
     std::string field;
-    JsonScalar baseline_value;  // string|integer|boolean|null
-    JsonScalar current_value;   // string|integer|boolean|null
+    JsonValue baseline_value;  // string|integer|boolean|null|array
+    JsonValue current_value;   // string|integer|boolean|null|array
     std::string severity{"warning"};
     std::string ci_policy_hint{"review_required"};
 };
@@ -874,7 +907,8 @@ Schema-Tests:
   validiert NICHT.
 - Compare-Kompatibilitaetsmatrix-Tests:
   - `(5, 5)` ist erlaubt.
-  - `(4, 5)`, `(5, 4)`, `(6, 5)` sind abgelehnt.
+  - `(4, 5)`, `(5, 4)`, `(6, 5)`, `(5, 7)` und `(7, 6)` sind
+    abgelehnt.
 
 E2E-/Golden-Tests:
 
