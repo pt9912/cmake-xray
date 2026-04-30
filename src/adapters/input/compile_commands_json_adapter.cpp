@@ -182,12 +182,14 @@ CompileDatabaseResult load_compile_database(std::string_view path) {
 
 xray::hexagon::model::BuildModelResult CompileCommandsJsonAdapter::load_build_model(
     std::string_view path) const {
-    // source=exact, no target metadata; remaining fields (target_assignments,
-    // source_root, diagnostics) are populated by CmakeFileApiAdapter in M4.
-    // Aggregate return avoids a gcov NRVO artifact on the closing brace.
-    return {xray::hexagon::model::ObservationSource::exact,
-            xray::hexagon::model::TargetMetadataStatus::not_loaded,
-            load_compile_database(path), {}, {}, {}};
+    // source=exact, no target metadata; target-graph fields stay at their
+    // not_loaded defaults because compile_commands.json carries no
+    // target-to-target relationship data.
+    return xray::hexagon::model::BuildModelResult{
+        .source = xray::hexagon::model::ObservationSource::exact,
+        .target_metadata = xray::hexagon::model::TargetMetadataStatus::not_loaded,
+        .compile_database = load_compile_database(path),
+    };
 }
 
 }  // namespace xray::adapters::input

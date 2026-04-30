@@ -1,11 +1,17 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <atomic>
+#include <cstddef>
 #include <filesystem>
+#include <fstream>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 #ifdef XRAY_HAS_LIBCAP
 #include <sys/capability.h>
@@ -13,8 +19,11 @@
 
 #include "adapters/input/cmake_file_api_adapter.h"
 #include "adapters/input/compile_commands_json_adapter.h"
+#include "hexagon/model/build_model_result.h"
 #include "hexagon/model/compile_database_result.h"
+#include "hexagon/model/diagnostic.h"
 #include "hexagon/model/observation_source.h"
+#include "hexagon/model/target_graph.h"
 #include "hexagon/services/analysis_support.h"
 
 namespace {
@@ -576,4 +585,483 @@ TEST_CASE("file api adapter produces identical results for permuted target order
         CHECK(baseline.target_assignments[i].observation_key ==
               permuted.target_assignments[i].observation_key);
     }
+}
+
+// --- M6 AP 1.1 A.3: target-graph extraction from File API replies ---
+
+namespace m6 {
+
+using xray::hexagon::model::BuildModelResult;
+using xray::hexagon::model::Diagnostic;
+using xray::hexagon::model::DiagnosticSeverity;
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraphStatus;
+
+// One dependency entry within a target reply. id=nullopt + empty_id_string=false
+// produces an object without an "id" key (a defect case).
+struct DepSpec {
+    std::optional<std::string> id;
+    bool empty_id_string{false};
+};
+
+struct TargetSpec {
+    std::string name;
+    std::string type{"STATIC_LIBRARY"};
+    std::string id;
+    std::vector<DepSpec> dependencies;
+    bool with_source{true};
+    bool omit_dependencies_field{false};
+    bool malformed_dependencies{false};
+};
+
+// Disposable on-disk fixture rooted at a unique temp directory. Tests scope
+// one builder per scenario; ~FixtureBuilder cleans up on exit.
+class FixtureBuilder {
+public:
+    explicit FixtureBuilder(const std::string& scope) {
+        static std::atomic<unsigned long long> counter{0};
+        const auto seq = counter.fetch_add(1);
+        root_ = std::filesystem::temp_directory_path() /
+                ("cmake-xray-m6-" + scope + "-" + std::to_string(seq));
+        std::error_code ec;
+        std::filesystem::remove_all(root_, ec);
+        std::filesystem::create_directories(root_);
+    }
+
+    ~FixtureBuilder() {
+        std::error_code ec;
+        std::filesystem::remove_all(root_, ec);
+    }
+
+    FixtureBuilder(const FixtureBuilder&) = delete;
+    FixtureBuilder& operator=(const FixtureBuilder&) = delete;
+
+    std::filesystem::path build_dir() const { return root_; }
+
+    std::filesystem::path commit(const std::vector<TargetSpec>& targets) {
+        const auto reply_dir = root_ / ".cmake" / "api" / "v1" / "reply";
+        std::filesystem::create_directories(reply_dir);
+
+        nlohmann::json target_refs = nlohmann::json::array();
+        for (std::size_t i = 0; i < targets.size(); ++i) {
+            const auto target_file =
+                "target-" + targets[i].name + "-" + std::to_string(i) + ".json";
+            target_refs.push_back({
+                {"name", targets[i].name},
+                {"id", targets[i].id},
+                {"directoryIndex", 0},
+                {"projectIndex", 0},
+                {"jsonFile", target_file},
+            });
+        }
+
+        nlohmann::json codemodel = {
+            {"kind", "codemodel"},
+            {"version", {{"major", 2}, {"minor", 6}}},
+            {"paths", {{"source", "/project"}, {"build", "/project/build"}}},
+            {"configurations",
+             nlohmann::json::array(
+                 {{{"name", ""},
+                   {"directories",
+                    nlohmann::json::array({{
+                        {"source", "."},
+                        {"build", "."},
+                        {"projectIndex", 0},
+                        {"childIndexes", nlohmann::json::array()},
+                        {"targetIndexes", nlohmann::json::array()},
+                    }})},
+                   {"projects",
+                    nlohmann::json::array({{
+                        {"name", "myproject"},
+                        {"directoryIndexes", nlohmann::json::array({0})},
+                        {"targetIndexes", nlohmann::json::array()},
+                    }})},
+                   {"targets", target_refs}}})},
+        };
+        write_json(reply_dir / "codemodel-v2-abc.json", codemodel);
+
+        nlohmann::json index = {
+            {"kind", "index"},
+            {"objects", nlohmann::json::array(
+                            {{{"kind", "codemodel"},
+                              {"jsonFile", "codemodel-v2-abc.json"}}})},
+        };
+        write_json(reply_dir / "index-2025-01-01T00-00-00-0000.json", index);
+
+        for (std::size_t i = 0; i < targets.size(); ++i) {
+            write_target_reply(reply_dir, targets[i], i);
+        }
+        return root_;
+    }
+
+private:
+    static void write_json(const std::filesystem::path& path,
+                           const nlohmann::json& value) {
+        std::ofstream f(path);
+        f << value.dump(2);
+    }
+
+    static void write_target_reply(const std::filesystem::path& reply_dir,
+                                   const TargetSpec& t, std::size_t i) {
+        nlohmann::json target_json = {
+            {"name", t.name},
+            {"id", t.id},
+            {"type", t.type},
+            {"paths", {{"source", "."}, {"build", "."}}},
+        };
+        if (t.with_source) {
+            target_json["sources"] = nlohmann::json::array(
+                {{{"path", "src/" + t.name + ".cpp"}, {"compileGroupIndex", 0}}});
+            target_json["compileGroups"] = nlohmann::json::array(
+                {{{"sourceIndexes", nlohmann::json::array({0})},
+                  {"language", "CXX"},
+                  {"includes", nlohmann::json::array()},
+                  {"defines", nlohmann::json::array()},
+                  {"compileCommandFragments", nlohmann::json::array()}}});
+        }
+        if (t.malformed_dependencies) {
+            target_json["dependencies"] = "not-an-array";
+        } else if (!t.omit_dependencies_field) {
+            nlohmann::json deps = nlohmann::json::array();
+            for (const auto& d : t.dependencies) {
+                nlohmann::json entry = nlohmann::json::object();
+                if (d.id.has_value()) {
+                    entry["id"] = *d.id;
+                } else if (d.empty_id_string) {
+                    entry["id"] = "";
+                }
+                deps.push_back(entry);
+            }
+            target_json["dependencies"] = deps;
+        }
+        const auto target_file =
+            "target-" + t.name + "-" + std::to_string(i) + ".json";
+        write_json(reply_dir / target_file, target_json);
+    }
+
+    std::filesystem::path root_;
+};
+
+const TargetDependency* find_edge(const std::vector<TargetDependency>& edges,
+                                  std::string_view from_uk,
+                                  std::string_view to_uk) {
+    for (const auto& e : edges) {
+        if (e.from_unique_key == from_uk && e.to_unique_key == to_uk) return &e;
+    }
+    return nullptr;
+}
+
+std::size_t count_diagnostics(const std::vector<Diagnostic>& diagnostics,
+                              DiagnosticSeverity severity,
+                              std::string_view substr) {
+    std::size_t count = 0;
+    for (const auto& d : diagnostics) {
+        if (d.severity == severity && d.message.find(substr) != std::string::npos)
+            ++count;
+    }
+    return count;
+}
+
+}  // namespace m6
+
+TEST_CASE("file api adapter: target reply without dependencies field yields loaded status with empty edges") {
+    m6::FixtureBuilder fixture("no-deps");
+    const auto build = fixture.commit({
+        {.name = "a", .id = "a::@1", .omit_dependencies_field = true},
+        {.name = "b", .id = "b::@2", .omit_dependencies_field = true},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(build.string());
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::loaded);
+    REQUIRE(result.target_graph.nodes.size() == 2);
+    CHECK(result.target_graph.edges.empty());
+    // No graph-related diagnostics expected.
+    CHECK(m6::count_diagnostics(result.diagnostics, m6::DiagnosticSeverity::warning,
+                                "duplicate target id") == 0);
+}
+
+TEST_CASE("file api adapter: fully resolved direct dependency yields loaded status and one resolved edge") {
+    m6::FixtureBuilder fixture("resolved-dep");
+    const auto build = fixture.commit({
+        {.name = "a", .id = "a::@1", .dependencies = {{.id = "b::@2"}}},
+        {.name = "b", .id = "b::@2"},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(build.string());
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::loaded);
+    REQUIRE(result.target_graph.edges.size() == 1);
+    const auto& e = result.target_graph.edges[0];
+    CHECK(e.from_unique_key == "a::STATIC_LIBRARY");
+    CHECK(e.to_unique_key == "b::STATIC_LIBRARY");
+    CHECK(e.resolution == m6::TargetDependencyResolution::resolved);
+    CHECK(m6::count_diagnostics(result.diagnostics, m6::DiagnosticSeverity::note,
+                                "unknown target id") == 0);
+}
+
+TEST_CASE("file api adapter: forward reference to a later target in the codemodel resolves cleanly") {
+    // Pin the two-phase contract: A appears before B in the codemodel and
+    // declares a dependency on B's id. A single-pass adapter would treat the
+    // edge as external; the documented two-phase contract resolves it.
+    m6::FixtureBuilder fixture("forward-ref");
+    const auto build = fixture.commit({
+        {.name = "a", .id = "a::@1", .dependencies = {{.id = "b::@2"}}},
+        {.name = "b", .id = "b::@2"},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(build.string());
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::loaded);
+    REQUIRE(result.target_graph.edges.size() == 1);
+    CHECK(result.target_graph.edges[0].resolution ==
+          m6::TargetDependencyResolution::resolved);
+    CHECK(result.target_graph.edges[0].to_unique_key == "b::STATIC_LIBRARY");
+}
+
+TEST_CASE("file api adapter: id collision with two targets yields one warning and routes references to first-wins") {
+    m6::FixtureBuilder fixture("collision-two");
+    const auto build = fixture.commit({
+        {.name = "a", .id = "dup-id"},
+        {.name = "b", .id = "dup-id"},
+        {.name = "c", .id = "c::@3", .dependencies = {{.id = "dup-id"}}},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(build.string());
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::partial);
+    // Both colliding targets remain as nodes.
+    REQUIRE(result.target_graph.nodes.size() == 3);
+    // C's reference resolves against A (first-wins), not against B.
+    const auto* edge = m6::find_edge(result.target_graph.edges, "c::STATIC_LIBRARY",
+                                     "a::STATIC_LIBRARY");
+    REQUIRE(edge != nullptr);
+    CHECK(edge->resolution == m6::TargetDependencyResolution::resolved);
+    // Exactly one collision warning, mentioning b as the displaced unique_key.
+    CHECK(m6::count_diagnostics(result.diagnostics, m6::DiagnosticSeverity::warning,
+                                "duplicate target id 'dup-id'") == 1);
+    CHECK(m6::count_diagnostics(result.diagnostics, m6::DiagnosticSeverity::warning,
+                                "b::STATIC_LIBRARY") == 1);
+}
+
+TEST_CASE("file api adapter: three-way id collision lex-sorts the displaced unique_keys regardless of reply order") {
+    // Insert in the order C, A, B so the collision-loser list sees inputs out
+    // of lex order; the diagnostic must still list B then C lexicographically.
+    m6::FixtureBuilder fixture("collision-three");
+    const auto build = fixture.commit({
+        {.name = "c", .id = "dup"},
+        {.name = "a", .id = "dup"},
+        {.name = "b", .id = "dup"},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(build.string());
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::partial);
+    REQUIRE(result.target_graph.nodes.size() == 3);
+
+    // Find the collision warning and verify A (winner) plus the lex-sorted
+    // displaced list "a::STATIC_LIBRARY, b::STATIC_LIBRARY".
+    bool found = false;
+    for (const auto& d : result.diagnostics) {
+        if (d.severity != m6::DiagnosticSeverity::warning) continue;
+        if (d.message.find("duplicate target id 'dup'") == std::string::npos) continue;
+        found = true;
+        CHECK(d.message.find("first occurrence 'c::STATIC_LIBRARY'") != std::string::npos);
+        CHECK(d.message.find("a::STATIC_LIBRARY, b::STATIC_LIBRARY") != std::string::npos);
+    }
+    CHECK(found);
+}
+
+TEST_CASE("file api adapter: dependency on unknown id becomes an external edge with a note diagnostic") {
+    m6::FixtureBuilder fixture("external-dep");
+    const auto build = fixture.commit({
+        {.name = "a", .id = "a::@1", .dependencies = {{.id = "ghost::@99"}}},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(build.string());
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::partial);
+    REQUIRE(result.target_graph.edges.size() == 1);
+    const auto& e = result.target_graph.edges[0];
+    CHECK(e.to_unique_key == "<external>::ghost::@99");
+    CHECK(e.to_display_name == "ghost::@99");
+    CHECK(e.resolution == m6::TargetDependencyResolution::external);
+    CHECK(m6::count_diagnostics(result.diagnostics, m6::DiagnosticSeverity::note,
+                                "references unknown target id 'ghost::@99'") == 1);
+}
+
+TEST_CASE("file api adapter: two external dependencies with different raw_ids yield two distinct edges and two diagnostics") {
+    m6::FixtureBuilder fixture("two-external");
+    const auto build = fixture.commit({
+        {.name = "a",
+         .id = "a::@1",
+         .dependencies = {{.id = "ghostfoo"}, {.id = "ghostbar"}}},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(build.string());
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::partial);
+    REQUIRE(result.target_graph.edges.size() == 2);
+    CHECK(m6::find_edge(result.target_graph.edges, "a::STATIC_LIBRARY",
+                        "<external>::ghostbar") != nullptr);
+    CHECK(m6::find_edge(result.target_graph.edges, "a::STATIC_LIBRARY",
+                        "<external>::ghostfoo") != nullptr);
+    CHECK(m6::count_diagnostics(result.diagnostics, m6::DiagnosticSeverity::note,
+                                "references unknown target id") == 2);
+}
+
+TEST_CASE("file api adapter: inverted reply order produces the same canonically sorted target graph") {
+    m6::FixtureBuilder ab("order-ab");
+    const auto build_ab = ab.commit({
+        {.name = "a", .id = "a::@1", .dependencies = {{.id = "b::@2"}}},
+        {.name = "b", .id = "b::@2"},
+    });
+    m6::FixtureBuilder ba("order-ba");
+    const auto build_ba = ba.commit({
+        {.name = "b", .id = "b::@2"},
+        {.name = "a", .id = "a::@1", .dependencies = {{.id = "b::@2"}}},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto r_ab = adapter.load_build_model(build_ab.string());
+    const auto r_ba = adapter.load_build_model(build_ba.string());
+
+    REQUIRE(r_ab.compile_database.is_success());
+    REQUIRE(r_ba.compile_database.is_success());
+    REQUIRE(r_ab.target_graph.nodes.size() == r_ba.target_graph.nodes.size());
+    for (std::size_t i = 0; i < r_ab.target_graph.nodes.size(); ++i) {
+        CHECK(r_ab.target_graph.nodes[i].unique_key ==
+              r_ba.target_graph.nodes[i].unique_key);
+    }
+    REQUIRE(r_ab.target_graph.edges.size() == r_ba.target_graph.edges.size());
+    for (std::size_t i = 0; i < r_ab.target_graph.edges.size(); ++i) {
+        CHECK(r_ab.target_graph.edges[i].from_unique_key ==
+              r_ba.target_graph.edges[i].from_unique_key);
+        CHECK(r_ab.target_graph.edges[i].to_unique_key ==
+              r_ba.target_graph.edges[i].to_unique_key);
+    }
+}
+
+TEST_CASE("file api adapter: duplicate external entries with the same raw_id collapse to one edge and one diagnostic") {
+    m6::FixtureBuilder fixture("dup-external");
+    const auto build = fixture.commit({
+        {.name = "a",
+         .id = "a::@1",
+         .dependencies = {{.id = "ghost"}, {.id = "ghost"}}},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(build.string());
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::partial);
+    REQUIRE(result.target_graph.edges.size() == 1);
+    CHECK(result.target_graph.edges[0].to_unique_key == "<external>::ghost");
+    CHECK(m6::count_diagnostics(result.diagnostics, m6::DiagnosticSeverity::note,
+                                "references unknown target id 'ghost'") == 1);
+}
+
+TEST_CASE("file api adapter: dependency entries without id are dropped with a warning and mark the graph partial") {
+    m6::FixtureBuilder fixture("missing-id");
+    const auto build = fixture.commit({
+        {.name = "a",
+         .id = "a::@1",
+         .dependencies = {{.id = std::nullopt, .empty_id_string = false},
+                          {.id = std::nullopt, .empty_id_string = true}}},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(build.string());
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::partial);
+    CHECK(result.target_graph.edges.empty());
+    // Two defective entries -> two warnings (no diagnostic dedup for missing
+    // ids since each entry represents distinct reply content).
+    CHECK(m6::count_diagnostics(result.diagnostics, m6::DiagnosticSeverity::warning,
+                                "without a target id") == 2);
+}
+
+TEST_CASE("file api adapter: self-edge is dropped with a note and marks the graph partial") {
+    m6::FixtureBuilder fixture("self-edge");
+    const auto build = fixture.commit({
+        {.name = "a", .id = "a::@1", .dependencies = {{.id = "a::@1"}}},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(build.string());
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::partial);
+    CHECK(result.target_graph.edges.empty());
+    CHECK(m6::count_diagnostics(result.diagnostics, m6::DiagnosticSeverity::note,
+                                "self-dependency") == 1);
+}
+
+TEST_CASE("file api adapter: duplicate (A,B,direct) entries collapse to a single edge with no diagnostic") {
+    m6::FixtureBuilder fixture("dup-edge");
+    const auto build = fixture.commit({
+        {.name = "a",
+         .id = "a::@1",
+         .dependencies = {{.id = "b::@2"}, {.id = "b::@2"}}},
+        {.name = "b", .id = "b::@2"},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(build.string());
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::loaded);
+    REQUIRE(result.target_graph.edges.size() == 1);
+    CHECK(result.target_graph.edges[0].to_unique_key == "b::STATIC_LIBRARY");
+}
+
+TEST_CASE("file api adapter: target_metadata=partial does not propagate into target_graph_status when the graph is fully loaded") {
+    // 'a' has no compilable sources -> targets_without_sources triggers
+    // target_metadata=partial. The graph itself has zero defects, so
+    // target_graph_status must stay loaded.
+    m6::FixtureBuilder fixture("metadata-partial");
+    const auto build = fixture.commit({
+        {.name = "a",
+         .id = "a::@1",
+         .dependencies = {{.id = "b::@2"}},
+         .with_source = false},
+        {.name = "b", .id = "b::@2"},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(build.string());
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_metadata == TargetMetadataStatus::partial);
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::loaded);
+    REQUIRE(result.target_graph.edges.size() == 1);
+}
+
+TEST_CASE("file api adapter: load failure leaves target_graph_status at not_loaded and the graph empty") {
+    // Reuse the existing no_codemodel fixture (index without a codemodel
+    // object). The plan requires that any hard load failure leaves the
+    // target-graph defaults untouched so downstream services can rely on them.
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(testdata + "no_codemodel/build");
+
+    REQUIRE_FALSE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::not_loaded);
+    CHECK(result.target_graph.nodes.empty());
+    CHECK(result.target_graph.edges.empty());
 }

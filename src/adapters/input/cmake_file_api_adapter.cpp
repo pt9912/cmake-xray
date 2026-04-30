@@ -4,10 +4,14 @@
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -17,7 +21,9 @@
 #include "hexagon/model/compile_entry.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/observation_source.h"
+#include "hexagon/model/target_graph.h"
 #include "hexagon/model/target_info.h"
+#include "hexagon/services/target_graph_support.h"
 
 namespace xray::adapters::input {
 
@@ -31,6 +37,11 @@ using xray::hexagon::model::Diagnostic;
 using xray::hexagon::model::DiagnosticSeverity;
 using xray::hexagon::model::ObservationSource;
 using xray::hexagon::model::TargetAssignment;
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyKind;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraph;
+using xray::hexagon::model::TargetGraphStatus;
 using xray::hexagon::model::TargetInfo;
 using xray::hexagon::model::TargetMetadataStatus;
 
@@ -154,10 +165,23 @@ struct CodemodelPaths {
     std::string build_root;
 };
 
+struct CachedTargetForGraph {
+    TargetInfo target_info;
+    std::string raw_id;
+    nlohmann::json dependencies;  // null if absent; preserved if array.
+    bool dependencies_malformed{false};
+};
+
 struct ParsedTargets {
     std::vector<CompileEntry> entries;
     std::map<std::string, std::vector<TargetInfo>> assignments;
     std::size_t targets_without_sources{0};
+    // Phase 1 outputs feeding Phase 2 dependency resolution.
+    std::vector<TargetInfo> nodes;
+    std::vector<CachedTargetForGraph> cached_targets;
+    std::unordered_map<std::string, TargetInfo> id_to_info;  // first-wins.
+    // Per colliding raw_id, the unique_keys of subsequently displaced targets.
+    std::map<std::string, std::vector<std::string>> id_collision_displaced;
 };
 
 struct SourceEntryContext {
@@ -454,9 +478,40 @@ std::optional<BuildModelResult> append_target_reply(const std::filesystem::path&
     }
 
     const auto target_type = target.value("type", "");
-    append_target_entries(target, parsed_codemodel,
-                          TargetInfo{target_name, target_type, target_name + "::" + target_type},
-                          parsed_targets);
+    const auto target_info =
+        TargetInfo{target_name, target_type, target_name + "::" + target_type};
+
+    // Phase 1: every target reply contributes a node to the graph and, when
+    // its raw file-API id is present, an entry to the id->TargetInfo map.
+    // First-wins resolution on collision; later targets stay as nodes but are
+    // not reachable via the colliding id.
+    parsed_targets.nodes.push_back(target_info);
+    const auto raw_id = target.value("id", std::string{});
+    if (!raw_id.empty()) {
+        const auto [it, inserted] =
+            parsed_targets.id_to_info.try_emplace(raw_id, target_info);
+        if (!inserted) {
+            parsed_targets.id_collision_displaced[raw_id].push_back(
+                target_info.unique_key);
+        }
+    }
+
+    // Cache the dependencies subobject for Phase 2; a present-but-malformed
+    // (non-array) dependencies field surfaces as a graph-status diagnostic
+    // in Phase 2 without aborting the whole reply.
+    CachedTargetForGraph cached;
+    cached.target_info = target_info;
+    cached.raw_id = raw_id;
+    if (target.contains("dependencies")) {
+        if (target["dependencies"].is_array()) {
+            cached.dependencies = target["dependencies"];
+        } else {
+            cached.dependencies_malformed = true;
+        }
+    }
+    parsed_targets.cached_targets.push_back(std::move(cached));
+
+    append_target_entries(target, parsed_codemodel, target_info, parsed_targets);
     return std::nullopt;
 }
 
@@ -504,6 +559,141 @@ std::vector<Diagnostic> build_partial_target_diagnostics(const ParsedCodemodel& 
                  " targets have no compilable sources and are not included in the analysis"}};
 }
 
+struct EdgeIdentity {
+    std::string from_unique_key;
+    std::string to_unique_key;
+    TargetDependencyKind kind;
+    bool operator==(const EdgeIdentity& o) const noexcept {
+        return kind == o.kind && from_unique_key == o.from_unique_key
+               && to_unique_key == o.to_unique_key;
+    }
+};
+
+struct PairKey {
+    std::string a;
+    std::string b;
+    bool operator==(const PairKey& o) const noexcept {
+        return a == o.a && b == o.b;
+    }
+};
+
+struct EdgeIdentityHash {
+    std::size_t operator()(const EdgeIdentity& e) const noexcept {
+        std::size_t h = std::hash<std::string>{}(e.from_unique_key);
+        const std::size_t to_h = std::hash<std::string>{}(e.to_unique_key);
+        h ^= to_h + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+        const std::size_t kind_h = std::hash<int>{}(static_cast<int>(e.kind));
+        h ^= kind_h + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+        return h;
+    }
+};
+
+struct PairKeyHash {
+    std::size_t operator()(const PairKey& p) const noexcept {
+        std::size_t h = std::hash<std::string>{}(p.a);
+        h ^= std::hash<std::string>{}(p.b) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+        return h;
+    }
+};
+
+void emit_id_collision_diagnostics(const ParsedTargets& parsed_targets,
+                                   std::vector<Diagnostic>& diagnostics) {
+    for (const auto& [raw_id, displaced_raw] : parsed_targets.id_collision_displaced) {
+        const auto winner_it = parsed_targets.id_to_info.find(raw_id);
+        if (winner_it == parsed_targets.id_to_info.end()) continue;
+        std::vector<std::string> displaced = displaced_raw;
+        std::sort(displaced.begin(), displaced.end());
+        displaced.erase(std::unique(displaced.begin(), displaced.end()), displaced.end());
+        std::string list;
+        for (std::size_t i = 0; i < displaced.size(); ++i) {
+            if (i > 0) list += ", ";
+            list += displaced[i];
+        }
+        diagnostics.push_back(
+            {DiagnosticSeverity::warning,
+             "file api reply contains duplicate target id '" + raw_id +
+                 "'; first occurrence '" + winner_it->second.unique_key +
+                 "' wins, conflicting targets: " + list});
+    }
+}
+
+void resolve_target_dependencies(const ParsedTargets& parsed_targets,
+                                 std::vector<TargetDependency>& edges,
+                                 std::vector<Diagnostic>& diagnostics,
+                                 bool& graph_partial) {
+    std::unordered_set<EdgeIdentity, EdgeIdentityHash> seen_edges;
+    std::unordered_set<PairKey, PairKeyHash> seen_external_diags;
+    std::unordered_set<PairKey, PairKeyHash> seen_self_edge_diags;
+
+    for (const auto& cached : parsed_targets.cached_targets) {
+        if (cached.dependencies_malformed) {
+            diagnostics.push_back(
+                {DiagnosticSeverity::warning,
+                 "target '" + cached.target_info.display_name +
+                     "' has a malformed dependencies field; edges skipped"});
+            graph_partial = true;
+            continue;
+        }
+        if (!cached.dependencies.is_array()) continue;
+
+        for (const auto& dep : cached.dependencies) {
+            const bool has_id = dep.is_object() && dep.contains("id") &&
+                                dep["id"].is_string();
+            const auto raw_id = has_id ? dep["id"].get<std::string>() : std::string{};
+            if (raw_id.empty()) {
+                diagnostics.push_back(
+                    {DiagnosticSeverity::warning,
+                     "target '" + cached.target_info.display_name +
+                         "' has a dependency entry without a target id; entry skipped"});
+                graph_partial = true;
+                continue;
+            }
+
+            const auto resolved_it = parsed_targets.id_to_info.find(raw_id);
+            const bool is_resolved = (resolved_it != parsed_targets.id_to_info.end());
+            const std::string to_unique_key =
+                is_resolved ? resolved_it->second.unique_key : "<external>::" + raw_id;
+            const std::string to_display_name =
+                is_resolved ? resolved_it->second.display_name : raw_id;
+
+            if (cached.target_info.unique_key == to_unique_key) {
+                const PairKey k{cached.target_info.unique_key, to_unique_key};
+                if (seen_self_edge_diags.insert(k).second) {
+                    diagnostics.push_back(
+                        {DiagnosticSeverity::note,
+                         "target '" + cached.target_info.display_name +
+                             "' has a self-dependency; edge skipped"});
+                }
+                graph_partial = true;
+                continue;
+            }
+
+            if (!is_resolved) {
+                const PairKey k{cached.target_info.unique_key, raw_id};
+                if (seen_external_diags.insert(k).second) {
+                    diagnostics.push_back(
+                        {DiagnosticSeverity::note,
+                         "target '" + cached.target_info.display_name +
+                             "' references unknown target id '" + raw_id + "'"});
+                }
+                graph_partial = true;
+            }
+
+            const EdgeIdentity edge_id{cached.target_info.unique_key, to_unique_key,
+                                       TargetDependencyKind::direct};
+            if (!seen_edges.insert(edge_id).second) continue;
+            edges.push_back(TargetDependency{cached.target_info.unique_key,
+                                             cached.target_info.display_name,
+                                             to_unique_key,
+                                             to_display_name,
+                                             TargetDependencyKind::direct,
+                                             is_resolved
+                                                 ? TargetDependencyResolution::resolved
+                                                 : TargetDependencyResolution::external});
+        }
+    }
+}
+
 BuildModelResult build_success_result(const ParsedCodemodel& parsed_codemodel,
                                       ParsedTargets parsed_targets) {
     sort_compile_entries(parsed_targets.entries);
@@ -511,16 +701,36 @@ BuildModelResult build_success_result(const ParsedCodemodel& parsed_codemodel,
     const auto target_metadata = parsed_targets.targets_without_sources > 0
                                      ? TargetMetadataStatus::partial
                                      : TargetMetadataStatus::loaded;
-    const auto diagnostics = build_partial_target_diagnostics(parsed_codemodel, parsed_targets);
+    auto diagnostics = build_partial_target_diagnostics(parsed_codemodel, parsed_targets);
 
-    // Aggregate return avoids a gcov NRVO artifact on the closing brace.
-    return {ObservationSource::derived,
-            target_metadata,
-            CompileDatabaseResult{CompileDatabaseError::none, {}, std::move(parsed_targets.entries),
-                                  {}},
+    bool graph_partial = false;
+    emit_id_collision_diagnostics(parsed_targets, diagnostics);
+    if (!parsed_targets.id_collision_displaced.empty()) graph_partial = true;
+
+    TargetGraph target_graph;
+    target_graph.nodes = std::move(parsed_targets.nodes);
+    resolve_target_dependencies(parsed_targets, target_graph.edges, diagnostics,
+                                graph_partial);
+    xray::hexagon::services::sort_target_graph(target_graph);
+
+    const auto target_graph_status =
+        graph_partial ? TargetGraphStatus::partial : TargetGraphStatus::loaded;
+
+    // Designated init keeps NRVO happy and stays explicit about the new
+    // target-graph fields without depending on declaration order.
+    return BuildModelResult{
+        .source = ObservationSource::derived,
+        .target_metadata = target_metadata,
+        .compile_database = CompileDatabaseResult{CompileDatabaseError::none, {},
+                                                  std::move(parsed_targets.entries), {}},
+        .target_assignments =
             build_target_assignments(std::move(parsed_targets.assignments)),
-            parsed_codemodel.source_root,
-            std::move(diagnostics)};
+        .source_root = parsed_codemodel.source_root,
+        .diagnostics = std::move(diagnostics),
+        .cmake_file_api_resolved_path = std::nullopt,
+        .target_graph = std::move(target_graph),
+        .target_graph_status = target_graph_status,
+    };
 }
 
 struct LoadAttemptResult {
