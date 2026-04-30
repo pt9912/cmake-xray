@@ -266,7 +266,8 @@ Teil-Output):
   analog.
 - `"compare: format_version combination (<bv>, <cv>) is not in the compatibility matrix"`
   bei nicht dokumentierter Versions-Kombination (siehe
-  Compare-Kompatibilitaetsmatrix).
+  Compare-Kompatibilitaetsmatrix). Interner Fehlerbezeichner:
+  `incompatible_format_version`.
 - `"compare: project identity source mismatch (baseline=<bs>, current=<cs>)"`
   bei abweichender `project_identity_source`.
 - `"compare: invalid project identity source '<value>'"`
@@ -537,8 +538,19 @@ Listen-Normalisierung:
 Sortierung der Diff-Eintraege:
 
 - Reihenfolge der Diff-Gruppen: `added`, `removed`, `changed`.
-- Innerhalb einer Gruppe: nach Vergleichs-Identitaet, dann nach
-  Anzeige-Name.
+- Innerhalb einer Gruppe: stabil aufsteigend nach kanonischer
+  Vergleichs-Identitaet, dann nach Anzeige-Name. Die
+  Vergleichs-Identitaet ist pro Gruppe:
+  - Translation Units:
+    `(normalized_source_path, normalized_build_context_key)`.
+  - Include-Hotspots:
+    `(normalized_header_path, include_origin, include_depth_kind)`.
+  - Target-Knoten: `unique_key`.
+  - Target-Kanten: `(from_unique_key, to_unique_key, resolution)`.
+  - Target-Hubs: `(unique_key, direction)`.
+- Diese Sortierung ist Teil des JSON-/Console-/Markdown-Vertrags und
+  wird vor Serialisierung angewendet; Map-/Set-Iteration darf nie die
+  Ausgabe-Reihenfolge bestimmen.
 
 ## Diagnostic-Vertrag fuer Compare
 
@@ -784,6 +796,8 @@ in M6 aber immer `0`, weil Hub-Diffs nur added/removed kennen.
 (`translation_units`, `include_hotspots`, `target_nodes`,
 `target_edges`, `target_hubs`), jeder davon ein Objekt mit
 `added`/`removed`/`changed` als Pflichtschluessel und Array-Werten.
+Alle Diff-Arrays werden nach der oben definierten kanonischen
+Diff-Eintrag-Sortierung serialisiert.
 `target_hubs.changed` ist aus Einheitlichkeitsgruenden Pflicht, bleibt
 in M6 aber immer `[]`, weil Hub-Diffs nur added/removed kennen.
 
@@ -862,6 +876,10 @@ Service-Tests `tests/hexagon/test_compare_service.cpp`:
 - project_identity_drift: Compile-DB-Hash unterschiedlich,
   --allow-project-identity-drift gesetzt, Diagnostic mit allen
   fuenf Pflichtfeldern.
+- File-API-`project_identity` unterschiedlich mit gesetztem
+  `--allow-project-identity-drift`: bleibt harter CLI-Fehler
+  `"compare: project identity differs ..."` und erzeugt keinen
+  Compare-Output.
 - Compare-Pfadnormalisierung im Compile-DB-Fallback: absolute
   Workspace-/Temp-Praefixe unterscheiden sich zwischen baseline und
   current, aber gleicher relativer Pfad-Suffix erzeugt keinen
