@@ -638,6 +638,33 @@ Wichtig:
   Markdown-Adapter doppelte Backticks `` `` `` als Inline-Code-Wrapper,
   analog zu existierenden M5-Code-Spans.
 
+Markdown-Tabellen-Escaping (gilt fuer alle M6-Tabellenzellen, also
+`Direct Target Dependencies`, `Target Hubs` und `Target Graph
+Reference`):
+
+- `|` in einem fachlichen Wert (Target-Display-Name, `raw_id`,
+  Diagnostic-Text) wird zu `\|` escaped, weil `|` in
+  Markdown-Tabellenzellen der Spaltentrenner ist und die Tabellenzeile
+  sonst zerbricht.
+- Whitespace-Normalisierung folgt dem M5-HTML-Vertrag aus
+  `docs/report-html.md`: `\r\n` und `\r` zu `\n`, jedes `\n` zu
+  sichtbarem ` / ` (Leerzeichen-Slash-Leerzeichen), `\t` zu einem
+  Leerzeichen, sonstige ASCII-Control-Bytes unter `0x20` zu einem
+  Leerzeichen. Damit bleibt eine Tabellenzeile einzeilig, ohne dass
+  ein Newline im fachlichen Wert die Markdown-Tabellenzeile beendet.
+- UTF-8-Bytes ueber `0x7F` bleiben rohe Bytes. Markdown-Renderer
+  akzeptieren UTF-8 in Tabellenzellen.
+- Die Backtick-Inline-Code-Regel fuer ``` ` ``` im Target-Namen bleibt
+  zusaetzlich aktiv: doppelte Backticks `` `` `` als Wrapper, damit der
+  Inhalt monospace dargestellt wird; das `|`-Escape wirkt unabhaengig
+  davon.
+
+Console-Tabellen-Escaping ist nicht noetig, weil Console-Output
+zeilenbasiert ist und keinen `|`-Trenner-Vertrag hat. Whitespace im
+fachlichen Wert wird in Console NICHT normalisiert; mehrzeilige
+Diagnostic-Texte oder Newlines im `raw_id` (was Reply-defekt waere)
+bleiben in Console rohe Mehrzeilen, was als M5-erbe akzeptiert ist.
+
 Sortier-Vertrag fuer Console und Markdown (alle Listen und Tabellen):
 
 - `Direct Target Dependencies`-Liste (Console) und Tabelle (Markdown):
@@ -895,14 +922,22 @@ Adapter-Unit-Tests:
   - Compile-DB-only-`analyze`: `graph_target_graph_status="not_loaded"`,
     keine Target-Knoten ausserhalb der bisherigen M4-`tu_target`-Knoten,
     keine `target_dependency`-Kanten.
-- HTML-Adapter:
-  - Compile-DB-only-`analyze`: `Target Graph`-Section enthaelt `h2` und
-    Absatz `Target graph not loaded.`, KEINE Tabelle. `Target Hubs`-Section
-    enthaelt `h2` und Absatz `Target hubs not available.`, KEINE Tabelle.
-    Beide Sections bleiben im Output (nicht weggelassen).
-  - File-API-`analyze` mit Hubs: `Target Graph`-Tabelle gefuellt,
-    `Target Hubs`-Tabelle mit zwei Zeilen, Schwellen sichtbar,
-    Display-Namen in Hub-Liste byte-stabil.
+- HTML-Adapter (Status-Matrix Reporttyp × Status):
+  - `analyze` × `not_loaded` (Compile-DB-only): `Target Graph`-Section
+    enthaelt `h2` und Absatz `Target graph not loaded.`, KEINE Tabelle.
+    `Target Hubs`-Section enthaelt `h2` und Absatz `Target hubs not
+    available.`, KEINE Tabelle. Beide Sections bleiben im Output (nicht
+    weggelassen).
+  - `analyze` × `loaded`: `Target Graph`-Tabelle gefuellt, `Target
+    Hubs`-Tabelle mit zwei Zeilen, Schwellen sichtbar, Display-Namen in
+    Hub-Liste byte-stabil.
+  - `analyze` × `partial`: wie `loaded`, mindestens eine External-Kante
+    in der `Target Graph`-Tabelle.
+  - `impact` × `not_loaded`: `Target Graph Reference`-Section enthaelt
+    `h2` und Absatz `Target graph not loaded.` (gleicher Leersatz wie
+    Analyze, weil Section-Inhaltsregel identisch ist).
+  - `impact` × `loaded`: `Target Graph Reference`-Tabelle gefuellt.
+  - `impact` × `partial`: wie `loaded`, mindestens eine External-Kante.
   - `<external>::<raw_id>`-Strings werden HTML-escaped als
     `&lt;external&gt;::<raw_id>` ausgegeben. Adapter-Test verwendet
     `raw_id="evil<script>"` und prueft, dass keine Roh-HTML-Tags
@@ -918,22 +953,52 @@ Adapter-Unit-Tests:
     `>` im externen Suffix korrekt zu `&lt;external&gt;::foo`.
   - File-API-`impact`: `Target Graph Reference`-Section gefuellt; keine
     Hub-Section.
-- Console-Adapter:
-  - Compile-DB-only-`analyze`: kein Target-Graph- und kein Target-Hub-
-    Abschnitt.
-  - File-API-`analyze` mit Hubs: beide Abschnitte gefuellt, Schwellen
-    sichtbar, Listen kommagetrennt.
+- Console-Adapter (Status-Matrix Reporttyp × Status):
+  - `analyze` × `not_loaded` (Compile-DB-only): kein Target-Graph- und
+    kein Target-Hub-Abschnitt.
+  - `analyze` × `loaded`: `Direct Target Dependencies`-Abschnitt mit
+    Kanten, `Target Hubs`-Abschnitt mit Schwellen und Listen.
+  - `analyze` × `partial`: `Direct Target Dependencies`-Abschnitt mit
+    mindestens einer External-Kante, `Target Hubs`-Abschnitt
+    weiterhin gefuellt.
+  - `impact` × `not_loaded`: kein `Target Graph Reference`-Abschnitt.
+  - `impact` × `loaded`: `Target Graph Reference`-Abschnitt mit Kanten,
+    KEIN Hub-Abschnitt im Impact-Pfad.
+  - `impact` × `partial`: `Target Graph Reference`-Abschnitt mit
+    mindestens einer External-Kante.
   - Disambiguierung wie HTML.
   - `external`-Kante: `to`-Element ist die `raw_id`, gefolgt von
     `[external]`-Suffix; kein literales `external`-Wort als Ziel.
   - Mischfall mit Disambiguierungs-Kollision plus External: Suffix-
     Reihenfolge `<raw_id> [external] [key: <external>::<raw_id>]`
     byteweise gepinnt.
-- Markdown-Adapter:
-  - Wie Console; zusaetzlich Test, dass leere Tabellen NICHT als leere
-    Markdown-Tabelle ausgegeben werden, sondern als Leersatz-Absatz.
-  - Test fuer Backtick-im-Display-Namen mit doppelten-Backticks-Inline-Code-
-    Wrapping.
+- Markdown-Adapter (Status-Matrix Reporttyp × Status, identisch zu
+  Console):
+  - `analyze` × `not_loaded`: kein Target-Graph- und kein Target-Hub-
+    Heading.
+  - `analyze` × `loaded`: `## Direct Target Dependencies`- und
+    `## Target Hubs`-Sections mit Tabellen.
+  - `analyze` × `partial`: wie `loaded`, mindestens eine External-Kante
+    in der Tabelle.
+  - `impact` × `not_loaded`: kein `## Target Graph Reference`-Heading.
+  - `impact` × `loaded`: `## Target Graph Reference`-Section mit
+    Tabelle.
+  - `impact` × `partial`: wie `loaded`, mindestens eine External-Kante.
+  - Test, dass leere Tabellen NICHT als leere Markdown-Tabelle
+    ausgegeben werden, sondern als Leersatz-Absatz.
+  - Test fuer Backtick-im-Display-Namen mit doppelten-Backticks-Inline-
+    Code-Wrapping.
+  - Test fuer `|`-Escape: ein Target mit `display_name="lib|name"` (oder
+    ein `raw_id` mit `|`) erzeugt in der Markdown-Tabellenzelle den
+    String `lib\|name`; Markdown-Renderer interpretiert die Zelle als
+    eine Spalte, nicht als zwei.
+  - Test fuer Newline-Normalisierung: ein Target-Display-Name mit
+    `\n` in der Mitte (Reply-defekt, aber moeglich) wird zu
+    `before / after`; die Tabellenzeile bleibt einzeilig.
+  - Test fuer kombinierte Sonderzeichen: ein Wert mit `|`, Backtick und
+    Newline gleichzeitig erzeugt korrektes Escape-Komposit
+    (Reihenfolge: Whitespace-Normalisierung zuerst, dann Backtick-
+    Wrapping, dann `|`-Escape).
 
 E2E-/Golden-Tests:
 
