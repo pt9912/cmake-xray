@@ -780,6 +780,12 @@ struct ImpactTargetNode {
     std::string id;
     TargetInfo target;
     bool direct{false};  // direct wins over heuristic on dual-membership.
+    // True when the node carries an impact classification (from
+    // ImpactResult::affected_targets). False for nodes that exist only
+    // because target_graph.nodes propagated them; those are reference data
+    // and must not advertise an impact attribute per docs/report-dot.md
+    // (impact is optional on target nodes).
+    bool has_impact_attribute{true};
 };
 
 struct ImpactEdge {
@@ -984,7 +990,7 @@ void build_extra_impact_target_nodes(ImpactContext& ctx,
         ImpactTargetNode new_node{};
         new_node.id = "target_" + std::to_string(target_index++);
         new_node.target = node;
-        new_node.direct = false;  // graph-only nodes carry no impact classification.
+        new_node.has_impact_attribute = false;
         ctx.target_id_by_key.emplace(node.unique_key, new_node.id);
         ctx.graph.target_nodes.push_back(std::move(new_node));
     }
@@ -1078,8 +1084,10 @@ void emit_impact_tu_node(std::ostringstream& out, const ImpactTuNode& node) {
 void emit_impact_target_node(std::ostringstream& out, const ImpactTargetNode& node) {
     out << "  " << node.id << " [";
     append_string_attribute(out, "kind", "target");
-    out << ", ";
-    append_string_attribute(out, "impact", node.direct ? "direct" : "heuristic");
+    if (node.has_impact_attribute) {
+        out << ", ";
+        append_string_attribute(out, "impact", node.direct ? "direct" : "heuristic");
+    }
     out << ", ";
     append_string_attribute(out, "label", node.target.display_name);
     out << ", ";
