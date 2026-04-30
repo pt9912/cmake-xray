@@ -81,8 +81,11 @@ Release- und Preview-Grenzen in [docs/releasing.md](./docs/releasing.md)
 
 Fuer normale Nutzung wird die CLI als `cmake-xray` aufgerufen. Releases stellen
 dafuer ein versioniertes Linux-CLI-Artefakt und ein OCI-kompatibles
-Container-Image bereit, damit Nutzer nicht auf interne Build-Pfade angewiesen
-sind.
+Container-Image bereit, damit Linux-Nutzer nicht auf interne Build-Pfade
+angewiesen sind. Nutzer auf macOS arm64 oder Windows x86_64
+(`validated_smoke`) bauen das Binary direkt aus dem Source (siehe
+"Quellbuild aus Source" weiter unten); dieser Weg ist auf diesen
+Plattformen voll unterstuetzt und nicht nur "fuer Entwicklung".
 
 Release-Artefakt entpacken:
 
@@ -119,12 +122,23 @@ docker run --rm ghcr.io/pt9912/cmake-xray:latest --version
 Vorabversionen (`-rc.N`, `-alpha.N` usw.) bleiben auf ihren Versions-Tag
 beschraenkt und aktualisieren `:latest` nicht.
 
-Lokaler Quellbuild fuer Entwicklung:
+Quellbuild aus Source (Entwicklung auf jeder Plattform sowie unterstuetzter
+Nutzungsweg auf macOS arm64 und Windows x86_64):
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
+
+Resultat:
+
+- Linux/macOS: `./build/cmake-xray`
+- Windows (Visual-Studio-Generator): `./build/Release/cmake-xray.exe`
+
+Auf macOS und Windows wird die so gebaute Binary anschliessend wie ein
+installiertes `cmake-xray` in den `PATH` gelegt; auf Linux liefert das
+versionierte Release-Artefakt das supported Binary, der Quellbuild ist
+dort fuer Endnutzer-Aufrufe nicht empfohlen.
 
 Runtime-Image bauen:
 

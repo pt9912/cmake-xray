@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- README.md and docs/guide.md now explicitly document the
+  `cmake -B build`-aus-Source path as the supported user-facing
+  installation path on macOS arm64 and Windows x86_64 (where no
+  release artefact is shipped), with platform-specific output paths
+  (`./build/cmake-xray` on Linux/macOS, `./build/Release/cmake-xray.exe`
+  on Windows). The previous "fuer Entwicklung" label suggested the
+  source build was developer-only; on the two `validated_smoke`
+  platforms it is the supported user path.
 - macOS arm64 and Windows x86_64 platform status promoted from
   `known_limited` to `validated_smoke` in `README.md`,
   `docs/guide.md`, `docs/releasing.md`, `docs/quality.md` and

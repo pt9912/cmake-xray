@@ -50,10 +50,14 @@ Required-Check-Namen, Atomic-Replace-Matrix und Smoke-Report-Vertrag in
 
 ## Ausfuehrungswege
 
-Fuer normale Nutzung wird die CLI als `cmake-xray` aufgerufen. Das kann ueber
-ein versioniertes Linux-Release-Artefakt oder ueber ein OCI-kompatibles
-Container-Image erfolgen. Beispiele in diesem Guide verwenden deshalb nicht den
-internen Entwicklerpfad `./build/cmake-xray`.
+Fuer normale Nutzung wird die CLI als `cmake-xray` aufgerufen. Auf Linux x86_64
+geschieht das ueber ein versioniertes Release-Artefakt oder ueber ein
+OCI-kompatibles Container-Image. Auf macOS arm64 und Windows x86_64
+(`validated_smoke`) gibt es kein offizielles Release-Artefakt; Nutzer dort
+bauen das Binary aus dem Source (Sektion "Lokaler Quellbuild" weiter unten)
+und legen es in ihren `PATH`. Beispiele in diesem Guide setzen den so
+installierten `cmake-xray` voraus, nicht den internen Entwicklerpfad
+`./build/cmake-xray`.
 
 ### Release-Artefakt
 
@@ -99,17 +103,26 @@ docker build --target runtime -t cmake-xray .
 docker run --rm cmake-xray --help
 ```
 
-### Lokaler Quellbuild fuer Entwicklung
+### Lokaler Quellbuild
 
-Der lokale Build ist vor allem fuer Entwicklung, Tests und Debugging gedacht:
+Der lokale Build deckt zwei Faelle ab: Entwicklung, Tests und Debugging auf
+jeder Plattform sowie den unterstuetzten Nutzungsweg auf macOS arm64 und
+Windows x86_64, fuer die kein vorgefertigtes Release-Artefakt erzeugt wird:
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-Das dabei entstehende Binary im Build-Verzeichnis ist kein empfohlener
-Nutzeraufruf fuer Release-Dokumentation.
+Resultat:
+
+- Linux/macOS: `./build/cmake-xray`
+- Windows (Visual-Studio-Generator): `./build/Release/cmake-xray.exe`
+
+Auf macOS und Windows wird die so gebaute Binary anschliessend wie ein
+installiertes `cmake-xray` in den `PATH` gelegt; auf Linux ist der Quellbuild
+fuer Endnutzer-Aufrufe nicht empfohlen — dort liefert das versionierte
+Release-Artefakt das supported Binary.
 
 ## Schnellstart
 
