@@ -268,6 +268,32 @@ Felder fuer Hubs (nur `analyze`-JSON):
 Impact-JSON auf den reinen Target-Graphen ohne Hub-Sicht; AP 1.3 entscheidet
 ueber Hub-Sichtbarkeit im Impact-Kontext zusammen mit der Priorisierung.
 
+**Schema-Erzwingung der report_type-Asymmetrie**: Das bestehende
+`oneOf`-Konstrukt in `report-json.schema.json` (siehe M5-Schema mit
+`AnalysisReport` vs. `ImpactReport`) wird in AP 1.2 so erweitert:
+
+- `AnalysisReport.required` enthaelt `target_graph_status`,
+  `target_graph` und `target_hubs`. `AnalysisReport.properties` listet
+  alle drei Felder; `additionalProperties: false` bleibt aktiv.
+- `ImpactReport.required` enthaelt `target_graph_status` und
+  `target_graph`, aber NICHT `target_hubs`. `ImpactReport.properties`
+  listet `target_hubs` ueberhaupt nicht; in Kombination mit dem bereits
+  aktiven `additionalProperties: false` lehnt das Schema `target_hubs`
+  im Impact-JSON hart ab.
+- Damit unterscheidet das Schema strict zwischen analyze und impact;
+  eine fehlerhafte Adapter-Implementierung, die `target_hubs` im
+  Impact-Output serialisieren wuerde, schlaegt am Schema-Validations-
+  Gate `json_schema_check` sofort fehl.
+
+Schema-Negativtests in A.1 fuer die Asymmetrie:
+
+- Ein synthetisches Impact-JSON mit `target_hubs`-Feld muss am Schema
+  fehlschlagen.
+- Ein synthetisches Analyze-JSON ohne `target_hubs`-Feld muss am Schema
+  fehlschlagen.
+- Beide Tests laufen im selben CTest-Gate wie die Goldens-Validation
+  und sind Pflichtbestandteil der A.1-Abnahme.
+
 Feldreihenfolge im Analyze-JSON (`format_version=2`):
 
 1. `format`
@@ -344,25 +370,33 @@ Neue Kantenart `target_dependency` fuer Analyze und Impact:
   `kind="external_target"`, `label=<raw_id>` und
   `external_target_id=<raw_id>` erzeugt; AP 1.2 verbietet das Erfinden
   eines `unique_key` fuer externe Ziele im DOT-Knotengraphen.
-- **Dedup-Vertrag fuer `external_target`-Knoten**: Pro
-  `to_unique_key` (= `<external>::<raw_id>`) wird genau EIN synthetischer
-  Knoten erzeugt. Alle `target_dependency`-Kanten mit demselben
-  `to_unique_key` referenzieren denselben `external_<index>`-Knoten als
-  Ziel. Der Dedup-Vertrag ist verbindlich, damit:
+- **Dedup-Vertrag fuer `external_target`-Knoten (Geltungsbereich:
+  Analyze UND Impact)**: Pro `to_unique_key` (= `<external>::<raw_id>`)
+  wird genau EIN synthetischer Knoten erzeugt. Alle `target_dependency`-
+  Kanten mit demselben `to_unique_key` referenzieren denselben
+  `external_<index>`-Knoten als Ziel. Der Vertrag gilt sowohl fuer
+  `analyze --format dot` als auch fuer `impact --format dot`; der
+  DOT-Adapter implementiert beide Pfade ueber denselben
+  Dedup-Helper, damit kein Pfad versehentlich pro Quelle einen eigenen
+  externalen Knoten erzeugt. Der Dedup-Vertrag ist verbindlich, damit:
   - mehrere interne Targets gegen dieselbe externe Bibliothek nicht zu
     `n` separaten externalen Knoten fuehren,
   - das `node_limit` nicht durch redundante synthetische Knoten verbraucht
     wird,
   - die DOT-Ausgabe byte-stabil bleibt, auch wenn die Reihenfolge der
     Roh-Reply-Kanten variiert.
-- ID-Vergabe fuer `external_<index>`: Der Adapter sammelt zuerst die
-  Menge aller `to_unique_key`-Werte mit `resolution=external` aus den
-  finalen `target_dependency`-Kanten (also nach Anwendung des
-  Kantenbudgets), sortiert sie nach `to_unique_key` aufsteigend und
-  vergibt `external_1`, `external_2`, ... in dieser Sortierreihenfolge.
-  Der Index ist damit reproduzierbar und unabhaengig von der
-  Reply-Reihenfolge oder davon, welche interne Quelle die Kante zuerst
-  produziert hat.
+- ID-Vergabe fuer `external_<index>` (gilt fuer Analyze und Impact):
+  Der Adapter sammelt zuerst die Menge aller `to_unique_key`-Werte mit
+  `resolution=external` aus den finalen `target_dependency`-Kanten
+  (also nach Anwendung des Kantenbudgets), sortiert sie nach
+  `to_unique_key` aufsteigend und vergibt `external_1`, `external_2`,
+  ... in dieser Sortierreihenfolge. Der Index ist damit reproduzierbar
+  und unabhaengig von der Reply-Reihenfolge oder davon, welche interne
+  Quelle die Kante zuerst produziert hat. Bei Impact-DOT ist die
+  ID-Vergabe unabhaengig von Analyze-DOT; ein gleichzeitiger Lauf ueber
+  beide Reporttypen wuerde unterschiedliche ID-Mappings erzeugen, was
+  konsistent bleibt, weil DOT-Outputs pro Report-Aufruf einzeln
+  gerendert werden.
 - Wenn das `node_limit` keine `external_target`-Knoten mehr zulaesst,
   werden zugehoerige `target_dependency`-Kanten ueber die bestehende M5-
   Regel "Kanten werden nur ausgegeben, wenn beide Endknoten im finalen
@@ -574,9 +608,27 @@ Wichtig:
   Markdown-Sonderzeichen wie ``` ` ``` im Target-Namen verwendet der
   Markdown-Adapter doppelte Backticks `` `` `` als Inline-Code-Wrapper,
   analog zu existierenden M5-Code-Spans.
-- `target_graph.edges` wird in Console und Markdown sortiert nach
+
+Sortier-Vertrag fuer Console und Markdown (alle Listen und Tabellen):
+
+- `Direct Target Dependencies`-Liste (Console) und Tabelle (Markdown):
+  sortiert nach
   `(from_unique_key, to_unique_key, kind, from_display_name, to_display_name)`
-  ausgegeben (gleicher Vertrag wie `target_graph_support::sort_target_graph`).
+  gemaess M6-Hauptplan-Sortiervertrag (identisch zu
+  `target_graph_support::sort_target_graph`).
+- `Target Hubs`-Inbound-Liste: sortiert nach
+  `(unique_key, display_name, type)`, identisch zur JSON-
+  `target_hubs.inbound`-Sortierung.
+- `Target Hubs`-Outbound-Liste: sortiert nach
+  `(unique_key, display_name, type)`, identisch zur JSON-
+  `target_hubs.outbound`-Sortierung.
+- `Target Graph Reference`-Liste (Impact): sortiert nach demselben
+  5-Stufen-Tupel wie der Analyze-`Direct Target Dependencies`-Abschnitt.
+- Adapter rufen `sort_target_graph` NICHT erneut auf; sie verlassen sich
+  auf die im `AnalysisResult`/`ImpactResult` bereits normalisierten
+  Datenstrukturen aus AP 1.1. Wenn die Modellsortierung nicht stabil
+  waere, wuerden Goldens zwischen Laeufen flackern; das ist ein
+  AP-1.1-Verstoss und nicht durch Adapter-Logik abzufangen.
 
 ## HTML-Vertragsregeln
 
@@ -636,6 +688,19 @@ Section `Target Graph Reference` (Impact) Inhalt:
 - AP 1.3 darf den Section-Titel auf `Target Graph (prioritised)` aendern
   und die Tabelle um Priorisierungs-Spalten erweitern; AP 1.2 schreibt nur
   die Lesedaten-Sicht.
+
+Sortier-Vertrag fuer HTML (alle Tabellen und Listen):
+
+- `Target Graph`-Tabelle (Analyze) und `Target Graph Reference`-Tabelle
+  (Impact): Zeilenreihenfolge nach
+  `(from_unique_key, to_unique_key, kind, from_display_name, to_display_name)`,
+  identisch zu JSON `target_graph.edges` und Console/Markdown.
+- `Target Hubs`-Tabelle (Analyze): Zeilenreihenfolge fest
+  `Inbound, Outbound`. Innerhalb jeder `Targets`-Zelle ist die kommaweise
+  Reihenfolge nach `(unique_key, display_name, type)` sortiert,
+  identisch zu JSON `target_hubs.inbound`/`target_hubs.outbound`.
+- HTML-Adapter rufen `sort_target_graph` nicht erneut auf; gleicher
+  Vertrag wie Console und Markdown.
 
 CSS:
 
@@ -749,6 +814,14 @@ Adapter-Unit-Tests:
     Reihenfolge `external_1` (raw_id `abseil`) und `external_2`
     (raw_id `boost`), weil die ID-Vergabe sortiert nach `to_unique_key`
     erfolgt.
+  - `impact` mit drei internen Targets, die alle gegen `boost` linken:
+    genau EIN `external_target`-Knoten, drei `target_dependency`-
+    Kanten zeigen darauf. Test pinnt den Impact-Pfad gegen
+    versehentliche pro-Quelle-Knotenerzeugung byteweise.
+  - `impact` mit zwei externen Zielen `boost` und `abseil`: identische
+    ID-Vergabe-Reihenfolge wie im Analyze-Test (`external_1` =
+    `abseil`, `external_2` = `boost`), damit der gemeinsame
+    Dedup-Helper auch im Impact-Pfad gepinnt ist.
   - `analyze` mit `node_limit`-Druck: `target_graph.nodes` werden zuletzt
     aufgenommen; bei erreichten Budget wird `graph_truncated="true"`
     gesetzt und ueberzaehlige `target_dependency`-Kanten weggelassen.
