@@ -125,15 +125,15 @@ Hinweis: `F-39` (Soll) kann bei Bedarf in Phase 2 oder 3 vorgezogen werden, fall
 
 Ziel: zusaetzliche Ausbaupunkte nach dem bereits geplanten M5-Umfang aufnehmen, ohne die historische Planung der Phasen 0 bis 5 umzuschreiben.
 
-Stand: M6 besitzt mit [`docs/plan-M6.md`](./plan-M6.md) ein eigenes Planungsdokument. Die untenstehende Tabelle listet die Ausbaupunkte aus der Roadmap; konkrete Schnitt-, Vertrags- und Abnahmedetails sind im M6-Plan festgehalten. Der Status bleibt bis zur konkreten Umsetzung `tbd`.
+Stand: M6 besitzt mit [`docs/plan-M6.md`](./plan-M6.md) ein eigenes Planungsdokument. Die untenstehende Tabelle listet die geplanten Ausbaupunkte aus der Roadmap; konkrete Schnitt-, Vertrags- und Abnahmedetails sind im M6-Plan festgehalten. Der Status bleibt bis zur konkreten Umsetzung `geplant`.
 
-| Arbeitspaket                                                                            | Relevante Kennungen            | Status |
-| --------------------------------------------------------------------------------------- | ------------------------------ | ------ |
-| Direkte Target-Graph-Analysen und textuelle Darstellung direkter Target-Abhaengigkeiten | `F-18`                         | `tbd`  |
-| Hervorhebung von Targets mit vielen ein- oder ausgehenden Abhaengigkeiten               | `F-20`                         | `tbd`  |
-| Priorisierung betroffener Targets ueber den Target-Graphen hinweg                       | `F-25`                         | `tbd`  |
-| Verfeinerte Include-Sicht jenseits des MVP                                              | `F-16`, `F-17`                 | `tbd`  |
-| Erweiterte Analysekonfiguration, Schwellenwerte und Vergleichsansichten                 | `F-10`, `F-11`, `F-37`, `F-38` | `tbd`  |
+| Arbeitspaket                                                                            | Relevante Kennungen            | Status     |
+| --------------------------------------------------------------------------------------- | ------------------------------ | ---------- |
+| Direkte Target-Graph-Analysen und textuelle Darstellung direkter Target-Abhaengigkeiten | `F-18`                         | `geplant` |
+| Hervorhebung von Targets mit vielen ein- oder ausgehenden Abhaengigkeiten               | `F-20`                         | `geplant` |
+| Priorisierung betroffener Targets ueber den Target-Graphen hinweg                       | `F-25`                         | `geplant` |
+| Verfeinerte Include-Sicht jenseits des MVP                                              | `F-16`, `F-17`                 | `geplant` |
+| Erweiterte Analysekonfiguration, Schwellenwerte und Vergleichsansichten                 | `F-10`, `F-11`, `F-37`, `F-38` | `geplant` |
 
 ## 4. MVP-Abgrenzung
 
