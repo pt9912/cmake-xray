@@ -264,6 +264,11 @@ Regeln:
   drei. Datenverfuegbarkeit wird danach ueber
   `analysis_section_states` ausgedrueckt, nicht durch Entfernen aus
   `effective_sections`.
+- In AP 1.5 sind `requested_sections` und `effective_sections` nach
+  erfolgreicher CLI-Validierung inhaltlich identisch. Beide Felder
+  bleiben im Modell, weil spaetere APs Auto-Ergaenzungen oder
+  Degradierungen abbilden koennen; Adapter serialisieren nur
+  `effective_sections` als `analysis_configuration.analysis_sections`.
 - `tu_thresholds` ist ein Map von `TuRankingMetric` auf Mindest-Wert.
   Leere Map (keine `--tu-threshold`-Option) bedeutet keine
   Schwellenfilterung. Wenn eine Metrik gesetzt ist, gibt es fuer diese
@@ -782,14 +787,17 @@ CLI-Tests `tests/e2e/test_cli.cpp`:
 Adapter-Tests fuer alle Reportformate:
 
 - JSON: `analysis_configuration` und `analysis_section_states`-Bloecke
-  immer vorhanden mit Pflichtschluesseln.
+  immer vorhanden mit Pflichtschluesseln; disabled/not_loaded-Sections
+  werden mit Empty-Strukturen serialisiert.
 - DOT: alle sieben neuen `graph_*`-Attribute immer gesetzt.
 - HTML: `Analysis Configuration`-Section mit korrekten Werten;
   Section-State-Badges in den jeweiligen Sections sichtbar.
 - Console: `Analysis Configuration`-Block byteweise gepinnt;
-  deaktivierte Sections werden weggelassen.
+  fachliche Abschnitte fuer disabled/not_loaded-Sections werden
+  weggelassen.
 - Markdown: `## Analysis Configuration`-Section mit Listen-/
-  Tabellenformat byteweise gepinnt.
+  Tabellenformat byteweise gepinnt; fachliche Abschnitte fuer
+  disabled/not_loaded-Sections werden weggelassen.
 
 E2E-/Golden-Tests:
 
@@ -868,7 +876,13 @@ Innerhalb von **A.3 (Schema und Format-Vertrag)**:
 
 10. `kReportFormatVersion` auf `5` heben.
 11. `TargetGraphStatus` um `disabled` erweitern.
-12. `report-json.schema.json` auf v5.
+12. `report-json.schema.json` auf v5:
+    `analysis_configuration` und `analysis_section_states` sind
+    Top-Level-Pflichtfelder; `analysis_configuration.tu_thresholds`
+    verlangt exakt `arg_count`, `include_path_count` und
+    `define_count`; `analysis_section_states` verlangt exakt
+    `tu-ranking`, `include-hotspots`, `target-graph` und `target-hubs`;
+    alle neuen Objekte bleiben `additionalProperties: false`.
 13. `report-json.md` auf v5.
 
 Innerhalb von **A.4 (JSON- und DOT-Adapter)**:
@@ -938,7 +952,10 @@ AP 1.5 ist abgeschlossen, wenn:
   werden;
 - `analysis_section_states` fuer alle vier Sections immer gesetzt
   ist; `disabled`/`not_loaded`/`active`-Klassifikation korrekt;
-- deaktivierte Sections in Reportoutput unterdrueckt werden;
+- disabled/not_loaded-Sections im JSON mit den definierten
+  Empty-Strukturen serialisiert werden; in HTML, Console, Markdown und
+  DOT werden ihre fachlichen Daten unterdrueckt bzw. durch die
+  definierten Status-/Empty-Hinweise ersetzt;
 - die wirksame Konfiguration (`analysis_configuration`) in allen
   fuenf Reportformaten serialisiert wird;
 - `target_hubs.thresholds`-Werte aus den CLI-Optionen statt
