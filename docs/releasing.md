@@ -364,16 +364,37 @@ Erkennen: `docker buildx imagetools inspect ${IMAGE_REPO}:${VERSION} --format '{
 Recovery: `latest` manuell auf den korrekten Digest umsetzen. Plan-Vertrag verlangt, dass automatisierte Re-Runs einen `latest`-Digest-Mismatch hart abbrechen; der manuelle Pfad ist die einzige zulaessige Korrektur.
 
 ```bash
-docker buildx imagetools create \
-    --tag "${IMAGE_REPO}:latest" \
-    "${IMAGE_REPO}:${VERSION}"
+# Pull the versioned manifest into the local cache, retag and push as
+# :latest. This produces a :latest entry whose manifest digest is
+# byte-identical to the versioned tag and mirrors what release.yml's
+# cmd_latest does in the normal flow. `docker buildx imagetools create`
+# would also re-tag remotely without a rebuild, but it wraps a
+# single-platform source in an OCI Image Index, which leaves :latest
+# pointing at an *index* digest that differs from :${VERSION}'s
+# manifest digest -- functionally correct (clients pulling :latest get
+# the right image) but the digest verification below would fail.
+docker pull "${IMAGE_REPO}:${VERSION}"
+docker tag "${IMAGE_REPO}:${VERSION}" "${IMAGE_REPO}:latest"
+docker push "${IMAGE_REPO}:latest"
 
-# Verifikation: beide Tags muessen jetzt denselben Digest tragen.
-diff <(docker buildx imagetools inspect "${IMAGE_REPO}:${VERSION}" --format '{{.Manifest.Digest}}') \
-     <(docker buildx imagetools inspect "${IMAGE_REPO}:latest"     --format '{{.Manifest.Digest}}')
+# Verifikation: beide Tags muessen jetzt denselben Manifest-Digest
+# tragen. buildx 0.30.x (Ubuntu 24.04 docker package, GHA ubuntu-latest
+# runners) ignoriert `--format '{{.Manifest.Digest}}'` und liefert
+# stattdessen die mehrzeilige Default-Ausgabe; das gleiche awk-Filter
+# wie in scripts/oci-image-publish.sh `read_remote_digest` macht den
+# Vergleich version-unabhaengig robust.
+inspect_digest() {
+    docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}' 2>/dev/null \
+        | awk '
+            /^sha256:/ { print; exit }
+            /^Digest:[[:space:]]+sha256:/ { print $2; exit }
+        '
+}
+diff <(inspect_digest "${IMAGE_REPO}:${VERSION}") \
+     <(inspect_digest "${IMAGE_REPO}:latest")
 ```
 
-Begruendung: `latest`-Mismatch ist der einzige Fall, in dem Plan-Vertrag explizit "manuelle Recovery-Sequenz" verlangt. Der `imagetools create`-Pfad re-tagged remote, ohne neu zu pushen, sodass kein zusaetzlicher Build-Cache-Konsistenz-Pfad gebraucht wird. Die `diff`-Verifikation am Schluss schliesst die Recovery ab.
+Begruendung: `latest`-Mismatch ist der einzige Fall, in dem Plan-Vertrag explizit "manuelle Recovery-Sequenz" verlangt. Der `docker pull/tag/push`-Pfad re-tagged ohne lokalen Rebuild und ohne Index-Wrapper, sodass `:latest` und `:${VERSION}` byte-stabil denselben Manifest-Digest tragen. Die `diff`-Verifikation am Schluss schliesst die Recovery ab.
 
 ### Audit-Trail
 
