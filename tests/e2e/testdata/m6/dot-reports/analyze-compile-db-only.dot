@@ -1,0 +1,19 @@
+digraph cmake_xray_analysis {
+  xray_report_type="analyze";
+  format_version=2;
+  graph_node_limit=50;
+  graph_edge_limit=80;
+  graph_truncated=false;
+  graph_target_graph_status="not_loaded";
+  tu_1 [kind="translation_unit", rank=1, label="main.cpp", path="src/app/main.cpp", directory="build/app", unique_key="/workspace/tests/e2e/testdata/m2/basic_project/src/app/main.cpp|/workspace/tests/e2e/testdata/m2/basic_project/build/app"];
+  tu_2 [kind="translation_unit", rank=2, label="tool.cpp", path="src/tools/tool.cpp", directory="build/tools", unique_key="/workspace/tests/e2e/testdata/m2/basic_project/src/tools/tool.cpp|/workspace/tests/e2e/testdata/m2/basic_project/build/tools"];
+  tu_3 [kind="translation_unit", rank=3, label="core.cpp", path="src/lib/core.cpp", directory="build/lib", unique_key="/workspace/tests/e2e/testdata/m2/basic_project/src/lib/core.cpp|/workspace/tests/e2e/testdata/m2/basic_project/build/lib"];
+  hotspot_1 [kind="include_hotspot", label="config.h", path="include/common/config.h", context_total_count=3, context_returned_count=3, context_truncated=false];
+  hotspot_2 [kind="include_hotspot", label="shared.h", path="include/common/shared.h", context_total_count=3, context_returned_count=3, context_truncated=false];
+  tu_1 -> hotspot_1 [kind="tu_include_hotspot"];
+  tu_3 -> hotspot_1 [kind="tu_include_hotspot"];
+  tu_2 -> hotspot_1 [kind="tu_include_hotspot"];
+  tu_1 -> hotspot_2 [kind="tu_include_hotspot"];
+  tu_3 -> hotspot_2 [kind="tu_include_hotspot"];
+  tu_2 -> hotspot_2 [kind="tu_include_hotspot"];
+}

@@ -1,0 +1,13 @@
+digraph cmake_xray_analysis {
+  xray_report_type="analyze";
+  format_version=2;
+  graph_node_limit=50;
+  graph_edge_limit=80;
+  graph_truncated=false;
+  graph_target_graph_status="partial";
+  tu_1 [kind="translation_unit", rank=1, label="app.cpp", path="src/app.cpp", directory="build", unique_key="/project/src/app.cpp|/project/build"];
+  target_1 [kind="target", label="app", name="app", type="EXECUTABLE", unique_key="app::EXECUTABLE"];
+  external_1 [kind="external_target", label="wei\"rd\\target\nnewline", external_target_id="wei\"rd\\target\nnewline"];
+  tu_1 -> target_1 [kind="tu_target"];
+  target_1 -> external_1 [kind="target_dependency", style="dashed", resolution="external", external_target_id="wei\"rd\\target\nnewline"];
+}

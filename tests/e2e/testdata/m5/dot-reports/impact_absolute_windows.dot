@@ -4,5 +4,6 @@ digraph cmake_xray_impact {
   graph_node_limit=100;
   graph_edge_limit=200;
   graph_truncated=false;
+  graph_target_graph_status="not_loaded";
   changed_file [kind="changed_file", label="main.cpp", path="C:/project/src/app/main.cpp"];
 }

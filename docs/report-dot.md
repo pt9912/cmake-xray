@@ -82,10 +82,11 @@ Jeder DOT-Report enthaelt mindestens:
 | Attribut | Typ | Beschreibung |
 | --- | --- | --- |
 | `xray_report_type` | quoted string | `analyze` oder `impact`. |
-| `format_version` | integer | identisch mit `xray::hexagon::model::kReportFormatVersion`, initial `1`. |
+| `format_version` | integer | identisch mit `xray::hexagon::model::kReportFormatVersion`, ab AP M6-1.2 `2`. |
 | `graph_node_limit` | integer | wirksames Node-Budget fuer diesen Report. |
 | `graph_edge_limit` | integer | wirksames Edge-Budget fuer diesen Report. |
 | `graph_truncated` | boolean | `true`, wenn ein Kandidatenknoten oder eine Kandidatenkante wegen `node_limit`, `edge_limit` oder Analyze-`context_limit` nicht im finalen Graph enthalten ist. Auch im ungekuerzten Fall verpflichtend ausgegeben (`false`). |
+| `graph_target_graph_status` | quoted string | `not_loaded`, `loaded`, `partial`. Pflicht ab AP M6-1.2 fuer Analyze und Impact. Spiegelt `AnalysisResult::target_graph_status` bzw. `ImpactResult::target_graph_status`. |
 
 `graph_truncated` bezieht sich auf den finalen Graphzustand nach Entfernen reiner, unverbundener Kontextknoten.
 
@@ -99,6 +100,8 @@ Ein Analyze-DOT-Graph enthaelt nur Knoten aus vorhandenen `AnalysisResult`-Daten
 - Include-Hotspots beziehungsweise Include-Dateien aus der Top-N-Hotspot-Sicht.
 - Target-Knoten aus vorhandenen M4-Target-Zuordnungen primaerer Top-Ranking-Translation-Units.
 - begrenzte Kontext-Translation-Units fuer ausgegebene Include-Hotspots.
+- ab AP M6-1.2: weitere Target-Knoten aus `AnalysisResult::target_graph.nodes`, dedupliziert gegen die M4-Target-Zuordnungs-Knoten ueber `TargetInfo::unique_key`.
+- ab AP M6-1.2: synthetische `external_target`-Knoten fuer `<external>::*`-Ziele, die als Endpunkt einer `target_dependency`-Kante mit `resolution=external` im finalen Graph erscheinen.
 
 Pflichtattribute fuer Translation-Unit-Knoten:
 
@@ -130,25 +133,35 @@ Pflichtattribute fuer Target-Knoten:
 - `type`: Target-Typ aus `TargetInfo::type`.
 - `unique_key`: fachlicher Target-Schluessel aus `TargetInfo::unique_key`.
 
+Pflichtattribute fuer `external_target`-Knoten (ab AP M6-1.2):
+
+- `kind="external_target"`.
+- `label`: gekuerztes Leselabel aus dem rohen `raw_id`-Wert (Middle-Truncation an).
+- `external_target_id`: vollstaendiger `raw_id`-Wert ohne Middle-Truncation. Beide Attribute sind als DOT-String-Literale escaped (Backslash, Anfuehrungszeichen, Newline usw. nach dem M5-Escape-Vertrag).
+
 ### Kanten
 
 Analyze-DOT erzeugt nur folgende Kantenarten:
 
 - Translation Unit zu Include-Hotspot, wenn der Hotspot-Kontext aus `IncludeHotspot` ableitbar ist.
 - primaere Top-Ranking-Translation Unit zu Target, wenn fuer diese Translation Unit eine Target-Zuordnung vorhanden ist.
+- ab AP M6-1.2: Target zu Target (`target_dependency`), wenn `AnalysisResult::target_graph.edges` mindestens eine direkte Abhaengigkeit enthaelt und beide Endknoten im finalen Graph stehen.
 
 Pflichtattribute fuer Kanten:
 
-- `kind`: `tu_include_hotspot` oder `tu_target`.
+- `kind`: `tu_include_hotspot`, `tu_target` oder `target_dependency`.
+- `style` (nur `target_dependency`): `solid` fuer `resolution=resolved`, `dashed` fuer `resolution=external`.
+- `resolution` (nur `target_dependency`): `resolved` oder `external`.
+- `external_target_id` (nur `target_dependency` mit `resolution=external`): vollstaendiger `raw_id`-Wert, identisch mit dem gleichnamigen Knotenattribut.
 
 Regeln:
 
-- Analyze-Kanten tragen kein `style`-Attribut.
+- Analyze-`tu_*`-Kanten tragen kein `style`-Attribut.
 - Analyze-Kanten tragen kein `label`-Attribut.
 - `context_only`-Translation-Units erzeugen keine `tu_target`-Kanten und keine Target-Knoten.
 - Kanten werden nur ausgegeben, wenn beide Endknoten im finalen Graph enthalten sind.
 - Es werden keine Include-zu-Include-Kanten erzeugt.
-- Es werden keine Target-zu-Target-Kanten erzeugt.
+- Bis AP M6-1.2 wurden keine Target-zu-Target-Kanten erzeugt; AP M6-1.2 fuehrt `target_dependency` ueber das `AnalysisResult::target_graph`-Modell ein.
 
 ### Budgets
 
@@ -170,6 +183,8 @@ Knotenkandidaten werden deterministisch in dieser Reihenfolge aufgenommen:
 2. Top-Hotspot-Knoten.
 3. Target-Knoten fuer primaere Top-Ranking-Translation-Units.
 4. Hotspot-Kontext-Translation-Units, sortiert nach `source_path`, `directory` und `unique_key`.
+5. ab AP M6-1.2: weitere Target-Knoten aus `AnalysisResult::target_graph.nodes`, dedupliziert ueber `TargetInfo::unique_key` gegen Prioritaet 3.
+6. ab AP M6-1.2: synthetische `external_target`-Knoten, ID-Vergabe `external_<index>` in der Sortierreihenfolge `to_unique_key` aufsteigend (deterministisch und unabhaengig von der Quelle).
 
 Tie-Breaker:
 
@@ -197,11 +212,13 @@ Kantenkandidaten werden nur fuer vorhandene Endknoten gebildet und priorisiert:
 
 1. Translation-Unit-zu-Include-Hotspot-Kanten.
 2. Translation-Unit-zu-Target-Kanten.
+3. ab AP M6-1.2: `target_dependency`-Kanten zwischen Targets bzw. zwischen Target und synthetischem `external_target`-Knoten. Innerhalb dieser Kantenart wird nach `(from_unique_key, to_unique_key)` priorisiert.
 
 Kantenrichtung:
 
 - `tu_include_hotspot`: Quelle ist die Translation Unit, Ziel ist der Include-Hotspot.
 - `tu_target`: Quelle ist die primaere Top-Ranking-Translation-Unit, Ziel ist das Target.
+- `target_dependency`: Quelle ist das konsumierende Target, Ziel ist das Ziel-Target oder ein synthetischer `external_target`-Knoten.
 
 ## Impact-Vertrag
 

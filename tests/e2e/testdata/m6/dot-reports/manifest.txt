@@ -1,0 +1,22 @@
+# Manifest of cmake-xray M6 DOT report goldens (AP M6-1.2 Tranche A.2).
+#
+# Each non-comment, non-blank line names exactly one golden file in this
+# directory. tests/validate_dot_reports.py checks that the manifest and the
+# directory contents agree, and validates each listed golden against the
+# DOT contract.
+#
+# Coverage per plan-M6-1-2.md "E2E-/Golden-Tests":
+#   analyze-compile-db-only.dot         -> not_loaded, no target nodes
+#   analyze-file-api-loaded.dot         -> loaded, multiple edges, hub source
+#   analyze-file-api-partial.dot        -> partial, external_target node + dashed edge
+#   analyze-dot-raw-id-special-chars.dot-> escape contract for raw_id with quote/backslash/newline
+#   impact-compile-db-only.dot          -> not_loaded
+#   impact-file-api-loaded.dot          -> loaded, multiple edges
+#   impact-file-api-partial.dot         -> partial, external_target node + dashed edge
+analyze-compile-db-only.dot
+analyze-dot-raw-id-special-chars.dot
+analyze-file-api-loaded.dot
+analyze-file-api-partial.dot
+impact-compile-db-only.dot
+impact-file-api-loaded.dot
+impact-file-api-partial.dot

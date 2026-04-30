@@ -1,0 +1,16 @@
+digraph cmake_xray_impact {
+  xray_report_type="impact";
+  format_version=2;
+  graph_node_limit=100;
+  graph_edge_limit=200;
+  graph_truncated=false;
+  graph_target_graph_status="partial";
+  changed_file [kind="changed_file", label="app.cpp", path="src/app.cpp"];
+  direct_tu_1 [kind="translation_unit", impact="direct", label="app.cpp", path="src/app.cpp", directory="build", unique_key="/project/src/app.cpp|/project/build"];
+  target_1 [kind="target", impact="direct", label="app", name="app", type="STATIC_LIBRARY", unique_key="app::STATIC_LIBRARY"];
+  target_2 [kind="target", impact="heuristic", label="lib", name="lib", type="STATIC_LIBRARY", unique_key="lib::STATIC_LIBRARY"];
+  external_1 [kind="external_target", label="ghost::@99", external_target_id="ghost::@99"];
+  changed_file -> direct_tu_1 [kind="changed_file_direct_tu", style="solid"];
+  direct_tu_1 -> target_1 [kind="direct_tu_target", style="solid"];
+  target_1 -> external_1 [kind="target_dependency", style="dashed", resolution="external", external_target_id="ghost::@99"];
+}

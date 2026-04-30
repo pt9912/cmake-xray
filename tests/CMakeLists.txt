@@ -234,6 +234,16 @@ add_test(
             --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/dot-reports/manifest.txt
 )
 
+# AP M6-1.2 Tranche A.2: M6 dataset DOT goldens validate against the same
+# stdlib parser as m5/dot-reports/.
+add_test(
+    NAME dot_report_python_validation_m6
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_dot_reports.py
+            --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/dot-reports
+            --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/dot-reports/manifest.txt
+)
+
 # Negative gate: feeding a deliberately broken DOT must fail validation.
 # WILL_FAIL inverts the test outcome so a passing (exit 0) result is
 # treated as a failure of the broken-DOT detector.
@@ -286,6 +296,34 @@ if(DOT_PROGRAM AND BASH_PROGRAM)
                 ${DOT_PROGRAM}
                 ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/dot-reports
                 ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/dot-reports/manifest.txt
+                json
+    )
+
+    # AP M6-1.2 Tranche A.2: M6 DOT goldens go through the same Graphviz
+    # backends as the m5/ tree so target_dependency edges and external_target
+    # nodes stay -Tsvg/-Tplain/-Tjson clean.
+    add_test(
+        NAME dot_report_graphviz_validation_m6
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/validate_dot_via_graphviz.sh
+                ${DOT_PROGRAM}
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/dot-reports
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/dot-reports/manifest.txt
+                svg
+    )
+    add_test(
+        NAME dot_report_graphviz_validation_m6_plain
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/validate_dot_via_graphviz.sh
+                ${DOT_PROGRAM}
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/dot-reports
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/dot-reports/manifest.txt
+                plain
+    )
+    add_test(
+        NAME dot_report_graphviz_validation_m6_json
+        COMMAND bash ${PROJECT_SOURCE_DIR}/tests/validate_dot_via_graphviz.sh
+                ${DOT_PROGRAM}
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/dot-reports
+                ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/dot-reports/manifest.txt
                 json
     )
 endif()

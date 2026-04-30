@@ -4,6 +4,7 @@ digraph cmake_xray_analysis {
   graph_node_limit=50;
   graph_edge_limit=80;
   graph_truncated=false;
+  graph_target_graph_status="loaded";
   tu_1 [kind="translation_unit", rank=1, label="main.cpp", path="src/main.cpp", directory="build", unique_key="/project/src/main.cpp|/project/build"];
   tu_2 [kind="translation_unit", rank=2, label="core.cpp", path="src/core.cpp", directory="build", unique_key="/project/src/core.cpp|/project/build"];
   target_1 [kind="target", label="app", name="app", type="EXECUTABLE", unique_key="app::EXECUTABLE"];

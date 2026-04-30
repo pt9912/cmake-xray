@@ -4,6 +4,7 @@ digraph cmake_xray_analysis {
   graph_node_limit=34;
   graph_edge_limit=56;
   graph_truncated=true;
+  graph_target_graph_status="not_loaded";
   tu_1 [kind="translation_unit", rank=1, label="file_00.cpp", path="src/file_00.cpp", directory="build", unique_key="HOSTPATH"];
   tu_2 [kind="translation_unit", rank=2, label="file_01.cpp", path="src/file_01.cpp", directory="build", unique_key="HOSTPATH"];
   tu_3 [kind="translation_unit", rank=3, label="file_02.cpp", path="src/file_02.cpp", directory="build", unique_key="HOSTPATH"];

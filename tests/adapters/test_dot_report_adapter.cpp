@@ -13,6 +13,7 @@
 #include "hexagon/model/impact_result.h"
 #include "hexagon/model/report_format_version.h"
 #include "hexagon/model/report_inputs.h"
+#include "hexagon/model/target_graph.h"
 #include "hexagon/model/translation_unit.h"
 
 namespace {
@@ -33,6 +34,11 @@ using xray::hexagon::model::RankedTranslationUnit;
 using xray::hexagon::model::ReportInputs;
 using xray::hexagon::model::ReportInputSource;
 using xray::hexagon::model::TargetAssignment;
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyKind;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraph;
+using xray::hexagon::model::TargetGraphStatus;
 using xray::hexagon::model::TargetImpactClassification;
 using xray::hexagon::model::TargetInfo;
 using xray::hexagon::model::TranslationUnitReference;
@@ -928,4 +934,398 @@ TEST_CASE("compute_analyze_budget pins budgets at every documented threshold") {
     CHECK(compute_analyze_budget(4).context_limit == 4);
     CHECK(compute_analyze_budget(5).context_limit == 5);
     CHECK(compute_analyze_budget(6).context_limit == 5);
+}
+
+// --- M6 AP 1.2 A.2: target-graph fields in DOT v2 ---
+
+namespace m6_dot {
+
+TargetDependency direct_edge(std::string from_uk, std::string to_uk,
+                             TargetDependencyResolution res =
+                                 TargetDependencyResolution::resolved,
+                             std::string raw_id = "") {
+    const std::string to_display = raw_id.empty() ? to_uk : raw_id;
+    return TargetDependency{from_uk, from_uk, to_uk,        to_display,
+                            TargetDependencyKind::direct, res};
+}
+
+}  // namespace m6_dot
+
+TEST_CASE("dot analyze v2: graph_target_graph_status reflects AnalysisResult.target_graph_status") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = TargetGraphStatus::loaded;
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 5);
+    CHECK(rendered.find("graph_target_graph_status=\"loaded\"") != std::string::npos);
+}
+
+TEST_CASE("dot analyze v2: target_graph nodes are emitted with kind=target after the M4 target row") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = TargetGraphStatus::loaded;
+    result.target_graph.nodes.push_back({"app", "EXECUTABLE", "app::EXECUTABLE"});
+    result.target_graph.nodes.push_back({"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"});
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 5);
+
+    CHECK(rendered.find("kind=\"target\", label=\"app\"") != std::string::npos);
+    CHECK(rendered.find("kind=\"target\", label=\"core\"") != std::string::npos);
+}
+
+TEST_CASE("dot analyze v2: resolved target_dependency edge has style=solid and resolution=resolved") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = TargetGraphStatus::loaded;
+    result.target_graph.nodes.push_back({"app", "EXECUTABLE", "app::EXECUTABLE"});
+    result.target_graph.nodes.push_back({"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"});
+    result.target_graph.edges.push_back(
+        m6_dot::direct_edge("app::EXECUTABLE", "core::STATIC_LIBRARY"));
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 5);
+
+    CHECK(rendered.find(
+              "[kind=\"target_dependency\", style=\"solid\", resolution=\"resolved\"]") !=
+          std::string::npos);
+}
+
+TEST_CASE("dot analyze v2: external target_dependency edge serializes external_target_id and dashed style") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = TargetGraphStatus::partial;
+    result.target_graph.nodes.push_back({"app", "EXECUTABLE", "app::EXECUTABLE"});
+    result.target_graph.edges.push_back(m6_dot::direct_edge(
+        "app::EXECUTABLE", "<external>::libfoo",
+        TargetDependencyResolution::external, "libfoo"));
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 5);
+
+    // Synthetic external_target node with kind/label/external_target_id.
+    CHECK(rendered.find(
+              "external_1 [kind=\"external_target\", label=\"libfoo\", external_target_id=\"libfoo\"]") !=
+          std::string::npos);
+    // Dashed external edge points at external_1.
+    CHECK(rendered.find(
+              "-> external_1 [kind=\"target_dependency\", style=\"dashed\", resolution=\"external\", external_target_id=\"libfoo\"]") !=
+          std::string::npos);
+    // graph_target_graph_status reflects partial.
+    CHECK(rendered.find("graph_target_graph_status=\"partial\"") != std::string::npos);
+}
+
+TEST_CASE("dot analyze v2: external_target nodes deduplicate by to_unique_key with deterministic indexing") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = TargetGraphStatus::partial;
+    result.target_graph.nodes.push_back({"a", "STATIC_LIBRARY", "a::STATIC_LIBRARY"});
+    result.target_graph.nodes.push_back({"b", "STATIC_LIBRARY", "b::STATIC_LIBRARY"});
+    // Two real targets reference the same external library; expect ONE
+    // external_target node and stable external_<index> ordering by sorted
+    // to_unique_key (libbar < libfoo so libbar gets external_1, libfoo external_2).
+    result.target_graph.edges.push_back(m6_dot::direct_edge(
+        "a::STATIC_LIBRARY", "<external>::libfoo",
+        TargetDependencyResolution::external, "libfoo"));
+    result.target_graph.edges.push_back(m6_dot::direct_edge(
+        "b::STATIC_LIBRARY", "<external>::libfoo",
+        TargetDependencyResolution::external, "libfoo"));
+    result.target_graph.edges.push_back(m6_dot::direct_edge(
+        "a::STATIC_LIBRARY", "<external>::libbar",
+        TargetDependencyResolution::external, "libbar"));
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 5);
+
+    // Sorted-allocation contract: libbar wins external_1, libfoo external_2.
+    CHECK(rendered.find(
+              "external_1 [kind=\"external_target\", label=\"libbar\"") !=
+          std::string::npos);
+    CHECK(rendered.find(
+              "external_2 [kind=\"external_target\", label=\"libfoo\"") !=
+          std::string::npos);
+    // libfoo node only appears once (no external_3 or duplicate external_2).
+    CHECK(rendered.find("external_3") == std::string::npos);
+}
+
+TEST_CASE("dot analyze v2: raw_id with quote/backslash/newline escapes per the M5 string contract") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = TargetGraphStatus::partial;
+    result.target_graph.nodes.push_back({"app", "EXECUTABLE", "app::EXECUTABLE"});
+    const std::string weird = "wei\"rd\\target\nnewline";
+    result.target_graph.edges.push_back(m6_dot::direct_edge(
+        "app::EXECUTABLE", "<external>::" + weird,
+        TargetDependencyResolution::external, weird));
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 5);
+
+    // Both label and external_target_id carry the escaped form (no truncation
+    // since the raw id is below 48 chars).
+    CHECK(rendered.find("label=\"wei\\\"rd\\\\target\\nnewline\"") !=
+          std::string::npos);
+    CHECK(rendered.find("external_target_id=\"wei\\\"rd\\\\target\\nnewline\"") !=
+          std::string::npos);
+}
+
+TEST_CASE("dot analyze v2: label is middle-truncated past 48 chars, external_target_id stays full") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = TargetGraphStatus::partial;
+    result.target_graph.nodes.push_back({"app", "EXECUTABLE", "app::EXECUTABLE"});
+    // 50-char raw id triggers middle truncation in label only.
+    const std::string long_id(50, 'x');
+    result.target_graph.edges.push_back(m6_dot::direct_edge(
+        "app::EXECUTABLE", "<external>::" + long_id,
+        TargetDependencyResolution::external, long_id));
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 5);
+
+    // Label truncation pattern: 22 head chars + "..." + 23 tail chars (all 'x' here).
+    const std::string truncated_label = std::string(22, 'x') + "..." + std::string(23, 'x');
+    CHECK(rendered.find("label=\"" + truncated_label + "\"") != std::string::npos);
+    // external_target_id keeps the full 50-char value.
+    CHECK(rendered.find("external_target_id=\"" + long_id + "\"") !=
+          std::string::npos);
+}
+
+TEST_CASE("dot impact v2: target_graph propagation produces target_dependency edges without an impact attribute") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = "src/main.cpp";
+    result.target_graph_status = TargetGraphStatus::loaded;
+    result.target_graph.nodes.push_back({"a", "STATIC_LIBRARY", "a::STATIC_LIBRARY"});
+    result.target_graph.nodes.push_back({"b", "STATIC_LIBRARY", "b::STATIC_LIBRARY"});
+    result.target_graph.edges.push_back(
+        m6_dot::direct_edge("a::STATIC_LIBRARY", "b::STATIC_LIBRARY"));
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_impact_report(result);
+
+    CHECK(rendered.find("graph_target_graph_status=\"loaded\"") != std::string::npos);
+    // Edge attribute set must NOT include an "impact" key per AP 1.2 (AP 1.3 decides).
+    CHECK(rendered.find(
+              "[kind=\"target_dependency\", style=\"solid\", resolution=\"resolved\"]") !=
+          std::string::npos);
+    CHECK(rendered.find("kind=\"target_dependency\", impact=") == std::string::npos);
+}
+
+TEST_CASE("dot impact v2: external_target node and dashed target_dependency mirror the analyze contract") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = "src/main.cpp";
+    result.target_graph_status = TargetGraphStatus::partial;
+    result.target_graph.nodes.push_back({"app", "EXECUTABLE", "app::EXECUTABLE"});
+    result.target_graph.edges.push_back(m6_dot::direct_edge(
+        "app::EXECUTABLE", "<external>::ghost",
+        TargetDependencyResolution::external, "ghost"));
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_impact_report(result);
+
+    CHECK(rendered.find(
+              "external_1 [kind=\"external_target\", label=\"ghost\", external_target_id=\"ghost\"]") !=
+          std::string::npos);
+    CHECK(rendered.find(
+              "-> external_1 [kind=\"target_dependency\", style=\"dashed\", resolution=\"external\", external_target_id=\"ghost\"]") !=
+          std::string::npos);
+}
+
+// --- M6 AP 1.2 A.2: defensive truncation branches (filter + budget overflow) ---
+
+TEST_CASE("dot analyze v2: target_dependency edge is dropped and graph_truncated set when from_unique_key is not in target_graph.nodes") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = TargetGraphStatus::loaded;
+    result.target_graph.nodes.push_back({"a", "STATIC_LIBRARY", "a::STATIC_LIBRARY"});
+    // Source target is not declared as a node; the filter step must drop the
+    // edge and flip graph_truncated=true.
+    result.target_graph.edges.push_back(
+        m6_dot::direct_edge("missing::STATIC_LIBRARY", "a::STATIC_LIBRARY"));
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 0);
+
+    CHECK(rendered.find("graph_truncated=true") != std::string::npos);
+    CHECK(rendered.find("kind=\"target_dependency\"") == std::string::npos);
+}
+
+TEST_CASE("dot analyze v2: resolved target_dependency edge is dropped when to_unique_key is not in target_graph.nodes") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = TargetGraphStatus::loaded;
+    result.target_graph.nodes.push_back({"a", "STATIC_LIBRARY", "a::STATIC_LIBRARY"});
+    result.target_graph.edges.push_back(m6_dot::direct_edge(
+        "a::STATIC_LIBRARY", "missing::STATIC_LIBRARY",
+        TargetDependencyResolution::resolved));
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 0);
+
+    CHECK(rendered.find("graph_truncated=true") != std::string::npos);
+    CHECK(rendered.find("kind=\"target_dependency\"") == std::string::npos);
+}
+
+TEST_CASE("dot analyze v2: extra target_graph.nodes beyond the node budget set graph_truncated") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = TargetGraphStatus::loaded;
+    // top=0 -> node_limit=25; with 26 target_graph.nodes the last one trips
+    // build_extra_target_nodes' budget guard.
+    for (int i = 0; i < 26; ++i) {
+        const auto uk = "n" + std::to_string(i) + "::STATIC_LIBRARY";
+        result.target_graph.nodes.push_back({uk, "STATIC_LIBRARY", uk});
+    }
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 0);
+
+    CHECK(rendered.find("graph_truncated=true") != std::string::npos);
+    // Exactly node_limit (25) target nodes appear; the 26th is dropped.
+    std::size_t target_count = 0;
+    std::size_t pos = 0;
+    while ((pos = rendered.find("kind=\"target\"", pos)) != std::string::npos) {
+        ++target_count;
+        ++pos;
+    }
+    CHECK(target_count == 25);
+}
+
+TEST_CASE("dot analyze v2: external_target node allocation beyond the node budget yields graph_truncated and the lookup miss drops the edge") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = TargetGraphStatus::partial;
+    // Fill the entire 25-node budget with target_graph.nodes so the external
+    // allocator can't add any synthetic external_<index> nodes; the inner
+    // edge loop then misses external_id_by_to_uk for the candidate.
+    for (int i = 0; i < 25; ++i) {
+        const auto uk = "n" + std::to_string(i) + "::STATIC_LIBRARY";
+        result.target_graph.nodes.push_back({uk, "STATIC_LIBRARY", uk});
+    }
+    result.target_graph.edges.push_back(m6_dot::direct_edge(
+        "n0::STATIC_LIBRARY", "<external>::ghost",
+        TargetDependencyResolution::external, "ghost"));
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 0);
+
+    CHECK(rendered.find("graph_truncated=true") != std::string::npos);
+    CHECK(rendered.find("kind=\"external_target\"") == std::string::npos);
+    CHECK(rendered.find("kind=\"target_dependency\"") == std::string::npos);
+}
+
+TEST_CASE("dot analyze v2: target_dependency edges beyond the edge budget set graph_truncated") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = TargetGraphStatus::loaded;
+    // top=0 -> node_limit=25, edge_limit=40. Fit 25 nodes and 41 edges so the
+    // 41st target_dependency hits the edge_limit guard.
+    for (int i = 0; i < 25; ++i) {
+        const auto uk = "n" + std::to_string(i) + "::STATIC_LIBRARY";
+        result.target_graph.nodes.push_back({uk, "STATIC_LIBRARY", uk});
+    }
+    int edge_count = 0;
+    for (int i = 0; i < 25 && edge_count < 41; ++i) {
+        for (int j = 0; j < 25 && edge_count < 41; ++j) {
+            if (i == j) continue;
+            result.target_graph.edges.push_back(m6_dot::direct_edge(
+                "n" + std::to_string(i) + "::STATIC_LIBRARY",
+                "n" + std::to_string(j) + "::STATIC_LIBRARY"));
+            ++edge_count;
+        }
+    }
+    REQUIRE(edge_count == 41);
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 0);
+
+    CHECK(rendered.find("graph_truncated=true") != std::string::npos);
+}
+
+TEST_CASE("dot impact v2: target_dependency edge is dropped when from_unique_key is not in target_graph.nodes") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = "src/main.cpp";
+    result.target_graph_status = TargetGraphStatus::loaded;
+    result.target_graph.nodes.push_back({"a", "STATIC_LIBRARY", "a::STATIC_LIBRARY"});
+    result.target_graph.edges.push_back(
+        m6_dot::direct_edge("missing::STATIC_LIBRARY", "a::STATIC_LIBRARY"));
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_impact_report(result);
+
+    CHECK(rendered.find("graph_truncated=true") != std::string::npos);
+    CHECK(rendered.find("kind=\"target_dependency\"") == std::string::npos);
+}
+
+TEST_CASE("dot impact v2: resolved target_dependency edge is dropped when to_unique_key is not in target_graph.nodes") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = "src/main.cpp";
+    result.target_graph_status = TargetGraphStatus::loaded;
+    result.target_graph.nodes.push_back({"a", "STATIC_LIBRARY", "a::STATIC_LIBRARY"});
+    result.target_graph.edges.push_back(m6_dot::direct_edge(
+        "a::STATIC_LIBRARY", "missing::STATIC_LIBRARY",
+        TargetDependencyResolution::resolved));
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_impact_report(result);
+
+    CHECK(rendered.find("graph_truncated=true") != std::string::npos);
+    CHECK(rendered.find("kind=\"target_dependency\"") == std::string::npos);
+}
+
+TEST_CASE("dot impact v2: extra target_graph.nodes beyond the impact node budget set graph_truncated") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = "src/main.cpp";
+    result.target_graph_status = TargetGraphStatus::loaded;
+    // Impact node budget is 100. With 1 changed_file already in the graph,
+    // 100 target_graph.nodes leave room for 99; the 100th trips the guard.
+    for (int i = 0; i < 100; ++i) {
+        const auto uk = "n" + std::to_string(i) + "::STATIC_LIBRARY";
+        result.target_graph.nodes.push_back({uk, "STATIC_LIBRARY", uk});
+    }
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_impact_report(result);
+
+    CHECK(rendered.find("graph_truncated=true") != std::string::npos);
+}
+
+TEST_CASE("dot impact v2: external_target node allocation beyond the impact node budget drops external edges") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = "src/main.cpp";
+    result.target_graph_status = TargetGraphStatus::partial;
+    // Pin 99 graph nodes plus 1 changed_file = 100, fully consuming the impact
+    // budget; the external candidate then misses the external allocation and
+    // the inner edge loop drops it via the external lookup miss.
+    for (int i = 0; i < 99; ++i) {
+        const auto uk = "n" + std::to_string(i) + "::STATIC_LIBRARY";
+        result.target_graph.nodes.push_back({uk, "STATIC_LIBRARY", uk});
+    }
+    result.target_graph.edges.push_back(m6_dot::direct_edge(
+        "n0::STATIC_LIBRARY", "<external>::ghost",
+        TargetDependencyResolution::external, "ghost"));
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_impact_report(result);
+
+    CHECK(rendered.find("graph_truncated=true") != std::string::npos);
+    CHECK(rendered.find("kind=\"external_target\"") == std::string::npos);
+    CHECK(rendered.find("kind=\"target_dependency\"") == std::string::npos);
+}
+
+TEST_CASE("dot impact v2: target_dependency edges beyond the impact edge budget set graph_truncated") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = "src/main.cpp";
+    result.target_graph_status = TargetGraphStatus::loaded;
+    // Impact edge budget is 200. Use 25 nodes with all-pairs minus self
+    // direction = 25*24 = 600 candidate edges; cap at 201 so the 201st trips
+    // the guard.
+    for (int i = 0; i < 25; ++i) {
+        const auto uk = "n" + std::to_string(i) + "::STATIC_LIBRARY";
+        result.target_graph.nodes.push_back({uk, "STATIC_LIBRARY", uk});
+    }
+    int edge_count = 0;
+    for (int i = 0; i < 25 && edge_count < 201; ++i) {
+        for (int j = 0; j < 25 && edge_count < 201; ++j) {
+            if (i == j) continue;
+            result.target_graph.edges.push_back(m6_dot::direct_edge(
+                "n" + std::to_string(i) + "::STATIC_LIBRARY",
+                "n" + std::to_string(j) + "::STATIC_LIBRARY"));
+            ++edge_count;
+        }
+    }
+    REQUIRE(edge_count == 201);
+
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_impact_report(result);
+
+    CHECK(rendered.find("graph_truncated=true") != std::string::npos);
 }

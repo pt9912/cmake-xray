@@ -19,6 +19,7 @@
 #include "hexagon/model/impact_result.h"
 #include "hexagon/model/include_hotspot.h"
 #include "hexagon/model/report_format_version.h"
+#include "hexagon/model/target_graph.h"
 #include "hexagon/model/target_info.h"
 #include "hexagon/model/translation_unit.h"
 
@@ -58,6 +59,11 @@ using xray::hexagon::model::ImpactResult;
 using xray::hexagon::model::IncludeHotspot;
 using xray::hexagon::model::RankedTranslationUnit;
 using xray::hexagon::model::TargetAssignment;
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyKind;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraph;
+using xray::hexagon::model::TargetGraphStatus;
 using xray::hexagon::model::TargetImpactClassification;
 using xray::hexagon::model::TargetInfo;
 using xray::hexagon::model::TranslationUnitReference;
@@ -150,7 +156,14 @@ struct GraphHeader {
     std::string_view report_type;
     DotBudget budget;
     bool truncated;
+    TargetGraphStatus target_graph_status{TargetGraphStatus::not_loaded};
 };
+
+std::string target_graph_status_text(TargetGraphStatus status) {
+    if (status == TargetGraphStatus::loaded) return "loaded";
+    if (status == TargetGraphStatus::partial) return "partial";
+    return "not_loaded";
+}
 
 void emit_graph_header(std::ostringstream& out, const GraphHeader& header) {
     out << "digraph " << header.graph_name << " {\n";
@@ -170,6 +183,10 @@ void emit_graph_header(std::ostringstream& out, const GraphHeader& header) {
     out << ";\n";
     out << "  ";
     append_boolean_attribute(out, "graph_truncated", header.truncated);
+    out << ";\n";
+    out << "  ";
+    append_string_attribute(out, "graph_target_graph_status",
+                            target_graph_status_text(header.target_graph_status));
     out << ";\n";
 }
 
@@ -230,11 +247,30 @@ struct AnalyzeEdge {
     std::string_view kind;  // "tu_include_hotspot" or "tu_target"
 };
 
+// Synthetic <external>::* node placed at edge resolution time. Carries the raw
+// File-API id so the adapter can emit the truncated label and the full
+// external_target_id attribute side by side.
+struct ExternalTargetNode {
+    std::string id;          // external_1, external_2, ...
+    std::string raw_id;      // text from <external>::<raw_id>
+};
+
+// Edge from a real target to either another real target (resolved) or to an
+// ExternalTargetNode (external).
+struct TargetDependencyEdge {
+    std::string source_id;
+    std::string target_id;
+    TargetDependencyResolution resolution{TargetDependencyResolution::resolved};
+    std::string raw_id;  // populated for external; empty for resolved.
+};
+
 struct AnalyzeGraph {
     std::vector<AnalyzeTuNode> tu_nodes;
     std::vector<AnalyzeHotspotNode> hotspot_nodes;
     std::vector<AnalyzeTargetNode> target_nodes;
+    std::vector<ExternalTargetNode> external_nodes;
     std::vector<AnalyzeEdge> edges;
+    std::vector<TargetDependencyEdge> dependency_edges;
     bool truncated{false};
 };
 
@@ -415,6 +451,154 @@ void build_analyze_edges(AnalyzeContext& ctx,
     }
 }
 
+// Priority 5 in the M6 node-priority list: target nodes from
+// AnalysisResult::target_graph.nodes that are not already part of the graph
+// via priority 3 (M4 target_assignments). target_id_by_key is the shared
+// dedup key, so the extra entries get the next available target_<index>.
+void build_extra_target_nodes(AnalyzeContext& ctx, const TargetGraph& target_graph) {
+    std::size_t node_count = ctx.graph.tu_nodes.size() +
+                              ctx.graph.hotspot_nodes.size() +
+                              ctx.graph.target_nodes.size() +
+                              ctx.graph.external_nodes.size();
+    std::size_t target_index = ctx.graph.target_nodes.size() + 1;
+    for (const auto& node : target_graph.nodes) {
+        if (ctx.target_id_by_key.count(node.unique_key) > 0) continue;
+        if (node_count >= ctx.budget.node_limit) {
+            ctx.graph.truncated = true;
+            return;
+        }
+        ++node_count;
+        AnalyzeTargetNode new_node{};
+        new_node.id = "target_" + std::to_string(target_index++);
+        new_node.target = node;
+        ctx.target_id_by_key.emplace(node.unique_key, new_node.id);
+        ctx.graph.target_nodes.push_back(std::move(new_node));
+    }
+}
+
+struct TargetDependencyCandidate {
+    std::string from_uk;
+    std::string to_uk;
+    TargetDependencyResolution resolution;
+    std::string raw_id;  // populated for external; empty for resolved.
+};
+
+// Dedup target-graph edges by (from_uk, to_uk, kind) and sort by
+// (from_uk, to_uk). Plan-M6-1-2.md only defines kind=direct for AP 1.2 so a
+// single bucket per pair is sufficient; future kinds will require an
+// explicit kind tier in the bucket key.
+std::map<std::pair<std::string, std::string>, TargetDependencyCandidate>
+dedup_target_dependency_candidates(const TargetGraph& target_graph) {
+    std::map<std::pair<std::string, std::string>, TargetDependencyCandidate> by_pair;
+    for (const auto& edge : target_graph.edges) {
+        if (edge.kind != TargetDependencyKind::direct) continue;
+        const auto key = std::make_pair(edge.from_unique_key, edge.to_unique_key);
+        by_pair.try_emplace(
+            key, TargetDependencyCandidate{
+                     edge.from_unique_key, edge.to_unique_key, edge.resolution,
+                     edge.resolution == TargetDependencyResolution::external
+                         ? edge.to_display_name
+                         : std::string{}});
+    }
+    // Move-construct return defeats NRVO so the closing brace is a covered line.
+    return std::move(by_pair);
+}
+
+// Filter dependency candidates to those whose source target survived
+// build_extra_target_nodes (target_id_by_key) and, for resolved edges, whose
+// destination target also survived. External edges defer the dst-existence
+// check to allocate_external_target_nodes via the surviving_external map.
+template <typename Context>
+std::vector<TargetDependencyCandidate> filter_resolvable_candidates(
+    Context& ctx,
+    const std::map<std::pair<std::string, std::string>, TargetDependencyCandidate>&
+        by_pair) {
+    std::vector<TargetDependencyCandidate> candidates;
+    candidates.reserve(by_pair.size());
+    for (const auto& [_, c] : by_pair) {
+        if (ctx.target_id_by_key.count(c.from_uk) == 0) {
+            ctx.graph.truncated = true;
+            continue;
+        }
+        if (c.resolution == TargetDependencyResolution::resolved &&
+            ctx.target_id_by_key.count(c.to_uk) == 0) {
+            ctx.graph.truncated = true;
+            continue;
+        }
+        candidates.push_back(c);
+    }
+    return std::move(candidates);
+}
+
+// Priority 6 in the M6 node-priority list: synthetic external_<index> nodes
+// for `<external>::*` destinations. Index assignment is a pure function of
+// the sorted to_unique_key set, so analyze and impact rendering of the same
+// external set produce byte-identical IDs.
+void allocate_external_target_nodes(
+    AnalyzeContext& ctx,
+    const std::vector<TargetDependencyCandidate>& candidates,
+    std::map<std::string, std::string>& external_id_by_to_uk) {
+    std::map<std::string, std::string> ext_to_raw;
+    for (const auto& c : candidates) {
+        if (c.resolution != TargetDependencyResolution::external) continue;
+        ext_to_raw.emplace(c.to_uk, c.raw_id);
+    }
+    std::size_t node_count = ctx.graph.tu_nodes.size() +
+                              ctx.graph.hotspot_nodes.size() +
+                              ctx.graph.target_nodes.size() +
+                              ctx.graph.external_nodes.size();
+    std::size_t external_index = ctx.graph.external_nodes.size() + 1;
+    for (const auto& [to_uk, raw_id] : ext_to_raw) {
+        if (node_count >= ctx.budget.node_limit) {
+            ctx.graph.truncated = true;
+            continue;  // surviving edges to this destination get filtered later.
+        }
+        ++node_count;
+        ExternalTargetNode node;
+        node.id = "external_" + std::to_string(external_index++);
+        node.raw_id = raw_id;
+        external_id_by_to_uk.emplace(to_uk, node.id);
+        ctx.graph.external_nodes.push_back(std::move(node));
+    }
+}
+
+// Edge priority 3: append target_dependency edges after tu_include_hotspot
+// (priority 1) and tu_target (priority 2). The shared edge_limit budget is
+// counted across edges + dependency_edges so M6 edges yield first under
+// pressure per plan-M6-1-2.md.
+void build_target_dependency_edges(AnalyzeContext& ctx,
+                                    const TargetGraph& target_graph) {
+    const auto by_pair = dedup_target_dependency_candidates(target_graph);
+    const auto candidates = filter_resolvable_candidates(ctx, by_pair);
+    std::map<std::string, std::string> external_id_by_to_uk;
+    allocate_external_target_nodes(ctx, candidates, external_id_by_to_uk);
+
+    for (const auto& c : candidates) {
+        std::string dst_id;
+        if (c.resolution == TargetDependencyResolution::resolved) {
+            // filter_resolvable_candidates already verified target_id_by_key
+            // has c.to_uk; use at() so a future regression surfaces as a
+            // throw rather than silent edge drop.
+            dst_id = ctx.target_id_by_key.at(c.to_uk);
+        } else {
+            const auto dst_it = external_id_by_to_uk.find(c.to_uk);
+            if (dst_it == external_id_by_to_uk.end()) {
+                ctx.graph.truncated = true;
+                continue;
+            }
+            dst_id = dst_it->second;
+        }
+        const auto total_edges =
+            ctx.graph.edges.size() + ctx.graph.dependency_edges.size();
+        if (total_edges >= ctx.budget.edge_limit) {
+            ctx.graph.truncated = true;
+            continue;
+        }
+        ctx.graph.dependency_edges.push_back(
+            {ctx.target_id_by_key.at(c.from_uk), dst_id, c.resolution, c.raw_id});
+    }
+}
+
 void remove_orphan_context_nodes(AnalyzeGraph& graph) {
     std::unordered_set<std::string> referenced;
     for (const auto& edge : graph.edges) {
@@ -498,20 +682,55 @@ void emit_analyze_target_node(std::ostringstream& out, const AnalyzeTargetNode& 
     out << "];\n";
 }
 
+void emit_external_target_node(std::ostringstream& out,
+                               const ExternalTargetNode& node) {
+    out << "  " << node.id << " [";
+    append_string_attribute(out, "kind", "external_target");
+    out << ", ";
+    // label gets middle-truncation per docs/plan-M6-1-2.md DOT-Vertragsregeln;
+    // append_string_attribute then escapes the truncated value as a DOT string.
+    append_string_attribute(out, "label", truncate_label(node.raw_id));
+    out << ", ";
+    // external_target_id stays full-length so the raw id is recoverable even
+    // if the label was truncated. Escape contract still applies.
+    append_string_attribute(out, "external_target_id", node.raw_id);
+    out << "];\n";
+}
+
 void emit_analyze_edge(std::ostringstream& out, const AnalyzeEdge& edge) {
     out << "  " << edge.source_id << " -> " << edge.target_id << " [";
     append_string_attribute(out, "kind", edge.kind);
     out << "];\n";
 }
 
+void emit_target_dependency_edge(std::ostringstream& out,
+                                 const TargetDependencyEdge& edge) {
+    const bool is_external = edge.resolution == TargetDependencyResolution::external;
+    out << "  " << edge.source_id << " -> " << edge.target_id << " [";
+    append_string_attribute(out, "kind", "target_dependency");
+    out << ", ";
+    append_string_attribute(out, "style", is_external ? "dashed" : "solid");
+    out << ", ";
+    append_string_attribute(out, "resolution", is_external ? "external" : "resolved");
+    if (is_external) {
+        out << ", ";
+        append_string_attribute(out, "external_target_id", edge.raw_id);
+    }
+    out << "];\n";
+}
+
 void emit_analyze_graph(std::ostringstream& out, const AnalyzeGraph& graph,
-                        const DotBudget& budget) {
-    emit_graph_header(out,
-                      GraphHeader{"cmake_xray_analysis", "analyze", budget, graph.truncated});
+                        const DotBudget& budget,
+                        TargetGraphStatus target_graph_status) {
+    emit_graph_header(out, GraphHeader{"cmake_xray_analysis", "analyze", budget,
+                                       graph.truncated, target_graph_status});
     for (const auto& node : graph.tu_nodes) emit_analyze_tu_node(out, node);
     for (const auto& node : graph.hotspot_nodes) emit_analyze_hotspot_node(out, node);
     for (const auto& node : graph.target_nodes) emit_analyze_target_node(out, node);
+    for (const auto& node : graph.external_nodes) emit_external_target_node(out, node);
     for (const auto& edge : graph.edges) emit_analyze_edge(out, edge);
+    for (const auto& edge : graph.dependency_edges)
+        emit_target_dependency_edge(out, edge);
     emit_graph_footer(out);
 }
 
@@ -538,12 +757,14 @@ std::string render_analyze(const AnalysisResult& result, std::size_t top_limit) 
 
     build_analyze_nodes(ctx, primary, top_hotspots, target_candidates);
     build_analyze_context_nodes(ctx, top_hotspots);
+    build_extra_target_nodes(ctx, result.target_graph);
     build_analyze_edges(ctx, primary);
+    build_target_dependency_edges(ctx, result.target_graph);
     remove_orphan_context_nodes(graph);
     compute_hotspot_context_counts(graph);
 
     std::ostringstream out;
-    emit_analyze_graph(out, graph, budget);
+    emit_analyze_graph(out, graph, budget, result.target_graph_status);
     return out.str();
 }
 
@@ -573,7 +794,9 @@ struct ImpactGraph {
     std::string changed_file_path;
     std::vector<ImpactTuNode> tu_nodes;
     std::vector<ImpactTargetNode> target_nodes;
+    std::vector<ExternalTargetNode> external_nodes;
     std::vector<ImpactEdge> edges;
+    std::vector<TargetDependencyEdge> dependency_edges;
     bool truncated{false};
 };
 
@@ -740,6 +963,91 @@ void build_impact_edges(ImpactContext& ctx, const ImpactResult& result) {
                           "heuristic_tu_target", "dashed");
 }
 
+// Impact-side mirror of the analyze priority-5 step: append target nodes from
+// ImpactResult::target_graph.nodes that are not already in target_id_by_key
+// (which holds the existing M4-impact target nodes from
+// ImpactResult::affected_targets).
+void build_extra_impact_target_nodes(ImpactContext& ctx,
+                                      const TargetGraph& target_graph) {
+    std::size_t node_count = (ctx.graph.has_changed_file ? 1 : 0) +
+                              ctx.graph.tu_nodes.size() +
+                              ctx.graph.target_nodes.size() +
+                              ctx.graph.external_nodes.size();
+    std::size_t target_index = ctx.graph.target_nodes.size() + 1;
+    for (const auto& node : target_graph.nodes) {
+        if (ctx.target_id_by_key.count(node.unique_key) > 0) continue;
+        if (node_count >= ctx.budget.node_limit) {
+            ctx.graph.truncated = true;
+            return;
+        }
+        ++node_count;
+        ImpactTargetNode new_node{};
+        new_node.id = "target_" + std::to_string(target_index++);
+        new_node.target = node;
+        new_node.direct = false;  // graph-only nodes carry no impact classification.
+        ctx.target_id_by_key.emplace(node.unique_key, new_node.id);
+        ctx.graph.target_nodes.push_back(std::move(new_node));
+    }
+}
+
+void allocate_impact_external_target_nodes(
+    ImpactContext& ctx,
+    const std::vector<TargetDependencyCandidate>& candidates,
+    std::map<std::string, std::string>& external_id_by_to_uk) {
+    std::map<std::string, std::string> ext_to_raw;
+    for (const auto& c : candidates) {
+        if (c.resolution != TargetDependencyResolution::external) continue;
+        ext_to_raw.emplace(c.to_uk, c.raw_id);
+    }
+    std::size_t node_count = (ctx.graph.has_changed_file ? 1 : 0) +
+                              ctx.graph.tu_nodes.size() +
+                              ctx.graph.target_nodes.size() +
+                              ctx.graph.external_nodes.size();
+    std::size_t external_index = ctx.graph.external_nodes.size() + 1;
+    for (const auto& [to_uk, raw_id] : ext_to_raw) {
+        if (node_count >= ctx.budget.node_limit) {
+            ctx.graph.truncated = true;
+            continue;
+        }
+        ++node_count;
+        ExternalTargetNode node;
+        node.id = "external_" + std::to_string(external_index++);
+        node.raw_id = raw_id;
+        external_id_by_to_uk.emplace(to_uk, node.id);
+        ctx.graph.external_nodes.push_back(std::move(node));
+    }
+}
+
+void build_impact_target_dependency_edges(ImpactContext& ctx,
+                                          const TargetGraph& target_graph) {
+    const auto by_pair = dedup_target_dependency_candidates(target_graph);
+    const auto candidates = filter_resolvable_candidates(ctx, by_pair);
+    std::map<std::string, std::string> external_id_by_to_uk;
+    allocate_impact_external_target_nodes(ctx, candidates, external_id_by_to_uk);
+
+    for (const auto& c : candidates) {
+        std::string dst_id;
+        if (c.resolution == TargetDependencyResolution::resolved) {
+            dst_id = ctx.target_id_by_key.at(c.to_uk);
+        } else {
+            const auto dst_it = external_id_by_to_uk.find(c.to_uk);
+            if (dst_it == external_id_by_to_uk.end()) {
+                ctx.graph.truncated = true;
+                continue;
+            }
+            dst_id = dst_it->second;
+        }
+        const auto total_edges =
+            ctx.graph.edges.size() + ctx.graph.dependency_edges.size();
+        if (total_edges >= ctx.budget.edge_limit) {
+            ctx.graph.truncated = true;
+            continue;
+        }
+        ctx.graph.dependency_edges.push_back(
+            {ctx.target_id_by_key.at(c.from_uk), dst_id, c.resolution, c.raw_id});
+    }
+}
+
 void emit_impact_changed_file_node(std::ostringstream& out, std::string_view path) {
     out << "  changed_file [";
     append_string_attribute(out, "kind", "changed_file");
@@ -792,14 +1100,19 @@ void emit_impact_edge(std::ostringstream& out, const ImpactEdge& edge) {
 }
 
 void emit_impact_graph(std::ostringstream& out, const ImpactGraph& graph,
-                       const DotBudget& budget) {
-    emit_graph_header(out, GraphHeader{"cmake_xray_impact", "impact", budget, graph.truncated});
+                       const DotBudget& budget,
+                       TargetGraphStatus target_graph_status) {
+    emit_graph_header(out, GraphHeader{"cmake_xray_impact", "impact", budget,
+                                       graph.truncated, target_graph_status});
     if (graph.has_changed_file) {
         emit_impact_changed_file_node(out, graph.changed_file_path);
     }
     for (const auto& node : graph.tu_nodes) emit_impact_tu_node(out, node);
     for (const auto& node : graph.target_nodes) emit_impact_target_node(out, node);
+    for (const auto& node : graph.external_nodes) emit_external_target_node(out, node);
     for (const auto& edge : graph.edges) emit_impact_edge(out, edge);
+    for (const auto& edge : graph.dependency_edges)
+        emit_target_dependency_edge(out, edge);
     emit_graph_footer(out);
 }
 
@@ -813,8 +1126,10 @@ std::string render_impact(const ImpactResult& result) {
                        target_id_by_key};
     build_impact_nodes(ctx, result);
     build_impact_edges(ctx, result);
+    build_extra_impact_target_nodes(ctx, result.target_graph);
+    build_impact_target_dependency_edges(ctx, result.target_graph);
     std::ostringstream out;
-    emit_impact_graph(out, graph, budget);
+    emit_impact_graph(out, graph, budget, result.target_graph_status);
     return out.str();
 }
 
