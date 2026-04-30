@@ -217,8 +217,8 @@ Jedes Rezept enthaelt:
 
 ## Format-Vertrags-Final-Sweep
 
-AP 1.7 fuehrt eine konsolidierte Pruefung der vier Format-Vertrags-
-Dokumente durch:
+AP 1.7 fuehrt eine konsolidierte Pruefung aller Format-Vertrags-
+Artefakte durch:
 
 - `docs/report-json.md`: Verweise auf
   `docs/compare-matrix.md` und `docs/report-compare.schema.json`
@@ -389,7 +389,7 @@ Neuer Abschnitt `[1.3.0] - <Release-Datum>`:
   `Target Graph`, `Target Hubs`, `Prioritised Affected Targets`.
 
 ### Fixed
-- (entries from any A.5 audit-pass fixups across AP 1.1-1.6)
+- (entries from any AP audit-pass fixups across AP 1.1-1.6)
 
 ### Migration
 - pre-M6 JSON reports are not consumable by v1.3.0 tools. Re-run
@@ -429,8 +429,8 @@ gemeinsamen Tabelle in `docs/plan-M6.md` konsolidiert:
 
 ## Tests und Abnahme
 
-AP 1.7 fuehrt keine **neuen** Tests ein, sondern bestaetigt die in
-AP 1.1-1.6 geforderten Tests:
+AP 1.7 fuehrt keine neuen fachlichen Feature-Tests ein, sondern
+bestaetigt die in AP 1.1-1.6 geforderten Tests:
 
 - Plan-Test-Liste aus jedem Sub-Plan wird gegen Ist-Stand
   verifiziert (Audit-Pass-Konvention aus M5).
@@ -447,8 +447,8 @@ AP 1.1-1.6 geforderten Tests:
 - Docker-Gates (`test`, `coverage-check`, `quality-check`,
   `runtime`) gruen.
 
-AP 1.7 fuehrt keinen neuen fachlichen Feature-Test ein. Ergaenzt wird
-ein Abnahmeselbsttest/Gating-Test fuer den Release-Schnitt:
+Zusaetzlich ergaenzt AP 1.7 einen Abnahmeselbsttest/Gating-Test fuer
+den Release-Schnitt:
 
 - **`m6_versionspin_consistency`**: Test, dass
   `cmake-xray --version` exakt `1.3.0` ausgibt, dass das Schema
