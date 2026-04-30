@@ -218,10 +218,10 @@ Regeln fuer `AnalysisSection`:
 Regeln fuer `AnalysisSectionState`:
 
 - `active`: Section wurde aktiviert UND Daten sind verfuegbar.
-- `disabled`: Section wurde deaktiviert (entweder explizit per
-  `--analysis` oder implizit, wenn `target-hubs` ohne `target-graph`
-  gesetzt wuerde, was per CLI-Validierung aber schon vorab
-  abgelehnt wird).
+- `disabled`: Section wurde nicht angefordert, also steht sie nicht in
+  `analysis_configuration.effective_sections`. Der frueher denkbare
+  Fall `target-hubs` ohne `target-graph` ist kein `disabled`-Zustand,
+  sondern ein CLI-Verwendungsfehler und erreicht das Modell nicht.
 - `not_loaded`: Section wurde aktiviert, aber Daten sind nicht
   verfuegbar (z. B. `target-graph` aktiviert, aber Compile-DB-only-
   Pfad ohne File-API).
@@ -257,19 +257,28 @@ Regeln:
 
 - `requested_sections` ist die durch den Nutzer (oder Default `all`)
   angeforderte Section-Liste, kanonisch sortiert nach Rangtabelle.
-- `effective_sections` ist die wirklich aktive Section-Liste; bei
-  `--analysis all` oder ohne `--analysis` enthaelt sie alle vier
-  Sektionen. Bei `--analysis tu-ranking,target-graph,target-hubs`
-  enthaelt sie diese drei.
+- `effective_sections` ist die validierte, kanonische Section-Auswahl
+  nach Aufloesung von `all`; bei `--analysis all` oder ohne
+  `--analysis` enthaelt sie alle vier Sektionen. Bei
+  `--analysis tu-ranking,target-graph,target-hubs` enthaelt sie diese
+  drei. Datenverfuegbarkeit wird danach ueber
+  `analysis_section_states` ausgedrueckt, nicht durch Entfernen aus
+  `effective_sections`.
 - `tu_thresholds` ist ein Map von `TuRankingMetric` auf Mindest-Wert.
   Leere Map (keine `--tu-threshold`-Option) bedeutet keine
-  Schwellenfilterung. Pro Metrik genau ein Eintrag (CLI verhindert
-  Duplikate); die Map dient nur dem deterministischen Reportoutput.
+  Schwellenfilterung. Wenn eine Metrik gesetzt ist, gibt es fuer diese
+  Metrik genau einen Eintrag (CLI verhindert Duplikate).
+  Im Request- und Servicemodell darf die Map leer oder partiell sein.
+  Reportadapter normalisieren sie vor der Ausgabe auf alle drei
+  Metriken; fehlende Metriken werden als `0` serialisiert.
 - `min_hotspot_tus`, `target_hub_in_threshold`,
   `target_hub_out_threshold` sind die wirksamen Schwellen
   (CLI-Default oder CLI-gesetzt).
 - `analysis_section_states` enthaelt fuer jede der vier Sections
   genau einen Eintrag; das Feld ist Pflicht und immer voll besetzt.
+  Invariante: `state=disabled` genau dann, wenn die Section nicht in
+  `effective_sections` steht. `state=active|not_loaded` ist nur fuer
+  Sections in `effective_sections` erlaubt.
 
 ### Erweiterung von `AnalyzeProjectRequest`
 
@@ -292,6 +301,10 @@ Regeln:
 - Alle anderen Felder sind die schon im CLI-Adapter validierten
   Werte. Service-Tests duerfen sie direkt setzen, ohne den
   CLI-Pfad nachzubauen.
+- `tu_thresholds` darf hier leer oder partiell sein. Die Semantik ist:
+  fehlende Metrik = Schwelle `0` = kein Filter fuer diese Metrik.
+  JSON, HTML, Markdown, Console und DOT serialisieren daraus immer alle
+  drei Metriken in kanonischer Reihenfolge.
 
 ## CLI-Vertrag
 
@@ -403,8 +416,28 @@ Datenverfuegbarkeit:
 - `tu_ranking`: immer verfuegbar, sobald eine Eingabe (Compile-DB
   oder File-API) erfolgreich geladen wurde.
 - `include_hotspots`: immer verfuegbar.
-- `target_graph`: verfuegbar, wenn `target_graph_status != not_loaded`.
-- `target_hubs`: verfuegbar, wenn `target_graph_status != not_loaded`.
+- `target_graph`: verfuegbar, wenn die bestehende Target-Graph-
+  Ermittlung `loaded` oder `partial` liefert; sonst `not_loaded`.
+- `target_hubs`: verfuegbar genau dann, wenn `target_graph` verfuegbar
+  ist. Eine angeforderte Hub-Section kann deshalb nur `active` oder
+  `not_loaded` sein; eine nicht angeforderte Hub-Section ist
+  `disabled`.
+
+Invarianten:
+
+- `analysis_section_states` ist die primaere Section-State-Quelle fuer
+  alle Adapter.
+- `target_graph_status` beschreibt zusaetzlich den Datenzustand des
+  Target-Graph-Modells und muss mit
+  `analysis_section_states["target-graph"]` konsistent sein:
+  - `disabled` genau dann, wenn `target-graph` nicht in
+    `effective_sections` steht.
+  - `not_loaded` genau dann, wenn `target-graph` angefordert wurde, aber
+    keine Target-Graph-Daten verfuegbar sind.
+  - `loaded`/`partial` nur, wenn `target-graph` angefordert wurde und
+    Daten verfuegbar sind.
+- `analysis_section_states["target-hubs"]` darf nur `active` sein, wenn
+  `target_graph_status` `loaded` oder `partial` ist.
 
 Effekt auf Modellfelder:
 
@@ -487,13 +520,17 @@ Neuer `analysis_configuration`-Block (`format_version=5`):
 
 Regeln:
 
-- `analysis_configuration.analysis_sections` ist immer voll besetzt
-  und kanonisch sortiert. Bei `--analysis tu-ranking` enthaelt das
-  Feld `["tu-ranking"]`.
+- `analysis_configuration.analysis_sections` ist immer vorhanden und
+  kanonisch sortiert. Bei `--analysis all` enthaelt es alle vier
+  Sections; bei `--analysis tu-ranking` enthaelt das Feld
+  `["tu-ranking"]`.
 - `analysis_configuration.tu_thresholds` ist ein Objekt mit allen drei
   Metriken als Pflichtschluessel. Nicht gesetzte Metriken haben Wert
   `0` (semantisch "keine Filterung"). Damit bleibt das Schema
-  geschlossen mit `additionalProperties: false`.
+  geschlossen mit `additionalProperties: false`. Diese Vollbesetzung
+  ist eine JSON-/Report-Normalisierung; sie aendert nicht den
+  Servicemodell-Vertrag, in dem eine leere oder partielle
+  `tu_thresholds`-Map erlaubt ist.
 - `analysis_section_states` ist ein Objekt mit allen vier Sections
   als Pflichtschluessel.
 - `target_hubs.thresholds` aus AP 1.2 wird auf die wirksamen Werte
@@ -526,8 +563,8 @@ Feldreihenfolge im Analyze-JSON (`format_version=5`):
 | `include_hotspot_excluded_by_min_tus_count` | integer | ja | Hotspots, durch `min_hotspot_tus` ausgeschlossen. |
 
 Sections, deren `analysis_section_states`-Eintrag `disabled` oder
-`not_loaded` ist, werden trotzdem im JSON ausgegeben, aber mit dem
-Konvent der Empty-Section aus AP 1.2:
+`not_loaded` ist, werden trotzdem im JSON ausgegeben, aber mit
+deterministischen Empty-Section-Strukturen:
 
 - `disabled`-`tu-ranking`: `translation_unit_ranking.items=[]`,
   Zaehler `0`, neuer Status `analysis_section_states.tu-ranking="disabled"`.
@@ -538,6 +575,16 @@ Konvent der Empty-Section aus AP 1.2:
   Wert in v5, siehe unten).
 - `disabled`-`target-hubs`: `target_hubs.inbound=[]`,
   `target_hubs.outbound=[]`.
+- `not_loaded`-`target-graph`: `target_graph.nodes=[]`,
+  `target_graph.edges=[]`, `target_graph_status="not_loaded"`.
+- `not_loaded`-`target-hubs`: `target_hubs.inbound=[]`,
+  `target_hubs.outbound=[]`, waehrend `target_graph_status` den
+  Zustand des Target-Graph-Modells (`not_loaded`) traegt.
+- `not_loaded` ist fuer `tu-ranking` und `include-hotspots` im
+  normalen Analyze-Pfad nicht erwartet; falls es durch einen
+  Eingangsdatenfehler entsteht, werden dieselben Empty-Strukturen wie
+  bei `disabled` serialisiert und der Section-State bleibt
+  `not_loaded`.
 
 Erweiterung von `TargetGraphStatus`-Enum (im Modell und im Schema):
 
@@ -552,8 +599,9 @@ enum class TargetGraphStatus {
 
 Regeln:
 
-- `disabled` bedeutet "Section per CLI deaktiviert"; semantisch
-  unterschiedlich von `not_loaded` ("Daten nicht verfuegbar").
+- `disabled` bedeutet "Target-Graph-Section nicht angefordert";
+  semantisch unterschiedlich von `not_loaded` ("angefordert, aber Daten
+  nicht verfuegbar").
 - Das Schema erweitert die `TargetGraphStatus`-Enum um `disabled`.
 
 ### HTML
@@ -585,6 +633,11 @@ Section `Analysis Configuration` Inhalt:
 - Wenn Section `disabled`: Section bleibt mit `h2` und Absatz
   `Section disabled.`. Diese Variante ergaenzt den bestehenden
   Empty-Section-Vertrag aus AP 1.2 fuer den `disabled`-Fall.
+- Wenn Section `not_loaded`: Section bleibt mit `h2` und Absatz
+  `Section not loaded.`. Fuer `target-graph` und `target-hubs` ersetzt
+  dieser Absatz die Tabellen/Graph-Details; fuer `tu-ranking` und
+  `include-hotspots` gilt dieselbe Empty-Section-Darstellung, falls der
+  Zustand wider Erwarten auftritt.
 
 ### DOT
 
@@ -602,8 +655,9 @@ Neue Graph-Attribute fuer Analyze-DOT:
 Diese sieben sind Pflicht ab AP 1.5 fuer Analyze-DOT.
 
 Wenn eine Section `disabled` oder `not_loaded` ist, werden ihre
-Knoten und Kanten nicht ausgegeben (analog zum `not_loaded`-Verhalten
-aus AP 1.2 fuer Target-Graph).
+Knoten und Kanten nicht ausgegeben. Die `graph_*`-Konfigurations-
+Attribute bleiben trotzdem vorhanden; der Section-State selbst wird in
+DOT nicht als eigener Knoten serialisiert.
 
 ### Console
 
@@ -625,8 +679,9 @@ Section states:
 ```
 
 Wenn eine Section `disabled` oder `not_loaded` ist, wird der
-zugehoerige Reportabschnitt komplett weggelassen (Empty-Section-
-Vertrag aus AP 1.2).
+zugehoerige fachliche Reportabschnitt komplett weggelassen. Der
+`Section states`-Block im `Analysis Configuration`-Abschnitt bleibt die
+einzige Sichtbarkeit dieser Section in Console.
 
 ### Markdown
 
@@ -651,6 +706,10 @@ Neuer Abschnitt **Analysis Configuration** mit Liste und Section-States:
 ```
 
 Markdown-Tabellen-Escaping aus AP 1.2 gilt fuer alle Zellen.
+
+Wenn eine Section `disabled` oder `not_loaded` ist, wird der
+zugehoerige fachliche Abschnitt im Markdown komplett weggelassen. Die
+Section bleibt ausschliesslich in der `Section States`-Tabelle sichtbar.
 
 ## Tests
 
@@ -717,8 +776,8 @@ CLI-Tests `tests/e2e/test_cli.cpp`:
 - `--target-hub-in-threshold` und `--target-hub-out-threshold` analog.
 - Default-Test: alle vier Defaults
   (`min_hotspot_tus=2`, `target_hub_in_threshold=10`,
-  `target_hub_out_threshold=10`, leere `tu_thresholds`) erscheinen
-  in der serialisierten Konfiguration.
+  `target_hub_out_threshold=10`, alle drei `tu_thresholds` mit `0`)
+  erscheinen in der serialisierten Konfiguration.
 
 Adapter-Tests fuer alle Reportformate:
 
