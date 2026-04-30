@@ -297,8 +297,13 @@ Regeln:
 
 - `*_requested` sind die in M6 hardcoded Defaults
   (`32` Tiefe, `10000` Knoten).
-- `*_effective` ist die tatsaechlich erreichte Tiefe bzw. Anzahl
-  besuchter Knoten ueber alle TUs hinweg.
+- `*_effective` ist global pro `analyze`-Lauf definiert:
+  `include_depth_limit_effective` ist die maximale erreichte Tiefe ueber
+  alle TU-lokalen BFS-Laeufe hinweg; `include_node_budget_effective` ist
+  die Anzahl neu enqueueter TU-lokaler Traversal-Knoten ueber alle TUs
+  hinweg. Derselbe normalisierte Header kann in unterschiedlichen TUs
+  jeweils einen eigenen TU-lokalen Traversal-Knoten belegen und zaehlt
+  dann mehrfach gegen das globale Budget.
 - `include_node_budget_reached` ist `true`, sobald das Budget mindestens
   einmal waehrend der BFS erschoepft wurde; in diesem Fall wurde die
   Sicht deterministisch gekuerzt.
@@ -444,15 +449,21 @@ und Kuerzungen reproduzierbar sind.
 
 ### Algorithmus
 
-Pro `analyze`-Lauf wird ein **gemeinsamer** BFS-Zustand fuer alle TUs
-gepflegt. `include_depth_limit=32` und `include_node_budget=10000`
-sind harte M6-Defaults.
+Pro `analyze`-Lauf werden **globale Budget- und Effektivwerte** fuer
+alle TUs gepflegt. Die BFS-Frontier, das Traversal-Visited-Set und die
+pro Header ausgegebenen `depth_kind`-Varianten sind dagegen **TU-lokal**.
+`include_depth_limit=32` und `include_node_budget=10000` sind harte
+M6-Defaults.
 
 1. **Start-TUs sortieren**: Alle TUs werden nach
    `(normalized_source_path, normalized_build_context_key)` sortiert
    (M6-Hauptplan-Vertrag).
 2. **Pro TU**: BFS-Frontier startet mit dem TU-Source-File auf
-   Tiefe 0.
+   Tiefe 0. Fuer diese TU werden zwei getrennte Mengen gefuehrt:
+   `traversal_visited` dedupliziert Header-Expansionen ueber
+   `normalize_path(resolved_path)`, `emitted_depth_kinds` merkt pro
+   normalisiertem Header, welche `IncludeDepthKind`-Varianten bereits in
+   `ResolvedTranslationUnitIncludes::headers` ausgegeben wurden.
 3. **Frontier-Schritt** (Tiefe `t < include_depth_limit`):
    - Knoten der aktuellen Frontier werden in
      `(normalized_including_path, normalized_included_path, include_origin, include_depth_kind, raw_spelling)`-
@@ -460,24 +471,37 @@ sind harte M6-Defaults.
    - Pro Knoten: `#include`-Direktiven parsen (gleiches Regex wie
      M3); jede Direktive ueber das Quote-/Include-/System-Pfad-Set
      der TU resolven (gleicher Algorithmus wie M3).
-   - Neue (= nicht im Visited-Set vorhandene) Header-Knoten werden in
-     der Frontier-Schritt-Reihenfolge zur naechsten Frontier
-     hinzugefuegt UND ins Visited-Set aufgenommen.
-   - Pro neu entdecktem Header wird `include_node_budget_effective`
-     inkrementiert. Sobald `include_node_budget_effective ==
-     include_node_budget_requested` erreicht ist, werden keine
-     weiteren Knoten mehr enqueued; bestehende Frontier-Knoten werden
-     noch verarbeitet, aber ihre nicht aufgenommenen Kinder werden
-     verworfen. `include_node_budget_reached=true`.
-   - Bereits besuchte Knoten (`active_stack` und `fully_visited` im
-     bestehenden DFS-Code, in BFS ueber ein einziges Visited-Set
-     pro TU realisiert) werden ueber den normalisierten
-     Include-Knotenschluessel (`normalize_path(resolved_path)`)
-     dedupliziert.
-4. **Tiefen-Cap**: Wenn `t == include_depth_limit`, werden die
-   Frontier-Kinder nicht weiter expandiert. Bereits enqueued
-   Frontier-Knoten der naechsten Tiefe werden noch verarbeitet, weil
-   sie schon besucht wurden; ihre Kinder werden aber nicht gesucht.
+   - Fuer jede erfolgreich resolvte Direktive wird zunaechst der
+     `IncludeDepthKind` aus der Zieltiefe bestimmt: Tiefe 1 ist
+     `direct`, Tiefe `>=2` ist `indirect`.
+   - Ist `normalize_path(resolved_path)` bereits in
+     `traversal_visited`, wird der Header nicht erneut expandiert. Wenn
+     `(normalize_path(resolved_path), depth_kind)` fuer diese TU noch
+     nicht in `emitted_depth_kinds` vorhanden ist, wird aber ein
+     weiterer `IncludeEntry` ausgegeben und
+     `include_depth_limit_effective` auf die maximal ausgegebene
+     Zieltiefe aktualisiert. Dadurch kann derselbe Header in derselben
+     TU genau zwei Eintraege haben: einmal `direct`, einmal `indirect`.
+   - Ist `normalize_path(resolved_path)` noch nicht in
+     `traversal_visited`, wird der Header nur aufgenommen, wenn das
+     globale `include_node_budget_effective` noch kleiner als
+     `include_node_budget_requested` ist. Dann wird er in der
+     Frontier-Schritt-Reihenfolge zur naechsten Frontier hinzugefuegt,
+     in `traversal_visited` aufgenommen, als `IncludeEntry` ausgegeben
+     und in `emitted_depth_kinds` markiert; dabei wird
+     `include_depth_limit_effective` auf die maximal ausgegebene
+     Zieltiefe aktualisiert.
+   - Pro neu enqueuetem Traversal-Knoten wird das globale
+     `include_node_budget_effective` inkrementiert. Sobald
+     `include_node_budget_effective == include_node_budget_requested`
+     erreicht ist, werden keine weiteren neuen Traversal-Knoten
+     aufgenommen; bestehende Frontier-Knoten werden noch verarbeitet,
+     aber ihre nicht aufgenommenen neuen Kinder werden verworfen.
+     `include_node_budget_reached=true`.
+4. **Tiefen-Cap**: Frontier-Knoten mit `t == include_depth_limit`
+   bleiben als Ergebnis erhalten, werden aber nicht expandiert; ihre
+   `#include`-Direktiven werden nicht geparst und Kinder in Tiefe
+   `include_depth_limit + 1` werden nicht erzeugt.
 5. **`depth_kind`-Markierung**: Jeder
    `IncludeEntry`-Eintrag pro TU traegt `depth_kind=direct`, wenn der
    Header in Tiefe 1 entdeckt wurde (also direkt aus der TU-Datei
@@ -486,9 +510,9 @@ sind harte M6-Defaults.
 
 ### Zyklus-Behandlung
 
-- BFS mit Visited-Set verhindert Endlosschleifen automatisch. Wenn
-  ein Header sich selbst inkludiert (defekter Code) oder zwei Header
-  sich zyklisch inkludieren, terminiert die BFS sauber.
+- Das TU-lokale `traversal_visited` verhindert Endlosschleifen
+  automatisch. Wenn ein Header sich selbst inkludiert (defekter Code)
+  oder zwei Header sich zyklisch inkludieren, terminiert die BFS sauber.
 - Diagnostics fuer Zyklen werden NICHT erzeugt. Header-Zyklen sind
   legitime C++-Patterns (Include-Guards) und kein Reply-Defekt.
 
@@ -701,16 +725,16 @@ Neue Sichtbarkeit in der `Include Hotspots`-Section:
 
 ### DOT
 
-DOT-Knoten fuer Include-Hotspots erhalten optional zwei neue Attribute
+DOT-Knoten fuer Include-Hotspots erhalten zwei neue Pflichtattribute
 auf bestehenden `include_hotspot`-Knoten:
 
 - `origin` (string-quoted): `project`, `external`, `unknown`.
 - `depth_kind` (string-quoted): `direct`, `indirect`, `mixed`.
 
-Beide sind in `analyze --format dot` Pflichtattribute (also nicht
-optional), sobald ein Include-Hotspot im finalen Graph erscheint. Sie
-werden nach `path` und vor den `context_*`-Attributen aufgenommen,
-gemaess M5-Attributreihenfolge-Vertrag.
+Beide werden nach `path` und vor den `context_*`-Attributen aufgenommen,
+gemaess M5-Attributreihenfolge-Vertrag. Sie sind in
+`analyze --format dot` immer vorhanden, sobald ein Include-Hotspot im
+finalen Graph erscheint.
 
 Neue Graph-Attribute fuer Analyze-DOT:
 
@@ -799,7 +823,7 @@ Adapter-Tests `tests/adapters/test_source_parsing_include_adapter.cpp`:
   Diagnostic ist gesetzt.
 - Budget-Cap: Header `>10000` werden nicht erfasst,
   `include_node_budget_reached=true`, Diagnostic ist gesetzt.
-- Zyklischer Include: BFS terminiert ueber Visited-Set, keine
+- Zyklischer Include: BFS terminiert ueber `traversal_visited`, keine
   Diagnostic.
 - Selbstinkludierender Header: BFS terminiert.
 - Determinismus bei sehr nahem Budget-Limit: ein Lauf mit Budget
