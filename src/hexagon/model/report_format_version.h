@@ -2,6 +2,6 @@
 
 namespace xray::hexagon::model {
 
-inline constexpr int kReportFormatVersion = 1;
+inline constexpr int kReportFormatVersion = 2;
 
 }  // namespace xray::hexagon::model

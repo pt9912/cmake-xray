@@ -189,6 +189,38 @@ add_test(
             --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/json-reports/manifest.txt
 )
 
+# AP M6-1.2 Tranche A.1: M6 dataset goldens validate against the v2 schema
+# alongside the existing m5/ tree. Both directories carry only v2 goldens.
+add_test(
+    NAME report_json_schema_validation_m6
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
+            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/json-reports
+            --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/json-reports/manifest.txt
+)
+
+# AP M6-1.2 Tranche A.1: schema-asymmetry negative gates. The v2 schema
+# requires target_hubs in analyze and forbids it in impact via
+# additionalProperties=false. Both negative samples must fail validation.
+add_test(
+    NAME report_json_schema_rejects_impact_with_target_hubs
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
+            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_with_target_hubs_broken_sample.json
+)
+set_tests_properties(report_json_schema_rejects_impact_with_target_hubs PROPERTIES WILL_FAIL TRUE)
+
+add_test(
+    NAME report_json_schema_rejects_analyze_without_target_hubs
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
+            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_analyze_without_target_hubs_broken_sample.json
+)
+set_tests_properties(report_json_schema_rejects_analyze_without_target_hubs PROPERTIES WILL_FAIL TRUE)
+
 # AP M5-1.3 Tranche A: DOT contract gates. The Python fallback uses only
 # stdlib and runs in every environment with python3 on PATH. The Graphviz
 # path runs in addition wherever the `dot` binary is installed (Docker

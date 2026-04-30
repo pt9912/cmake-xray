@@ -1,0 +1,9 @@
+{
+  "kind": "index",
+  "objects": [
+    {
+      "kind": "codemodel",
+      "jsonFile": "codemodel-v2-abc.json"
+    }
+  ]
+}

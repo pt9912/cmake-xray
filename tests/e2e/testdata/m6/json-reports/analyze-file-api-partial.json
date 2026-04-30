@@ -1,0 +1,129 @@
+{
+  "format": "cmake-xray.analysis",
+  "format_version": 2,
+  "report_type": "analyze",
+  "inputs": {
+    "compile_database_path": null,
+    "compile_database_source": null,
+    "cmake_file_api_path": "tests/e2e/testdata/m6/file_api_partial/build",
+    "cmake_file_api_resolved_path": "tests/e2e/testdata/m6/file_api_partial/build/.cmake/api/v1/reply",
+    "cmake_file_api_source": "cli"
+  },
+  "summary": {
+    "translation_unit_count": 2,
+    "ranking_total_count": 2,
+    "hotspot_total_count": 0,
+    "top_limit": 10,
+    "include_analysis_heuristic": true,
+    "observation_source": "derived",
+    "target_metadata": "loaded"
+  },
+  "translation_unit_ranking": {
+    "limit": 10,
+    "total_count": 2,
+    "returned_count": 2,
+    "truncated": false,
+    "items": [
+      {
+        "rank": 1,
+        "reference": {
+          "source_path": "src/app.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 3,
+          "include_path_count": 0,
+          "define_count": 0,
+          "score": 3
+        },
+        "targets": [
+          {
+            "display_name": "app",
+            "type": "STATIC_LIBRARY"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/app.cpp"
+          }
+        ]
+      },
+      {
+        "rank": 2,
+        "reference": {
+          "source_path": "src/lib.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 3,
+          "include_path_count": 0,
+          "define_count": 0,
+          "score": 3
+        },
+        "targets": [
+          {
+            "display_name": "lib",
+            "type": "STATIC_LIBRARY"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/lib.cpp"
+          }
+        ]
+      }
+    ]
+  },
+  "include_hotspots": {
+    "limit": 10,
+    "total_count": 0,
+    "returned_count": 0,
+    "truncated": false,
+    "items": []
+  },
+  "target_graph_status": "partial",
+  "target_graph": {
+    "nodes": [
+      {
+        "display_name": "app",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "app::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "lib",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "lib::STATIC_LIBRARY"
+      }
+    ],
+    "edges": [
+      {
+        "from_display_name": "app",
+        "from_unique_key": "app::STATIC_LIBRARY",
+        "to_display_name": "ghost::@99",
+        "to_unique_key": "<external>::ghost::@99",
+        "kind": "direct",
+        "resolution": "external"
+      }
+    ]
+  },
+  "target_hubs": {
+    "inbound": [],
+    "outbound": [],
+    "thresholds": {
+      "in_threshold": 10,
+      "out_threshold": 10
+    }
+  },
+  "diagnostics": [
+    {
+      "severity": "note",
+      "message": "include-based results are heuristic; conditional or generated includes may be missing"
+    },
+    {
+      "severity": "note",
+      "message": "target 'app' references unknown target id 'ghost::@99'"
+    }
+  ]
+}

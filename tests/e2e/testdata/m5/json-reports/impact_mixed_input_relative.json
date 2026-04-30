@@ -1,6 +1,6 @@
 {
   "format": "cmake-xray.impact",
-  "format_version": 1,
+  "format_version": 2,
   "report_type": "impact",
   "inputs": {
     "compile_database_path": "tests/e2e/testdata/m4/with_targets/compile_commands.json",
@@ -76,6 +76,27 @@
       "type": "EXECUTABLE"
     }
   ],
+  "target_graph_status": "loaded",
+  "target_graph": {
+    "nodes": [
+      {
+        "display_name": "app",
+        "type": "EXECUTABLE",
+        "unique_key": "app::EXECUTABLE"
+      },
+      {
+        "display_name": "core",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "core::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "tool",
+        "type": "EXECUTABLE",
+        "unique_key": "tool::EXECUTABLE"
+      }
+    ],
+    "edges": []
+  },
   "diagnostics": [
     {
       "severity": "warning",

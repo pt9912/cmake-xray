@@ -1,0 +1,32 @@
+{
+  "name": "src02",
+  "id": "src02::@s2",
+  "type": "STATIC_LIBRARY",
+  "paths": {
+    "source": ".",
+    "build": "."
+  },
+  "sources": [
+    {
+      "path": "src/src02.cpp",
+      "compileGroupIndex": 0
+    }
+  ],
+  "compileGroups": [
+    {
+      "sourceIndexes": [
+        0
+      ],
+      "language": "CXX",
+      "includes": [],
+      "defines": [],
+      "compileCommandFragments": []
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "hub::@h",
+      "backtrace": 0
+    }
+  ]
+}

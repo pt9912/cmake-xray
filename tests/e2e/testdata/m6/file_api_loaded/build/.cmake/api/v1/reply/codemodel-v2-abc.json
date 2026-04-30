@@ -1,0 +1,137 @@
+{
+  "kind": "codemodel",
+  "version": {
+    "major": 2,
+    "minor": 6
+  },
+  "paths": {
+    "source": "/project",
+    "build": "/project/build"
+  },
+  "configurations": [
+    {
+      "name": "",
+      "directories": [
+        {
+          "source": ".",
+          "build": ".",
+          "projectIndex": 0,
+          "childIndexes": [],
+          "targetIndexes": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ]
+        }
+      ],
+      "projects": [
+        {
+          "name": "myproject",
+          "directoryIndexes": [
+            0
+          ],
+          "targetIndexes": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ]
+        }
+      ],
+      "targets": [
+        {
+          "name": "hub",
+          "id": "hub::@h",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-hub-0.json"
+        },
+        {
+          "name": "src00",
+          "id": "src00::@s0",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-src00-1.json"
+        },
+        {
+          "name": "src01",
+          "id": "src01::@s1",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-src01-2.json"
+        },
+        {
+          "name": "src02",
+          "id": "src02::@s2",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-src02-3.json"
+        },
+        {
+          "name": "src03",
+          "id": "src03::@s3",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-src03-4.json"
+        },
+        {
+          "name": "src04",
+          "id": "src04::@s4",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-src04-5.json"
+        },
+        {
+          "name": "src05",
+          "id": "src05::@s5",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-src05-6.json"
+        },
+        {
+          "name": "src06",
+          "id": "src06::@s6",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-src06-7.json"
+        },
+        {
+          "name": "src07",
+          "id": "src07::@s7",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-src07-8.json"
+        },
+        {
+          "name": "src08",
+          "id": "src08::@s8",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-src08-9.json"
+        },
+        {
+          "name": "src09",
+          "id": "src09::@s9",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-src09-10.json"
+        }
+      ]
+    }
+  ]
+}

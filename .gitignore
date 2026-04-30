@@ -11,6 +11,19 @@ tests/e2e/testdata/m4/**/build/.cmake/api/*
 tests/e2e/testdata/m4/**/build/.cmake/api/v1/*
 !tests/e2e/testdata/m4/**/build/.cmake/api/v1/reply/
 !tests/e2e/testdata/m4/**/build/.cmake/api/v1/reply/**
+# AP M6-1.2 A.1: M6 dataset fixtures with target dependencies. Same precedence
+# as the m4 block above so the synthetic CMake reply files survive `build/`
+# being globally ignored.
+!tests/e2e/testdata/m6/**/build/
+tests/e2e/testdata/m6/**/build/*
+!tests/e2e/testdata/m6/**/build/.cmake/
+tests/e2e/testdata/m6/**/build/.cmake/*
+!tests/e2e/testdata/m6/**/build/.cmake/api/
+tests/e2e/testdata/m6/**/build/.cmake/api/*
+!tests/e2e/testdata/m6/**/build/.cmake/api/v1/
+tests/e2e/testdata/m6/**/build/.cmake/api/v1/*
+!tests/e2e/testdata/m6/**/build/.cmake/api/v1/reply/
+!tests/e2e/testdata/m6/**/build/.cmake/api/v1/reply/**
 # AP M5-1.8 A.3: versionierte File-API-Reply-Fixtures fuer
 # tests/reference/scale_*/build/.cmake/api/v1/reply/. Selbe Praezedenz-
 # Logik wie der m4-Block oben: erst alle build/-Inhalte ignorieren, dann
