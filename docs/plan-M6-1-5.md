@@ -659,6 +659,13 @@ Neue Graph-Attribute fuer Analyze-DOT:
 
 Diese sieben sind Pflicht ab AP 1.5 fuer Analyze-DOT.
 
+DOT serialisiert bewusst nicht den vollstaendigen
+`analysis_section_states`-Block. Der DOT-Vertrag enthaelt nur
+konfigurationsrelevante Werte und die angeforderte, validierte
+`effective_sections`-Liste. Vollstaendige Section-States sind in JSON,
+HTML, Console und Markdown sichtbar; DOT bleibt auf Graph-Metadaten und
+Graph-Inhalte beschraenkt.
+
 Wenn eine Section `disabled` oder `not_loaded` ist, werden ihre
 Knoten und Kanten nicht ausgegeben. Die `graph_*`-Konfigurations-
 Attribute bleiben trotzdem vorhanden; der Section-State selbst wird in
@@ -730,6 +737,13 @@ Service-Tests `tests/hexagon/test_project_analyzer.cpp`:
   beide Sections aktiv.
 - `--analysis target-graph,target-hubs` mit Compile-DB-only:
   beide `not_loaded`. Diagnostic vorhanden.
+- Target-Graph-State-Invarianten: gezielter Test fuer
+  `analysis_section_states["target-graph"]` plus
+  `target_graph_status` in den Kombinationen `disabled`, `not_loaded`,
+  `loaded` und `partial`; unzulaessige Kombinationen wie
+  `target_graph_status="disabled"` bei aktivem `target-graph` oder
+  `analysis_section_states["target-hubs"]="active"` bei
+  `target_graph_status="not_loaded"` duerfen nicht entstehen.
 - `--tu-threshold include_path_count=5`: TUs mit
   `include_path_count < 5` werden nicht ins Ranking aufgenommen;
   `tu_ranking_excluded_by_thresholds_count > 0`.
@@ -789,7 +803,8 @@ Adapter-Tests fuer alle Reportformate:
 - JSON: `analysis_configuration` und `analysis_section_states`-Bloecke
   immer vorhanden mit Pflichtschluesseln; disabled/not_loaded-Sections
   werden mit Empty-Strukturen serialisiert.
-- DOT: alle sieben neuen `graph_*`-Attribute immer gesetzt.
+- DOT: alle sieben neuen `graph_*`-Attribute immer gesetzt; kein
+  vollstaendiger `analysis_section_states`-Block in DOT.
 - HTML: `Analysis Configuration`-Section mit korrekten Werten;
   Section-State-Badges in den jeweiligen Sections sichtbar.
 - Console: `Analysis Configuration`-Block byteweise gepinnt;
