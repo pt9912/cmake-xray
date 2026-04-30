@@ -65,9 +65,22 @@ read_local_image_id() {
 # manifest bytes and would diverge across buildx versions or whitespace
 # rendering. On a missing tag the inspect exits 1 and the function
 # yields an empty stdout, which the callers detect via `[ -z ... ]`.
+#
+# buildx 0.30.x (shipped with Ubuntu 24.04's docker package) silently
+# ignores `--format` and prints the default `Name/MediaType/Digest`
+# block; buildx >= 0.33 honours the template and prints just the
+# digest. The awk filter accepts both: a single `sha256:...` line on
+# its own is taken verbatim, otherwise the value of the `Digest:` line
+# is extracted. The Ubuntu-runner-driven CI failure surfaced the
+# divergence; v1.2.0's release.yml run hit it after the cmd_latest
+# pre-push abort was lifted.
 read_remote_digest() {
     local tag="$1"
-    docker buildx imagetools inspect "$tag" --format '{{.Manifest.Digest}}' 2>/dev/null
+    docker buildx imagetools inspect "$tag" --format '{{.Manifest.Digest}}' 2>/dev/null \
+        | awk '
+            /^sha256:/ { print; exit }
+            /^Digest:[[:space:]]+sha256:/ { print $2; exit }
+        '
 }
 
 cmd_build() {
@@ -172,14 +185,22 @@ cmd_latest() {
         exit 1
     fi
 
+    # Inform the operator if `latest` already exists with a different
+    # digest. This is the normal case for any release after the first
+    # (latest currently points at the previous stable release); the
+    # transition to the new versioned digest happens via `docker push`
+    # below. The pre-push form of this check used to abort hard, which
+    # made every release after v1.1.0 unable to update latest -- the
+    # bug shipped because every dry-run scenario uses a prerelease
+    # version and skips this code path. Fall-4-style detection (latest
+    # stuck on a digest unrelated to any release) is now an external
+    # inspection concern, with the manual recovery path in
+    # docs/releasing.md unchanged for those cases. The post-push verify
+    # on lines below is the correctness guarantee for the normal flow.
     local existing_latest_digest
     existing_latest_digest="$(read_remote_digest "$latest_tag" || true)"
-
     if [ -n "$existing_latest_digest" ] && [ "$existing_latest_digest" != "$versioned_digest" ]; then
-        echo "error: remote $latest_tag already points at digest $existing_latest_digest" >&2
-        echo "       which differs from the validated $versioned_tag digest $versioned_digest" >&2
-        echo "       'latest' may only be updated by the documented manual recovery path; aborting" >&2
-        exit 1
+        echo "info: $latest_tag currently points at $existing_latest_digest; updating to $versioned_digest"
     fi
 
     docker tag "$versioned_tag" "$latest_tag"

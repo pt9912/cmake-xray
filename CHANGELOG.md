@@ -13,6 +13,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `scripts/oci-image-publish.sh` `latest` command no longer aborts
+  when `:latest` already points at a different digest than the new
+  versioned tag. The pre-push abort blocked every release after the
+  first regular release, because `:latest` legitimately carries the
+  previous stable release's digest at that moment. The post-push
+  digest-verify on `:latest` is unchanged and remains the correctness
+  guarantee for the normal flow; Fall 4 of `docs/releasing.md`
+  Recovery-Runbook stays the manual path for stuck-`latest`
+  inspections.
+- `read_remote_digest` in `scripts/oci-image-publish.sh` now extracts
+  the digest robustly across buildx versions. buildx 0.30.x (Ubuntu
+  24.04's docker package, the GHA ubuntu-latest runner) silently
+  ignores `--format '{{.Manifest.Digest}}'` and prints the full
+  `Name/MediaType/Digest` block; buildx >= 0.33 honours the template
+  and prints just the digest string. The post-push digest comparison
+  in `cmd_latest` previously compared the multi-line block as-is,
+  which differed between `:latest` and `:X.Y.Z` only in the `Name:`
+  field, so the verify always failed once it was reached. The awk
+  filter accepts both buildx output shapes.
+- Regression coverage for both fixes: new stable-version scenario in
+  `tests/release/test_release_dry_run.sh` exercises the `cmd_latest`
+  path end-to-end against a pre-seeded `:latest` digest (the
+  prerelease versions in scenarios 1-9 all skip `cmd_latest`, which
+  is why both bugs shipped uncovered).
+
 ## [1.2.0] - 2026-04-30
 
 M5 hardens the report formats, ships a reproducible release pipeline and

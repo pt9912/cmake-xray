@@ -186,10 +186,18 @@ gleichzeitiges Setzen beider Cache-Variablen ist `FATAL_ERROR`.
 
 - nur fuer regulaere Releases (Versions-String enthaelt kein `-`).
 - nur nach erfolgreichem Push und Digest-Validierung des Versions-Tags.
-- bei Digest-Mismatch zwischen `latest` und Versions-Tag bricht der
-  Workflow hart ab; ein Update von `latest` auf einen anderen Digest
-  ist ausschliesslich ueber den dokumentierten manuellen Recovery-Pfad
-  zulaessig (siehe Recovery-Runbook unten, Fall 4).
+- ein bestehender `latest`-Digest (typischerweise der vorherige stable
+  Release) wird durch den Push transparent auf den neuen Versions-Tag-
+  Digest umgesetzt; der Workflow protokolliert die Transition als
+  `info:`-Zeile zur Audit-Spur.
+- nach dem Push wird der `latest`-Digest gegen den neu publishten
+  Versions-Tag-Digest verifiziert; ein Mismatch (z. B. durch ein
+  konkurrierendes Retag waehrend des Workflows) bricht hart ab, bevor
+  der GitHub-Release public promotet wird.
+- Fall 4 (Recovery-Runbook unten) bleibt der Pfad fuer den Fall, dass
+  `latest` durch externe Inspektion auf einem Digest stehengeblieben
+  ist, der weder dem aktuellen Release noch einem dokumentierten
+  Vorgaenger-Release entspricht.
 
 ## Plattformartefakte macOS und Windows
 

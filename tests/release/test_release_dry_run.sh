@@ -53,6 +53,20 @@ docker run --rm -d -p "${registry_port}:5000" --name "$registry_name" \
 failures=0
 state_dirs=()
 
+# buildx 0.30.x ignores `--format '{{.Manifest.Digest}}'` and prints the
+# default Name/MediaType/Digest block; buildx >= 0.33 honours the
+# template. Mirror the awk filter in scripts/oci-image-publish.sh's
+# read_remote_digest so cross-tag digest comparisons (e.g. scenario 10)
+# survive the divergence on whichever buildx the host happens to ship.
+inspect_digest() {
+    local tag="$1"
+    docker buildx imagetools inspect "$tag" --format '{{.Manifest.Digest}}' 2>/dev/null \
+        | awk '
+            /^sha256:/ { print; exit }
+            /^Digest:[[:space:]]+sha256:/ { print $2; exit }
+        '
+}
+
 # Files inside the state-dirs are written by the in-container root user
 # of the dry-run; the host user cannot rm them directly. Run a tiny
 # alpine container with the bind-mount and let the in-container root
@@ -452,6 +466,65 @@ elif [ -f "$state9_dir/state/draft_release_created" ] \
     failures=$((failures + 1))
 else
     echo "PASS: scenario 9 macos/windows archive aborts before any state transition"
+fi
+
+# ---- Scenario 10: stable version updates a pre-existing latest digest ----
+#
+# Regression for the v1.2.0 release-pipeline failure: cmd_latest in
+# scripts/oci-image-publish.sh used to abort hard whenever
+# `${repo}:latest` already existed with a digest that differed from the
+# new versioned-tag digest. Every release after the first hits exactly
+# that condition (latest currently points at the previous stable
+# release), so v1.2.0 was the first release that reached the buggy
+# code path -- and failed in the GHA "Publish OCI image (latest tag for
+# stable releases)" step. Scenarios 1-9 all use prerelease versions
+# (`-` suffix), which release-dry-run.sh skips for `cmd_latest`, so the
+# bug had zero coverage. This scenario exercises the stable code path:
+# pre-seed `latest` with a different image, then run the full dry-run
+# for a non-prerelease version, and assert that latest is updated to
+# the new versioned digest by the end.
+state10_dir="$(mktemp -d -t cmake-xray-dry-run-s10.XXXXXX)"
+state_dirs+=("$state10_dir")
+mkdir -p "$state10_dir/state"
+
+s10_repo="localhost:${registry_port}/cmake-xray"
+s10_latest_tag="${s10_repo}:latest"
+
+# Pre-seed latest with an unrelated image so its digest differs from
+# whatever the dry-run will push at :0.0.10.
+docker pull alpine:3.21 >/dev/null 2>&1 || true
+docker tag alpine:3.21 "$s10_latest_tag"
+docker push "$s10_latest_tag" >/dev/null
+preseed_latest_digest=$(inspect_digest "$s10_latest_tag")
+
+s10_output=$(run_dry_run v0.0.10 "$state10_dir" 2>&1) || {
+    echo "FAIL: scenario 10 stable-version dry-run failed" >&2
+    printf '%s\n' "$s10_output" | tail -20 >&2 || true
+    failures=$((failures + 1))
+}
+assert_output_contains "scenario 10 stable dry-run reaches release_published" \
+    "$s10_output" "[dry-run] release_published"
+assert_marker "scenario 10 stable dry-run created oci_image_published marker" \
+    "$state10_dir" "oci_image_published"
+
+# After the dry-run, latest must point at the new versioned digest, not
+# the pre-seed alpine digest. This is the core regression: with the
+# old cmd_latest pre-push abort, the dry-run would have failed before
+# touching latest, and the digest would still equal preseed_latest_digest.
+s10_versioned_digest=$(inspect_digest "${s10_repo}:0.0.10")
+s10_post_latest_digest=$(inspect_digest "$s10_latest_tag")
+if [ -z "$s10_versioned_digest" ]; then
+    echo "FAIL: scenario 10 versioned tag :0.0.10 not present after dry-run" >&2
+    failures=$((failures + 1))
+elif [ "$s10_post_latest_digest" = "$preseed_latest_digest" ]; then
+    echo "FAIL: scenario 10 latest still points at pre-seed digest (${preseed_latest_digest})" >&2
+    echo "       cmd_latest pre-push abort regression?" >&2
+    failures=$((failures + 1))
+elif [ "$s10_post_latest_digest" != "$s10_versioned_digest" ]; then
+    echo "FAIL: scenario 10 latest digest ${s10_post_latest_digest:-<unset>} does not match versioned ${s10_versioned_digest}" >&2
+    failures=$((failures + 1))
+else
+    echo "PASS: scenario 10 latest updated from pre-seed to new versioned digest (${s10_versioned_digest})"
 fi
 
 echo ""
