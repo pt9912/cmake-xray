@@ -36,11 +36,14 @@ verwendet werden.
 
 ### Plattformstatus
 
-Linux ist die offizielle Releaseplattform fuer M5; macOS und Windows sind
-`known_limited`. Die Beispiele in diesem Guide setzen Linux voraus, laufen
-mit Anpassungen aber auch auf macOS und Windows lokal. Eine offizielle
-macOS-/Windows-Freigabe ist aus diesem Guide ausdruecklich *nicht*
-abgeleitet — die normative Aussage steht in
+Linux ist die offizielle Releaseplattform fuer M5; macOS arm64 und
+Windows x86_64 sind seit 2026-04-30 als `validated_smoke` freigegeben,
+weil Branch-Protection auf `main` die `Native (...)`-Required-Checks
+verankert hat und ein gruener Post-Protection-CI-Lauf auf den
+Plattform-Runnern auditiert ist. Die Beispiele in diesem Guide setzen
+Linux voraus, laufen mit Anpassungen aber auch auf macOS und Windows
+lokal. Eine offizielle macOS-/Windows-Releasefreigabe ist aus diesem
+Guide ausdruecklich *nicht* abgeleitet — die normative Aussage steht in
 [releasing.md](./releasing.md) "Plattformartefakte macOS und Windows";
 Required-Check-Namen, Atomic-Replace-Matrix und Smoke-Report-Vertrag in
 [quality.md](./quality.md) "Plattformstatus (AP M5-1.7)".

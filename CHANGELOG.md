@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- macOS arm64 and Windows x86_64 platform status promoted from
+  `known_limited` to `validated_smoke` in `README.md`,
+  `docs/guide.md`, `docs/releasing.md`, `docs/quality.md` and
+  `docs/plan-M5-1-7.md`. Both external preconditions from
+  `docs/plan-M5-1-7.md` "Plattformstatus-Vertrag" are now met:
+  Branch-Protection on `main` anchors the five Required Checks
+  (`Native (linux-x86_64)`, `Native (macos-arm64)`,
+  `Native (windows-x86_64)`, `Docker Runtime Build`, `docs/examples
+  Host-Portability`), and build.yml run 25153798452 (commit
+  `7be4829`, post-protection) is the auditable green CI run on the
+  platform runners. The `[1.2.0]` platform-status table stays
+  unchanged because it is the release-time record; the upgrade
+  ships in the next release.
+
 ### Fixed
 
 - `scripts/oci-image-publish.sh` `latest` command no longer aborts

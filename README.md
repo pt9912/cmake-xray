@@ -61,17 +61,17 @@ Aktueller M5-Stand:
 | Plattform | Status |
 |---|---|
 | Linux x86_64 | `supported` |
-| macOS arm64 | `known_limited` |
-| Windows x86_64 | `known_limited` |
+| macOS arm64 | `validated_smoke` |
+| Windows x86_64 | `validated_smoke` |
 
-Linux ist die einzige offizielle Releaseplattform; die nativen
-macOS-/Windows-Jobs fahren via `ctest` bereits die Atomic-Replace- und
-CLI-Pflicht-Smokes (Tranchen B und C.1), die UNC/Extended-Length-
-Adaptertests (C.2) und auf Windows zusaetzlich den PowerShell-Pflicht-
-Smoke (D.1). `known_limited` bleibt bestehen, bis externe
-Branch-Protection den jeweiligen `Native (...)`-Check als Required
-Check verankert und ein gruener CI-Lauf auf den Plattform-Runnern
-auditiert ist. Detaillierte Gate-Erklaerungen,
+Linux ist die einzige offizielle Releaseplattform; macOS arm64 und
+Windows x86_64 sind seit 2026-04-30 als `validated_smoke` freigegeben,
+nachdem Branch-Protection auf `main` die `Native (...)`-Required-Checks
+verankert hat und build.yml run 25153798452 als gruener
+Post-Protection-Lauf auditiert ist. Die nativen Jobs fahren via `ctest`
+die Atomic-Replace- und CLI-Pflicht-Smokes (Tranchen B und C.1), die
+UNC/Extended-Length-Adaptertests (C.2) und auf Windows zusaetzlich den
+PowerShell-Pflicht-Smoke (D.1). Detaillierte Gate-Erklaerungen,
 Required-Check-Namen und die Atomic-Replace-Matrix stehen in
 [docs/quality.md](./docs/quality.md) "Plattformstatus (AP M5-1.7)";
 Release- und Preview-Grenzen in [docs/releasing.md](./docs/releasing.md)

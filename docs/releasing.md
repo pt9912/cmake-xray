@@ -216,8 +216,8 @@ Aktueller M5-Stand:
 | Plattform | Status | Release-Artefakt |
 |---|---|---|
 | Linux x86_64 | `supported` | Linux-CLI-Archiv (`.tar.gz`) plus OCI-Image |
-| macOS arm64 | `known_limited` | kein offizielles Release-Artefakt |
-| Windows x86_64 | `known_limited` | kein offizielles Release-Artefakt |
+| macOS arm64 | `validated_smoke` | kein offizielles Release-Artefakt |
+| Windows x86_64 | `validated_smoke` | kein offizielles Release-Artefakt |
 
 `validated_smoke` darf erst dokumentiert werden, wenn pro Plattform (a) der
 zugehoerige Required Check in der Branch-Protection verankert ist und (b)
@@ -226,11 +226,15 @@ AP 1.7 hat die workflow-internen Voraussetzungen voll geliefert: `ctest`
 fuehrt auf der Native-Matrix die Atomic-Replace-Tests (B) und die
 CLI-Pflicht-Smokes inklusive `--output` (C.1) aus, plus die
 Adapter-Tests fuer UNC/Extended-Length (C.2) und auf Windows zusaetzlich
-`scripts/platform-smoke.ps1` (D.1). Beide externen Bedingungen sind aber
-Repo-Konfiguration bzw. Run-Audit; der heutige Stand bleibt deshalb
-`known_limited`. Das Plattformstatus-Vokabular und die Required-Check-
-Namen sind in [docs/plan-M5-1-7.md](./plan-M5-1-7.md) verbindlich
-festgelegt; per-Adapter-Coverage und Atomic-Replace-Matrix in
+`scripts/platform-smoke.ps1` (D.1). Beide externen Bedingungen sind seit
+2026-04-30 erfuellt: Branch-Protection auf `main` verankert die fuenf
+Required Checks (`Native (linux-x86_64)`, `Native (macos-arm64)`,
+`Native (windows-x86_64)`, `Docker Runtime Build`, `docs/examples
+Host-Portability`), und build.yml run 25153798452 (commit `7be4829`,
+post-protection) bildet den auditierbaren gruenen Run-Audit. Das
+Plattformstatus-Vokabular und die Required-Check-Namen sind in
+[docs/plan-M5-1-7.md](./plan-M5-1-7.md) verbindlich festgelegt;
+per-Adapter-Coverage und Atomic-Replace-Matrix in
 [docs/quality.md](./quality.md) "Plattformstatus (AP M5-1.7)".
 
 ### Build-Matrix vs. Release-Matrix
@@ -260,13 +264,12 @@ festgelegt; per-Adapter-Coverage und Atomic-Replace-Matrix in
   `e2e_binary_artifacts` (mit den `--output`-Smokes aus C.1) und
   `e2e_binary_verbosity`). Windows fuegt `scripts/platform-smoke.ps1`
   (D.1) als konvertierungsfreien `native_powershell`-Pflichtmodus
-  hinzu. Der
-  `known_limited`-Status haengt deshalb nur noch an zwei *externen*
-  Bedingungen: die Branch-Protection muss den jeweiligen
-  `Native (...)`-Check als Required Check verankern, und ein gruener
-  CI-Lauf auf den Plattform-Runnern muss auditiert sein. Eine spaetere
-  Tranche kann zusaetzlich einen `Platform Smoke Report (...)`-Verifier-
-  Pfad bauen, ohne den Release-Pfad selbst zu beruehren.
+  hinzu. Beide Plattformen sind seit 2026-04-30 als `validated_smoke`
+  freigegeben; Branch-Protection auf `main` verankert die `Native
+  (...)`-Required-Checks und build.yml run 25153798452 ist der
+  auditierbare Post-Protection-Lauf. Eine spaetere Tranche kann
+  zusaetzlich einen `Platform Smoke Report (...)`-Verifier-Pfad bauen,
+  ohne den Release-Pfad selbst zu beruehren.
 - Der Release-Asset-Allowlist-Guard hat keine macOS-/Windows-Whitelist;
   ein etwaiger Preview-Pfad mueesste eine eigene, separat versionierte
   Allowlist und Tag-Konvention mitbringen (heute nicht eingerichtet).

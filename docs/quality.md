@@ -275,8 +275,8 @@ Aktueller Stand nach Abschluss von AP 1.7 (alle Tranchen A–D ausgeliefert):
 | Plattform | Status | Required Check | Hinweis |
 |---|---|---|---|
 | Linux x86_64 | `supported` | `Native (linux-x86_64)` plus die Docker-Gates oben | offizielle M5-Releaseplattform; Atomic-Replace-/CLI-Pflicht-Smokes laufen ueber bestehende E2E-Suites |
-| macOS arm64 | `known_limited` | `Native (macos-arm64)` | `ctest` faehrt `xray_tests` (inkl. Atomic-Replace-Tests aus B und UNC/Extended-Length-Tests aus C.2) plus die E2E-Suites `e2e_binary_smoke`/`_artifacts`/`_verbosity` (inkl. der `--output`-Pflicht-Smokes aus C.1). Status bleibt `known_limited`, weil die Branch-Protection den Required Check noch nicht versioniert verankert hat und ein gruener CI-Lauf auf macos-latest noch nicht auditiert ist |
-| Windows x86_64 | `known_limited` | `Native (windows-x86_64)` plus PowerShell-Smoke (D.1) | `ctest` faehrt dieselben Pflicht-Suites wie macOS; zusaetzlich laeuft `scripts/platform-smoke.ps1` als konvertierungsfreier `native_powershell`-Pfad. Status bleibt `known_limited` aus denselben externen Gruenden wie macOS (Branch-Protection plus Audit) |
+| macOS arm64 | `validated_smoke` | `Native (macos-arm64)` | `ctest` faehrt `xray_tests` (inkl. Atomic-Replace-Tests aus B und UNC/Extended-Length-Tests aus C.2) plus die E2E-Suites `e2e_binary_smoke`/`_artifacts`/`_verbosity` (inkl. der `--output`-Pflicht-Smokes aus C.1). Status seit 2026-04-30 `validated_smoke`, weil Branch-Protection den Required Check verankert hat und build.yml run 25153798452 (commit `7be4829`, post-protection) der auditierbare gruene CI-Lauf auf macos-latest ist |
+| Windows x86_64 | `validated_smoke` | `Native (windows-x86_64)` plus PowerShell-Smoke (D.1) | `ctest` faehrt dieselben Pflicht-Suites wie macOS; zusaetzlich laeuft `scripts/platform-smoke.ps1` als konvertierungsfreier `native_powershell`-Pfad. Status seit 2026-04-30 `validated_smoke` aus denselben Bedingungen wie macOS (Required Check + Audit ueber run 25153798452) |
 
 Die Required-Check-Namen sind in
 [docs/plan-M5-1-7.md](./plan-M5-1-7.md) "Plattformstatus-Vertrag" verbindlich
