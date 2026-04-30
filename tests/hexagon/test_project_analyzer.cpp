@@ -705,10 +705,12 @@ class FileApiPortWithGraph final
     : public xray::hexagon::ports::driven::BuildModelPort {
 public:
     FileApiPortWithGraph(TargetGraph graph, TargetGraphStatus status,
-                         std::vector<TargetAssignment> assignments = {})
+                         std::vector<TargetAssignment> assignments = {},
+                         std::vector<xray::hexagon::model::Diagnostic> diagnostics = {})
         : graph_(std::move(graph)),
           status_(status),
-          assignments_(std::move(assignments)) {}
+          assignments_(std::move(assignments)),
+          diagnostics_(std::move(diagnostics)) {}
 
     xray::hexagon::model::BuildModelResult load_build_model(
         std::string_view) const override {
@@ -725,6 +727,7 @@ public:
         result.target_assignments = assignments_;
         result.target_graph = graph_;
         result.target_graph_status = status_;
+        result.diagnostics = diagnostics_;
         return result;
     }
 
@@ -732,6 +735,7 @@ private:
     TargetGraph graph_;
     TargetGraphStatus status_;
     std::vector<TargetAssignment> assignments_;
+    std::vector<xray::hexagon::model::Diagnostic> diagnostics_;
 };
 
 }  // namespace m6_pa
@@ -795,10 +799,13 @@ TEST_CASE("project analyzer: mixed-input path propagates target_graph from file-
     CHECK(result.target_hubs_in[0].unique_key == "hub::STATIC_LIBRARY");
 }
 
-TEST_CASE("project analyzer: partial graph status propagates from build model") {
+TEST_CASE("project analyzer: partial graph status and build-model diagnostics propagate to AnalysisResult") {
     const m6_pa::FileApiPortWithGraph file_api_port{
         m6_pa::star_graph_into("hub::STATIC_LIBRARY", 3),
-        m6_pa::TargetGraphStatus::partial};
+        m6_pa::TargetGraphStatus::partial,
+        {},
+        {{xray::hexagon::model::DiagnosticSeverity::note,
+          "target 'a' references unknown target id 'ghost::@99'"}}};
     const UnusedBuildModelPort compile_db_port;
     const EmptyIncludeResolverPort include_resolver_port;
     const xray::hexagon::services::ProjectAnalyzer analyzer{
@@ -809,6 +816,14 @@ TEST_CASE("project analyzer: partial graph status propagates from build model") 
 
     REQUIRE(result.compile_database.is_success());
     CHECK(result.target_graph_status == m6_pa::TargetGraphStatus::partial);
+    bool found_external_diagnostic = false;
+    for (const auto& d : result.diagnostics) {
+        if (d.message.find("references unknown target id 'ghost::@99'") !=
+            std::string::npos) {
+            found_external_diagnostic = true;
+        }
+    }
+    CHECK(found_external_diagnostic);
 }
 
 TEST_CASE("project analyzer: target_metadata=partial does not pull target_graph_status into partial when graph is fully resolved") {

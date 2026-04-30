@@ -444,6 +444,42 @@ struct TargetReplyResult {
     bool retry{false};
 };
 
+CachedTargetForGraph cache_target_dependencies(const nlohmann::json& target,
+                                               const TargetInfo& target_info,
+                                               const std::string& raw_id) {
+    const bool has = target.contains("dependencies");
+    const bool is_array = has && target["dependencies"].is_array();
+    // Aggregate return avoids the gcov NRVO artifact other returns in this
+    // file work around the same way.
+    return CachedTargetForGraph{
+        .target_info = target_info,
+        .raw_id = raw_id,
+        .dependencies = is_array ? target["dependencies"] : nlohmann::json{},
+        .dependencies_malformed = has && !is_array,
+    };
+}
+
+// Phase 1: every target reply contributes a node to the graph and, when its
+// raw file-API id is present, an entry to the id->TargetInfo map. First-wins
+// resolution on collision; later targets stay as nodes but are not reachable
+// via the colliding id. Phase 2 then resolves the cached dependencies.
+void register_target_for_graph(const nlohmann::json& target,
+                               const TargetInfo& target_info,
+                               ParsedTargets& parsed_targets) {
+    parsed_targets.nodes.push_back(target_info);
+    const auto raw_id = target.value("id", std::string{});
+    if (!raw_id.empty()) {
+        const auto [it, inserted] =
+            parsed_targets.id_to_info.try_emplace(raw_id, target_info);
+        if (!inserted) {
+            parsed_targets.id_collision_displaced[raw_id].push_back(
+                target_info.unique_key);
+        }
+    }
+    parsed_targets.cached_targets.push_back(
+        cache_target_dependencies(target, target_info, raw_id));
+}
+
 std::optional<BuildModelResult> append_target_reply(const std::filesystem::path& reply_dir,
                                                     const ParsedCodemodel& parsed_codemodel,
                                                     const nlohmann::json& target_ref,
@@ -481,36 +517,7 @@ std::optional<BuildModelResult> append_target_reply(const std::filesystem::path&
     const auto target_info =
         TargetInfo{target_name, target_type, target_name + "::" + target_type};
 
-    // Phase 1: every target reply contributes a node to the graph and, when
-    // its raw file-API id is present, an entry to the id->TargetInfo map.
-    // First-wins resolution on collision; later targets stay as nodes but are
-    // not reachable via the colliding id.
-    parsed_targets.nodes.push_back(target_info);
-    const auto raw_id = target.value("id", std::string{});
-    if (!raw_id.empty()) {
-        const auto [it, inserted] =
-            parsed_targets.id_to_info.try_emplace(raw_id, target_info);
-        if (!inserted) {
-            parsed_targets.id_collision_displaced[raw_id].push_back(
-                target_info.unique_key);
-        }
-    }
-
-    // Cache the dependencies subobject for Phase 2; a present-but-malformed
-    // (non-array) dependencies field surfaces as a graph-status diagnostic
-    // in Phase 2 without aborting the whole reply.
-    CachedTargetForGraph cached;
-    cached.target_info = target_info;
-    cached.raw_id = raw_id;
-    if (target.contains("dependencies")) {
-        if (target["dependencies"].is_array()) {
-            cached.dependencies = target["dependencies"];
-        } else {
-            cached.dependencies_malformed = true;
-        }
-    }
-    parsed_targets.cached_targets.push_back(std::move(cached));
-
+    register_target_for_graph(target, target_info, parsed_targets);
     append_target_entries(target, parsed_codemodel, target_info, parsed_targets);
     return std::nullopt;
 }
@@ -617,80 +624,145 @@ void emit_id_collision_diagnostics(const ParsedTargets& parsed_targets,
     }
 }
 
+struct GraphResolverState {
+    std::unordered_set<EdgeIdentity, EdgeIdentityHash> seen_edges;
+    std::unordered_set<PairKey, PairKeyHash> seen_external_diags;
+    std::unordered_set<PairKey, PairKeyHash> seen_self_edge_diags;
+};
+
+// Bundles the mutable outputs threaded through the dependency-resolution
+// helpers so individual functions stay below the 5-parameter quality bar.
+struct GraphResolverOutputs {
+    GraphResolverState state;
+    std::vector<TargetDependency>* edges;
+    std::vector<Diagnostic>* diagnostics;
+    bool* graph_partial;
+};
+
+struct DependencyResolution {
+    bool is_resolved;
+    std::string to_unique_key;
+    std::string to_display_name;
+};
+
+std::optional<std::string> read_dependency_id(const nlohmann::json& dep) {
+    if (!dep.is_object() || !dep.contains("id") || !dep["id"].is_string())
+        return std::nullopt;
+    auto id = dep["id"].get<std::string>();
+    if (id.empty()) return std::nullopt;
+    return id;
+}
+
+DependencyResolution resolve_dependency_id(const ParsedTargets& parsed_targets,
+                                           const std::string& raw_id) {
+    const auto it = parsed_targets.id_to_info.find(raw_id);
+    if (it != parsed_targets.id_to_info.end()) {
+        return {true, it->second.unique_key, it->second.display_name};
+    }
+    return {false, "<external>::" + raw_id, raw_id};
+}
+
+void emit_missing_id_diagnostic(const TargetInfo& from,
+                                std::vector<Diagnostic>& diagnostics) {
+    diagnostics.push_back(
+        {DiagnosticSeverity::warning,
+         "target '" + from.display_name +
+             "' has a dependency entry without a target id; entry skipped"});
+}
+
+void emit_self_edge_diagnostic_once(
+    const TargetInfo& from,
+    std::unordered_set<PairKey, PairKeyHash>& seen,
+    std::vector<Diagnostic>& diagnostics) {
+    if (!seen.insert(PairKey{from.unique_key, from.unique_key}).second) return;
+    diagnostics.push_back(
+        {DiagnosticSeverity::note,
+         "target '" + from.display_name + "' has a self-dependency; edge skipped"});
+}
+
+void emit_external_diagnostic_once(
+    const TargetInfo& from, const std::string& raw_id,
+    std::unordered_set<PairKey, PairKeyHash>& seen,
+    std::vector<Diagnostic>& diagnostics) {
+    if (!seen.insert(PairKey{from.unique_key, raw_id}).second) return;
+    diagnostics.push_back(
+        {DiagnosticSeverity::note,
+         "target '" + from.display_name + "' references unknown target id '" +
+             raw_id + "'"});
+}
+
+void append_resolved_edge(const TargetInfo& from,
+                          const DependencyResolution& resolution,
+                          GraphResolverState& state,
+                          std::vector<TargetDependency>& edges) {
+    const EdgeIdentity edge_id{from.unique_key, resolution.to_unique_key,
+                               TargetDependencyKind::direct};
+    if (!state.seen_edges.insert(edge_id).second) return;
+    edges.push_back(TargetDependency{from.unique_key,
+                                     from.display_name,
+                                     resolution.to_unique_key,
+                                     resolution.to_display_name,
+                                     TargetDependencyKind::direct,
+                                     resolution.is_resolved
+                                         ? TargetDependencyResolution::resolved
+                                         : TargetDependencyResolution::external});
+}
+
+void resolve_one_dependency(const CachedTargetForGraph& cached,
+                            const nlohmann::json& dep,
+                            const ParsedTargets& parsed_targets,
+                            GraphResolverOutputs& out) {
+    const auto raw_id_opt = read_dependency_id(dep);
+    if (!raw_id_opt.has_value()) {
+        emit_missing_id_diagnostic(cached.target_info, *out.diagnostics);
+        *out.graph_partial = true;
+        return;
+    }
+    const auto& raw_id = *raw_id_opt;
+    const auto resolution = resolve_dependency_id(parsed_targets, raw_id);
+
+    if (cached.target_info.unique_key == resolution.to_unique_key) {
+        emit_self_edge_diagnostic_once(cached.target_info,
+                                        out.state.seen_self_edge_diags,
+                                        *out.diagnostics);
+        *out.graph_partial = true;
+        return;
+    }
+
+    if (!resolution.is_resolved) {
+        emit_external_diagnostic_once(cached.target_info, raw_id,
+                                       out.state.seen_external_diags,
+                                       *out.diagnostics);
+        *out.graph_partial = true;
+    }
+
+    append_resolved_edge(cached.target_info, resolution, out.state, *out.edges);
+}
+
+void resolve_dependencies_for_target(const CachedTargetForGraph& cached,
+                                     const ParsedTargets& parsed_targets,
+                                     GraphResolverOutputs& out) {
+    if (cached.dependencies_malformed) {
+        out.diagnostics->push_back(
+            {DiagnosticSeverity::warning,
+             "target '" + cached.target_info.display_name +
+                 "' has a malformed dependencies field; edges skipped"});
+        *out.graph_partial = true;
+        return;
+    }
+    if (!cached.dependencies.is_array()) return;
+    for (const auto& dep : cached.dependencies) {
+        resolve_one_dependency(cached, dep, parsed_targets, out);
+    }
+}
+
 void resolve_target_dependencies(const ParsedTargets& parsed_targets,
                                  std::vector<TargetDependency>& edges,
                                  std::vector<Diagnostic>& diagnostics,
                                  bool& graph_partial) {
-    std::unordered_set<EdgeIdentity, EdgeIdentityHash> seen_edges;
-    std::unordered_set<PairKey, PairKeyHash> seen_external_diags;
-    std::unordered_set<PairKey, PairKeyHash> seen_self_edge_diags;
-
+    GraphResolverOutputs out{{}, &edges, &diagnostics, &graph_partial};
     for (const auto& cached : parsed_targets.cached_targets) {
-        if (cached.dependencies_malformed) {
-            diagnostics.push_back(
-                {DiagnosticSeverity::warning,
-                 "target '" + cached.target_info.display_name +
-                     "' has a malformed dependencies field; edges skipped"});
-            graph_partial = true;
-            continue;
-        }
-        if (!cached.dependencies.is_array()) continue;
-
-        for (const auto& dep : cached.dependencies) {
-            const bool has_id = dep.is_object() && dep.contains("id") &&
-                                dep["id"].is_string();
-            const auto raw_id = has_id ? dep["id"].get<std::string>() : std::string{};
-            if (raw_id.empty()) {
-                diagnostics.push_back(
-                    {DiagnosticSeverity::warning,
-                     "target '" + cached.target_info.display_name +
-                         "' has a dependency entry without a target id; entry skipped"});
-                graph_partial = true;
-                continue;
-            }
-
-            const auto resolved_it = parsed_targets.id_to_info.find(raw_id);
-            const bool is_resolved = (resolved_it != parsed_targets.id_to_info.end());
-            const std::string to_unique_key =
-                is_resolved ? resolved_it->second.unique_key : "<external>::" + raw_id;
-            const std::string to_display_name =
-                is_resolved ? resolved_it->second.display_name : raw_id;
-
-            if (cached.target_info.unique_key == to_unique_key) {
-                const PairKey k{cached.target_info.unique_key, to_unique_key};
-                if (seen_self_edge_diags.insert(k).second) {
-                    diagnostics.push_back(
-                        {DiagnosticSeverity::note,
-                         "target '" + cached.target_info.display_name +
-                             "' has a self-dependency; edge skipped"});
-                }
-                graph_partial = true;
-                continue;
-            }
-
-            if (!is_resolved) {
-                const PairKey k{cached.target_info.unique_key, raw_id};
-                if (seen_external_diags.insert(k).second) {
-                    diagnostics.push_back(
-                        {DiagnosticSeverity::note,
-                         "target '" + cached.target_info.display_name +
-                             "' references unknown target id '" + raw_id + "'"});
-                }
-                graph_partial = true;
-            }
-
-            const EdgeIdentity edge_id{cached.target_info.unique_key, to_unique_key,
-                                       TargetDependencyKind::direct};
-            if (!seen_edges.insert(edge_id).second) continue;
-            edges.push_back(TargetDependency{cached.target_info.unique_key,
-                                             cached.target_info.display_name,
-                                             to_unique_key,
-                                             to_display_name,
-                                             TargetDependencyKind::direct,
-                                             is_resolved
-                                                 ? TargetDependencyResolution::resolved
-                                                 : TargetDependencyResolution::external});
-        }
+        resolve_dependencies_for_target(cached, parsed_targets, out);
     }
 }
 

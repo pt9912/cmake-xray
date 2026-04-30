@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <functional>
-#include <limits>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -19,17 +18,6 @@ using xray::hexagon::model::TargetDependency;
 using xray::hexagon::model::TargetDependencyKind;
 using xray::hexagon::model::TargetGraph;
 using xray::hexagon::model::TargetInfo;
-
-// Explicit rank table: edge sort order must not depend on enum ordinal or
-// string representation of the kind, so future enum additions stay
-// reorder-safe.
-int kind_rank(TargetDependencyKind kind) {
-    switch (kind) {
-        case TargetDependencyKind::direct:
-            return 0;
-    }
-    return std::numeric_limits<int>::max();
-}
 
 struct EdgeIdentity {
     std::string from_unique_key;
@@ -64,9 +52,9 @@ bool edge_less(const TargetDependency& a, const TargetDependency& b) {
         return a.from_unique_key < b.from_unique_key;
     if (a.to_unique_key != b.to_unique_key)
         return a.to_unique_key < b.to_unique_key;
-    const int ar = kind_rank(a.kind);
-    const int br = kind_rank(b.kind);
-    if (ar != br) return ar < br;
+    // TargetDependencyKind has only `direct` today; when adding a new kind,
+    // insert an explicit rank-table tier here per plan-M6-1-1.md so order
+    // does not depend on enum ordinal or string representation.
     if (a.from_display_name != b.from_display_name)
         return a.from_display_name < b.from_display_name;
     return a.to_display_name < b.to_display_name;
@@ -101,14 +89,21 @@ void sort_target_graph(TargetGraph& graph) {
     }
 }
 
-std::pair<std::vector<TargetInfo>, std::vector<TargetInfo>>
-compute_target_hubs(const TargetGraph& graph, TargetHubThresholds thresholds) {
-    // Defensive identity-collapsed view of the node set. If a unique_key
-    // appears multiple times in graph.nodes (defect case), the lex-first
-    // (display_name, type) entry wins for the hub-list TargetInfo.
-    std::unordered_map<std::string, TargetInfo> node_info;
-    node_info.reserve(graph.nodes.size());
-    for (const auto& n : graph.nodes) {
+struct EdgeDegrees {
+    std::unordered_map<std::string, std::size_t> in_count;
+    std::unordered_map<std::string, std::size_t> out_count;
+};
+
+// Defensive identity-collapsed view of the node set. If a unique_key appears
+// multiple times in graph.nodes (defect case), the lex-first (display_name,
+// type) entry wins for the hub-list TargetInfo. Output parameter avoids the
+// gcov NRVO artifact on the closing brace that named-return-of-unordered_map
+// triggers on this toolchain.
+void populate_deduped_node_info(
+    const std::vector<TargetInfo>& nodes,
+    std::unordered_map<std::string, TargetInfo>& node_info) {
+    node_info.reserve(nodes.size());
+    for (const auto& n : nodes) {
         const auto it = node_info.find(n.unique_key);
         if (it == node_info.end()) {
             node_info.emplace(n.unique_key, n);
@@ -119,40 +114,49 @@ compute_target_hubs(const TargetGraph& graph, TargetHubThresholds thresholds) {
             it->second = n;
         }
     }
+}
 
-    // Defensive edge-identity dedup so duplicate edges don't double-count.
-    std::unordered_set<EdgeIdentity, EdgeIdentityHash> seen_edges;
-    seen_edges.reserve(graph.edges.size());
-    std::unordered_map<std::string, std::size_t> in_count;
-    std::unordered_map<std::string, std::size_t> out_count;
-    for (const auto& e : graph.edges) {
-        if (!seen_edges.insert({e.from_unique_key, e.to_unique_key, e.kind})
-                 .second) {
+// Defensive edge-identity dedup so duplicate edges don't double-count toward
+// in/out degree.
+EdgeDegrees count_edge_degrees(const std::vector<TargetDependency>& edges) {
+    std::unordered_set<EdgeIdentity, EdgeIdentityHash> seen;
+    seen.reserve(edges.size());
+    EdgeDegrees degrees;
+    for (const auto& e : edges) {
+        if (!seen.insert({e.from_unique_key, e.to_unique_key, e.kind}).second) {
             continue;
         }
-        ++in_count[e.to_unique_key];
-        ++out_count[e.from_unique_key];
+        ++degrees.in_count[e.to_unique_key];
+        ++degrees.out_count[e.from_unique_key];
     }
+    return degrees;
+}
+
+std::size_t lookup_or_zero(const std::unordered_map<std::string, std::size_t>& m,
+                           const std::string& key) {
+    const auto it = m.find(key);
+    return it == m.end() ? 0 : it->second;
+}
+
+std::pair<std::vector<TargetInfo>, std::vector<TargetInfo>>
+compute_target_hubs(const TargetGraph& graph, TargetHubThresholds thresholds) {
+    std::unordered_map<std::string, TargetInfo> node_info;
+    populate_deduped_node_info(graph.nodes, node_info);
+    const auto degrees = count_edge_degrees(graph.edges);
 
     std::vector<TargetInfo> in_hubs;
     std::vector<TargetInfo> out_hubs;
     in_hubs.reserve(node_info.size());
     out_hubs.reserve(node_info.size());
     for (const auto& [key, info] : node_info) {
-        const auto in_it = in_count.find(key);
-        const auto out_it = out_count.find(key);
-        const std::size_t in_c = (in_it == in_count.end()) ? 0 : in_it->second;
-        const std::size_t out_c =
-            (out_it == out_count.end()) ? 0 : out_it->second;
-        if (in_c >= thresholds.in_threshold) in_hubs.push_back(info);
-        if (out_c >= thresholds.out_threshold) out_hubs.push_back(info);
+        if (lookup_or_zero(degrees.in_count, key) >= thresholds.in_threshold)
+            in_hubs.push_back(info);
+        if (lookup_or_zero(degrees.out_count, key) >= thresholds.out_threshold)
+            out_hubs.push_back(info);
     }
 
-    auto sort_hubs = [](std::vector<TargetInfo>& v) {
-        std::sort(v.begin(), v.end(), node_less);
-    };
-    sort_hubs(in_hubs);
-    sort_hubs(out_hubs);
+    std::sort(in_hubs.begin(), in_hubs.end(), node_less);
+    std::sort(out_hubs.begin(), out_hubs.end(), node_less);
     return {std::move(in_hubs), std::move(out_hubs)};
 }
 

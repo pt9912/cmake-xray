@@ -222,6 +222,24 @@ TEST_CASE("target_graph_support: edge sort tie-breaks via display names when (fr
     CHECK(g.edges[0].to_display_name == "A-to");
 }
 
+TEST_CASE("target_graph_support: edge sort tie-breaks via to_display_name when (from,to,kind,from_display_name) all match") {
+    // Pin the deepest tie-break tier: identical from_display_name forces the
+    // comparator past the from-display tier and into the to-display tier.
+    // Dedup still collapses to one edge afterwards.
+    TargetGraph g;
+    g.edges.push_back(TargetDependency{"a::STATIC_LIBRARY", "shared-from",
+                                       "b::STATIC_LIBRARY", "Z-to",
+                                       TargetDependencyKind::direct,
+                                       TargetDependencyResolution::resolved});
+    g.edges.push_back(TargetDependency{"a::STATIC_LIBRARY", "shared-from",
+                                       "b::STATIC_LIBRARY", "A-to",
+                                       TargetDependencyKind::direct,
+                                       TargetDependencyResolution::resolved});
+    sort_target_graph(g);
+    REQUIRE(g.edges.size() == 1);
+    CHECK(g.edges[0].to_display_name == "A-to");
+}
+
 TEST_CASE("target_graph_support: sort_target_graph is idempotent") {
     TargetGraph g;
     g.nodes.push_back(make_node("c::STATIC_LIBRARY"));
@@ -353,4 +371,24 @@ TEST_CASE("target_graph_support: duplicate node entries collapse to one hub-list
     auto [in_hubs, out_hubs] = compute_target_hubs(g, defaults());
     REQUIRE(in_hubs.size() == 1);
     CHECK(in_hubs[0].unique_key == target_uk);
+}
+
+TEST_CASE("target_graph_support: lex-smaller duplicate display_name updates the chosen hub-list entry") {
+    // Pin the lex-smaller-wins branch in compute_target_hubs' duplicate-node
+    // handler: insert the larger display_name first, then the smaller one,
+    // and verify the smaller one wins the hub-list TargetInfo.
+    TargetGraph g;
+    const std::string shared_uk = "shared::STATIC_LIBRARY";
+    g.nodes.push_back(TargetInfo{"zeta", "STATIC_LIBRARY", shared_uk});
+    g.nodes.push_back(TargetInfo{"alpha", "STATIC_LIBRARY", shared_uk});
+    for (int i = 0; i < 10; ++i) {
+        const std::string src_uk = "src" + std::to_string(i) + "::STATIC_LIBRARY";
+        g.nodes.push_back(make_node(src_uk));
+        g.edges.push_back(make_edge(src_uk, shared_uk));
+    }
+
+    auto [in_hubs, out_hubs] = compute_target_hubs(g, defaults());
+    REQUIRE(in_hubs.size() == 1);
+    CHECK(in_hubs[0].unique_key == shared_uk);
+    CHECK(in_hubs[0].display_name == "alpha");
 }

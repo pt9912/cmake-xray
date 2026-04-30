@@ -1053,6 +1053,27 @@ TEST_CASE("file api adapter: target_metadata=partial does not propagate into tar
     REQUIRE(result.target_graph.edges.size() == 1);
 }
 
+TEST_CASE("file api adapter: malformed dependencies subobject is reported as a warning and marks the graph partial") {
+    // Reply where dependencies is present but not an array (e.g. wrong type
+    // due to a CMake regression). The plan requires that the rest of the
+    // target reply is still consumed but target_graph_status drops to partial
+    // with a single warning.
+    m6::FixtureBuilder fixture("malformed-deps");
+    const auto build = fixture.commit({
+        {.name = "a", .id = "a::@1", .malformed_dependencies = true},
+    });
+
+    const xray::adapters::input::CmakeFileApiAdapter adapter;
+    const auto result = adapter.load_build_model(build.string());
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6::TargetGraphStatus::partial);
+    CHECK(result.target_graph.edges.empty());
+    REQUIRE(result.target_graph.nodes.size() == 1);
+    CHECK(m6::count_diagnostics(result.diagnostics, m6::DiagnosticSeverity::warning,
+                                "malformed dependencies field") == 1);
+}
+
 TEST_CASE("file api adapter: load failure leaves target_graph_status at not_loaded and the graph empty") {
     // Reuse the existing no_codemodel fixture (index without a codemodel
     // object). The plan requires that any hard load failure leaves the
