@@ -206,8 +206,9 @@ Regeln fuer `IncludeOrigin`:
 
 - Sortierstaerke ueber explizite Rangtabelle:
   `project=0`, `external=1`, `unknown=2`.
-- `project`: Header liegt unter einer der dokumentierten Projektwurzeln
-  (siehe Klassifikations-Algorithmus unten).
+- `project`: Header liegt unter dem dokumentierten
+  `BuildModelResult::source_root` oder unter einem projekt-relevanten
+  Quote-/Include-Pfad (siehe Klassifikations-Algorithmus unten).
 - `external`: Header liegt ausschliesslich unter einem
   System-Include-Pfad oder traegt einen System-Marker.
 - `unknown`: Header passt weder belastbar zu `project` noch zu
@@ -300,13 +301,18 @@ Regeln:
 - `*_effective` ist global pro `analyze`-Lauf definiert:
   `include_depth_limit_effective` ist die maximale erreichte Tiefe ueber
   alle TU-lokalen BFS-Laeufe hinweg; `include_node_budget_effective` ist
-  die Anzahl neu enqueueter TU-lokaler Traversal-Knoten ueber alle TUs
-  hinweg. Derselbe normalisierte Header kann in unterschiedlichen TUs
-  jeweils einen eigenen TU-lokalen Traversal-Knoten belegen und zaehlt
-  dann mehrfach gegen das globale Budget.
-- `include_node_budget_reached` ist `true`, sobald das Budget mindestens
-  einmal waehrend der BFS erschoepft wurde; in diesem Fall wurde die
-  Sicht deterministisch gekuerzt.
+  die Anzahl akzeptierter Header-Traversal-Knoten ueber alle TUs hinweg.
+  TU-Source-Startknoten auf Tiefe 0 zaehlen nicht gegen das
+  `include_node_budget`. Derselbe normalisierte Header kann in
+  unterschiedlichen TUs jeweils einen eigenen TU-lokalen
+  Traversal-Knoten belegen und zaehlt dann mehrfach gegen das globale
+  Budget.
+- `include_node_budget_reached` ist `true`, sobald mindestens ein neuer
+  Header-Traversal-Knoten wegen erschoepftem Budget nicht mehr
+  aufgenommen wurde; in diesem Fall wurde die Sicht deterministisch
+  gekuerzt. Wenn exakt `include_node_budget_requested` Knoten erreichbar
+  sind und kein weiterer neuer Knoten verworfen wird, bleibt der Wert
+  `false`.
 - AP 1.4 propagiert diese Werte ueber `ProjectAnalyzer` in
   `AnalysisResult` und in alle Reportformate.
 
@@ -367,6 +373,20 @@ Regeln:
 - `include_hotspot_excluded_mixed_count` zaehlt Hotspots, die durch
   `--include-depth direct` oder `--include-depth indirect`
   ausgefiltert wurden (nur `IncludeDepthKind::mixed`).
+- AP 1.4 fuehrt bewusst nur diese beiden partiellen Diagnosezaehler
+  ein. Ausgeschlossene `project`- oder `external`-Hotspots bei
+  `--include-scope unknown|project|external` erhalten keinen eigenen
+  Zaehler; `include_hotspot_total_count` und
+  `include_hotspot_returned_count` bleiben die vollstaendige
+  Mengenbilanz.
+- Die beiden Exclusion-Zaehler sind disjunkt und werden in
+  Filterreihenfolge ermittelt: zuerst Scope, danach Depth. Ein Hotspot,
+  der am Scope-Filter scheitert, wird nicht mehr fuer
+  `include_hotspot_excluded_mixed_count` betrachtet. Ein Hotspot mit
+  `origin=unknown` und `depth_kind=mixed` zaehlt bei aktivem
+  `--include-scope project|external` deshalb hoechstens als
+  `excluded_unknown`; bei `--include-scope all --include-depth
+  direct|indirect` zaehlt er als `excluded_mixed`.
 
 ## Klassifikations-Algorithmus fuer `IncludeOrigin`
 
@@ -374,6 +394,8 @@ Eingabe pro Hotspot: `header_path` (normalisiert), aggregierte
 TU-Daten (`quote_include_paths`, `include_paths`,
 `system_include_paths` aus den TUs, die diesen Header inkludieren).
 Plus `BuildModelResult::source_root` als Projektwurzel-Hint.
+AP 1.4 modelliert genau dieses eine Attribut; mehrere Projektwurzeln
+oder Workspace-Roots sind nicht Teil dieses Arbeitspakets.
 
 Regeln (in dieser Reihenfolge angewendet):
 
@@ -383,15 +405,15 @@ Regeln (in dieser Reihenfolge angewendet):
    `IncludeOrigin::project`.
 2. **System-Include-Test**: Wenn `header_path` lexikalisch unter
    mindestens einem `system_include_paths`-Eintrag der TUs liegt
-   und nicht zugleich unter `source_root` oder einem
-   `quote_include_paths`-Eintrag der TUs, dann
-   `IncludeOrigin::external`.
+   und nicht zugleich unter `BuildModelResult::source_root` liegt,
+   dann `IncludeOrigin::external`. Dieser Schritt gewinnt auch dann,
+   wenn derselbe Header zugleich unter einem `quote_include_paths`-
+   oder `include_paths`-Eintrag liegt.
 3. **Quote-/Include-Pfad-Test**: Wenn `header_path` lexikalisch unter
    einem `quote_include_paths`- oder `include_paths`-Eintrag liegt,
-   der NICHT zugleich `system_include_paths`-Eintrag ist, dann
-   `IncludeOrigin::project`. Begruendung: `-I`/`-iquote`-Pfade ohne
-   System-Marker zaehlen als Projekt-relevante Pfade, auch wenn sie
-   nicht direkt unter der dokumentierten Projektwurzel liegen.
+   dann `IncludeOrigin::project`. Begruendung: `-I`/`-iquote`-Pfade
+   zaehlen als Projekt-relevante Pfade, sofern kein hoeher priorisierter
+   System-Hint aus Schritt 2 greift.
 4. **Andernfalls** `IncludeOrigin::unknown`.
 
 Wichtig:
@@ -404,14 +426,14 @@ Wichtig:
   `/repo` liegend klassifiziert werden.
 - System-Include-Pfade haben Vorrang vor Quote-/Include-Pfaden bei
   Konflikt (Schritt 2 vor Schritt 3), weil expliziter
-  `-isystem`/System-Hint die Bibliotheks-Bibliotheks-Eigenschaft
+  `-isystem`/System-Hint die Bibliotheks-Eigenschaft
   staerker dokumentiert als ein zufaelliger Quote-Pfad-Eintrag.
 - Bei mehreren TUs, die denselben Header inkludieren, wird die
   Klassifikation einmal pro Hotspot durchgefuehrt; alle
-  TU-Beobachtungen gehen in die Eingabe ein. Wenn mindestens eine
-  TU den Header als `project` klassifiziert, wird der Hotspot
-  `project`. Andernfalls greift Schritt 2/3/4 in der genannten
-  Reihenfolge, mit allen aggregierten Pfaden als Eingabe.
+  TU-Beobachtungen gehen in die Eingabe ein. Die Prioritaet bleibt auch
+  ueber mehrere TUs hinweg: `source_root` gewinnt zuerst, danach gewinnt
+  ein System-Hint gegen Quote-/Include-Pfade, danach koennen
+  Quote-/Include-Pfade `project` ergeben, andernfalls bleibt `unknown`.
 - Bei `unknown` wird KEINE Diagnostic erzeugt; `unknown` ist eine
   ehrliche Klassifikation und kein Fehlerfall.
 - Bei Konflikten (z. B. derselbe Pfad ist sowohl in
@@ -463,11 +485,16 @@ M6-Defaults.
    `traversal_visited` dedupliziert Header-Expansionen ueber
    `normalize_path(resolved_path)`, `emitted_depth_kinds` merkt pro
    normalisiertem Header, welche `IncludeDepthKind`-Varianten bereits in
-   `ResolvedTranslationUnitIncludes::headers` ausgegeben wurden.
+   `ResolvedTranslationUnitIncludes::headers` ausgegeben wurden. Der
+   TU-Source-Startknoten ist nur Traversal-Anker und zaehlt nicht gegen
+   das globale `include_node_budget`.
 3. **Frontier-Schritt** (Tiefe `t < include_depth_limit`):
-   - Knoten der aktuellen Frontier werden in
-     `(normalized_including_path, normalized_included_path, include_origin, include_depth_kind, raw_spelling)`-
-     Reihenfolge sortiert (M6-Hauptplan-Vertrag).
+   - Knoten bzw. erfolgreich resolvte Include-Kanten der aktuellen
+     Frontier werden in
+     `(normalized_including_path, normalized_included_path, raw_spelling)`-
+     Reihenfolge sortiert (M6-Hauptplan-Vertrag). `include_origin`
+     gehoert nicht zum BFS-Sortierschluessel; es wird erst spaeter auf
+     Hotspot-Ebene klassifiziert.
    - Pro Knoten: `#include`-Direktiven parsen (gleiches Regex wie
      M3); jede Direktive ueber das Quote-/Include-/System-Pfad-Set
      der TU resolven (gleicher Algorithmus wie M3).
@@ -492,12 +519,21 @@ M6-Defaults.
      `include_depth_limit_effective` auf die maximal ausgegebene
      Zieltiefe aktualisiert.
    - Pro neu enqueuetem Traversal-Knoten wird das globale
-     `include_node_budget_effective` inkrementiert. Sobald
-     `include_node_budget_effective == include_node_budget_requested`
-     erreicht ist, werden keine weiteren neuen Traversal-Knoten
-     aufgenommen; bestehende Frontier-Knoten werden noch verarbeitet,
-     aber ihre nicht aufgenommenen neuen Kinder werden verworfen.
-     `include_node_budget_reached=true`.
+     `include_node_budget_effective` inkrementiert. Ist
+     `include_node_budget_effective == include_node_budget_requested`,
+     ist das Budget voll ausgeschoepft, aber
+     `include_node_budget_reached` bleibt noch unveraendert.
+     `include_node_budget_reached=true` wird erst gesetzt, wenn danach
+     mindestens ein weiterer neuer Header-Traversal-Knoten verworfen
+     werden muss. Bestehende Frontier-Knoten werden noch verarbeitet;
+     bereits besuchte Header koennen weiterhin zusaetzliche
+     `IncludeEntry`-Varianten erzeugen, weil sie keinen neuen
+     Traversal-Knoten belegen.
+   - Die Budget-Grenze ist eine Knotenbasis, keine Entry-Basis:
+     `include_node_budget_effective <= include_node_budget_requested`
+     gilt immer, waehrend die Anzahl ausgegebener `IncludeEntry`-
+     Eintraege durch `direct`/`indirect`-Varianten bereits besuchter
+     Header groesser sein kann.
 4. **Tiefen-Cap**: Frontier-Knoten mit `t == include_depth_limit`
    bleiben als Ergebnis erhalten, werden aber nicht expandiert; ihre
    `#include`-Direktiven werden nicht geparst und Kinder in Tiefe
@@ -539,6 +575,31 @@ filtered_hotspots = [
   if scope_matches(hotspot.origin, request.include_scope)
   and depth_matches(hotspot.depth_kind, request.include_depth)
 ]
+```
+
+Die Exclusion-Zaehler werden aus derselben Filterreihenfolge abgeleitet
+und sind nicht als Summe aller ausgeschlossenen Hotspots zu lesen. Sie
+weisen nur die beiden fuer AP 1.4 relevanten Sonderfaelle `unknown` und
+`mixed` aus; die Gesamtbilanz ergibt sich aus
+`include_hotspot_total_count` und `include_hotspot_returned_count`:
+
+```
+excluded_unknown_count = count(
+  hotspot for hotspot in all_hotspots
+  if !scope_matches(hotspot.origin, request.include_scope)
+  and hotspot.origin == IncludeOrigin::unknown
+)
+
+scope_matched = [
+  hotspot for hotspot in all_hotspots
+  if scope_matches(hotspot.origin, request.include_scope)
+]
+
+excluded_mixed_count = count(
+  hotspot for hotspot in scope_matched
+  if !depth_matches(hotspot.depth_kind, request.include_depth)
+  and hotspot.depth_kind == IncludeDepthKind::mixed
+)
 ```
 
 `scope_matches`:
@@ -805,6 +866,10 @@ Service-Tests `tests/hexagon/test_project_analyzer.cpp`:
   und `mixed` aus, zaehlt `excluded_mixed_count`.
 - Schnittmenge: `--include-scope project --include-depth direct`
   zeigt nur `project`-`direct`-Hotspots.
+- Schnittmengen-Zaehler: ein Hotspot mit `origin=unknown` und
+  `depth_kind=mixed`, der am Scope-Filter scheitert, zaehlt nur fuer
+  `excluded_unknown_count` und nicht zusaetzlich fuer
+  `excluded_mixed_count`.
 - Filter-Statistik bei leerer gefilterter Liste:
   `include_hotspot_returned_count=0`,
   `include_hotspot_total_count > 0`.
@@ -821,14 +886,21 @@ Adapter-Tests `tests/adapters/test_source_parsing_include_adapter.cpp`:
   zwei Eintraege mit unterschiedlichem `depth_kind`.
 - Tiefen-Cap: Header in Tiefe `>32` werden nicht erfasst,
   Diagnostic ist gesetzt.
-- Budget-Cap: Header `>10000` werden nicht erfasst,
-  `include_node_budget_reached=true`, Diagnostic ist gesetzt.
+- Budget-Cap: neue Header-Traversal-Knoten jenseits der ersten
+  `10000` werden nicht aufgenommen, `include_node_budget_reached=true`,
+  Diagnostic ist gesetzt.
 - Zyklischer Include: BFS terminiert ueber `traversal_visited`, keine
   Diagnostic.
 - Selbstinkludierender Header: BFS terminiert.
-- Determinismus bei sehr nahem Budget-Limit: ein Lauf mit Budget
-  `100` und einem mit Budget `99` produzieren konsistente Outputs
-  (beide deterministisch).
+- Determinismus am harten Budget-Limit: eine Fixture mit mehr als
+  `10000` erreichbaren Headern wird zweimal mit denselben M6-Defaults
+  analysiert; beide Laeufe akzeptieren dieselben ersten `10000`
+  Header-Traversal-Knoten, setzen
+  `include_node_budget_effective=10000`, setzen
+  `include_node_budget_reached=true` erst wegen mindestens eines
+  verworfenen neuen Knotens und erzeugen dieselbe Budget-Diagnostic.
+  Die Anzahl der ausgegebenen `IncludeEntry`-Eintraege wird dabei nicht
+  als Budget-Zaehler verwendet.
 
 CLI-Tests `tests/e2e/test_cli.cpp`:
 
