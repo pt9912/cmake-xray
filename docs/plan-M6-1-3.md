@@ -445,6 +445,12 @@ ueber den Target-Graphen folgt.
      `to`-Knoten von outgoing-Kanten interner Quellen). Konsequenz:
      `prioritized_affected_targets` enthaelt **keine** externen
      Targets.
+   - AP 1.3 verlaesst sich nicht allein auf diese AP-1.1-Invariante:
+     Kandidaten mit externem Target-Key (`<external>::...`) oder ohne
+     interne `TargetInfo` werden vor dem Eintrag in
+     `prioritized_affected_targets` explizit verworfen. Sollte AP 1.1
+     spaeter externe Knoten auch als `from`-Knoten zulassen, bleibt der
+     AP-1.3-Output dadurch unveraendert frei von externen Targets.
 4. **Zyklen-Erkennung**:
    - Die erreichte-Targets-Tabelle verhindert, dass Zyklen die BFS in
      eine Endlosschleife treiben. Wenn die BFS einen Zyklus erkennt
@@ -623,7 +629,7 @@ Feldreihenfolge im Impact-JSON (`format_version=3`):
 | --- | --- | --- | --- |
 | `target` | object | ja | `TargetNode`-Schema aus AP 1.2. |
 | `priority_class` | string | ja | `direct`, `direct_dependent`, `transitive_dependent`. |
-| `graph_distance` | integer | ja | `0`, `1`, oder positiv ganzzahlig. |
+| `graph_distance` | integer | ja | `0` bis `32`; zusaetzlich `<= impact_target_depth_requested`. |
 | `evidence_strength` | string | ja | `direct`, `heuristic`, `uncertain`. |
 
 `impact_target_depth_requested`/`effective`-Felder:
@@ -926,6 +932,11 @@ Schema-Tests:
   Unterstuetzung keine felduebergreifende `<=`-Constraint ausdruecken
   kann, durch einen expliziten Schema-Companion-Test als ungueltig
   gepinnt.
+- Boundary-/Invariant-Negativtest fuer Targets: ein
+  `prioritized_affected_targets[]`-Eintrag mit `graph_distance=33` oder
+  `graph_distance > impact_target_depth_requested` validiert NICHT
+  bzw. wird bei fehlender felduebergreifender Schema-Unterstuetzung
+  durch einen Schema-Companion-Test als ungueltig gepinnt.
 
 Regressionstests:
 
