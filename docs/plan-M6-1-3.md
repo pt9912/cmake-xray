@@ -25,7 +25,9 @@ AP 1.5 fuer Schwellenwerte und AP 1.6 fuer Compare).
 
 AP 1.3 hebt `xray::hexagon::model::kReportFormatVersion` von `2`
 (eingefuehrt in AP 1.2) auf `3`, weil neue Pflichtfelder im Impact-JSON
-zugefuegt werden.
+zugefuegt werden. Die Aktivierung von `format_version=3` erfolgt erst
+in der Tranche, in der alle ausgelieferten Adapter die neuen
+Pflichtfelder/-Abschnitte schreiben.
 
 ## Scope
 
@@ -46,7 +48,8 @@ Umsetzen:
   `value exceeds maximum 32`.
 - Reportausgabe der priorisierten Target-Sicht in Console, Markdown,
   HTML, JSON und DOT.
-- `kReportFormatVersion` von `2` auf `3` heben; Schema-Update.
+- `kReportFormatVersion` von `2` auf `3` heben, sobald alle Adapter
+  v3-konform sind; Schema-Update.
 - Aktualisierung von `docs/report-json.md`, `docs/report-json.schema.json`,
   `docs/report-dot.md` und `docs/report-html.md` auf v3.
 - Goldens fuer alle fuenf Formate fuer die priorisierte Sicht.
@@ -110,6 +113,7 @@ Voraussichtlich zu aendern:
 - `src/adapters/output/html_report_adapter.cpp`
 - `src/adapters/output/json_report_adapter.cpp`
 - `src/adapters/output/dot_report_adapter.cpp`
+- `src/adapters/output/impact_priority_text.h`
 - `src/main.cpp`
 - `docs/report-json.md`
 - `docs/report-json.schema.json`
@@ -130,6 +134,8 @@ Voraussichtlich zu aendern:
 
 Neue Dateien (optional, je nach Code-Aufteilung):
 
+- `src/adapters/output/impact_priority_text.cpp`, falls der gemeinsame
+  String-Helper nicht header-only umgesetzt wird.
 - `src/hexagon/services/target_graph_traversal.{h,cpp}` falls Reverse-BFS
   als eigener Helper sinnvoll ist (anstatt direkt im
   `ImpactAnalyzer`-Body).
@@ -153,11 +159,21 @@ Neue Dateien (optional, je nach Code-Aufteilung):
 Wie in AP 1.2 gilt auch in AP 1.3:
 
 - Kein Dual-Output, kein CLI-Schalter zurueck zu v2.
-- Schema `report-json.schema.json` setzt `FormatVersion.const` auf `3`.
+- Schema `report-json.schema.json` setzt `FormatVersion.const` auf `3`
+  erst zusammen mit der globalen Aktivierung von
+  `kReportFormatVersion=3` in A.4. Vorher duerfen Schema-Aenderungen
+  nur als Zielvertrag dokumentiert oder in nicht-produktiven
+  Draft-/Testpfaden vorbereitet werden; die produktive Schema-Const
+  bleibt mit der produktiven Report-Version synchron.
 - Bestehende Goldens unter `m5/` und `m6/` werden in AP-1.3 inhaltlich
   auf v3 migriert (Felder hinzugefuegt). Beide Verzeichnisse leben
   weiter als fachliche Datensatz-Trennung (M5-Datensatz vs.
   M6-Datensatz).
+- Tranche-Invariant: Kein Commit darf Reports mit `format_version=3`
+  erzeugen, solange ein produktiver Adapter noch nicht alle AP-1.3-
+  Pflichtfelder bzw. Pflichtabschnitte rendert. Bis zu dieser
+  Aktivierung bleiben E2E-/Golden-Gates auf v2 oder auf adapterlokale
+  interne Tests beschraenkt.
 
 Konsequenzen fuer AP 1.6 (Compare):
 
@@ -307,13 +323,39 @@ Regeln:
 - `impact_target_depth` ist ein optionaler Wert, der vom CLI-Adapter
   gesetzt wird. Der CLI-Default `2` wird im CLI-Adapter angewendet
   (siehe CLI-Vertrag); fehlt der Wert im Request, wendet der
-  `ImpactAnalyzer` ebenfalls `2` als Fallback an. Werte ausserhalb
-  `[0, 32]` sind im Modell nicht repraesentierbar; CLI- und
-  Test-Builder lehnen sie schon vor dem Request-Aufbau ab.
+  `ImpactAnalyzer` ebenfalls `2` als Fallback an.
 - `require_target_graph` ist ein Flag, das im CLI-Adapter gesetzt
   wird. Bei `true` und fehlendem nutzbaren Target-Graphen wird
-  `impact` bereits in der Eingabevalidierung mit nonzero Exit
-  abgebrochen; siehe CLI-Vertrag.
+  `impact` bereits in der Service-Eingabevalidierung abgebrochen;
+  siehe Validierungsvertrag und CLI-Vertrag.
+
+### Service-Eingabevalidierung
+
+`ImpactAnalyzer::analyze_impact()` validiert `AnalyzeImpactRequest`
+selbst, unabhaengig davon, ob der Aufrufer CLI, Test-Builder oder ein
+anderer Adapter ist:
+
+- `impact_target_depth.value_or(2)` muss in `[0, 32]` liegen. Ein Wert
+  `> 32` ist ein Service-Validierungsfehler mit Code
+  `impact_target_depth_out_of_range` und Message
+  `"impact_target_depth: value exceeds maximum 32"`.
+- Negative Tiefenwerte sind kein Service-Fehlerfall dieses
+  Request-Typs, weil `AnalyzeImpactRequest::impact_target_depth` als
+  `std::size_t` modelliert ist und negative Werte nicht repraesentieren
+  kann. Die CLI validiert negative Textwerte vor dem Request-Aufbau mit
+  der CLI-Fehlerphrase `"--impact-target-depth: negative value"`.
+  Kuenftige Nicht-CLI-Adapter mit signed oder textueller Eingabe
+  muessen dieselbe Normalisierung vor Konstruktion des
+  `AnalyzeImpactRequest` leisten.
+- `require_target_graph=true` verlangt
+  `target_graph_status=loaded` oder `target_graph_status=partial`.
+  Bei `not_loaded` bricht der Service vor dem `ImpactResult`-Aufbau mit
+  Code `target_graph_required` und Message
+  `"target graph data is required but not available"` ab.
+- Service-Validierungsfehler erzeugen keinen partiellen
+  `ImpactResult`. CLI, Tests und kuenftige API-Adapter mappen diese
+  Fehler auf ihr jeweiliges Fehlerformat; die CLI-Mapping-Regeln stehen
+  im CLI-Vertrag.
 
 ## Service-Vertrag (Reverse-BFS)
 
@@ -482,6 +524,9 @@ Graph verfuegbar ist:
   - `"--impact-target-depth: negative value"` bei Werten `< 0`.
   - `"--impact-target-depth: value exceeds maximum 32"` bei Werten `> 32`.
   - Mehrfaches Setzen derselben Option: `"--impact-target-depth: option specified more than once"`.
+  Die CLI prueft diese Faelle vor dem Request-Aufbau. Der Service
+  validiert die normalisierte Tiefe trotzdem erneut und liefert fuer
+  nicht-CLI-Aufrufer den Code `impact_target_depth_out_of_range`.
 
 ### `--require-target-graph`
 
@@ -496,6 +541,12 @@ Graph verfuegbar ist:
     `"--require-target-graph: target graph data is required but not available"`.
     Kein stdout-Report, keine Zieldatei (`--output` wird ebenfalls
     leer gelassen).
+- **Exit-Code-Begruendung**: `--require-target-graph` ist syntaktisch
+  korrekt geparst; der Fehler entsteht erst bei der Eingabeanalyse,
+  weil die angeforderte File-API-/Target-Graph-Datenbasis fehlt.
+  Deshalb mappt die CLI den Service-Code `target_graph_required` auf
+  Exit-Code `1`. Parser- und Nutzungsfehler wie ungueltige
+  `--impact-target-depth`-Werte bleiben Exit-Code `2`.
 - **Wechselwirkung mit `--impact-target-depth`**: Beide Optionen sind
   unabhaengig kombinierbar. `--impact-target-depth 0
   --require-target-graph` ist gueltig; der Service rendert
@@ -585,7 +636,8 @@ Schema-Erweiterung in `report-json.schema.json`:
 - `PrioritizedImpactedTarget` als neues `$defs`-Objekt mit
   `additionalProperties: false`.
 - `TargetPriorityClass` und `TargetEvidenceStrength` als neue Enum-Defs.
-- `FormatVersion.const` steigt von `2` auf `3`.
+- `FormatVersion.const` steigt von `2` auf `3`, aber erst in A.4
+  zusammen mit `kReportFormatVersion=3` und den v3-faehigen Adaptern.
 
 ### HTML
 
@@ -730,6 +782,12 @@ Service-Tests `tests/hexagon/test_impact_analyzer.cpp`:
   Impact-Seed-Targets (`graph_distance=0`);
   `impact_target_depth_effective=0`.
   Diagnostic `"target graph not loaded ..."` ist gesetzt.
+- Service-Validierung: `AnalyzeImpactRequest::impact_target_depth=33`
+  bricht mit Code `impact_target_depth_out_of_range` und ohne
+  `ImpactResult` ab.
+- Service-Validierung: `require_target_graph=true` mit
+  `target_graph_status=not_loaded` bricht mit Code
+  `target_graph_required` und ohne `ImpactResult` ab.
 - File-API-`impact` mit Target-Graph, Default-Tiefe `2`: Reverse-BFS
   laeuft korrekt, alle erreichten Targets haben passende
   `priority_class` und `graph_distance`.
@@ -792,7 +850,9 @@ CLI-Tests `tests/e2e/test_cli.cpp`:
 - `--require-target-graph` ohne File-API-Daten (Compile-DB-only):
   Exit-Code `1`, Fehlermeldung
   `"--require-target-graph: target graph data is required but not available"`.
-  Kein stdout-Report, keine Zieldatei.
+  Kein stdout-Report, keine Zieldatei. Test pinnt, dass dies das
+  CLI-Mapping des Service-Codes `target_graph_required` ist und kein
+  Parserfehler mit Exit-Code `2`.
 - `--require-target-graph --impact-target-depth 0` mit File-API-Daten:
   laeuft, Result hat `impact_target_depth_effective=0`,
   `prioritized_affected_targets` enthaelt nur Impact-Seed-Targets.
@@ -900,41 +960,50 @@ Innerhalb von **A.1 (Modelle und Service-Logik)**:
 2. `PrioritizedImpactedTarget` und Erweiterung von `ImpactResult`.
 3. `AnalyzeImpactRequest` um `impact_target_depth` und
    `require_target_graph` erweitern.
-4. Service-Logik fuer Owner-Target-Sammlung mit
+4. Service-Eingabevalidierung fuer `impact_target_depth` und
+   `require_target_graph`.
+5. Service-Logik fuer Owner-Target-Sammlung mit
    `evidence_strength`-Klassifikation.
-5. Reverse-BFS-Implementierung mit deterministischer Sortierung,
+6. Reverse-BFS-Implementierung mit deterministischer Sortierung,
    erreichter-Targets-Tabelle, Zyklus-Erkennung, Same-Distance-
    Evidence-Merge und Tiefenbudget.
-6. Diagnostics fuer Compile-DB-only-Fallback, vorzeitiges BFS-Ende und
+7. Diagnostics fuer Compile-DB-only-Fallback, vorzeitiges BFS-Ende und
    Budget-Kappung.
-7. Service-Tests fuer alle BFS- und Klassifikations-Faelle.
+8. Service-Tests fuer Validierung, BFS- und Klassifikations-Faelle.
 
 Innerhalb von **A.2 (CLI und Schema)**:
 
-8. CLI-Optionen `--impact-target-depth` und `--require-target-graph`
+9. CLI-Optionen `--impact-target-depth` und `--require-target-graph`
    in `cli_adapter.cpp` mit den drei Fehlerphrasen.
-9. CLI-Validation und Composition-Root-Verdrahtung in `main.cpp`.
-10. CLI-Tests fuer alle Fehlerphrasen und Erfolgspfade.
-11. `kReportFormatVersion` auf `3` heben.
-12. `report-json.schema.json` auf v3.
-13. `report-json.md` auf v3.
+10. CLI-Validation und Composition-Root-Verdrahtung in `main.cpp`;
+    Service-Validierungsfehler auf CLI-Exit-Codes mappen.
+11. CLI-Tests fuer alle Fehlerphrasen, Service-Error-Mappings und
+    Erfolgspfade.
+12. `report-json.md` als v3-Zielvertrag vorbereiten. Aenderungen an
+    `report-json.schema.json` bleiben bis A.4 entweder aus oder auf
+    nicht-produktive Draft-/Testpfade beschraenkt; insbesondere bleibt
+    `FormatVersion.const` bis zur Adapter-Vollstaendigkeit auf `2`.
 
 Innerhalb von **A.3 (JSON- und DOT-Adapter)**:
 
-14. JSON-Adapter implementiert v3-Output.
-15. DOT-Adapter implementiert v3-Output mit neuen Knoten- und
+13. JSON-Adapter implementiert v3-faehige Ausgabe.
+14. DOT-Adapter implementiert v3-faehige Ausgabe mit neuen Knoten- und
     Graph-Attributen.
-16. `report-dot.md` auf v3.
-17. Goldens fuer JSON und DOT in `m5/` und `m6/` migriert/erweitert.
+15. `report-dot.md` auf v3.
+16. Adapterlokale Tests fuer JSON und DOT erweitern; globale
+    `format_version=3`-Goldens werden erst nach A.4 aktiviert.
 
 Innerhalb von **A.4 (HTML-, Markdown- und Console-Adapter)**:
 
-18. HTML-Adapter implementiert v3-Output mit
+17. HTML-Adapter implementiert v3-Output mit
     `Prioritised Affected Targets`-Section.
-19. Markdown-Adapter implementiert v3-Output.
-20. Console-Adapter implementiert v3-Output.
-21. `report-html.md` auf v3.
-22. Goldens fuer alle drei Formate.
+18. Markdown-Adapter implementiert v3-Output.
+19. Console-Adapter implementiert v3-Output.
+20. `report-html.md` auf v3.
+21. `kReportFormatVersion` auf `3` heben und
+    `report-json.schema.json::FormatVersion::const` auf `3` setzen.
+22. Goldens fuer alle fuenf Formate in `m5/` und `m6/`
+    migrieren/erweitern.
 
 Innerhalb von **A.5 (Audit-Pass)**:
 
@@ -949,28 +1018,34 @@ AP 1.3 wird in fuenf Sub-Tranchen geliefert:
 
 - **A.1 Modelle und Service-Logik (atomar)**: Neue Modelle,
   `AnalyzeImpactRequest`-Erweiterung, Reverse-BFS,
-  `evidence_strength`-Klassifikation und Service-Tests. Adapter werden
-  noch nicht angepasst; bestehende Adapter sehen die neuen Felder
-  einfach noch nicht und produzieren v2-Output.
-- **A.2 CLI und Schema**: CLI-Optionen, Schema-Update auf v3,
-  `kReportFormatVersion=3`. Bestehende Goldens werden in dieser
-  Tranche auf v3 migriert (additive Felder); Adapter im naechsten
-  Schritt.
+  `evidence_strength`-Klassifikation, Service-Eingabevalidierung und
+  Service-Tests. Adapter werden noch nicht angepasst; bestehende
+  Adapter sehen die neuen Felder einfach noch nicht und produzieren
+  weiterhin v2-Output.
+- **A.2 CLI und Schema-Zielvertrag**: CLI-Optionen, CLI-Mapping der
+  Service-Validierungsfehler, Doc-Vorbereitung auf v3 und hoechstens
+  nicht-produktive Schema-Drafts. `kReportFormatVersion` und die
+  produktive `report-json.schema.json::FormatVersion::const` bleiben
+  in dieser Tranche auf `2`; es gibt noch keine globalen v3-Goldens.
 - **A.3 JSON- und DOT-Adapter**: JSON- und DOT-Adapter implementieren
-  v3-Output mit den neuen Feldern. Goldens migriert.
-- **A.4 HTML-, Markdown- und Console-Adapter**: Drei Adapter, ihre
-  Goldens.
+  v3-faehige Ausgabe mit den neuen Feldern. Tests bleiben adapterlokal,
+  solange nicht alle Formate v3-faehig sind.
+- **A.4 HTML-, Markdown- und Console-Adapter plus Version-Aktivierung**:
+  Drei Adapter, `kReportFormatVersion=3`, Schema-Const `3` und globale
+  v3-Goldens fuer alle fuenf Formate.
 - **A.5 Audit-Pass**: Plan-Test-Liste verifizieren, Docker-Gates,
   Liefer-Stand.
 
 Begruendung der atomaren A.1-Tranche: Service-Logik ohne CLI- und
 Adapter-Anbindung ist intern testbar (`ImpactAnalyzer` mit
 synthetischem Request) und liefert die Modellfelder, die A.2-A.4
-benoetigen. A.2 muss Schema und CLI buendeln, weil das Schema-Update
-ohne CLI-Validation widersprueclich waere (CLI-Werte aus `[0,32]`
-muessen in den Schema-Range passen). A.3 und A.4 koennen parallel
-entwickelt werden, weil HTML/Markdown/Console keine Schema-
-Abhaengigkeit haben.
+benoetigen. A.2 muss CLI und Schema-Zielvertrag buendeln, weil
+CLI-Werte aus `[0,32]` und Service-Validierungsfehler mit dem
+Schema-Range zusammenpassen muessen. Der globale Versionssprung bleibt
+bis A.4 gesperrt, damit kein produktiver Report `format_version=3`
+ausweist, bevor alle Adapter die v3-Pflichtausgabe liefern. A.3 und
+A.4 koennen parallel entwickelt werden, solange dieser Tranche-
+Invariant eingehalten wird.
 
 ## Liefer-Stand
 
@@ -997,11 +1072,17 @@ AP 1.3 ist abgeschlossen, wenn:
   Ausgabe, unabhaengig von Container-Iteration), zyklensicher
   (erreichte-Targets-Tabelle greift) und budget-respektierend
   (`impact_target_depth_effective <= impact_target_depth_requested`);
+- der `ImpactAnalyzer` `AnalyzeImpactRequest` unabhaengig von der CLI
+  validiert und fuer ungueltige Tiefe bzw. fehlenden erforderlichen
+  Target-Graphen klare Service-Fehlercodes ohne partielles
+  `ImpactResult` liefert;
 - `--impact-target-depth <n>` mit drei klaren Fehlerphrasen
   (`negative value`, `not an integer`, `value exceeds maximum 32`)
   und Default `2`, Range `[0, 32]` validiert;
 - `--require-target-graph` mit fehlendem Target-Graph zu Exit-Code `1`,
-  klarer Fehlermeldung und keinem Reportoutput fuehrt;
+  klarer Fehlermeldung und keinem Reportoutput fuehrt; Exit-Code `1`
+  ist das bewusste CLI-Mapping des Service-Eingabefehlers
+  `target_graph_required`, nicht ein Parserfehler;
 - der Compile-DB-only-Fallback ohne `--require-target-graph`
   M5-kompatibles Verhalten plus eine klare Diagnostic liefert;
 - `target_graph_status=partial` als nutzbarer Teilgraph behandelt wird,
