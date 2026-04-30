@@ -8,6 +8,7 @@
 #include "diagnostic.h"
 #include "observation_source.h"
 #include "report_inputs.h"
+#include "target_graph.h"
 #include "target_info.h"
 #include "translation_unit.h"
 
@@ -48,6 +49,8 @@ struct ImpactResult {
     TargetMetadataStatus target_metadata{TargetMetadataStatus::not_loaded};
     std::vector<TargetAssignment> target_assignments;
     std::vector<ImpactedTarget> affected_targets;
+    TargetGraph target_graph;
+    TargetGraphStatus target_graph_status{TargetGraphStatus::not_loaded};
 };
 
 }  // namespace xray::hexagon::model

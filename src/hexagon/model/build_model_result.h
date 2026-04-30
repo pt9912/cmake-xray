@@ -8,6 +8,7 @@
 #include "compile_database_result.h"
 #include "diagnostic.h"
 #include "observation_source.h"
+#include "target_graph.h"
 #include "target_info.h"
 
 namespace xray::hexagon::model {
@@ -20,6 +21,8 @@ struct BuildModelResult {
     std::string source_root;
     std::vector<Diagnostic> diagnostics;
     std::optional<std::filesystem::path> cmake_file_api_resolved_path;
+    TargetGraph target_graph;
+    TargetGraphStatus target_graph_status{TargetGraphStatus::not_loaded};
 
     bool is_success() const { return compile_database.is_success(); }
 };

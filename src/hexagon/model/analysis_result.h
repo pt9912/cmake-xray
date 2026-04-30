@@ -6,6 +6,7 @@
 #include "include_hotspot.h"
 #include "observation_source.h"
 #include "report_inputs.h"
+#include "target_graph.h"
 #include "target_info.h"
 #include "translation_unit.h"
 
@@ -23,6 +24,10 @@ struct AnalysisResult {
     ObservationSource observation_source{ObservationSource::exact};
     TargetMetadataStatus target_metadata{TargetMetadataStatus::not_loaded};
     std::vector<TargetAssignment> target_assignments;
+    TargetGraph target_graph;
+    TargetGraphStatus target_graph_status{TargetGraphStatus::not_loaded};
+    std::vector<TargetInfo> target_hubs_in;
+    std::vector<TargetInfo> target_hubs_out;
 };
 
 }  // namespace xray::hexagon::model
