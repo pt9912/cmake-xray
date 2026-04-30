@@ -174,7 +174,7 @@ bewusst entlang der Format-Familie:
 | Console | Komplett weggelassen, kein Header | Komplett weggelassen, kein Header |
 | Markdown | Komplett weggelassen, kein Heading | Komplett weggelassen, kein Heading |
 | HTML | Section mit `h2` bleibt; Inhalt ist Absatz `Target graph not loaded.` | Section mit `h2` bleibt; Inhalt ist Absatz `Target hubs not available.` |
-| JSON | Pflichtfelder `target_graph_status`, `target_graph` mit `nodes=[]`, `edges=[]` | Pflichtfeld `target_hubs` mit `inbound=[]`, `outbound=[]`, `thresholds`-Objekt mit Defaults |
+| JSON | Pflichtfelder `target_graph_status`, `target_graph` mit `nodes=[]`, `edges=[]` (Analyze und Impact) | Nur Analyze-JSON: Pflichtfeld `target_hubs` mit `inbound=[]`, `outbound=[]`, `thresholds`-Objekt mit Defaults. Impact-JSON kennt das Feld gar nicht (Schema verbietet es ueber `additionalProperties: false`). |
 | DOT | `graph_target_graph_status="not_loaded"`-Attribut bleibt; keine Target-Knoten, keine `target_dependency`-Kanten, kein synthetischer `external_target` | (entfaellt: DOT hat keine Hub-Sicht in AP 1.2) |
 
 Begruendung der Asymmetrie:
@@ -413,11 +413,19 @@ Neue Kantenart `target_dependency` fuer Analyze und Impact:
   `to_unique_key` aufsteigend und vergibt `external_1`, `external_2`,
   ... in dieser Sortierreihenfolge. Der Index ist damit reproduzierbar
   und unabhaengig von der Reply-Reihenfolge oder davon, welche interne
-  Quelle die Kante zuerst produziert hat. Bei Impact-DOT ist die
-  ID-Vergabe unabhaengig von Analyze-DOT; ein gleichzeitiger Lauf ueber
-  beide Reporttypen wuerde unterschiedliche ID-Mappings erzeugen, was
-  konsistent bleibt, weil DOT-Outputs pro Report-Aufruf einzeln
-  gerendert werden.
+  Quelle die Kante zuerst produziert hat.
+- **Mapping ist eine reine Funktion vom finalen `to_unique_key`-Satz**:
+  Gegeben dieselbe sortierte Menge externer Ziele, vergibt der gemeinsame
+  Dedup-Helper aus AP 1.2 dieselben `external_<index>`-IDs, unabhaengig
+  davon, ob der Aufrufer `analyze --format dot` oder
+  `impact --format dot` ist. Wenn Analyze- und Impact-DOT denselben
+  externen Ziel-Satz rendern, sind die `external_<index>`-IDs in
+  beiden Reports byte-identisch zugeordnet. Wenn die Saetze
+  unterschiedlich sind (z. B. weil Impact-DOT einen kleineren
+  Subgraphen rendert oder weil Budget-Druck unterschiedlich greift),
+  unterscheiden sich die Mappings entsprechend ihrem Eingangs-Satz;
+  der Index bleibt aber innerhalb eines Report-Aufrufs deterministisch
+  und ueber identische Eingangsmengen reproduzierbar.
 - Wenn das `node_limit` keine `external_target`-Knoten mehr zulaesst,
   werden zugehoerige `target_dependency`-Kanten ueber die bestehende M5-
   Regel "Kanten werden nur ausgegeben, wenn beide Endknoten im finalen
@@ -825,6 +833,17 @@ Adapter-Unit-Tests:
     mit `kind="external_target"` und `external_target_id`-Attribut,
     `target_dependency`-Kante mit `style="dashed"` und
     `external_target_id`-Attribut.
+  - **M4/M6-Knoten-Dedup**: `analyze`, in dem ein Target `mylib` sowohl
+    als M4-Zuordnung einer Top-Ranking-TU (also Knotenprioritaet 3)
+    als auch in `target_graph.nodes` (Knotenprioritaet 5) auftritt:
+    Im finalen DOT-Graph erscheint genau EIN `target`-Knoten fuer
+    `mylib`, nicht zwei. Der Test pinnt das byteweise und prueft, dass
+    der ueberzaehlige Prioritaet-5-Kandidat sauber unterdrueckt wird.
+    Begruendung: Die DOT-Vertragsregel "Dedup auf Target-`unique_key`:
+    ein Target, das bereits als M4-Zuordnungs-Target im Graph steht,
+    bekommt keinen zweiten Knoten" ist zentral und braucht eine
+    explizite Regression. Ohne Test kann eine kuenftige Refaktorierung
+    der Knotenprioritaeten-Sammelschleife unbemerkt Duplikate erzeugen.
   - `analyze` mit drei internen Targets `mylib`, `app`, `test`, die alle
     gegen dasselbe externe Ziel `boost` linken: genau EIN
     `external_target`-Knoten mit `external_target_id="boost"` und drei
@@ -839,10 +858,19 @@ Adapter-Unit-Tests:
     genau EIN `external_target`-Knoten, drei `target_dependency`-
     Kanten zeigen darauf. Test pinnt den Impact-Pfad gegen
     versehentliche pro-Quelle-Knotenerzeugung byteweise.
-  - `impact` mit zwei externen Zielen `boost` und `abseil`: identische
-    ID-Vergabe-Reihenfolge wie im Analyze-Test (`external_1` =
-    `abseil`, `external_2` = `boost`), damit der gemeinsame
-    Dedup-Helper auch im Impact-Pfad gepinnt ist.
+  - `impact` mit zwei externen Zielen `boost` und `abseil`, deren
+    `to_unique_key`-Satz identisch zum Analyze-Pendant ist (also keine
+    Budget-Kuerzung, gleiche externe Ziele): identische ID-Vergabe-
+    Reihenfolge wie im Analyze-Test (`external_1` = `abseil`,
+    `external_2` = `boost`). Damit ist sowohl der gemeinsame
+    Dedup-Helper als auch das Mapping-als-Funktion-vom-Eingangs-Satz
+    byteweise gepinnt.
+  - `analyze` und `impact` mit unterschiedlichen externen Ziel-Saetzen
+    (z. B. Impact rendert nur einen Subgraphen, der `boost` enthaelt,
+    aber nicht `abseil`): Impact-`external_1` = `boost`, kein
+    `external_2`. Analyze unveraendert. Test pinnt, dass das Mapping
+    NICHT konfusion-stabil ueber Reporttypen hinweg ist, sondern strikt
+    eine Funktion des jeweiligen Eingangs-Satzes.
   - `analyze` mit einem `raw_id` `quote\"and\\backslash\nnewline`: das
     `label`-Attribut enthaelt die korrekt escapte Form
     (`\"`, `\\`, `\n`), das `external_target_id`-Attribut enthaelt
