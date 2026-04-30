@@ -370,6 +370,27 @@ Neue Kantenart `target_dependency` fuer Analyze und Impact:
   `kind="external_target"`, `label=<raw_id>` und
   `external_target_id=<raw_id>` erzeugt; AP 1.2 verbietet das Erfinden
   eines `unique_key` fuer externe Ziele im DOT-Knotengraphen.
+- **`raw_id`-Escaping und Truncation**: Sowohl `label` als auch
+  `external_target_id` folgen den bestehenden M5-DOT-Vertragsregeln aus
+  `docs/report-dot.md`. Konkret:
+  - **Stringescaping** (gilt fuer beide Attribute): Backslash zu `\\`,
+    Anfuehrungszeichen zu `\"`, Newline zu `\n`, Carriage Return zu `\r`,
+    Tab zu `\t`. Sonstige ASCII-Steuerzeichen unter `0x20` werden
+    deterministisch durch `\xHH`-Sequenzen ersetzt. UTF-8-Bytes ueber
+    `0x7F` bleiben rohe Bytes; Graphviz akzeptiert UTF-8 in quoted
+    Strings. AP 1.2 fuegt keine eigenen Escaping-Regeln hinzu.
+  - **Label-Truncation** (gilt nur fuer `label`): Wenn `raw_id` mehr als
+    48 Zeichen hat, wird die Middle-Truncation aus dem M5-DOT-Vertrag
+    angewendet (22 Zeichen + `...` + 23 Zeichen, ASCII-`...`).
+    `external_target_id` bleibt **unverkuerzt** und enthaelt den
+    vollstaendigen `raw_id`, analog zum M5-Vertrag fuer `unique_key`-
+    Attribute.
+  - **Begruendung**: `raw_id` kann beliebige UTF-8-Zeichen enthalten,
+    weil CMake-File-API-IDs nicht auf das CMake-Target-Namen-Vokabular
+    eingeschraenkt sind (z. B. interne IMPORTED-Target-Hashes mit `@`,
+    `#` oder Unicode-Pfadkomponenten). Ohne explizite Anbindung an den
+    M5-Escaping-Vertrag wuerden DOT-Parser/-Renderer bei `"`, `\`,
+    Newline oder Tab im `raw_id` brechen.
 - **Dedup-Vertrag fuer `external_target`-Knoten (Geltungsbereich:
   Analyze UND Impact)**: Pro `to_unique_key` (= `<external>::<raw_id>`)
   wird genau EIN synthetischer Knoten erzeugt. Alle `target_dependency`-
@@ -822,6 +843,22 @@ Adapter-Unit-Tests:
     ID-Vergabe-Reihenfolge wie im Analyze-Test (`external_1` =
     `abseil`, `external_2` = `boost`), damit der gemeinsame
     Dedup-Helper auch im Impact-Pfad gepinnt ist.
+  - `analyze` mit einem `raw_id` `quote\"and\\backslash\nnewline`: das
+    `label`-Attribut enthaelt die korrekt escapte Form
+    (`\"`, `\\`, `\n`), das `external_target_id`-Attribut enthaelt
+    dieselbe escapte Form unverkuerzt. Test pinnt sowohl Label-Output
+    als auch `external_target_id` byteweise und validiert zusaetzlich
+    ueber `dot -Tsvg` (Docker-Pfad) bzw. `tests/validate_dot_reports.py`,
+    dass Graphviz die Ausgabe akzeptiert.
+  - `analyze` mit einem `raw_id`, der mehr als 48 Zeichen lang ist (zum
+    Beispiel ein vollstaendiger CMake-IMPORTED-Target-Hash wie
+    `nlohmann_json::INTERFACE_LIBRARY::abcdef0123456789`): das
+    `label`-Attribut wird per Middle-Truncation auf 48 Zeichen gekuerzt,
+    waehrend `external_target_id` den vollstaendigen Wert behaelt.
+  - `analyze` mit einem `raw_id`, der UTF-8-Bytes ueber `0x7F` enthaelt
+    (zum Beispiel `älib` als Library-Name): rohe UTF-8-Bytes
+    bleiben in beiden Attributen erhalten; Graphviz akzeptiert die
+    Ausgabe.
   - `analyze` mit `node_limit`-Druck: `target_graph.nodes` werden zuletzt
     aufgenommen; bei erreichten Budget wird `graph_truncated="true"`
     gesetzt und ueberzaehlige `target_dependency`-Kanten weggelassen.
@@ -889,8 +926,16 @@ E2E-/Golden-Tests:
     in `target_graph.edges` enthalten.
     Fuer Console und Markdown muss das Golden den `Direct Target
     Dependencies`-Abschnitt mit mindestens einer External-Kante zeigen
-    (Console: `external_target_id`-Suffix; Markdown: `External Target`-
-    Spalte gefuellt).
+    (Console: `<raw_id> [external]`-Suffix gemaess Console-Vertrag;
+    Markdown: `External Target`-Spalte gefuellt).
+  - `analyze-dot-raw-id-special-chars.dot`: ein DOT-spezifisches Golden
+    mit einem `raw_id`, der Anfuehrungszeichen, Backslash und Newline
+    enthaelt. Pflicht nur fuer DOT, weil JSON, HTML, Console und
+    Markdown ihre eigenen Escape- und Whitespace-Vertraege haben, die
+    bereits durch Sonderzeichen-Tests in den Adapter-Tests abgesichert
+    sind. Das DOT-Golden pinnt das Zusammenspiel von M5-Escape-Vertrag
+    und M6-`raw_id`-Quelle byteweise und laeuft zusaetzlich durch
+    `dot -Tsvg`.
   - `impact-compile-db-only.<ext>`: keine Target-Graph-Daten,
     `target_graph_status=not_loaded`. Pflicht fuer alle fuenf Formate.
   - `impact-file-api-loaded.<ext>`: `loaded`, mehrere Kanten. Pflicht fuer
