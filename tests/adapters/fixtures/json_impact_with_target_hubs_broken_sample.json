@@ -53,6 +53,14 @@
     "nodes": [],
     "edges": []
   },
+  "target_hubs": {
+    "inbound": [],
+    "outbound": [],
+    "thresholds": {
+      "in_threshold": 10,
+      "out_threshold": 10
+    }
+  },
   "diagnostics": [
     {
       "severity": "warning",

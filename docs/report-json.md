@@ -37,7 +37,7 @@ Jeder JSON-Report enthaelt diese Pflichtfelder in genau dieser Reihenfolge:
 | Feld | Typ | Pflicht | Beschreibung |
 | --- | --- | --- | --- |
 | `format` | string | ja | Maschinenlesbarer Dokumenttyp. `cmake-xray.analysis` oder `cmake-xray.impact`. |
-| `format_version` | integer | ja | Aktuell `1`. Erhoeht sich bei vertragsbrechenden Aenderungen. |
+| `format_version` | integer | ja | Aktuell `2` (M6 AP 1.2). Erhoeht sich bei vertragsbrechenden Aenderungen. |
 | `report_type` | string | ja | `analyze` oder `impact`. Kurzer Workflow-Identifier; nicht der CLI-Wert `--format json`. |
 | `inputs` | object | ja | Eingabeprovenienz aus `ReportInputs`. Schema je Reporttyp unten. |
 | `summary` | object | ja | Aggregierte Kennzahlen je Reporttyp. |
@@ -106,7 +106,10 @@ Format-Identifier und Reporttyp:
 5. `summary`
 6. `translation_unit_ranking`
 7. `include_hotspots`
-8. `diagnostics`
+8. `target_graph_status`
+9. `target_graph`
+10. `target_hubs`
+11. `diagnostics`
 
 ### `inputs` (analyze)
 
@@ -203,7 +206,9 @@ Format-Identifier und Reporttyp:
 7. `heuristically_affected_translation_units`
 8. `directly_affected_targets`
 9. `heuristically_affected_targets`
-10. `diagnostics`
+10. `target_graph_status`
+11. `target_graph`
+12. `diagnostics`
 
 ### `inputs` (impact)
 
@@ -287,16 +292,77 @@ Impact-Listen werden in M5 nicht ueber `--top` begrenzt. AP 1.2 fuehrt keine `li
 
 Die Konstante lebt in `src/hexagon/model/report_format_version.h`. Schema, Adapter, Tests und Goldens beziehen sich auf genau diese Konstante; ein parallel definierter zweiter Versionswert ist verboten.
 
+## Target-Graph (M6 AP 1.2, `format_version=2`)
+
+Beide Reporttypen tragen die direkte Target-zu-Target-Abhaengigkeitssicht aus
+M6 AP 1.1 als Pflichtfelder:
+
+| Feld | Typ | Pflicht | Werte |
+| --- | --- | --- | --- |
+| `target_graph_status` | string | ja | `not_loaded`, `loaded`, `partial`. |
+| `target_graph` | object | ja | Container mit `nodes` und `edges`. Bei `not_loaded` beide leer. |
+| `target_graph.nodes` | array | ja | Knoten, sortiert nach `(unique_key, display_name, type)`. |
+| `target_graph.edges` | array | ja | Kanten, sortiert nach `(from_unique_key, to_unique_key, kind, from_display_name, to_display_name)`. |
+
+`TargetNode`-Schema:
+
+| Feld | Typ | Pflicht |
+| --- | --- | --- |
+| `display_name` | string | ja |
+| `type` | string | ja |
+| `unique_key` | string | ja |
+
+`TargetEdge`-Schema:
+
+| Feld | Typ | Pflicht |
+| --- | --- | --- |
+| `from_display_name` | string | ja |
+| `from_unique_key` | string | ja |
+| `to_display_name` | string | ja |
+| `to_unique_key` | string | ja |
+| `kind` | string (`direct`) | ja |
+| `resolution` | string (`resolved`, `external`) | ja |
+
+`<external>::*`-Targets erscheinen NICHT in `target_graph.nodes`, weil sie
+keine echten File-API-Targets sind. Sie erscheinen aber als
+`to_unique_key="<external>::<raw_id>"` in `target_graph.edges` mit
+`resolution="external"`.
+
+`target_graph_status="not_loaded"` impliziert in beiden Reporttypen einen
+leeren `target_graph` (`nodes=[]`, `edges=[]`); die Felder bleiben trotzdem
+Pflicht.
+
+### `target_hubs` (nur Analyze)
+
+Im Analyze-JSON ergaenzt ein Pflichtcontainer `target_hubs` die Hub-Sicht:
+
+| Feld | Typ | Pflicht | Beschreibung |
+| --- | --- | --- | --- |
+| `target_hubs.inbound` | array | ja | `TargetNode`-Objekte mit `in_count >= in_threshold`, sortiert nach `(unique_key, display_name, type)`. |
+| `target_hubs.outbound` | array | ja | `TargetNode`-Objekte mit `out_count >= out_threshold`, sortiert nach `(unique_key, display_name, type)`. |
+| `target_hubs.thresholds.in_threshold` | integer | ja | Wirksamer Schwellenwert; in AP 1.2 hardcoded `10`. |
+| `target_hubs.thresholds.out_threshold` | integer | ja | Wirksamer Schwellenwert; in AP 1.2 hardcoded `10`. |
+
+`target_hubs` ist im Impact-JSON bewusst NICHT enthalten und wird vom Schema
+ueber die Kombination aus fehlender Property-Deklaration und
+`additionalProperties: false` hart abgelehnt. AP 1.3 entscheidet ueber
+Hub-Sichtbarkeit im Impact-Kontext zusammen mit der Priorisierung.
+
+Im Analyze-JSON impliziert `target_graph_status="not_loaded"` zusaetzlich
+leere `target_hubs.inbound` und `target_hubs.outbound` sowie das
+`thresholds`-Objekt mit den hardcoded `10`/`10`-Defaults.
+
 ## Schema-Validierung
 
 - `docs/report-json.schema.json` ist die formale Schema-Definition (JSON Schema Draft 2020-12).
-- Jedes Vertragsobjekt setzt `additionalProperties: false`. Unbekannte Felder werden in M5 hart abgelehnt.
+- Jedes Vertragsobjekt setzt `additionalProperties: false`. Unbekannte Felder werden hart abgelehnt.
 - Schema und C++-Konstante `kReportFormatVersion` werden in einem CTest-Gate gegeneinander geprueft. Ein abweichender `const`-Wert im Schema laesst den Gate-Test fehlschlagen.
-- Goldens unter `tests/e2e/testdata/m5/json-reports/` werden ueber `tests/validate_json_schema.py` gegen das Schema validiert. Der Validator gleicht Verzeichnisinhalt und Manifest beidseitig ab.
+- Goldens unter `tests/e2e/testdata/m5/json-reports/` und `tests/e2e/testdata/m6/json-reports/` werden ueber `tests/validate_json_schema.py` gegen das Schema validiert. Der Validator gleicht Verzeichnisinhalt und Manifest beidseitig ab. Beide Verzeichnisse enthalten ausschliesslich `format_version=2`-Goldens; die `m5/`-/`m6/`-Trennung ist fachlich (Datensatz-Szenarien), nicht versionell.
+- Schema-Asymmetrie analyze vs. impact wird durch zwei Negativtests gepinnt: `report_json_schema_rejects_impact_with_target_hubs` und `report_json_schema_rejects_analyze_without_target_hubs`. Beide Tests laufen mit `WILL_FAIL TRUE` und scheitern absichtlich am Schema, damit ein Adapter-Bug, der die Asymmetrie verletzt, sofort sichtbar wird.
 
 ## Manifest
 
-`tests/e2e/testdata/m5/json-reports/manifest.txt` listet alle JSON-Report-Goldens, eine pro Zeile. Leerzeilen und mit `#` beginnende Kommentare sind zulaessig. Der Schema-Validator schlaegt fehl, wenn:
+`tests/e2e/testdata/m5/json-reports/manifest.txt` und `tests/e2e/testdata/m6/json-reports/manifest.txt` listen alle JSON-Report-Goldens des jeweiligen Datensatz-Szenarien-Verzeichnisses, eine pro Zeile. Leerzeilen und mit `#` beginnende Kommentare sind zulaessig. Der Schema-Validator schlaegt fehl, wenn:
 
 - ein Manifesteintrag nicht im Verzeichnis existiert,
 - ein Report-Golden im Verzeichnis nicht im Manifest steht,

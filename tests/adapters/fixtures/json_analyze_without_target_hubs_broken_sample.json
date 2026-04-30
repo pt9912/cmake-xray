@@ -3,7 +3,7 @@
   "format_version": 2,
   "report_type": "analyze",
   "inputs": {
-    "compile_database_path": "tests/e2e/testdata/m3/report_project/compile_commands.json",
+    "compile_database_path": "tests/e2e/testdata/m2/basic_project/compile_commands.json",
     "compile_database_source": "cli",
     "cmake_file_api_path": null,
     "cmake_file_api_resolved_path": null,
@@ -13,16 +13,16 @@
     "translation_unit_count": 3,
     "ranking_total_count": 3,
     "hotspot_total_count": 2,
-    "top_limit": 2,
+    "top_limit": 10,
     "include_analysis_heuristic": true,
     "observation_source": "exact",
     "target_metadata": "not_loaded"
   },
   "translation_unit_ranking": {
-    "limit": 2,
+    "limit": 10,
     "total_count": 3,
-    "returned_count": 2,
-    "truncated": true,
+    "returned_count": 3,
+    "truncated": false,
     "items": [
       {
         "rank": 1,
@@ -58,11 +58,26 @@
         },
         "targets": [],
         "diagnostics": []
+      },
+      {
+        "rank": 3,
+        "reference": {
+          "source_path": "src/lib/core.cpp",
+          "directory": "build/lib"
+        },
+        "metrics": {
+          "arg_count": 6,
+          "include_path_count": 1,
+          "define_count": 0,
+          "score": 7
+        },
+        "targets": [],
+        "diagnostics": []
       }
     ]
   },
   "include_hotspots": {
-    "limit": 2,
+    "limit": 10,
     "total_count": 2,
     "returned_count": 2,
     "truncated": false,
@@ -70,8 +85,8 @@
       {
         "header_path": "include/common/config.h",
         "affected_total_count": 3,
-        "affected_returned_count": 2,
-        "affected_truncated": true,
+        "affected_returned_count": 3,
+        "affected_truncated": false,
         "affected_translation_units": [
           {
             "reference": {
@@ -84,6 +99,13 @@
             "reference": {
               "source_path": "src/lib/core.cpp",
               "directory": "build/lib"
+            },
+            "targets": []
+          },
+          {
+            "reference": {
+              "source_path": "src/tools/tool.cpp",
+              "directory": "build/tools"
             },
             "targets": []
           }
@@ -93,8 +115,8 @@
       {
         "header_path": "include/common/shared.h",
         "affected_total_count": 3,
-        "affected_returned_count": 2,
-        "affected_truncated": true,
+        "affected_returned_count": 3,
+        "affected_truncated": false,
         "affected_translation_units": [
           {
             "reference": {
@@ -107,6 +129,13 @@
             "reference": {
               "source_path": "src/lib/core.cpp",
               "directory": "build/lib"
+            },
+            "targets": []
+          },
+          {
+            "reference": {
+              "source_path": "src/tools/tool.cpp",
+              "directory": "build/tools"
             },
             "targets": []
           }
@@ -119,14 +148,6 @@
   "target_graph": {
     "nodes": [],
     "edges": []
-  },
-  "target_hubs": {
-    "inbound": [],
-    "outbound": [],
-    "thresholds": {
-      "in_threshold": 10,
-      "out_threshold": 10
-    }
   },
   "diagnostics": [
     {

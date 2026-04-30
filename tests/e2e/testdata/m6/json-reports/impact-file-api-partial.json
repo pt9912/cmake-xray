@@ -5,10 +5,10 @@
   "inputs": {
     "compile_database_path": null,
     "compile_database_source": null,
-    "cmake_file_api_path": "tests/e2e/testdata/m4/file_api_only/build",
-    "cmake_file_api_resolved_path": "tests/e2e/testdata/m4/file_api_only/build/.cmake/api/v1/reply",
+    "cmake_file_api_path": "tests/e2e/testdata/m6/file_api_partial/build",
+    "cmake_file_api_resolved_path": "tests/e2e/testdata/m6/file_api_partial/build/.cmake/api/v1/reply",
     "cmake_file_api_source": "cli",
-    "changed_file": "src/main.cpp",
+    "changed_file": "src/app.cpp",
     "changed_file_source": "file_api_source_root"
   },
   "summary": {
@@ -25,13 +25,13 @@
   "directly_affected_translation_units": [
     {
       "reference": {
-        "source_path": "src/main.cpp",
+        "source_path": "src/app.cpp",
         "directory": "build"
       },
       "targets": [
         {
           "display_name": "app",
-          "type": "EXECUTABLE"
+          "type": "STATIC_LIBRARY"
         }
       ]
     }
@@ -40,25 +40,39 @@
   "directly_affected_targets": [
     {
       "display_name": "app",
-      "type": "EXECUTABLE"
+      "type": "STATIC_LIBRARY"
     }
   ],
   "heuristically_affected_targets": [],
-  "target_graph_status": "loaded",
+  "target_graph_status": "partial",
   "target_graph": {
     "nodes": [
       {
         "display_name": "app",
-        "type": "EXECUTABLE",
-        "unique_key": "app::EXECUTABLE"
+        "type": "STATIC_LIBRARY",
+        "unique_key": "app::STATIC_LIBRARY"
       },
       {
-        "display_name": "core",
+        "display_name": "lib",
         "type": "STATIC_LIBRARY",
-        "unique_key": "core::STATIC_LIBRARY"
+        "unique_key": "lib::STATIC_LIBRARY"
       }
     ],
-    "edges": []
+    "edges": [
+      {
+        "from_display_name": "app",
+        "from_unique_key": "app::STATIC_LIBRARY",
+        "to_display_name": "ghost::@99",
+        "to_unique_key": "<external>::ghost::@99",
+        "kind": "direct",
+        "resolution": "external"
+      }
+    ]
   },
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "note",
+      "message": "target 'app' references unknown target id 'ghost::@99'"
+    }
+  ]
 }

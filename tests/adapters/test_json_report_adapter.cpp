@@ -17,6 +17,7 @@
 #include "hexagon/model/include_hotspot.h"
 #include "hexagon/model/report_format_version.h"
 #include "hexagon/model/report_inputs.h"
+#include "hexagon/model/target_graph.h"
 #include "hexagon/model/translation_unit.h"
 
 namespace {
@@ -38,6 +39,11 @@ using xray::hexagon::model::RankedTranslationUnit;
 using xray::hexagon::model::ReportInputs;
 using xray::hexagon::model::ReportInputSource;
 using xray::hexagon::model::TargetAssignment;
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyKind;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraph;
+using xray::hexagon::model::TargetGraphStatus;
 using xray::hexagon::model::TargetImpactClassification;
 using xray::hexagon::model::TargetInfo;
 using xray::hexagon::model::TargetMetadataStatus;
@@ -683,4 +689,103 @@ TEST_CASE("schema rejects rendered JSON whose changed_file_source is unresolved_
     CHECK(std::find(enum_values.begin(), enum_values.end(),
                     std::string{"unresolved_file_api_source_root"}) ==
           enum_values.end());
+}
+
+// --- M6 AP 1.2 A.1: target-graph fields in JSON v2 ---
+
+namespace m6_json {
+
+TargetDependency direct_edge(std::string from_uk, std::string to_uk,
+                             TargetDependencyResolution res =
+                                 TargetDependencyResolution::resolved) {
+    return TargetDependency{from_uk, from_uk, to_uk,        to_uk,
+                            TargetDependencyKind::direct, res};
+}
+
+}  // namespace m6_json
+
+TEST_CASE("json analyze v2: not_loaded status yields empty target_graph and empty target_hubs at default thresholds") {
+    AnalysisResult result = make_analysis_result_with_heuristic(true);
+    // Default-constructed: status=not_loaded, graph empty, hubs empty.
+    REQUIRE(result.target_graph_status == TargetGraphStatus::not_loaded);
+
+    const JsonReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 10);
+    const auto doc = nlohmann::json::parse(rendered);
+
+    CHECK(doc["format_version"] == 2);
+    CHECK(doc["target_graph_status"] == "not_loaded");
+    CHECK(doc["target_graph"]["nodes"].empty());
+    CHECK(doc["target_graph"]["edges"].empty());
+    CHECK(doc["target_hubs"]["inbound"].empty());
+    CHECK(doc["target_hubs"]["outbound"].empty());
+    CHECK(doc["target_hubs"]["thresholds"]["in_threshold"] == 10);
+    CHECK(doc["target_hubs"]["thresholds"]["out_threshold"] == 10);
+}
+
+TEST_CASE("json analyze v2: loaded status with hub propagates nodes, edges and inbound hub list") {
+    AnalysisResult result = make_analysis_result_with_heuristic(true);
+    result.target_graph_status = TargetGraphStatus::loaded;
+    result.target_graph.nodes.push_back({"hub", "STATIC_LIBRARY", "hub::STATIC_LIBRARY"});
+    for (int i = 0; i < 10; ++i) {
+        const auto src_uk = "src" + std::to_string(i) + "::STATIC_LIBRARY";
+        result.target_graph.nodes.push_back({"src" + std::to_string(i),
+                                              "STATIC_LIBRARY", src_uk});
+        result.target_graph.edges.push_back(
+            m6_json::direct_edge(src_uk, "hub::STATIC_LIBRARY"));
+    }
+    result.target_hubs_in.push_back({"hub", "STATIC_LIBRARY", "hub::STATIC_LIBRARY"});
+
+    const JsonReportAdapter adapter;
+    const auto doc = nlohmann::json::parse(adapter.write_analysis_report(result, 10));
+
+    CHECK(doc["target_graph_status"] == "loaded");
+    CHECK(doc["target_graph"]["nodes"].size() == 11);
+    CHECK(doc["target_graph"]["edges"].size() == 10);
+    REQUIRE(doc["target_hubs"]["inbound"].size() == 1);
+    CHECK(doc["target_hubs"]["inbound"][0]["unique_key"] == "hub::STATIC_LIBRARY");
+    CHECK(doc["target_hubs"]["outbound"].empty());
+    // Edge details: from_unique_key, to_unique_key, kind, resolution.
+    const auto& first_edge = doc["target_graph"]["edges"][0];
+    CHECK(first_edge["from_unique_key"] == "src0::STATIC_LIBRARY");
+    CHECK(first_edge["to_unique_key"] == "hub::STATIC_LIBRARY");
+    CHECK(first_edge["kind"] == "direct");
+    CHECK(first_edge["resolution"] == "resolved");
+}
+
+TEST_CASE("json analyze v2: external edges serialize with <external>::* to_unique_key and resolution=external") {
+    AnalysisResult result = make_analysis_result_with_heuristic(false);
+    result.target_graph_status = TargetGraphStatus::partial;
+    result.target_graph.nodes.push_back({"app", "EXECUTABLE", "app::EXECUTABLE"});
+    result.target_graph.edges.push_back(TargetDependency{
+        "app::EXECUTABLE", "app", "<external>::ghost", "ghost",
+        TargetDependencyKind::direct, TargetDependencyResolution::external});
+
+    const JsonReportAdapter adapter;
+    const auto doc = nlohmann::json::parse(adapter.write_analysis_report(result, 10));
+
+    CHECK(doc["target_graph_status"] == "partial");
+    REQUIRE(doc["target_graph"]["edges"].size() == 1);
+    CHECK(doc["target_graph"]["edges"][0]["to_unique_key"] == "<external>::ghost");
+    CHECK(doc["target_graph"]["edges"][0]["to_display_name"] == "ghost");
+    CHECK(doc["target_graph"]["edges"][0]["resolution"] == "external");
+}
+
+TEST_CASE("json impact v2: target_graph is serialized but target_hubs is absent (schema asymmetry)") {
+    auto result = make_impact_result();
+    result.target_graph_status = TargetGraphStatus::loaded;
+    result.target_graph.nodes.push_back({"a", "STATIC_LIBRARY", "a::STATIC_LIBRARY"});
+    result.target_graph.nodes.push_back({"b", "STATIC_LIBRARY", "b::STATIC_LIBRARY"});
+    result.target_graph.edges.push_back(
+        m6_json::direct_edge("a::STATIC_LIBRARY", "b::STATIC_LIBRARY"));
+
+    const JsonReportAdapter adapter;
+    const auto doc = nlohmann::json::parse(adapter.write_impact_report(result));
+
+    CHECK(doc["format_version"] == 2);
+    CHECK(doc["target_graph_status"] == "loaded");
+    CHECK(doc["target_graph"]["nodes"].size() == 2);
+    CHECK(doc["target_graph"]["edges"].size() == 1);
+    // The schema-enforced asymmetry: target_hubs must NOT appear in impact JSON.
+    CHECK_FALSE(doc.contains("target_hubs"));
 }

@@ -16,8 +16,10 @@
 #include "hexagon/model/observation_source.h"
 #include "hexagon/model/report_format_version.h"
 #include "hexagon/model/report_inputs.h"
+#include "hexagon/model/target_graph.h"
 #include "hexagon/model/target_info.h"
 #include "hexagon/model/translation_unit.h"
+#include "hexagon/services/target_graph_support.h"
 
 namespace xray::adapters::output {
 
@@ -38,6 +40,11 @@ using xray::hexagon::model::RankedTranslationUnit;
 using xray::hexagon::model::ReportInputs;
 using xray::hexagon::model::ReportInputSource;
 using xray::hexagon::model::TargetAssignment;
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyKind;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraph;
+using xray::hexagon::model::TargetGraphStatus;
 using xray::hexagon::model::TargetImpactClassification;
 using xray::hexagon::model::TargetInfo;
 using xray::hexagon::model::TargetMetadataStatus;
@@ -80,6 +87,70 @@ std::string target_metadata_text(TargetMetadataStatus status) {
     if (status == TargetMetadataStatus::loaded) return "loaded";
     if (status == TargetMetadataStatus::partial) return "partial";
     return "not_loaded";
+}
+
+std::string target_graph_status_text(TargetGraphStatus status) {
+    if (status == TargetGraphStatus::loaded) return "loaded";
+    if (status == TargetGraphStatus::partial) return "partial";
+    return "not_loaded";
+}
+
+std::string target_dependency_kind_text(TargetDependencyKind /*kind*/) {
+    // TargetDependencyKind has only `direct` today; extend per plan-M6-1-1.md
+    // when adding kinds.
+    return "direct";
+}
+
+std::string target_dependency_resolution_text(TargetDependencyResolution res) {
+    return res == TargetDependencyResolution::external ? "external" : "resolved";
+}
+
+ordered_json render_target_node(const TargetInfo& info) {
+    ordered_json node;
+    node["display_name"] = info.display_name;
+    node["type"] = info.type;
+    node["unique_key"] = info.unique_key;
+    return node;
+}
+
+ordered_json render_target_edge(const TargetDependency& edge) {
+    ordered_json e;
+    e["from_display_name"] = edge.from_display_name;
+    e["from_unique_key"] = edge.from_unique_key;
+    e["to_display_name"] = edge.to_display_name;
+    e["to_unique_key"] = edge.to_unique_key;
+    e["kind"] = target_dependency_kind_text(edge.kind);
+    e["resolution"] = target_dependency_resolution_text(edge.resolution);
+    return e;
+}
+
+ordered_json render_target_graph(const TargetGraph& graph) {
+    ordered_json document;
+    auto nodes = ordered_json::array();
+    for (const auto& n : graph.nodes) nodes.push_back(render_target_node(n));
+    document["nodes"] = std::move(nodes);
+    auto edges = ordered_json::array();
+    for (const auto& e : graph.edges) edges.push_back(render_target_edge(e));
+    document["edges"] = std::move(edges);
+    return document;
+}
+
+ordered_json render_target_hubs(const std::vector<TargetInfo>& inbound,
+                                const std::vector<TargetInfo>& outbound) {
+    ordered_json hubs;
+    auto in_arr = ordered_json::array();
+    for (const auto& n : inbound) in_arr.push_back(render_target_node(n));
+    hubs["inbound"] = std::move(in_arr);
+    auto out_arr = ordered_json::array();
+    for (const auto& n : outbound) out_arr.push_back(render_target_node(n));
+    hubs["outbound"] = std::move(out_arr);
+    ordered_json thresholds;
+    thresholds["in_threshold"] =
+        xray::hexagon::services::kDefaultTargetHubInThreshold;
+    thresholds["out_threshold"] =
+        xray::hexagon::services::kDefaultTargetHubOutThreshold;
+    hubs["thresholds"] = std::move(thresholds);
+    return hubs;
 }
 
 std::string severity_text(DiagnosticSeverity severity) {
@@ -421,6 +492,11 @@ std::string JsonReportAdapter::write_analysis_report(
         render_ranking_container(analysis_result, top_limit);
     document["include_hotspots"] =
         render_hotspot_container(analysis_result, top_limit);
+    document["target_graph_status"] =
+        target_graph_status_text(analysis_result.target_graph_status);
+    document["target_graph"] = render_target_graph(analysis_result.target_graph);
+    document["target_hubs"] = render_target_hubs(analysis_result.target_hubs_in,
+                                                  analysis_result.target_hubs_out);
     document["diagnostics"] = std::move(diagnostics_array);
     return document.dump(2) + "\n";
 }
@@ -452,6 +528,9 @@ std::string JsonReportAdapter::write_impact_report(const ImpactResult& impact_re
     document["heuristically_affected_translation_units"] = std::move(heuristic_units);
     document["directly_affected_targets"] = std::move(direct_targets);
     document["heuristically_affected_targets"] = std::move(heuristic_targets);
+    document["target_graph_status"] =
+        target_graph_status_text(impact_result.target_graph_status);
+    document["target_graph"] = render_target_graph(impact_result.target_graph);
     document["diagnostics"] = std::move(diagnostics_array);
     return document.dump(2) + "\n";
 }
