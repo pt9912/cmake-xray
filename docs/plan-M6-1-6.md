@@ -413,8 +413,9 @@ erlaubter Versionskombination:
 - Umbenannte Felder (in M6 keine).
 - Entfernte Felder (in M6 keine).
 - Nicht vergleichbare Felder (Impact-Felder werden in jedem Fall
-  ausgeschlossen, weil Compare analyze-only ist; Compile-DB-only-
-  spezifische Felder werden bei Mixed-Mode-Eingaben uebersprungen).
+  ausgeschlossen, weil Compare analyze-only ist). Cross-/Mixed-Mode-
+  Eingaben erreichen diese Feld-Mapping-Logik in M6 nicht, weil sie
+  vorher als `project_identity_source`-Mismatch abgelehnt werden.
 
 Pflicht: AP-1.6-Implementierung darf nicht starten, bevor die
 Matrix fuer die `(5, 5)`-Kombination dokumentiert und mit Schema-
@@ -755,7 +756,7 @@ ist Objekt oder `null`.
 Beispiel:
 
 ```
-cmake-xray compare report
+cmake-xray compare
   baseline: /repo/baseline.json (v5)
   current:  /repo/current.json  (v5)
   project_identity: /repo (cmake_file_api_source_root)
@@ -865,8 +866,8 @@ E2E-/Golden-Tests:
   - `compare-empty.<ext>`: identische baseline und current.
   - `compare-typical.<ext>`: alle Diff-Typen vertreten.
   - `compare-config-drift.<ext>`: configuration_drift-Diagnostic.
-  - `compare-data-availability-drift.<ext>`: file-api baseline,
-    compile-db current.
+  - `compare-data-availability-drift.<ext>`: Same-Mode-File-API-
+    Eingaben mit unterschiedlicher Target-Graph-Datenverfuegbarkeit.
   - `compare-project-identity-drift.<ext>`: --allow-project-identity-drift
     aktiviert.
 - Eingangsdaten unter `tests/e2e/testdata/m6/compare-reports/inputs/`
