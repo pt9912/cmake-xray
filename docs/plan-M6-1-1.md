@@ -853,19 +853,20 @@ AP 1.1 ist abgeschlossen, wenn:
 
 ## Liefer-Stand
 
-Diese Sektion wird nach dem ersten Tranchenschnitt analog zu
-`docs/plan-M5-1-8.md` Z. 151ff. mit den Commit-Hashes der A-Schritte
-befuellt. Bis dahin bleibt sie leer; ein leeres Liefer-Stand-Feld bedeutet,
-dass AP 1.1 noch nicht abnahmefaehig ist.
-
-- A.1 (Modelle): noch nicht ausgeliefert.
-- A.2 (`target_graph_support`-Helper und Tests): noch nicht ausgeliefert.
-- A.3 (`CmakeFileApiAdapter`-Erweiterung und Adapter-Tests): noch nicht
-  ausgeliefert.
+- A.1 (Modelle): `ea9c7e3` feat: add M6 AP 1.1 A.1 target-graph model contracts.
+- A.2 (`target_graph_support`-Helper und Tests): `7c85bff` feat: add M6 AP 1.1
+  A.2 target_graph_support helper and tests.
+- A.3 (`CmakeFileApiAdapter`-Erweiterung und Adapter-Tests): `de15925` feat:
+  add M6 AP 1.1 A.3 target-graph extraction in CmakeFileApiAdapter.
 - A.4 (Service-Anbindung in `ProjectAnalyzer`/`ImpactAnalyzer` und
-  Service-Tests): noch nicht ausgeliefert.
-- A.5 (Audit-Pass: Plan-Test-Liste gegen Ist-Stand verifiziert): noch nicht
-  ausgeliefert.
+  Service-Tests): `640e3d9` feat: add M6 AP 1.1 A.4 target-graph propagation
+  in analyzers.
+- A.5 (Audit-Pass: Plan-Test-Liste gegen Ist-Stand verifiziert): `a620e23`
+  test: close M6 AP 1.1 A.5 audit gaps and pass full quality gate set.
+
+Docker-Gate-Lauf gemaess `docs/quality.md` auf `a620e23` lokal gruen:
+`docker build --target test`, `--target coverage-check
+--build-arg XRAY_COVERAGE_THRESHOLD=100` und `--target quality-check`.
 
 ## Offene Folgearbeiten
 
