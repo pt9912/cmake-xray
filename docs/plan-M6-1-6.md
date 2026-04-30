@@ -428,9 +428,17 @@ normalisiert, um Workspace-/Build-/Temp-Praefixe und
 Plattform-Unterschiede unsichtbar zu machen:
 
 1. **Relativisierung**: Pfade werden relativ zur im jeweiligen
-   JSON dokumentierten Projekt-/Source-Root normalisiert.
-   Absolute Workspace-, Build- und Temp-Praefixe duerfen nicht zu
-   fachlichen Diffs fuehren.
+   JSON dokumentierten Projekt-/Source-Root normalisiert, wenn
+   `project_identity_source=cmake_file_api_source_root` ist.
+   Bei `project_identity_source=fallback_compile_database_fingerprint`
+   gibt es keine belastbare Source-Root; dann werden Pfade relativ zum
+   laengsten gemeinsamen Verzeichnis-Praefix des jeweiligen Reports
+   normalisiert. Der Praefix wird aus allen TU-`source_path`-Werten und
+   allen absoluten Header-/Target-Pfaden gebildet, segment-basiert und
+   nach Backslash-Normalisierung. Existiert kein gemeinsamer
+   Verzeichnis-Praefix mit mindestens einem Segment, bleiben Pfade
+   lexikalisch normalisierte Anzeige-Pfade. Absolute Workspace-, Build-
+   und Temp-Praefixe duerfen nicht zu fachlichen Diffs fuehren.
 2. **Backslashes zu `/`**.
 3. **Redundante `.`-Segmente entfernt**.
 4. **`..`-Segmente nur innerhalb der bekannten Projekt-/Source-
@@ -598,8 +606,8 @@ enum class CompareDiffKind {
 
 struct CompareDiagnosticConfigurationDrift {
     std::string field;
-    std::string baseline_value_text;
-    std::string current_value_text;
+    JsonScalar baseline_value;  // string|integer|boolean|null
+    JsonScalar current_value;   // string|integer|boolean|null
     std::string severity{"warning"};
     std::string ci_policy_hint{"review_required"};
 };
@@ -642,6 +650,7 @@ struct CompareSummary {
     int target_edges_changed;
     int target_hubs_added;
     int target_hubs_removed;
+    int target_hubs_changed{0};  // in M6 immer 0
 };
 
 struct CompareResult {
@@ -734,7 +743,9 @@ Feldreihenfolge:
 | `project_identity` | string\|null | ja | shared identity oder `null` bei erlaubtem `project_identity_drift`. |
 | `project_identity_source` | string | ja | shared source. |
 
-`summary`-Schema: alle 14 Zaehler aus `CompareSummary`.
+`summary`-Schema: alle 15 Zaehler aus `CompareSummary`.
+`target_hubs_changed` ist aus Einheitlichkeitsgruenden Pflicht, bleibt
+in M6 aber immer `0`, weil Hub-Diffs nur added/removed kennen.
 
 `diffs`-Schema: ein Objekt mit fuenf Pflichtschluesseln
 (`translation_units`, `include_hotspots`, `target_nodes`,
@@ -802,7 +813,8 @@ Service-Tests `tests/hexagon/test_compare_service.cpp`:
   Wechsel `project, direct` -> `project, mixed` ist ein
   added+removed-Paar, nicht ein changed.
 - Target-Graph-Knoten und -Kanten: added/removed/changed.
-- Target-Hubs: added/removed.
+- Target-Hubs: added/removed; `target_hubs.changed=[]` und
+  `summary.target_hubs_changed=0` sind hart gepinnt.
 - Cross-Mode-Compare, z. B. Compile-DB-only baseline + File-API
   current: harter CLI-Fehler
   `"compare: project identity source mismatch ..."`; es wird kein
@@ -817,6 +829,10 @@ Service-Tests `tests/hexagon/test_compare_service.cpp`:
 - project_identity_drift: Compile-DB-Hash unterschiedlich,
   --allow-project-identity-drift gesetzt, Diagnostic mit allen
   fuenf Pflichtfeldern.
+- Compare-Pfadnormalisierung im Compile-DB-Fallback: absolute
+  Workspace-/Temp-Praefixe unterscheiden sich zwischen baseline und
+  current, aber gleicher relativer Pfad-Suffix erzeugt keinen
+  fachlichen Diff.
 
 CLI-Tests `tests/e2e/test_cli.cpp`:
 
