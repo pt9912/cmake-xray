@@ -482,15 +482,29 @@ Abschnitts-Format Console (`analyze`):
 ```
 Direct Target Dependencies (target_graph_status: loaded):
   mylib -> common
-  mylib -> external [external_target_id: nlohmann_json::INTERFACE_LIBRARY]
+  mylib -> nlohmann_json::INTERFACE_LIBRARY [external]
   app -> mylib
 ```
 
 - Ueberschrift in deutscher CMake-Xray-Konvention bleibt englisch (analog zu
   bestehenden M5-Sections).
 - Eine Kante pro Zeile, zwei Leerzeichen Einzug.
-- `external_target_id` erscheint nur bei `resolution=external`, kann den
-  vollstaendigen `raw_id` enthalten.
+- `to`-Element ist `to_display_name` aus dem Modell: `display_name` fuer
+  `resolution=resolved` und `raw_id` fuer `resolution=external`. Damit
+  arbeitet der Disambiguierungs-Helper auf demselben `display_text` wie
+  in den anderen Formaten und Mischfaelle (intern `foo` vs. extern
+  `raw_id=foo`) werden ueber `[key: <unique_key>]` aufgeloest.
+- Suffix `[external]` erscheint genau dann, wenn `resolution=external`.
+  Bei `resolved` entfaellt das Suffix komplett (kein redundantes
+  `[resolved]`-Suffix, weil das Lärm waere).
+- Reihenfolge der Suffixe bei kombiniertem Mischfall:
+  `<to_display_name> [external] [key: <to_unique_key>]`. `[external]`
+  kommt zuerst, weil es semantisch zur Kante gehoert; `[key: ...]`
+  kommt zuletzt, weil es ein Disambiguierungs-Marker ist. Doppelte
+  Suffixe sind im Kollisionsfall akzeptiert; der `<external>::`-Praefix
+  in `[key: <external>::foo]` und das separate `[external]`-Suffix
+  bleiben beide sichtbar, damit ein Console-Leser nicht erst aus dem
+  Schluessel-Praefix die Resolution rekonstruieren muss.
 
 Abschnitts-Format Console (`analyze`, Hubs):
 
@@ -772,6 +786,11 @@ Adapter-Unit-Tests:
   - File-API-`analyze` mit Hubs: beide Abschnitte gefuellt, Schwellen
     sichtbar, Listen kommagetrennt.
   - Disambiguierung wie HTML.
+  - `external`-Kante: `to`-Element ist die `raw_id`, gefolgt von
+    `[external]`-Suffix; kein literales `external`-Wort als Ziel.
+  - Mischfall mit Disambiguierungs-Kollision plus External: Suffix-
+    Reihenfolge `<raw_id> [external] [key: <external>::<raw_id>]`
+    byteweise gepinnt.
 - Markdown-Adapter:
   - Wie Console; zusaetzlich Test, dass leere Tabellen NICHT als leere
     Markdown-Tabelle ausgegeben werden, sondern als Leersatz-Absatz.
@@ -858,21 +877,39 @@ Verboten:
 
 ## Implementierungsreihenfolge
 
-1. `kReportFormatVersion` auf `2` heben; Schema-Konstante synchron auf `2`
-   heben.
-2. JSON-Schema (`report-json.schema.json`) um `target_graph_status`,
-   `target_graph` und `target_hubs` erweitern; Schema-Test laufen lassen.
-3. Format-Vertrags-Dokumente (`docs/report-json.md`, `docs/report-dot.md`,
-   `docs/report-html.md`) auf v2 aktualisieren.
+Die Reihenfolge ist auf die atomaren Tranchen A.1-A.4 abgestimmt; jede
+Tranche umfasst Schema/Adapter/Goldens fuer einen kohaerenten
+Format-Cluster, damit das CTest-Gate `json_schema_check` und die DOT-/
+HTML-Validations-Gates niemals zwischen Schritten rot werden.
+
+Innerhalb von **A.1**:
+1. `kReportFormatVersion` auf `2` heben; Schema-Konstante synchron auf `2`.
+2. `report-json.schema.json` um `target_graph_status`, `target_graph`
+   und `target_hubs` erweitern.
+3. `docs/report-json.md` auf v2 aktualisieren.
 4. JSON-Adapter implementieren; Adapter-Tests gruen.
-5. DOT-Adapter implementieren; Adapter-Tests gruen.
-6. HTML-Adapter implementieren; Adapter-Tests gruen.
-7. Markdown-Adapter implementieren; Adapter-Tests gruen.
-8. Console-Adapter implementieren; Adapter-Tests gruen.
-9. M6-Goldens erzeugen, manifeste aktualisieren, `validate_doc_examples.py`
-   aktualisieren.
-10. CLI-E2E-Tests laufen lassen, byte-stabil gegen M6-Goldens vergleichen.
-11. Docker-Gates ausfuehren (siehe `docs/quality.md`); Tranche gilt erst
+5. M5-JSON-Goldens unter `tests/e2e/testdata/m5/json-reports/` auf v2
+   migrieren; M6-JSON-Goldens unter `tests/e2e/testdata/m6/json-reports/`
+   anlegen; Schema-Validation und E2E-Tests gruen.
+
+Innerhalb von **A.2**:
+6. `docs/report-dot.md` auf v2 aktualisieren.
+7. DOT-Adapter implementieren; Adapter-Tests gruen.
+8. M5-DOT-Goldens migrieren; M6-DOT-Goldens anlegen; DOT-Syntax-Gate und
+   E2E-Tests gruen.
+
+Innerhalb von **A.3**:
+9. `docs/report-html.md` auf v2 aktualisieren.
+10. HTML-Adapter implementieren; Adapter-Tests gruen.
+11. Markdown-Adapter implementieren; Adapter-Tests gruen.
+12. Console-Adapter implementieren; Adapter-Tests gruen.
+13. M5-Goldens fuer HTML, Markdown, Console migrieren; M6-Goldens anlegen;
+    `validate_doc_examples.py` aktualisieren.
+
+Innerhalb von **A.4**:
+14. CLI-E2E-Tests vollstaendig durchlaufen lassen, byte-stabil gegen
+    Goldens vergleichen.
+15. Docker-Gates ausfuehren (siehe `docs/quality.md`); Tranche gilt erst
     nach gruenem Gate als geliefert.
 
 ## Tranchen-Schnitt
@@ -880,24 +917,50 @@ Verboten:
 AP 1.2 wird in vier Sub-Tranchen geliefert, analog zum M5-Liefer-Stand-
 Vertrag:
 
-- **A.1 Schema und Vertrag**: `kReportFormatVersion=2`,
-  `report-json.schema.json` v2, alle drei Format-Vertrags-Dokumente
-  aktualisiert. Keine Adapter-Aenderungen. CTest-Gate `json_schema_check`
-  bleibt gruen, weil noch keine Adapter v2-Output produzieren.
-- **A.2 JSON- und DOT-Adapter**: JSON-Adapter und DOT-Adapter implementieren
-  v2-Output. Goldens fuer JSON und DOT erzeugen. Adapter- und E2E-Tests
-  gruen.
+- **A.1 Schema, JSON-Adapter und JSON-Goldens (atomar)**:
+  `kReportFormatVersion=2`, `report-json.schema.json` v2,
+  `docs/report-json.md` auf v2 aktualisiert, JSON-Adapter implementiert
+  v2-Output (mit `target_graph_status`, `target_graph`, `target_hubs`),
+  bestehende M5-JSON-Goldens unter `tests/e2e/testdata/m5/json-reports/`
+  werden auf v2 migriert (Pfad bleibt `m5/`, weil sie historisch dort
+  leben und in M5-Tests referenziert sind), neue M6-Goldens unter
+  `tests/e2e/testdata/m6/json-reports/` fuer Target-Graph-Daten
+  hinzugefuegt. JSON-Adapter-Tests, Schema-Validation-Gate und E2E-Tests
+  fuer JSON gruen.
+- **A.2 DOT-Adapter und DOT-Goldens**: DOT-Adapter implementiert
+  v2-Output (`graph_target_graph_status`, `target_dependency`-Kanten,
+  synthetische `external_target`-Knoten), `docs/report-dot.md` auf v2
+  aktualisiert, M5-DOT-Goldens migriert, M6-DOT-Goldens erzeugt.
+  Adapter-Tests, DOT-Syntax-Gate und E2E-Tests gruen.
 - **A.3 HTML-, Markdown- und Console-Adapter**: HTML-Adapter,
-  Markdown-Adapter und Console-Adapter implementieren v2-Output. Goldens
-  fuer alle drei Formate erzeugen. Adapter- und E2E-Tests gruen.
+  Markdown-Adapter und Console-Adapter implementieren v2-Output.
+  `docs/report-html.md` auf v2 aktualisiert. Goldens fuer alle drei
+  Formate erzeugen. Adapter- und E2E-Tests gruen.
 - **A.4 Audit-Pass**: Plan-Test-Liste aus `Tests`-Sektion gegen Ist-Stand
   verifizieren. Docker-Gates gruen. Liefer-Stand-Block in diesem Dokument
   und in `docs/plan-M6.md` aktualisieren.
 
-A.1 und A.2 koennen nicht gleichzeitig im selben Commit landen, weil A.1
-das Schema haerter macht und A.2 dann erst die passenden Adapter liefert.
-A.3 darf parallel zu A.2 entwickelt werden, weil HTML/Markdown/Console
-keine Schema-Abhaengigkeit haben.
+Begruendung der atomaren A.1-Tranche: Die urspruenglich angedachte
+Aufteilung in "A.1 Schema only" + "A.2 JSON-Adapter" wurde verworfen.
+Schema v2 setzt `additionalProperties: false` zusammen mit neuen
+Pflichtfeldern (`target_graph_status`, `target_graph`, `target_hubs`); ein
+Schema-Update ohne gleichzeitige Adapter- und Goldens-Migration wuerde
+das CTest-Gate `json_schema_check` rot werden lassen, weil bestehende
+M5-Goldens das verschaerfte Schema nicht mehr erfuellen. Die saubere
+Loesung ist, alle drei Aenderungen in einem Liefer-Schritt zu buendeln.
+
+A.3 darf parallel zu A.2 entwickelt werden, weil HTML, Markdown und
+Console keine Schema-Abhaengigkeit haben. A.1 ist Voraussetzung fuer
+A.2 und A.3, weil `kReportFormatVersion=2` als zentrale Konstante in
+beiden Tranchen verwendet wird.
+
+Scope von `json_schema_check` in A.1: Das Gate validiert in A.1 und
+allen Folge-Tranchen (a) das Schema selbst (Schema-Selbst-Validation,
+`FormatVersion.const == 2`), (b) alle JSON-Goldens unter `m5/json-reports/`
+und `m6/json-reports/` gegen das v2-Schema, und (c) die durch E2E-Tests
+generierten Live-JSON-Outputs gegen dasselbe Schema. Es gibt keinen
+Validator-Pfad, der Goldens gegen ein altes v1-Schema validiert; v1
+existiert nach A.1 weder als Schema-Datei noch als Goldens-Inhalt.
 
 ## Liefer-Stand
 
@@ -905,8 +968,8 @@ Wird nach dem Schnitt der A-Tranchen mit Commit-Hashes befuellt. Bis dahin
 ist AP 1.2 nicht abnahmefaehig. Format analog zu `docs/plan-M5-1-8.md`
 Z. 151ff.:
 
-- A.1 (Schema und Vertrag): noch nicht ausgeliefert.
-- A.2 (JSON- und DOT-Adapter): noch nicht ausgeliefert.
+- A.1 (Schema, JSON-Adapter und JSON-Goldens): noch nicht ausgeliefert.
+- A.2 (DOT-Adapter und DOT-Goldens): noch nicht ausgeliefert.
 - A.3 (HTML-, Markdown- und Console-Adapter): noch nicht ausgeliefert.
 - A.4 (Audit-Pass): noch nicht ausgeliefert.
 
