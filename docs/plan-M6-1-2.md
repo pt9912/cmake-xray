@@ -352,9 +352,15 @@ Wichtig:
 - `external::*`-Targets erscheinen NICHT in `target_graph.nodes`, weil sie
   keine echten File-API-Targets sind. Sie erscheinen aber als
   `to_unique_key="<external>::<raw_id>"` in `target_graph.edges`.
-- `target_graph_status="not_loaded"` impliziert leeren `target_graph` und
-  leere `target_hubs`-Listen, aber das Schema verlangt die Felder
-  trotzdem (nicht weglassen).
+- `target_graph_status="not_loaded"` impliziert in beiden JSON-Reporttypen
+  einen leeren `target_graph` (`nodes=[]`, `edges=[]`); das Schema
+  verlangt diese Felder trotzdem (nicht weglassen).
+- Im Analyze-JSON impliziert `target_graph_status="not_loaded"`
+  zusaetzlich leere `target_hubs.inbound` und `target_hubs.outbound`
+  sowie das `thresholds`-Objekt mit den hardcoded `10`/`10`-Defaults.
+  Im Impact-JSON ist `target_hubs` per Schema verboten und wird
+  unabhaengig von `target_graph_status` nie serialisiert; die
+  pauschale "leere Hub-Listen"-Regel gilt fuer Impact NICHT.
 
 ## DOT-Vertragsregeln
 
@@ -507,22 +513,29 @@ Anpassung im Impact-DOT:
 
 Budget-Aenderungen:
 
-- Analyze-DOT: `node_limit = max(25, 4 * top_limit + 10)` bleibt
-  unveraendert. Target-Graph-Knoten teilen sich dasselbe Budget mit allen
-  anderen Analyze-Knotenarten. Bei Knoten-Druck weicht zuerst die
+- Die M5-Budget-Formeln bleiben unveraendert: Analyze-DOT verwendet
+  `node_limit = max(25, 4 * top_limit + 10)` und
+  `edge_limit = max(40, 6 * top_limit + 20)`; Impact-DOT verwendet die
+  fixen Werte `node_limit = 100` und `edge_limit = 200`. AP 1.2 fuegt
+  weder neue Formeln noch eigene Budgets hinzu.
+- Target-Graph-Knoten und `target_dependency`-Kanten teilen sich
+  dasselbe Budget mit allen anderen Knoten- und Kantenarten in jedem
+  Reporttyp. Bei Knoten-Druck im Analyze-Pfad weicht zuerst die
   niedrigste Prioritaet aus der oben definierten sechsstufigen
   Knotenprioritaet, also synthetische `external_target`-Knoten zuerst,
   danach weitere Target-Knoten aus `target_graph.nodes` (Prioritaet 5),
   danach Hotspot-Kontext-TUs (Prioritaet 4), danach Targets der Top-
   Ranking-TUs (Prioritaet 3) und so weiter. Top-Ranking-TUs (Prioritaet 1)
   und Top-Hotspot-Knoten (Prioritaet 2) bleiben Teil des Graphen, solange
-  ueberhaupt Knoten ausgegeben werden.
-- Analyze-DOT: `edge_limit = max(40, 6 * top_limit + 20)` bleibt
-  unveraendert. `target_dependency`-Kanten teilen sich das Budget mit
-  `tu_include_hotspot` und `tu_target` ueber die Kantenprioritaet.
-- Impact-DOT: `node_limit = 100` und `edge_limit = 200` bleiben
-  unveraendert. Target-Graph-Knoten und `target_dependency`-Kanten teilen
-  sich diese Budgets.
+  ueberhaupt Knoten ausgegeben werden. Im Impact-Pfad gilt die bestehende
+  M5-Knotenprioritaet (geaenderte Datei, betroffene TUs, betroffene
+  Targets) zuzueglich Target-Graph-Knoten und `external_target`-Knoten
+  am Ende der Reihenfolge.
+- Bei Kanten-Druck teilt sich der Kantenpool das `edge_limit` ueber die
+  Kantenprioritaet: `tu_include_hotspot` und `tu_target` (M5) zuerst,
+  `target_dependency` (M6) zuletzt im Analyze-Pfad; im Impact-Pfad
+  `changed_file_*` und `*_tu_target` (M5) zuerst, `target_dependency`
+  (M6) zuletzt.
 - `graph_truncated=true` wird gesetzt, sobald mindestens ein
   Kandidat-Target-Knoten oder eine Kandidat-`target_dependency`-Kante
   wegen Budget weggefallen ist.
@@ -702,12 +715,9 @@ Sortier-Vertrag fuer Console und Markdown (alle Listen und Tabellen):
   `(from_unique_key, to_unique_key, kind, from_display_name, to_display_name)`
   gemaess M6-Hauptplan-Sortiervertrag (identisch zu
   `target_graph_support::sort_target_graph`).
-- `Target Hubs`-Inbound-Liste: sortiert nach
-  `(unique_key, display_name, type)`, identisch zur JSON-
-  `target_hubs.inbound`-Sortierung.
-- `Target Hubs`-Outbound-Liste: sortiert nach
-  `(unique_key, display_name, type)`, identisch zur JSON-
-  `target_hubs.outbound`-Sortierung.
+- `Target Hubs`-Inbound- und Outbound-Listen: beide sortiert nach
+  `(unique_key, display_name, type)`, identisch zur JSON-Sortierung
+  von `target_hubs.inbound` und `target_hubs.outbound`.
 - `Target Graph Reference`-Liste (Impact): sortiert nach demselben
   5-Stufen-Tupel wie der Analyze-`Direct Target Dependencies`-Abschnitt.
 - Adapter rufen `sort_target_graph` NICHT erneut auf; sie verlassen sich
