@@ -12,6 +12,7 @@
 #include "hexagon/model/impact_result.h"
 #include "hexagon/model/observation_source.h"
 #include "hexagon/model/report_inputs.h"
+#include "hexagon/model/target_graph.h"
 #include "hexagon/model/target_info.h"
 #include "hexagon/ports/driven/build_model_port.h"
 #include "hexagon/ports/driven/include_resolver_port.h"
@@ -669,5 +670,207 @@ TEST_CASE("project analyzer is stable when the process working directory changes
     for (std::size_t i = 0; i < baseline.translation_units.size(); ++i) {
         CHECK(baseline.translation_units[i].reference.unique_key ==
               after_cwd_change.translation_units[i].reference.unique_key);
+    }
+}
+
+// --- M6 AP 1.1 A.4: target-graph propagation in ProjectAnalyzer ---
+
+namespace m6_pa {
+
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyKind;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraph;
+using xray::hexagon::model::TargetGraphStatus;
+
+TargetDependency direct_edge(std::string from_uk, std::string to_uk,
+                             TargetDependencyResolution res =
+                                 TargetDependencyResolution::resolved) {
+    return TargetDependency{from_uk, from_uk, to_uk,        to_uk,
+                            TargetDependencyKind::direct, res};
+}
+
+TargetGraph star_graph_into(const std::string& hub_uk, std::size_t in_degree) {
+    TargetGraph g;
+    g.nodes.push_back(TargetInfo{hub_uk, "STATIC_LIBRARY", hub_uk});
+    for (std::size_t i = 0; i < in_degree; ++i) {
+        const auto src = "src" + std::to_string(i) + "::STATIC_LIBRARY";
+        g.nodes.push_back(TargetInfo{src, "STATIC_LIBRARY", src});
+        g.edges.push_back(direct_edge(src, hub_uk));
+    }
+    return g;
+}
+
+class FileApiPortWithGraph final
+    : public xray::hexagon::ports::driven::BuildModelPort {
+public:
+    FileApiPortWithGraph(TargetGraph graph, TargetGraphStatus status,
+                         std::vector<TargetAssignment> assignments = {})
+        : graph_(std::move(graph)),
+          status_(status),
+          assignments_(std::move(assignments)) {}
+
+    xray::hexagon::model::BuildModelResult load_build_model(
+        std::string_view) const override {
+        xray::hexagon::model::BuildModelResult result;
+        result.source = ObservationSource::derived;
+        result.target_metadata = TargetMetadataStatus::loaded;
+        result.source_root = "/project";
+        result.compile_database = CompileDatabaseResult{
+            CompileDatabaseError::none, {},
+            {CompileEntry::from_arguments(
+                "/project/src/main.cpp", "/project/build/app",
+                {"clang++", "-I/project/include", "-c", "/project/src/main.cpp"})},
+            {}};
+        result.target_assignments = assignments_;
+        result.target_graph = graph_;
+        result.target_graph_status = status_;
+        return result;
+    }
+
+private:
+    TargetGraph graph_;
+    TargetGraphStatus status_;
+    std::vector<TargetAssignment> assignments_;
+};
+
+}  // namespace m6_pa
+
+TEST_CASE("project analyzer: compile-database-only path leaves target-graph at not_loaded defaults") {
+    const StubBuildModelPort build_model_port;
+    const UnusedBuildModelPort unused_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{
+        build_model_port, include_resolver_port, unused_port};
+
+    const auto result = analyzer.analyze_project(
+        make_project_request("/tmp/compile_commands.json", ""));
+
+    CHECK(result.target_graph_status == m6_pa::TargetGraphStatus::not_loaded);
+    CHECK(result.target_graph.nodes.empty());
+    CHECK(result.target_graph.edges.empty());
+    CHECK(result.target_hubs_in.empty());
+    CHECK(result.target_hubs_out.empty());
+}
+
+TEST_CASE("project analyzer: file-api-only path with full graph propagates nodes, edges and hub lists") {
+    const m6_pa::FileApiPortWithGraph file_api_port{
+        m6_pa::star_graph_into("hub::STATIC_LIBRARY", 10),
+        m6_pa::TargetGraphStatus::loaded};
+    const UnusedBuildModelPort compile_db_port;
+    const EmptyIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{
+        compile_db_port, include_resolver_port, file_api_port};
+
+    const auto result =
+        analyzer.analyze_project(make_project_request("", "/tmp/build"));
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6_pa::TargetGraphStatus::loaded);
+    CHECK(result.target_graph.nodes.size() == 11);  // hub + 10 sources
+    CHECK(result.target_graph.edges.size() == 10);
+    REQUIRE(result.target_hubs_in.size() == 1);
+    CHECK(result.target_hubs_in[0].unique_key == "hub::STATIC_LIBRARY");
+    CHECK(result.target_hubs_out.empty());
+}
+
+TEST_CASE("project analyzer: mixed-input path propagates target_graph from file-api model") {
+    const m6_pa::FileApiPortWithGraph file_api_port{
+        m6_pa::star_graph_into("hub::STATIC_LIBRARY", 10),
+        m6_pa::TargetGraphStatus::loaded,
+        {{"/project/src/main.cpp|/project/build/app",
+          {{"myapp", "EXECUTABLE", "myapp::EXECUTABLE"}}}}};
+    const StubBuildModelPort compile_db_port;
+    const EmptyIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{
+        compile_db_port, include_resolver_port, file_api_port};
+
+    const auto result = analyzer.analyze_project(
+        make_project_request("/tmp/compile_commands.json", "/tmp/build"));
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6_pa::TargetGraphStatus::loaded);
+    CHECK(result.target_graph.nodes.size() == 11);
+    REQUIRE(result.target_hubs_in.size() == 1);
+    CHECK(result.target_hubs_in[0].unique_key == "hub::STATIC_LIBRARY");
+}
+
+TEST_CASE("project analyzer: partial graph status propagates from build model") {
+    const m6_pa::FileApiPortWithGraph file_api_port{
+        m6_pa::star_graph_into("hub::STATIC_LIBRARY", 3),
+        m6_pa::TargetGraphStatus::partial};
+    const UnusedBuildModelPort compile_db_port;
+    const EmptyIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{
+        compile_db_port, include_resolver_port, file_api_port};
+
+    const auto result =
+        analyzer.analyze_project(make_project_request("", "/tmp/build"));
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6_pa::TargetGraphStatus::partial);
+}
+
+TEST_CASE("project analyzer: target_metadata=partial does not pull target_graph_status into partial when graph is fully resolved") {
+    class MetadataPartialGraphLoadedPort final
+        : public xray::hexagon::ports::driven::BuildModelPort {
+    public:
+        xray::hexagon::model::BuildModelResult load_build_model(
+            std::string_view) const override {
+            xray::hexagon::model::BuildModelResult result;
+            result.source = ObservationSource::derived;
+            result.target_metadata = TargetMetadataStatus::partial;
+            result.source_root = "/project";
+            result.compile_database = CompileDatabaseResult{
+                CompileDatabaseError::none, {},
+                {CompileEntry::from_arguments(
+                    "/project/src/main.cpp", "/project/build/app",
+                    {"clang++", "-I/project/include", "-c", "/project/src/main.cpp"})},
+                {}};
+            result.target_graph = m6_pa::star_graph_into("hub::STATIC_LIBRARY", 2);
+            result.target_graph_status = m6_pa::TargetGraphStatus::loaded;
+            return result;
+        }
+    };
+
+    const MetadataPartialGraphLoadedPort file_api_port;
+    const UnusedBuildModelPort compile_db_port;
+    const EmptyIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{
+        compile_db_port, include_resolver_port, file_api_port};
+
+    const auto result =
+        analyzer.analyze_project(make_project_request("", "/tmp/build"));
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_metadata == TargetMetadataStatus::partial);
+    CHECK(result.target_graph_status == m6_pa::TargetGraphStatus::loaded);
+}
+
+TEST_CASE("project analyzer: hub thresholds use the M6 default of 10 incoming edges") {
+    SUBCASE("nine incoming edges yields no in-hub") {
+        const m6_pa::FileApiPortWithGraph file_api_port{
+            m6_pa::star_graph_into("hub::STATIC_LIBRARY", 9),
+            m6_pa::TargetGraphStatus::loaded};
+        const UnusedBuildModelPort compile_db_port;
+        const EmptyIncludeResolverPort include_resolver_port;
+        const xray::hexagon::services::ProjectAnalyzer analyzer{
+            compile_db_port, include_resolver_port, file_api_port};
+        const auto result =
+            analyzer.analyze_project(make_project_request("", "/tmp/build"));
+        CHECK(result.target_hubs_in.empty());
+    }
+    SUBCASE("exactly ten incoming edges promotes the node to in-hub") {
+        const m6_pa::FileApiPortWithGraph file_api_port{
+            m6_pa::star_graph_into("hub::STATIC_LIBRARY", 10),
+            m6_pa::TargetGraphStatus::loaded};
+        const UnusedBuildModelPort compile_db_port;
+        const EmptyIncludeResolverPort include_resolver_port;
+        const xray::hexagon::services::ProjectAnalyzer analyzer{
+            compile_db_port, include_resolver_port, file_api_port};
+        const auto result =
+            analyzer.analyze_project(make_project_request("", "/tmp/build"));
+        REQUIRE(result.target_hubs_in.size() == 1);
+        CHECK(result.target_hubs_in[0].unique_key == "hub::STATIC_LIBRARY");
     }
 }

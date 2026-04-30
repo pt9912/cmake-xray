@@ -9,6 +9,7 @@
 #include "hexagon/model/include_resolution.h"
 #include "hexagon/model/observation_source.h"
 #include "hexagon/model/report_inputs.h"
+#include "hexagon/model/target_graph.h"
 #include "hexagon/model/target_info.h"
 #include "hexagon/ports/driven/build_model_port.h"
 #include "hexagon/ports/driven/include_resolver_port.h"
@@ -1092,4 +1093,129 @@ TEST_CASE("impact analyzer keeps changed_file relative when path_for_io is pre-r
     REQUIRE(result.inputs.changed_file.has_value());
     CHECK(*result.inputs.changed_file == "src/main.cpp");
     CHECK(result.changed_file == "src/main.cpp");
+}
+
+// --- M6 AP 1.1 A.4: target-graph propagation in ImpactAnalyzer ---
+
+namespace m6_ia {
+
+using xray::hexagon::model::TargetAssignment;
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyKind;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraph;
+using xray::hexagon::model::TargetGraphStatus;
+using xray::hexagon::model::TargetInfo;
+
+TargetGraph two_target_graph() {
+    TargetGraph g;
+    g.nodes.push_back(TargetInfo{"a", "STATIC_LIBRARY", "a::STATIC_LIBRARY"});
+    g.nodes.push_back(TargetInfo{"b", "STATIC_LIBRARY", "b::STATIC_LIBRARY"});
+    g.edges.push_back(TargetDependency{"a::STATIC_LIBRARY", "a",
+                                       "b::STATIC_LIBRARY", "b",
+                                       TargetDependencyKind::direct,
+                                       TargetDependencyResolution::resolved});
+    return g;
+}
+
+class FileApiPortWithGraph final
+    : public xray::hexagon::ports::driven::BuildModelPort {
+public:
+    FileApiPortWithGraph(TargetGraph graph, TargetGraphStatus status,
+                         std::vector<TargetAssignment> assignments = {})
+        : graph_(std::move(graph)),
+          status_(status),
+          assignments_(std::move(assignments)) {}
+
+    xray::hexagon::model::BuildModelResult load_build_model(
+        std::string_view) const override {
+        xray::hexagon::model::BuildModelResult result;
+        result.source = ObservationSource::derived;
+        result.target_metadata = TargetMetadataStatus::loaded;
+        result.source_root = "/project";
+        result.compile_database = CompileDatabaseResult{
+            CompileDatabaseError::none, {},
+            {CompileEntry::from_arguments("/project/src/main.cpp",
+                                          "/project/build/debug",
+                                          {"clang++", "-I/project/include", "-c",
+                                           "/project/src/main.cpp"}),
+             CompileEntry::from_arguments("/project/src/main.cpp",
+                                          "/project/build/release",
+                                          {"clang++", "-I/project/include", "-DREL=1",
+                                           "-c", "/project/src/main.cpp"}),
+             CompileEntry::from_arguments("/project/src/core.cpp",
+                                          "/project/build/core",
+                                          {"clang++", "-I/project/include", "-c",
+                                           "/project/src/core.cpp"})},
+            {}};
+        result.target_assignments = assignments_;
+        result.target_graph = graph_;
+        result.target_graph_status = status_;
+        return result;
+    }
+
+private:
+    TargetGraph graph_;
+    TargetGraphStatus status_;
+    std::vector<TargetAssignment> assignments_;
+};
+
+}  // namespace m6_ia
+
+TEST_CASE("impact analyzer: compile-database-only path leaves target_graph at not_loaded defaults") {
+    const StubBuildModelPort build_model_port;
+    const UnusedBuildModelPort unused_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{
+        build_model_port, include_resolver_port, unused_port};
+
+    const auto result = analyzer.analyze_impact(make_impact_request(
+        "/tmp/compile_commands.json", "/project/src/main.cpp", ""));
+
+    CHECK(result.target_graph_status == m6_ia::TargetGraphStatus::not_loaded);
+    CHECK(result.target_graph.nodes.empty());
+    CHECK(result.target_graph.edges.empty());
+}
+
+TEST_CASE("impact analyzer: file-api-only path propagates target_graph and status from build model") {
+    const m6_ia::FileApiPortWithGraph file_api_port{m6_ia::two_target_graph(),
+                                                    m6_ia::TargetGraphStatus::loaded};
+    const UnusedBuildModelPort compile_db_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{
+        compile_db_port, include_resolver_port, file_api_port};
+
+    const auto result = analyzer.analyze_impact(
+        make_impact_request("", "/project/src/main.cpp", "/tmp/build"));
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6_ia::TargetGraphStatus::loaded);
+    REQUIRE(result.target_graph.nodes.size() == 2);
+    REQUIRE(result.target_graph.edges.size() == 1);
+    CHECK(result.target_graph.edges[0].from_unique_key == "a::STATIC_LIBRARY");
+    CHECK(result.target_graph.edges[0].to_unique_key == "b::STATIC_LIBRARY");
+}
+
+TEST_CASE("impact analyzer: mixed-input path propagates target_graph from file-api model") {
+    const m6_ia::FileApiPortWithGraph file_api_port{
+        m6_ia::two_target_graph(), m6_ia::TargetGraphStatus::loaded,
+        {{"/project/src/main.cpp|/project/build/debug",
+          {{"a", "STATIC_LIBRARY", "a::STATIC_LIBRARY"}}}}};
+    const StubBuildModelPort compile_db_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{
+        compile_db_port, include_resolver_port, file_api_port};
+
+    const auto result = analyzer.analyze_impact(make_impact_request(
+        "/tmp/compile_commands.json", "/project/src/main.cpp", "/tmp/build"));
+
+    REQUIRE(result.compile_database.is_success());
+    CHECK(result.target_graph_status == m6_ia::TargetGraphStatus::loaded);
+    REQUIRE(result.target_graph.nodes.size() == 2);
+    REQUIRE(result.target_graph.edges.size() == 1);
+    // affected_targets still follows M4/M5 rules: AP 1.1 does not change how
+    // changed-file -> assignments -> targets resolves; the new target_graph
+    // is metadata that AP 1.3 will consume for reverse-BFS prioritisation.
+    REQUIRE(result.affected_targets.size() == 1);
+    CHECK(result.affected_targets[0].target.unique_key == "a::STATIC_LIBRARY");
 }

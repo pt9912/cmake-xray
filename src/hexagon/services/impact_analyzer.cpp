@@ -15,6 +15,7 @@
 #include "model/report_inputs.h"
 #include "services/analysis_support.h"
 #include "services/diagnostic_support.h"
+#include "services/target_graph_support.h"
 
 namespace xray::hexagon::services {
 
@@ -112,6 +113,16 @@ LoadedInputs load_compile_commands_input(const ports::driven::BuildModelPort& po
     return {compile_commands_base_directory(path, fallback_base), model.is_success()};
 }
 
+void apply_target_graph_view(const model::BuildModelResult& build_model,
+                             ImpactResult& result) {
+    result.target_graph = build_model.target_graph;
+    result.target_graph_status = build_model.target_graph_status;
+    // Defense-in-depth: future BuildModelPort adapters or test doubles must
+    // not be able to leak unsorted graphs into ImpactResult; AP 1.3 will
+    // build reverse-BFS on top of this.
+    sort_target_graph(result.target_graph);
+}
+
 FileApiLoadOutcome load_file_api_input(const ports::driven::BuildModelPort& port,
                                        std::string_view path,
                                        const AnalyzeImpactRequest& request,
@@ -122,6 +133,7 @@ FileApiLoadOutcome load_file_api_input(const ports::driven::BuildModelPort& port
     result.observation_source = model::ObservationSource::derived;
     result.target_metadata = model.target_metadata;
     result.target_assignments = model.target_assignments;
+    apply_target_graph_view(model, result);
     if (model.is_success()) {
         append_unique_diagnostics(result.diagnostics, model.diagnostics);
     }
@@ -339,6 +351,7 @@ void filter_assignments_to_observations(
     }
     result.target_metadata = file_api_model.target_metadata;
     result.target_assignments = std::move(matched);
+    apply_target_graph_view(file_api_model, result);
     if (result.target_assignments.empty() && !all_assignments.empty()) {
         append_unique_diagnostic(
             result.diagnostics,

@@ -14,6 +14,7 @@
 #include "model/report_inputs.h"
 #include "services/analysis_support.h"
 #include "services/diagnostic_support.h"
+#include "services/target_graph_support.h"
 
 namespace xray::hexagon::services {
 
@@ -82,6 +83,21 @@ void update_inputs_from_file_api_load(const model::BuildModelResult& model,
     }
 }
 
+void apply_target_graph_view(const model::BuildModelResult& build_model,
+                             model::AnalysisResult& result) {
+    result.target_graph = build_model.target_graph;
+    result.target_graph_status = build_model.target_graph_status;
+    // Defense-in-depth: BuildModelPort contract does not bind every adapter
+    // to pre-sorted output; sort here so AnalysisResult goldens are stable.
+    sort_target_graph(result.target_graph);
+    auto [in_hubs, out_hubs] = compute_target_hubs(
+        result.target_graph,
+        TargetHubThresholds{kDefaultTargetHubInThreshold,
+                            kDefaultTargetHubOutThreshold});
+    result.target_hubs_in = std::move(in_hubs);
+    result.target_hubs_out = std::move(out_hubs);
+}
+
 LoadedInputs load_compile_commands_input(const ports::driven::BuildModelPort& port,
                                          std::string_view path,
                                          const std::filesystem::path& fallback_base,
@@ -102,6 +118,7 @@ LoadedInputs load_file_api_only_input(const ports::driven::BuildModelPort& port,
     result.observation_source = model::ObservationSource::derived;
     result.target_metadata = model.target_metadata;
     result.target_assignments = model.target_assignments;
+    apply_target_graph_view(model, result);
     if (model.is_success()) {
         append_unique_diagnostics(result.diagnostics, model.diagnostics);
     }
@@ -146,6 +163,7 @@ void apply_target_enrichment(
 
     result.target_metadata = file_api_model.target_metadata;
     result.target_assignments = std::move(matched);
+    apply_target_graph_view(file_api_model, result);
 
     if (result.target_assignments.empty() && !all_assignments.empty()) {
         append_unique_diagnostic(
