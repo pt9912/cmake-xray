@@ -209,13 +209,13 @@ Regeln fuer `TargetEvidenceStrength`:
 - Sortierstaerke ueber explizite Rangtabelle:
   `direct=0`, `heuristic=1`, `uncertain=2` (kleinster Rang gewinnt).
 - `direct`: Das Target wurde aus mindestens einer direkt betroffenen TU
-  (`ImpactKind::direct`) als Owner-Target erkannt, oder es ist ueber
-  Reverse-BFS von einem `direct`-Target erreicht.
+  (`ImpactKind::direct`) als Owner-Target erkannt, oder es ist in seiner
+  minimalen Reverse-BFS-Distanz von einem `direct`-Seed erreichbar.
 - `heuristic`: Das Target wurde nur aus heuristisch betroffenen TUs
-  (`ImpactKind::heuristic`) als Owner erkannt, oder es ist ueber
-  Reverse-BFS von einem `heuristic`-Target erreicht (und nicht zugleich
-  von einem `direct`-Target erreichbar mit gleicher oder kuerzerer
-  Distanz).
+  (`ImpactKind::heuristic`) als Owner erkannt, oder es ist in seiner
+  minimalen Reverse-BFS-Distanz von einem `heuristic`-Seed erreichbar
+  (und auf dieser Distanz nicht zugleich von einem `direct`-Seed
+  erreichbar).
 - `uncertain`: Das Target ist betroffen, aber weder eine direkte TU
   noch eine heuristische TU des Targets ist im
   `affected_translation_units`-Set; das Target wurde rein ueber
@@ -223,8 +223,9 @@ Regeln fuer `TargetEvidenceStrength`:
   Header-Beziehung) als betroffen klassifiziert. Auch Targets, die ueber
   Reverse-BFS erreicht werden, deren Quelle aber selbst `uncertain` ist,
   erben diese Stufe.
-- Bei mehreren erreichbaren Wegen gewinnt die staerkere Evidenz;
-  `direct` > `heuristic` > `uncertain`.
+- Bei mehreren erreichbaren Wegen gewinnt zuerst die kuerzere Distanz.
+  Nur unter Wegen derselben minimalen Distanz gewinnt die staerkere
+  Evidenz: `direct` > `heuristic` > `uncertain`.
 
 ### `PrioritizedImpactedTarget`
 
@@ -246,8 +247,12 @@ Regeln:
 - `target` enthaelt `display_name`, `type` und `unique_key` aus dem
   jeweiligen Target.
 - `graph_distance` ist die minimal erreichbare Reverse-BFS-Distanz vom
-  Target zum naechsten Owner-Target eines direkt oder heuristisch
-  betroffenen TUs.
+  Target zum naechsten Impact-Seed-Target. Impact-Seed-Targets sind
+  Owner-Targets direkt oder heuristisch betroffener TUs sowie
+  `uncertain`-Targets, die rein ueber Build-Metadaten als betroffen
+  klassifiziert wurden. `uncertain`-Targets sind keine Owner-Targets
+  eines betroffenen TU, werden fuer die Distanzberechnung aber als
+  Seeds mit `graph_distance=0` behandelt.
 - `priority_class` ist abhaengig vom `graph_distance` (siehe
   Korrespondenzregel oben).
 - `evidence_strength` folgt der oben definierten Regel.
@@ -319,7 +324,7 @@ ueber den Target-Graphen folgt.
 
 ### Algorithmus
 
-1. **Owner-Targets sammeln**:
+1. **Impact-Seed-Targets sammeln**:
    - Direkt betroffene Owner-Targets sind Targets, die mindestens eine
      `ImpactKind::direct`-TU als Member haben.
      `evidence_strength=direct`, `graph_distance=0`,
@@ -332,35 +337,45 @@ ueber den Target-Graphen folgt.
      mit indirektem Header-Mapping ueber `target_assignments`):
      `evidence_strength=uncertain`, `graph_distance=0`,
      `priority_class=direct`.
+   - Wenn dasselbe Target ueber mehrere Seed-Quellen erkannt wird, gibt
+     es genau einen Seed-Eintrag mit `graph_distance=0`; die staerkste
+     Evidenz gewinnt.
 2. **Reverse-BFS**:
-   - Frontier `F_0` = Vereinigung aller Owner-Targets.
-   - Fuer jedes `step in {1..impact_target_depth_effective}`:
+   - Frontier `F_0` = Vereinigung aller Impact-Seed-Targets.
+   - Fuer jedes `step in {1..impact_target_depth_requested}`:
      - Sortiere die aktuelle Frontier `F_{step-1}` nach
        `(stable_target_key, edge_kind, display_name, target_type)`.
      - Sortiere die `target_graph.edges` deterministisch nach demselben
        Tupel.
      - Sammle alle Kanten mit `to_unique_key in F_{step-1}` und
        `kind=direct` (in M6 ist `direct` der einzige Kantentyp).
-     - Pro Kante: Das `from_unique_key`-Target ist ein Reverse-BFS-Hop.
-       Wenn das Target noch nicht im Visited-Set ist, fuege es hinzu;
-       `graph_distance = step`, `priority_class` folgt der
+     - Pro Kante: Das `from_unique_key`-Target ist ein Reverse-BFS-Hop
+       mit Kandidatendistanz `step`; `priority_class` folgt der
        Korrespondenzregel, `evidence_strength` wird vom
-       Frontier-Vorgaenger geerbt (mit Stronger-Wins-Regel:
-       wenn dasselbe Target ueber mehrere Pfade in derselben Distanz
-       erreicht wird, gewinnt die staerkere Evidenz).
-     - Die naechste Frontier `F_step` enthaelt alle neu hinzugefuegten
-       Targets.
+       Frontier-Vorgaenger geerbt.
+     - Fuehre die Kandidaten dieses Schritts pro Target zusammen und
+       gleiche sie gegen die bisher gespeicherten Resultate ab:
+       - Wenn das Target noch nicht erreicht wurde, fuege es mit
+         `graph_distance=step` hinzu.
+       - Wenn das Target bereits mit kleinerer Distanz erreicht wurde,
+         ignoriere den Kandidaten; kuerzeste Distanz gewinnt.
+       - Wenn das Target bereits mit derselben Distanz erreicht wurde,
+         aktualisiere nur `evidence_strength`, falls der Kandidat
+         staerkere Evidenz liefert. `graph_distance` und
+         `priority_class` bleiben unveraendert.
+     - Die naechste Frontier `F_step` enthaelt alle Targets, deren
+       minimale Distanz in diesem Schritt erstmals entdeckt wurde, mit
+       der nach dem Merge staerksten Evidenz dieser Distanz.
      - Wenn `F_step` leer ist, beende die BFS vorzeitig; setze
-       `impact_target_depth_effective` auf den aktuellen `step` (oder
-       `step-1` falls keine neuen Targets erreicht wurden), nicht auf
-       den `requested`-Wert.
+       `impact_target_depth_effective` auf `step-1`, also die groesste
+       tatsaechlich erreichte Distanz, nicht auf den `requested`-Wert.
    - Wenn `impact_target_depth_effective < impact_target_depth_requested`,
      fuege eine Diagnostic der Schwere `note` an `result.diagnostics`
      an: `"reverse target graph traversal stopped at depth N (no further reachable targets)"`.
 3. **Externe und unresolved Kanten**:
    - `target_graph.edges` mit `resolution=external` haben `to_unique_key`
      der Form `<external>::<raw_id>`. Externe Targets sind keine
-     Owner-Targets und tauchen daher nicht in `F_0` auf. Reverse-BFS
+     Impact-Seed-Targets und tauchen daher nicht in `F_0` auf. Reverse-BFS
      erreicht externe Targets als Frontier-Member nur dann, wenn sie
      ueber andere interne Targets als `to`-Knoten verbunden sind, was
      per AP-1.1-Vertrag nicht passieren kann (externe sind nur
@@ -368,10 +383,11 @@ ueber den Target-Graphen folgt.
      `prioritized_affected_targets` enthaelt **keine** externen
      Targets.
 4. **Zyklen-Erkennung**:
-   - Das Visited-Set verhindert, dass Zyklen die BFS in eine
-     Endlosschleife treiben. Wenn die BFS einen Zyklus erkennt (ein
-     Target wird zum zweiten Mal als Reverse-Kantenziel angetroffen),
-     wird die zweite Erreichung ignoriert (kuerzeste Distanz gewinnt).
+   - Die erreichte-Targets-Tabelle verhindert, dass Zyklen die BFS in
+     eine Endlosschleife treiben. Wenn die BFS einen Zyklus erkennt
+     (ein Target wird erneut als Reverse-Kantenziel angetroffen), wird
+     nur eine Erreichung mit groesserer Distanz ignoriert. Eine
+     Erreichung in derselben Distanz darf die Evidenzstaerke nachziehen.
    - Wenn die BFS innerhalb eines Zyklus das Tiefenbudget erschoepft,
      wird eine Diagnostic der Schwere `warning` angehaengt:
      `"reverse target graph traversal hit depth limit N within a cycle; some transitively dependent targets may be missing"`.
@@ -396,13 +412,13 @@ Wenn `target_graph_status=not_loaded` (Compile-DB-only-Pfad oder
 File-API ohne Target-Graph-Daten) und der Nutzer **nicht**
 `--require-target-graph` gesetzt hat:
 
-- `prioritized_affected_targets` enthaelt nur die Owner-Targets aus
-  Schritt 1, also `graph_distance=0`/`priority_class=direct`. Keine
-  Reverse-BFS-Hops.
+- `prioritized_affected_targets` enthaelt nur die Impact-Seed-Targets
+  aus Schritt 1, also `graph_distance=0`/`priority_class=direct`.
+  Keine Reverse-BFS-Hops.
 - `impact_target_depth_requested` ist der CLI-/Default-Wert.
 - `impact_target_depth_effective` ist `0`.
 - Eine Diagnostic der Schwere `note` an `result.diagnostics`:
-  `"target graph not loaded; impact prioritisation degrades to direct owner targets only"`.
+  `"target graph not loaded; impact prioritisation degrades to impact seed targets only"`.
 
 Wenn der Nutzer `--require-target-graph` gesetzt hat und kein Target-
 Graph verfuegbar ist:
@@ -418,11 +434,12 @@ Graph verfuegbar ist:
   `std::vector`-Listen, niemals `std::unordered_map` als Quelle der
   Iteration.
 - Bei mehreren Wegen zu demselben Target gewinnt:
-  - Erste die kuerzere Distanz.
+  - Zuerst die kuerzere Distanz.
   - Bei gleicher Distanz die staerkere Evidenz (`direct` > `heuristic`
     > `uncertain`).
   - Bei gleicher Distanz und Evidenz ist die `target`-Identitaet
-    unique; das passiert per Definition nur einmal pro Visited-Set.
+    unique; mehrere Kandidaten werden zu genau einem Result-Eintrag
+    gemerged.
 - Aenderungen am Provenienz-Pfad (welcher konkrete BFS-Pfad das Target
   zuerst erreicht hat) duerfen `graph_distance` und `priority_class`
   NICHT veraendern; sie aendern nur Diagnostics-Provenienz und sind
@@ -435,7 +452,7 @@ Graph verfuegbar ist:
 - **Default**: `2`.
 - **Wertebereich**: ganze Zahl in `[0, 32]`.
 - **Verhalten**:
-  - `0` reduziert die Sicht auf direkt betroffene Owner-Targets ohne
+  - `0` reduziert die Sicht auf Impact-Seed-Targets ohne
     Reverse-BFS-Hops.
   - Werte `>= 1` aktivieren entsprechend viele Reverse-BFS-Schritte.
 - **Fehlerphrasen** (CLI-Verwendungsfehler, Exit-Code `2`, Text auf
@@ -462,7 +479,7 @@ Graph verfuegbar ist:
 - **Wechselwirkung mit `--impact-target-depth`**: Beide Optionen sind
   unabhaengig kombinierbar. `--impact-target-depth 0
   --require-target-graph` ist gueltig; der Service rendert
-  `prioritized_affected_targets` mit nur Owner-Targets, aber das
+  `prioritized_affected_targets` mit nur Impact-Seed-Targets, aber das
   `--require-target-graph` haelt das Vertragsversprechen "Target-Graph
   ist verfuegbar".
 
@@ -679,13 +696,14 @@ Adapter-Grenzen (unveraendert aus M5/AP 1.2):
 Service-Tests `tests/hexagon/test_impact_analyzer.cpp`:
 
 - Compile-DB-only-`impact`: `prioritized_affected_targets` enthaelt nur
-  Owner-Targets (`graph_distance=0`); `impact_target_depth_effective=0`.
+  Impact-Seed-Targets (`graph_distance=0`);
+  `impact_target_depth_effective=0`.
   Diagnostic `"target graph not loaded ..."` ist gesetzt.
 - File-API-`impact` mit Target-Graph, Default-Tiefe `2`: Reverse-BFS
   laeuft korrekt, alle erreichten Targets haben passende
   `priority_class` und `graph_distance`.
 - File-API-`impact` mit `--impact-target-depth 0`: keine Reverse-BFS,
-  nur Owner-Targets; `impact_target_depth_effective=0`.
+  nur Impact-Seed-Targets; `impact_target_depth_effective=0`.
 - File-API-`impact` mit `--impact-target-depth 1`: ein
   Reverse-BFS-Schritt, Targets mit `graph_distance=1` erscheinen mit
   `priority_class=direct_dependent`.
@@ -694,8 +712,8 @@ Service-Tests `tests/hexagon/test_impact_analyzer.cpp`:
   impact_target_depth_requested`, Diagnostic `"reverse target graph
   traversal stopped at depth N ..."` ist gesetzt.
 - File-API-`impact` mit Zyklus innerhalb der Tiefenbegrenzung:
-  Reverse-BFS terminiert ueber Visited-Set, kuerzeste Distanz gewinnt,
-  keine Endlosschleife.
+  Reverse-BFS terminiert ueber die erreichte-Targets-Tabelle,
+  kuerzeste Distanz gewinnt, keine Endlosschleife.
 - File-API-`impact` mit Zyklus, der das Tiefenbudget erschoepft:
   Diagnostic `"reverse target graph traversal hit depth limit N within
   a cycle ..."` ist gesetzt.
@@ -740,7 +758,7 @@ CLI-Tests `tests/e2e/test_cli.cpp`:
   Kein stdout-Report, keine Zieldatei.
 - `--require-target-graph --impact-target-depth 0` mit File-API-Daten:
   laeuft, Result hat `impact_target_depth_effective=0`,
-  `prioritized_affected_targets` enthaelt nur Owner-Targets.
+  `prioritized_affected_targets` enthaelt nur Impact-Seed-Targets.
 
 Adapter-Tests:
 
@@ -769,7 +787,7 @@ E2E-/Golden-Tests:
   - `impact-prioritised-default.<ext>`: File-API-`impact`,
     Default-Tiefe `2`, alle drei `priority_class`-Stufen vertreten.
   - `impact-prioritised-depth-zero.<ext>`: `--impact-target-depth 0`,
-    nur Owner-Targets.
+    nur Impact-Seed-Targets.
   - `impact-prioritised-cycle.<ext>`: Reverse-BFS in zyklischem Graph,
     Diagnostic vorhanden.
   - `impact-not-loaded.<ext>`: Compile-DB-only, `not_loaded`-Pfad.
@@ -827,7 +845,8 @@ Innerhalb von **A.1 (Modelle und Service-Logik)**:
 4. Service-Logik fuer Owner-Target-Sammlung mit
    `evidence_strength`-Klassifikation.
 5. Reverse-BFS-Implementierung mit deterministischer Sortierung,
-   Visited-Set, Zyklus-Erkennung und Tiefenbudget.
+   erreichter-Targets-Tabelle, Zyklus-Erkennung, Same-Distance-
+   Evidence-Merge und Tiefenbudget.
 6. Diagnostics fuer Compile-DB-only-Fallback, vorzeitiges BFS-Ende und
    Budget-Kappung.
 7. Service-Tests fuer alle BFS- und Klassifikations-Faelle.
@@ -918,7 +937,7 @@ AP 1.3 ist abgeschlossen, wenn:
   unterstuetzt;
 - die Reverse-BFS deterministisch ist (gleiche Eingabe → gleiche
   Ausgabe, unabhaengig von Container-Iteration), zyklensicher
-  (Visited-Set greift) und budget-respektierend
+  (erreichte-Targets-Tabelle greift) und budget-respektierend
   (`impact_target_depth_effective <= impact_target_depth_requested`);
 - `--impact-target-depth <n>` mit drei klaren Fehlerphrasen
   (`negative value`, `not an integer`, `value exceeds maximum 32`)
@@ -928,7 +947,7 @@ AP 1.3 ist abgeschlossen, wenn:
 - der Compile-DB-only-Fallback ohne `--require-target-graph`
   M5-kompatibles Verhalten plus eine klare Diagnostic liefert;
 - `evidence_strength`-Klassifikation `direct`, `heuristic`, `uncertain`
-  in Service-Tests fuer Owner-Targets und Reverse-BFS-Hops gepinnt
+  in Service-Tests fuer Impact-Seed-Targets und Reverse-BFS-Hops gepinnt
   ist;
 - Mehrweg-Targets die kuerzere Distanz und staerkere Evidenz
   korrekt anwenden;
