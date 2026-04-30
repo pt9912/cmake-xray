@@ -128,9 +128,28 @@ Neue Dateien:
   repraesentativen M6-Beispielen
 
 Hinweis zur Verzeichnisstruktur: Goldens leben unter `m6/` parallel zu
-`m5/`, damit AP 1.7 (Doku- und Abnahme) keine Drift zwischen Pre-M6- und
-Post-M6-Beispielen riskiert. Der `validate_doc_examples.py`-Generator-
-Spec wird um die neuen `m6/`-Pfade erweitert.
+`m5/`. Die Trennung ist **fachlich**, nicht versionell:
+
+- `m5/<format>-reports/` enthaelt Goldens fuer M5-Datensatz-Szenarien
+  (Compile-DB-only und File-API ohne Target-Graph-Inhalte).
+- `m6/<format>-reports/` enthaelt Goldens fuer M6-Datensatz-Szenarien
+  (Target-Graph loaded/partial, Hubs, External-Kanten,
+  raw_id-Sonderzeichen).
+
+Nach A.1 enthalten beide Verzeichnisse ausschliesslich Goldens unter
+dem neuen v2-Schema; das v1-Schema existiert nicht mehr. Die alten
+M5-Goldens werden in A.1 inhaltlich auf v2 migriert (Pfad bleibt
+`m5/`, weil bestehende M5-Tests diese Pfade referenzieren), enthalten
+dabei aber weiterhin nur die M5-Datensatz-Szenarien.
+
+Damit ist die Frage "ist `m5/` ein Legacy-Verzeichnis?" beantwortet:
+nein, `m5/` bleibt eine aktive Goldens-Sammlung; es trennt nur
+fachliche Datensaetze von den neuen M6-Datensaetzen, nicht
+Schema-Versionen. Der Name `m5/` ist historisch, nicht versionell.
+
+Der `validate_doc_examples.py`-Generator-Spec wird um die neuen
+`m6/`-Pfade erweitert; `json_schema_check` validiert beide
+Verzeichnisse gegen das v2-Schema.
 
 ## Format-Versionierung
 
@@ -370,21 +389,32 @@ Neue Kantenart `target_dependency` fuer Analyze und Impact:
   `kind="external_target"`, `label=<raw_id>` und
   `external_target_id=<raw_id>` erzeugt; AP 1.2 verbietet das Erfinden
   eines `unique_key` fuer externe Ziele im DOT-Knotengraphen.
-- **`raw_id`-Escaping und Truncation**: Sowohl `label` als auch
-  `external_target_id` folgen den bestehenden M5-DOT-Vertragsregeln aus
-  `docs/report-dot.md`. Konkret:
-  - **Stringescaping** (gilt fuer beide Attribute): Backslash zu `\\`,
-    Anfuehrungszeichen zu `\"`, Newline zu `\n`, Carriage Return zu `\r`,
-    Tab zu `\t`. Sonstige ASCII-Steuerzeichen unter `0x20` werden
-    deterministisch durch `\xHH`-Sequenzen ersetzt. UTF-8-Bytes ueber
-    `0x7F` bleiben rohe Bytes; Graphviz akzeptiert UTF-8 in quoted
-    Strings. AP 1.2 fuegt keine eigenen Escaping-Regeln hinzu.
-  - **Label-Truncation** (gilt nur fuer `label`): Wenn `raw_id` mehr als
-    48 Zeichen hat, wird die Middle-Truncation aus dem M5-DOT-Vertrag
-    angewendet (22 Zeichen + `...` + 23 Zeichen, ASCII-`...`).
-    `external_target_id` bleibt **unverkuerzt** und enthaelt den
-    vollstaendigen `raw_id`, analog zum M5-Vertrag fuer `unique_key`-
-    Attribute.
+- **`raw_id`-Escaping und Truncation**: Beide Attribute (`label` und
+  `external_target_id`) sind DOT-String-Literale und werden als solche
+  escaped. Die Trennlinie zwischen den beiden ist nicht "escaped vs.
+  nicht escaped", sondern "Middle-Truncation an vs. aus":
+  - **Stringescaping bleibt aktiv fuer beide Attribute**: Backslash zu
+    `\\`, Anfuehrungszeichen zu `\"`, Newline zu `\n`, Carriage Return
+    zu `\r`, Tab zu `\t`. Sonstige ASCII-Steuerzeichen unter `0x20`
+    werden deterministisch durch `\xHH`-Sequenzen ersetzt. UTF-8-Bytes
+    ueber `0x7F` bleiben rohe Bytes; Graphviz akzeptiert UTF-8 in quoted
+    Strings. AP 1.2 fuegt keine eigenen Escaping-Regeln hinzu, sondern
+    verweist auf den M5-DOT-Vertrag in `docs/report-dot.md`.
+  - **Middle-Truncation gilt nur fuer `label`**: Wenn `raw_id` mehr als
+    48 Zeichen hat (gemessen am UTF-8-Codepoint-Strom vor dem Escapen),
+    wird das `label`-Attribut auf 22 Zeichen + `...` + 23 Zeichen
+    gekuerzt (ASCII-`...`). Der `label`-Wert wird nach der Truncation
+    weiterhin escaped, damit Sonderzeichen im gekuerzten Praefix oder
+    Suffix DOT-konform bleiben.
+  - **`external_target_id` bleibt trunkierungsfrei (Escape-Vertrag bleibt
+    aktiv)**: Das Attribut traegt den vollstaendigen `raw_id`-Wert ohne
+    Middle-Truncation, escaped als DOT-String-Literal. Damit ist der
+    vollstaendige `raw_id` recoverable, auch wenn das `label` gekuerzt
+    wurde. "Trunkierungsfrei" meint hier ausschliesslich "keine
+    Middle-Truncation"; das DOT-String-Escape ist davon unbetroffen
+    und immer aktiv. Das spiegelt den M5-Vertrag fuer `unique_key`-
+    Attribute, die ebenfalls trunkierungsfrei + escaped serialisiert
+    werden.
   - **Begruendung**: `raw_id` kann beliebige UTF-8-Zeichen enthalten,
     weil CMake-File-API-IDs nicht auf das CMake-Target-Namen-Vokabular
     eingeschraenkt sind (z. B. interne IMPORTED-Target-Hashes mit `@`,
@@ -898,22 +928,29 @@ Adapter-Unit-Tests:
     `external_2`. Analyze unveraendert. Test pinnt, dass das Mapping
     NICHT konfusion-stabil ueber Reporttypen hinweg ist, sondern strikt
     eine Funktion des jeweiligen Eingangs-Satzes.
-  - `analyze` mit einem `raw_id` `quote\"and\\backslash\nnewline`: das
-    `label`-Attribut enthaelt die korrekt escapte Form
-    (`\"`, `\\`, `\n`), das `external_target_id`-Attribut enthaelt
-    dieselbe escapte Form unverkuerzt. Test pinnt sowohl Label-Output
-    als auch `external_target_id` byteweise und validiert zusaetzlich
-    ueber `dot -Tsvg` (Docker-Pfad) bzw. `tests/validate_dot_reports.py`,
-    dass Graphviz die Ausgabe akzeptiert.
+  - `analyze` mit einem `raw_id` `quote"and\backslash` plus
+    Newline-Byte: das `label`-Attribut enthaelt die DOT-String-escapte
+    Form (`\"`, `\\`, `\n`), das `external_target_id`-Attribut enthaelt
+    dieselbe DOT-String-escapte Form. Test pinnt sowohl
+    Label-Output als auch `external_target_id`-Output byteweise als
+    quoted DOT-Strings (mit Escape-Sequenzen, nicht als Roh-Bytes!) und
+    validiert zusaetzlich ueber `dot -Tsvg` (Docker-Pfad) bzw.
+    `tests/validate_dot_reports.py`, dass Graphviz die Ausgabe
+    akzeptiert.
   - `analyze` mit einem `raw_id`, der mehr als 48 Zeichen lang ist (zum
     Beispiel ein vollstaendiger CMake-IMPORTED-Target-Hash wie
     `nlohmann_json::INTERFACE_LIBRARY::abcdef0123456789`): das
-    `label`-Attribut wird per Middle-Truncation auf 48 Zeichen gekuerzt,
-    waehrend `external_target_id` den vollstaendigen Wert behaelt.
+    `label`-Attribut wird per Middle-Truncation auf 48 Zeichen gekuerzt
+    UND escaped (Escape gilt fuer das gekuerzte Ergebnis), waehrend
+    `external_target_id` den vollstaendigen Wert escaped (aber nicht
+    truncated) traegt. Test pinnt explizit, dass beide Attribute
+    DOT-konform escaped sind, der eine aber gekuerzt und der andere
+    nicht.
   - `analyze` mit einem `raw_id`, der UTF-8-Bytes ueber `0x7F` enthaelt
-    (zum Beispiel `älib` als Library-Name): rohe UTF-8-Bytes
-    bleiben in beiden Attributen erhalten; Graphviz akzeptiert die
-    Ausgabe.
+    (zum Beispiel `älib` als Library-Name): UTF-8-Bytes bleiben in
+    beiden Attributen als rohe Bytes erhalten (M5-Escape-Vertrag
+    erfasst sie nicht); Graphviz akzeptiert die Ausgabe. Test prueft,
+    dass die UTF-8-Bytes nicht versehentlich als `\xHH` escaped werden.
   - `analyze` mit `node_limit`-Druck: `target_graph.nodes` werden zuletzt
     aufgenommen; bei erreichten Budget wird `graph_truncated="true"`
     gesetzt und ueberzaehlige `target_dependency`-Kanten weggelassen.
@@ -1057,14 +1094,19 @@ Schema-Tests:
 Regressionstests:
 
 - Compile-DB-only-Goldens fuer Console und Markdown bleiben byte-stabil
-  (es gibt keinen Target-Graph-Abschnitt).
-- M5-File-API- und Mixed-Input-Goldens **veraendern sich** durch AP 1.2.
-  Die Aenderung ist erwartet und wird im Tranchen-Liefer-Stand-Block
-  dokumentiert; Regressionstests vergleichen gegen die NEUEN Goldens, nicht
-  gegen die M5-Versionen.
-- Bestehende M5-DOT-/JSON-/HTML-Goldens werden vollstaendig durch
-  M6-Goldens ersetzt; AP 1.2 fuehrt KEINE doppelten Goldens fuer beide
-  Versionen.
+  (es gibt keinen Target-Graph-Abschnitt). Diese Goldens leben unter
+  `m5/console-reports/` bzw. `m5/markdown-reports/` und werden in A.3
+  weder migriert noch geloescht.
+- File-API- und Mixed-Input-Goldens unter `m5/<format>-reports/`
+  **veraendern sich** durch AP 1.2 inhaltlich, weil sie nun v2-Schema
+  und v2-Sektionen tragen. Die Aenderung ist erwartet und wird im
+  Tranchen-Liefer-Stand-Block dokumentiert; Regressionstests vergleichen
+  gegen die in A.1-A.3 migrierten Inhalte, nicht gegen die historischen
+  M5-Pre-AP-1.2-Versionen.
+- AP 1.2 fuehrt KEINE doppelten Goldens fuer v1 und v2 ein. Es gibt
+  weder ein paralleles `m5_v1/`-Verzeichnis noch eine
+  `format_version=1`-Goldens-Sammlung. Wer historische v1-Goldens
+  einsehen will, nutzt die Git-History vor dem A.1-Migrationskommit.
 
 ## Rueckwaertskompatibilitaet
 
@@ -1132,12 +1174,15 @@ Vertrag:
   `kReportFormatVersion=2`, `report-json.schema.json` v2,
   `docs/report-json.md` auf v2 aktualisiert, JSON-Adapter implementiert
   v2-Output (mit `target_graph_status`, `target_graph`, `target_hubs`),
-  bestehende M5-JSON-Goldens unter `tests/e2e/testdata/m5/json-reports/`
-  werden auf v2 migriert (Pfad bleibt `m5/`, weil sie historisch dort
-  leben und in M5-Tests referenziert sind), neue M6-Goldens unter
-  `tests/e2e/testdata/m6/json-reports/` fuer Target-Graph-Daten
-  hinzugefuegt. JSON-Adapter-Tests, Schema-Validation-Gate und E2E-Tests
-  fuer JSON gruen.
+  bestehende JSON-Goldens unter `tests/e2e/testdata/m5/json-reports/`
+  werden inhaltlich auf v2 migriert (Pfad bleibt `m5/` aus
+  Test-Referenz-Gruenden; `m5/` ist nach A.1 ein fachliches
+  Datensatz-Verzeichnis fuer M5-Szenarien, kein Versions-Verzeichnis
+  mehr), neue JSON-Goldens fuer M6-Datensatz-Szenarien unter
+  `tests/e2e/testdata/m6/json-reports/` hinzugefuegt. Beide
+  Verzeichnisse enthalten nach A.1 ausschliesslich v2-konforme Goldens.
+  JSON-Adapter-Tests, Schema-Validation-Gate und E2E-Tests fuer JSON
+  gruen.
 - **A.2 DOT-Adapter und DOT-Goldens**: DOT-Adapter implementiert
   v2-Output (`graph_target_graph_status`, `target_dependency`-Kanten,
   synthetische `external_target`-Knoten), `docs/report-dot.md` auf v2
@@ -1169,9 +1214,12 @@ Scope von `json_schema_check` in A.1: Das Gate validiert in A.1 und
 allen Folge-Tranchen (a) das Schema selbst (Schema-Selbst-Validation,
 `FormatVersion.const == 2`), (b) alle JSON-Goldens unter `m5/json-reports/`
 und `m6/json-reports/` gegen das v2-Schema, und (c) die durch E2E-Tests
-generierten Live-JSON-Outputs gegen dasselbe Schema. Es gibt keinen
-Validator-Pfad, der Goldens gegen ein altes v1-Schema validiert; v1
-existiert nach A.1 weder als Schema-Datei noch als Goldens-Inhalt.
+generierten Live-JSON-Outputs gegen dasselbe Schema. Beide
+Verzeichnisse `m5/` und `m6/` enthalten nach A.1 nur v2-Goldens; die
+Verzeichnistrennung ist fachlich (M5- vs. M6-Datensatz-Szenarien) und
+nicht versionell. Es gibt keinen Validator-Pfad, der Goldens gegen ein
+altes v1-Schema validiert; v1 existiert nach A.1 weder als
+Schema-Datei noch als Goldens-Inhalt.
 
 ## Liefer-Stand
 
