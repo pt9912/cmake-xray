@@ -44,8 +44,9 @@ Umsetzen:
   `target_graph_traversal`-Helper, je nach Code-Komplexitaet).
 - CLI-Optionen `--impact-target-depth <n>` (Default `2`, Range `0-32`)
   und `--require-target-graph` (Flag).
-- Drei klare CLI-Fehlerphrasen: `negative value`, `not an integer`,
-  `value exceeds maximum 32`.
+- Vier klare CLI-Fehlerphrasen fuer `--impact-target-depth`:
+  `negative value`, `not an integer`, `value exceeds maximum 32`,
+  `option specified more than once`.
 - Reportausgabe der priorisierten Target-Sicht in Console, Markdown,
   HTML, JSON und DOT.
 - `kReportFormatVersion` von `2` auf `3` heben, sobald alle Adapter
@@ -556,8 +557,10 @@ Graph verfuegbar ist:
 
 ### Wechselwirkung mit existierenden CLI-Optionen
 
-- `--format`-Validierung aus M5 bleibt unveraendert; alle fuenf Formate
-  unterstuetzen die neuen v3-Felder.
+- `--format`-Validierung aus M5 bleibt unveraendert. Die ausgewaehlten
+  Formate unterstuetzen die neuen v3-Felder erst ab der globalen
+  Version-Aktivierung in A.4; vorher bleiben produktive Reports v2
+  gemaess Tranche-Invariant.
 - `--output` aus M5 bleibt unveraendert; atomarer Schreibvertrag aus
   AP M5-1.1 gilt fuer v3-Outputs identisch.
 - `--quiet`/`--verbose` aus AP M5-1.5 bleiben unveraendert.
@@ -929,9 +932,11 @@ Regressionstests:
 - M5-`affected_targets`, `directly_affected_targets` und
   `heuristically_affected_targets` bleiben in v3-Output erhalten und
   zeigen dasselbe Verhalten wie in v2.
-- Compile-DB-only-Console- und Markdown-Goldens bleiben byte-stabil
-  gegenueber v2 ausser dem neuen Diagnostic-Eintrag (siehe
-  Kompatibilitaets-Fallback oben).
+- Compile-DB-only-Console- und Markdown-Goldens bleiben in den
+  bestehenden M5-Sections byte-stabil gegenueber v2. Ab v3 enthalten
+  sie zusaetzlich die neue `Prioritised Affected Targets`-
+  Fallback-Section mit Tiefen-Metadaten sowie den neuen Diagnostic-
+  Eintrag (siehe Kompatibilitaets-Fallback oben).
 
 ## Rueckwaertskompatibilitaet
 
@@ -974,7 +979,8 @@ Innerhalb von **A.1 (Modelle und Service-Logik)**:
 Innerhalb von **A.2 (CLI und Schema)**:
 
 9. CLI-Optionen `--impact-target-depth` und `--require-target-graph`
-   in `cli_adapter.cpp` mit den drei Fehlerphrasen.
+   in `cli_adapter.cpp` mit den vier
+   `--impact-target-depth`-Fehlerphrasen.
 10. CLI-Validation und Composition-Root-Verdrahtung in `main.cpp`;
     Service-Validierungsfehler auf CLI-Exit-Codes mappen.
 11. CLI-Tests fuer alle Fehlerphrasen, Service-Error-Mappings und
@@ -1076,9 +1082,10 @@ AP 1.3 ist abgeschlossen, wenn:
   validiert und fuer ungueltige Tiefe bzw. fehlenden erforderlichen
   Target-Graphen klare Service-Fehlercodes ohne partielles
   `ImpactResult` liefert;
-- `--impact-target-depth <n>` mit drei klaren Fehlerphrasen
-  (`negative value`, `not an integer`, `value exceeds maximum 32`)
-  und Default `2`, Range `[0, 32]` validiert;
+- `--impact-target-depth <n>` mit vier klaren Fehlerphrasen
+  (`negative value`, `not an integer`, `value exceeds maximum 32`,
+  `option specified more than once`) und Default `2`, Range `[0, 32]`
+  validiert;
 - `--require-target-graph` mit fehlendem Target-Graph zu Exit-Code `1`,
   klarer Fehlermeldung und keinem Reportoutput fuehrt; Exit-Code `1`
   ist das bewusste CLI-Mapping des Service-Eingabefehlers
