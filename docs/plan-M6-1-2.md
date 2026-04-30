@@ -25,9 +25,12 @@ werden synchron aktualisiert.
 
 Umsetzen:
 
-- Console- und Markdown-Adapter erhalten einen neuen Abschnitt fuer direkte
-  Target-Abhaengigkeiten (`from -> to`) und einen Abschnitt fuer
-  Target-Hubs.
+- Console- und Markdown-Adapter erhalten im `analyze`-Pfad einen neuen
+  Abschnitt fuer direkte Target-Abhaengigkeiten (`from -> to`) und einen
+  Abschnitt fuer Target-Hubs. Im `impact`-Pfad gibt es nur einen Abschnitt
+  "Target Graph Reference" als Lesedaten-Sicht; Target Hubs sind im Impact-
+  Pfad ausdruecklich nicht vorgesehen, analog zum JSON-Vertrag (siehe
+  unten).
 - HTML-Adapter erhaelt eine neue Section `Target Graph` (Knoten- und
   Kantentabellen) und `Target Hubs` (eingehende und ausgehende Hubs).
 - JSON-Adapter erhaelt neue Pflichtfelder `target_graph_status`,
@@ -338,9 +341,33 @@ Neue Kantenart `target_dependency` fuer Analyze und Impact:
 - Quelle und Ziel sind die jeweiligen DOT-Node-IDs der File-API-Targets.
   Bei `resolution=external` wird das Ziel ueber einen synthetischen
   Knoten der Form `external_<index>` mit Pflichtattributen
-  `kind="external_target"`, `label=<raw_id>` und `external_target_id=<raw_id>`
-  erzeugt; AP 1.2 verbietet das Erfinden eines `unique_key` fuer
-  externe Ziele im DOT-Knotengraphen.
+  `kind="external_target"`, `label=<raw_id>` und
+  `external_target_id=<raw_id>` erzeugt; AP 1.2 verbietet das Erfinden
+  eines `unique_key` fuer externe Ziele im DOT-Knotengraphen.
+- **Dedup-Vertrag fuer `external_target`-Knoten**: Pro
+  `to_unique_key` (= `<external>::<raw_id>`) wird genau EIN synthetischer
+  Knoten erzeugt. Alle `target_dependency`-Kanten mit demselben
+  `to_unique_key` referenzieren denselben `external_<index>`-Knoten als
+  Ziel. Der Dedup-Vertrag ist verbindlich, damit:
+  - mehrere interne Targets gegen dieselbe externe Bibliothek nicht zu
+    `n` separaten externalen Knoten fuehren,
+  - das `node_limit` nicht durch redundante synthetische Knoten verbraucht
+    wird,
+  - die DOT-Ausgabe byte-stabil bleibt, auch wenn die Reihenfolge der
+    Roh-Reply-Kanten variiert.
+- ID-Vergabe fuer `external_<index>`: Der Adapter sammelt zuerst die
+  Menge aller `to_unique_key`-Werte mit `resolution=external` aus den
+  finalen `target_dependency`-Kanten (also nach Anwendung des
+  Kantenbudgets), sortiert sie nach `to_unique_key` aufsteigend und
+  vergibt `external_1`, `external_2`, ... in dieser Sortierreihenfolge.
+  Der Index ist damit reproduzierbar und unabhaengig von der
+  Reply-Reihenfolge oder davon, welche interne Quelle die Kante zuerst
+  produziert hat.
+- Wenn das `node_limit` keine `external_target`-Knoten mehr zulaesst,
+  werden zugehoerige `target_dependency`-Kanten ueber die bestehende M5-
+  Regel "Kanten werden nur ausgegeben, wenn beide Endknoten im finalen
+  Graph enthalten sind" automatisch verworfen, und `graph_truncated=true`
+  wird gesetzt.
 
 Anpassung der Statement-Reihenfolge im Analyze-DOT (Knotenprioritaet,
 absteigend; bei Budget-Druck weicht jeweils die niedrigste noch nicht
@@ -512,11 +539,18 @@ Target Graph Reference (target_graph_status: loaded):
 ```
 
 - Same Format wie der `analyze`-Direct-Target-Dependencies-Abschnitt.
-- Es gibt keinen Hub-Abschnitt im `impact`-Output (siehe JSON-Regel).
-- AP 1.3 darf diesen Abschnitt durch eine priorisierte Sicht ersetzen, ohne
-  einen weiteren Versionssprung zu brauchen, weil Console und Markdown kein
-  `format_version` tragen; Goldens werden trotzdem in AP 1.3 byte-stabil
-  aktualisiert.
+- Es gibt KEINEN Hub-Abschnitt im `impact`-Output. Diese Asymmetrie
+  spiegelt den JSON-Vertrag: `target_hubs` existiert nur im
+  `cmake-xray.analysis`-JSON, nicht im `cmake-xray.impact`-JSON. AP 1.3
+  entscheidet ueber Hub-Sichtbarkeit im Impact-Kontext zusammen mit der
+  Priorisierung.
+- AP 1.3 darf den `Target Graph Reference`-Abschnitt durch eine
+  priorisierte Sicht ersetzen, ohne einen weiteren Versionssprung zu
+  brauchen, weil Console und Markdown kein `format_version` tragen;
+  Goldens werden trotzdem in AP 1.3 byte-stabil aktualisiert.
+- Bei `target_graph_status=not_loaded` wird auch der `Target Graph
+  Reference`-Abschnitt komplett weggelassen, gemaess dem zentralen
+  Empty-Section-Vertrag.
 
 Wichtig:
 
@@ -691,6 +725,16 @@ Adapter-Unit-Tests:
     mit `kind="external_target"` und `external_target_id`-Attribut,
     `target_dependency`-Kante mit `style="dashed"` und
     `external_target_id`-Attribut.
+  - `analyze` mit drei internen Targets `mylib`, `app`, `test`, die alle
+    gegen dasselbe externe Ziel `boost` linken: genau EIN
+    `external_target`-Knoten mit `external_target_id="boost"` und drei
+    `target_dependency`-Kanten, die alle diesen Knoten als Ziel
+    referenzieren. Der Test pinnt den Dedup-Vertrag byteweise.
+  - `analyze` mit zwei externen Zielen `boost` und `abseil` ueber zwei
+    interne Targets: zwei `external_target`-Knoten in deterministischer
+    Reihenfolge `external_1` (raw_id `abseil`) und `external_2`
+    (raw_id `boost`), weil die ID-Vergabe sortiert nach `to_unique_key`
+    erfolgt.
   - `analyze` mit `node_limit`-Druck: `target_graph.nodes` werden zuletzt
     aufgenommen; bei erreichten Budget wird `graph_truncated="true"`
     gesetzt und ueberzaehlige `target_dependency`-Kanten weggelassen.
@@ -737,13 +781,34 @@ Adapter-Unit-Tests:
 E2E-/Golden-Tests:
 
 - Goldens unter `tests/e2e/testdata/m6/<format>-reports/` mit mindestens:
-  - `analyze-compile-db-only.<ext>`: keine Target-Graph-Daten.
+  - `analyze-compile-db-only.<ext>`: keine Target-Graph-Daten,
+    `target_graph_status=not_loaded`. Pflicht fuer alle fuenf Formate.
   - `analyze-file-api-loaded.<ext>`: `loaded`, mehrere Kanten, mindestens
-    einen Hub.
+    einen Hub. Pflicht fuer alle fuenf Formate.
   - `analyze-file-api-partial.<ext>`: `partial`, mindestens eine
-    `external`-Kante, mindestens eine Diagnostic.
-  - `impact-compile-db-only.<ext>`: keine Target-Graph-Daten.
-  - `impact-file-api-loaded.<ext>`: `loaded`, mehrere Kanten.
+    `external`-Kante, mindestens eine `partial`-Diagnostic. Pflicht fuer
+    alle fuenf Formate. Fuer DOT muss dieses Golden zusaetzlich:
+    - mindestens einen synthetischen `external_target`-Knoten enthalten,
+    - das `graph_target_graph_status="partial"`-Graph-Attribut tragen,
+    - mindestens eine `target_dependency`-Kante mit `style="dashed"` und
+      `resolution="external"` ausgeben.
+    Fuer JSON muss das Golden zusaetzlich `target_graph_status="partial"`
+    serialisieren und mindestens eine Kante mit `resolution="external"`
+    in `target_graph.edges` enthalten.
+    Fuer Console und Markdown muss das Golden den `Direct Target
+    Dependencies`-Abschnitt mit mindestens einer External-Kante zeigen
+    (Console: `external_target_id`-Suffix; Markdown: `External Target`-
+    Spalte gefuellt).
+  - `impact-compile-db-only.<ext>`: keine Target-Graph-Daten,
+    `target_graph_status=not_loaded`. Pflicht fuer alle fuenf Formate.
+  - `impact-file-api-loaded.<ext>`: `loaded`, mehrere Kanten. Pflicht fuer
+    alle fuenf Formate.
+  - `impact-file-api-partial.<ext>`: `partial`, mindestens eine
+    `external`-Kante. Pflicht fuer JSON, HTML und DOT. Fuer Console und
+    Markdown ist das Golden optional, wenn der `Target Graph Reference`-
+    Abschnitt strukturell identisch zum Analyze-Pendant ist und nur durch
+    Goldens fuer den Analyze-Partial-Pfad abgedeckt wird; in diesem Fall
+    pinnt ein expliziter Adapter-Unit-Test den Code-Pfad.
 - Manifeste werden um die neuen Goldens erweitert; `validate_doc_examples.py`
   prueft sie ebenfalls.
 - JSON-Schema-Validation gegen `format_version=2`-Schema laeuft als
