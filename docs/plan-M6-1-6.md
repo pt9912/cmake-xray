@@ -56,9 +56,10 @@ Umsetzen:
   in einer neuen Datei `docs/compare-matrix.md` oder als Sektion in
   `docs/report-json.md`.
 - Pfadnormalisierungs-Helper fuer Compare-Schluessel.
-- Diff-Result-Modell und Diagnostik-Typen
-  (`configuration_drift`, `data_availability_drift`,
-  `project_identity_drift`, `incompatible_format_version`).
+- Diff-Result-Modell und Diagnostik: drei serialisierte
+  Output-Diagnostics (`configuration_drift`, `data_availability_drift`,
+  `project_identity_drift`) plus CLI-Fehlerfall
+  `incompatible_format_version`.
 - Console-, Markdown- und JSON-Ausgabe fuer Compare-Ergebnisse.
 - Eigener JSON-Output-Vertrag mit
   `format: cmake-xray.compare`,
@@ -385,15 +386,23 @@ Akzeptierter Trade-off:
 
 ## Compare-Kompatibilitaetsmatrix
 
-In M6 unterstuetzt `compare` ausschliesslich
-`format_version=5`-Eingaben (Stand nach AP 1.5).
+In M6 unterstuetzt `compare` genau die Analyze-JSON-Version, die nach
+AP 1.6 das `project_identity`-Feld enthaelt. Wenn AP 1.5
+`project_identity` schon in `format_version=5` aufgenommen hat, ist nur
+`(5, 5)` erlaubt. Wenn AP 1.6 A.1 dafuer auf `format_version=6` heben
+muss, ist nur `(6, 6)` erlaubt. Gemischte Versionspaare bleiben
+abgelehnt.
 
 | baseline_format_version | current_format_version | Status | Hinweise |
 |---|---|---|---|
-| 5 | 5 | OK | Vollstaendiger Vergleich aller M6-Sektionen. |
+| 5 | 5 | OK, falls `project_identity` in v5 enthalten ist | Vollstaendiger Vergleich aller M6-Sektionen. |
+| 6 | 6 | OK, falls AP 1.6 A.1 Analyze-JSON auf v6 hebt | Vollstaendiger Vergleich aller M6-Sektionen. |
+| 5 | 6 | abgelehnt | Keine Cross-Version-Migration in M6. |
+| 6 | 5 | abgelehnt | Keine Cross-Version-Migration in M6. |
 | 1, 2, 3, 4 | beliebig | abgelehnt | Aeltere Versionen werden in M6 nicht produziert; Migration erforderlich. |
 | beliebig | 1, 2, 3, 4 | abgelehnt | gleicher Grund. |
-| 6+ | beliebig | abgelehnt | Zukuenftige Schemaversion; Compare braucht eine erweiterte Matrix. |
+| 7+ | beliebig | abgelehnt | Zukuenftige Schemaversion; Compare braucht eine erweiterte Matrix. |
+| beliebig | 7+ | abgelehnt | gleicher Grund. |
 
 Die Matrix lebt sowohl in `docs/report-json.md` als auch in einer
 neuen Datei `docs/compare-matrix.md`, mit Pflichtinhalten pro
@@ -482,7 +491,10 @@ Vergleichswertige Felder pro Diff-Gruppe:
 - **Target-Hubs**: keine vergleichswertigen Felder ausser der
   Identitaet selbst; `added` oder `removed` sind die einzigen
   realistischen Faelle. Eine TargetHub-Aenderung kann sich also
-  semantisch nur als added/removed darstellen.
+  semantisch nur als added/removed darstellen. Das JSON-Schema enthaelt
+  trotzdem `target_hubs.changed` als Pflichtschluessel, damit alle
+  Diff-Gruppen dieselbe `added`/`removed`/`changed`-Form behalten; der
+  Wert ist in M6 immer ein leeres Array.
 
 Sortierung der Diff-Eintraege:
 
@@ -493,7 +505,8 @@ Sortierung der Diff-Eintraege:
 ## Diagnostic-Vertrag fuer Compare
 
 Compare-Diagnostics sind reicher als Analyze-Diagnostics, weil sie
-mehr strukturelle Informationen brauchen. Vier Diagnostic-Typen:
+mehr strukturelle Informationen brauchen. Drei Diagnostic-Typen werden
+im Compare-Output serialisiert:
 
 ### `configuration_drift`
 
@@ -563,11 +576,13 @@ Verhalten:
   haben UND `project_identity` sich unterscheidet.
 - KEIN Abbruchgrund (in diesem speziellen Pfad).
 
-### `incompatible_format_version`
+### CLI-Fehler `incompatible_format_version`
 
 Wird in M6 als CLI-Eingabefehler vor Reporterzeugung behandelt
 (siehe Fehlerphrasen oben). Es gibt kein Compare-Output mit dieser
-Diagnostic; der Bericht wird abgelehnt.
+Diagnostic; der Bericht wird abgelehnt. In Tests und
+Abnahmekriterien wird dieser Fall deshalb als CLI-Fehlerfall, nicht als
+serialisierter Diagnostic-Typ behandelt.
 
 ## Compare-Modell
 
@@ -607,7 +622,7 @@ struct CompareInputs {
     std::string current_path;
     int baseline_format_version;
     int current_format_version;
-    std::string project_identity;          // shared, falls gleich
+    std::optional<std::string> project_identity;  // shared oder null bei erlaubtem Drift
     std::string project_identity_source;
 };
 
@@ -713,9 +728,9 @@ Feldreihenfolge:
 | --- | --- | --- | --- |
 | `baseline_path` | string | ja | Anzeige-Pfad zur baseline-Datei. |
 | `current_path` | string | ja | Anzeige-Pfad zur current-Datei. |
-| `baseline_format_version` | integer | ja | `5` in M6. |
-| `current_format_version` | integer | ja | `5` in M6. |
-| `project_identity` | string | ja | shared identity oder `null` bei drift-fall. |
+| `baseline_format_version` | integer | ja | Erlaubte Matrix-Version (`5` oder `6`, siehe Matrix). |
+| `current_format_version` | integer | ja | Erlaubte Matrix-Version (`5` oder `6`, siehe Matrix). |
+| `project_identity` | string\|null | ja | shared identity oder `null` bei erlaubtem `project_identity_drift`. |
 | `project_identity_source` | string | ja | shared source. |
 
 `summary`-Schema: alle 14 Zaehler aus `CompareSummary`.
@@ -724,6 +739,8 @@ Feldreihenfolge:
 (`translation_units`, `include_hotspots`, `target_nodes`,
 `target_edges`, `target_hubs`), jeder davon ein Objekt mit
 `added`/`removed`/`changed` als Pflichtschluessel und Array-Werten.
+`target_hubs.changed` ist aus Einheitlichkeitsgruenden Pflicht, bleibt
+in M6 aber immer `[]`, weil Hub-Diffs nur added/removed kennen.
 
 Diff-Item-Schemas pro Gruppe variieren je nach Identitaet (siehe
 oben).
@@ -785,9 +802,15 @@ Service-Tests `tests/hexagon/test_compare_service.cpp`:
   added+removed-Paar, nicht ein changed.
 - Target-Graph-Knoten und -Kanten: added/removed/changed.
 - Target-Hubs: added/removed.
-- Compile-DB-only baseline + File-API current: data_availability_drift
-  fuer target_graph und target_hubs; betroffene Diff-Gruppen
-  uebersprungen.
+- Cross-Mode-Compare, z. B. Compile-DB-only baseline + File-API
+  current: harter CLI-Fehler
+  `"compare: project identity source mismatch ..."`; es wird kein
+  Compare-Output erzeugt.
+- Same-Mode-Vergleich mit unterschiedlicher Datenverfuegbarkeit, z. B.
+  File-API-basierte baseline mit Target-Graph und File-API-basierte
+  current ohne ladbare Target-Graph-Daten: `data_availability_drift`
+  fuer `target_graph` und `target_hubs`; betroffene Diff-Gruppen
+  werden uebersprungen.
 - Configuration-Drift: --analysis-Aenderung, tu-thresholds-Aenderung,
   hub-thresholds-Aenderung, alle als configuration_drifts ausgegeben.
 - project_identity_drift: Compile-DB-Hash unterschiedlich,
@@ -997,9 +1020,9 @@ AP 1.6 ist abgeschlossen, wenn:
   (gleicher Source-Path-Satz nach Normalisierung -> gleicher Hash);
 - impact-JSON-Eingaben aktiv abgelehnt werden;
 - HTML- und DOT-Compare-Formate aktiv abgelehnt werden;
-- alle vier Diagnostic-Typen (`configuration_drift`,
-  `data_availability_drift`, `project_identity_drift`,
-  `incompatible_format_version` als CLI-Fehler) korrekt erzeugt
+- alle drei Output-Diagnostics (`configuration_drift`,
+  `data_availability_drift`, `project_identity_drift`) und der
+  separate CLI-Fehler `incompatible_format_version` korrekt behandelt
   werden;
 - der Compile-DB-Trade-off (gleicher Source-Path-Satz mit
   unterschiedlichen Build-Kontexten erhaelt dieselbe Identitaet) in
