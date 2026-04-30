@@ -108,7 +108,10 @@ geliefert haben:
 
 AP 1.7 prueft, dass alle Liefer-Stand-Bloecke der Sub-Plaene
 `docs/plan-M6-1-1.md` bis `docs/plan-M6-1-6.md` mit
-Commit-Hashes gepinnt sind.
+Commit-Hashes gepinnt sind. Diese Pruefung ist nicht rein manuell:
+`m6_versionspin_consistency` validiert, dass `docs/plan-M6.md` fuer
+alle APs 1.1 bis 1.7 nicht-leere Commit-Spalten enthaelt und dass die
+Sub-Plan-Liefer-Stand-Bloecke keine Platzhalter mehr enthalten.
 
 ## Dateien
 
@@ -242,6 +245,21 @@ Wenn der Final-Sweep Inkonsistenzen findet (z. B. fehlende
 Kreuzverweise, veraltete Beispiele in einem Dokument), werden sie
 in derselben Tranche behoben. AP 1.7 fuehrt keine neuen Vertraege
 ein, korrigiert aber Doku-Drift.
+
+Definition of Done fuer A.2/A.3:
+
+| Dokument/Artefakt | Erwarteter Status | Nachweis |
+| --- | --- | --- |
+| `docs/report-json.md` / `.schema.json` | finaler M6-Analyze-Vertrag, keine AP-Platzhalter | `json_schema_check`, Crosslinks zu Compare-Doks |
+| `docs/report-dot.md` / `docs/report-html.md` | nur Drift-Korrekturen zu AP 1.2-1.5, keine neuen Vertragsinhalte | Golden-/Adapter-Tests, Doku-Review |
+| `docs/report-compare.md` / `.schema.json` / `docs/compare-matrix.md` | AP-1.6-Vertrag vollstaendig uebernommen und validiert | Compare-Schema-Test, Matrix-Test |
+| `docs/examples/` + Manifest | Beispiele aus bestehenden Goldens, keine neuen Feature-Szenarien | `doc_examples_validation` |
+| `README.md`, `docs/guide.md`, `docs/performance.md`, `docs/roadmap.md` | Nutzer- und Statusdoku synchron zum finalen Ist-Stand | A.3-Review, Docker-Gates |
+
+A.2/A.3 duerfen nur Drift-Korrekturen, Querverweise, Beispiele und
+Release-Dokumentation einbringen. Neue fachliche Vertrage oder
+Feature-Semantik gehoeren zurueck in die jeweiligen AP-1.1-bis-1.6-
+Plaene.
 
 ## docs/examples/
 
@@ -385,9 +403,10 @@ Neuer Abschnitt `[1.3.0] - <Release-Datum>`:
 
 ### Changed
 - `kReportFormatVersion` bumped from `1` (M5) to
-  `M6_ANALYZE_FORMAT_VERSION` over the M6 arc. This value is copied
-  from the final AP 1.6 code/schema state. Consumers must migrate to
-  the final M6 analyze format version; the
+  `M6_ANALYZE_FORMAT_VERSION` as the end state of the M6 series
+  (M5 baseline through the final AP 1.6 code/schema state). Intermediate
+  APs introduced versions 2 through the final M6 value. Consumers must
+  migrate to the final M6 analyze format version; the
   closed-schema rule (`additionalProperties: false`) makes
   unmigrated consumers fail validation.
 - `cmake-xray --version` reports `1.3.0`.
@@ -535,7 +554,9 @@ der Audit-Schluss.
 **Harte Tranchen-Abhaengigkeit zu allen vorherigen APs**: AP 1.7
 darf nicht starten, bevor die Liefer-Stand-Bloecke der Sub-Plaene
 `docs/plan-M6-1-1.md` bis `docs/plan-M6-1-6.md` mit Commit-Hashes
-gepinnt sind.
+gepinnt sind. Das Gate ist maschinenlesbar: `m6_versionspin_consistency`
+prueft die konsolidierte Tabelle in `docs/plan-M6.md` und die
+Sub-Plan-Liefer-Stand-Bloecke auf nicht-leere Commit-Felder.
 
 ## Liefer-Stand
 
