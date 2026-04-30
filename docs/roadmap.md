@@ -5,8 +5,8 @@
 | Feld       | Wert                                                                                   |
 | ---------- | -------------------------------------------------------------------------------------- |
 | Dokument   | Phasenplan `cmake-xray`                                                                |
-| Version    | `0.7`                                                                                  |
-| Stand      | `2026-04-23`                                                                           |
+| Version    | `0.8`                                                                                  |
+| Stand      | `2026-04-30`                                                                           |
 | Status     | Entwurf                                                                                |
 | Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Architektur](./architecture.md) |
 
@@ -42,7 +42,7 @@ Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**.
 | **M3 (MVP)** | `v1.0.0` | Phase 3 | Alle `AK-01` bis `AK-09` erfuellt; MVP lieferbar                                                                                          | `erledigt` |
 | **M4**       | `v1.1.0` | Phase 4 | CMake File API als zweite Eingabequelle, TU-zu-Target-Zuordnung, targetbezogene Impact-Ausgabe; ohne `compile_commands.json` analysierbar | `erledigt` |
 | **M5**       | `v1.2.0` | Phase 5 | HTML-Export, JSON-/DOT-Ausgaben, Release-Bereitstellung, Plattformunterstuetzung, Detail- und Quiet-Modi                                  | `erledigt` |
-| **M6**       | `tbd`    | Phase 6 | weitere Konfiguration, Vergleichsansichten und verfeinerte Analyse                                                                        | `tbd`      |
+| **M6**       | `v1.3.0` | Phase 6 | weitere Konfiguration, Vergleichsansichten und verfeinerte Analyse                                                                        | `tbd`      |
 
 ## 3. Phasen im Detail
 
@@ -125,7 +125,7 @@ Hinweis: `F-39` (Soll) kann bei Bedarf in Phase 2 oder 3 vorgezogen werden, fall
 
 Ziel: zusaetzliche Ausbaupunkte nach dem bereits geplanten M5-Umfang aufnehmen, ohne die historische Planung der Phasen 0 bis 5 umzuschreiben.
 
-Stand: M6 hat noch kein eigenes Planungsdokument (kein `docs/plan-M6.md`). Die untenstehende Tabelle listet die zukuenftigen Ausbaupunkte als Sammlung; konkrete Schnitt-, Vertrags- und Abnahmedetails werden erst in einem spaeteren M6-Plan festgehalten. Der Status `tbd` spiegelt das.
+Stand: M6 besitzt mit [`docs/plan-M6.md`](./plan-M6.md) ein eigenes Planungsdokument. Die untenstehende Tabelle listet die Ausbaupunkte aus der Roadmap; konkrete Schnitt-, Vertrags- und Abnahmedetails sind im M6-Plan festgehalten. Der Status bleibt bis zur konkreten Umsetzung `tbd`.
 
 | Arbeitspaket                                                                            | Relevante Kennungen            | Status |
 | --------------------------------------------------------------------------------------- | ------------------------------ | ------ |
