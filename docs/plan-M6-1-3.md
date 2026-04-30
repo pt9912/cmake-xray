@@ -263,7 +263,7 @@ Regeln:
 struct ImpactResult {
     // ... bestehende Felder ...
     std::vector<PrioritizedImpactedTarget> prioritized_affected_targets;
-    std::optional<std::size_t> impact_target_depth_requested;
+    std::size_t impact_target_depth_requested{2};
     std::size_t impact_target_depth_effective{0};
 };
 ```
@@ -274,11 +274,11 @@ Regeln:
   Sicht; sie enthaelt jedes betroffene Target genau einmal, sortiert
   nach dem M6-Hauptplan-Sortier-Tupel
   `(priority_class, graph_distance, evidence_strength, stable_target_key, display_name, target_type)`.
-- `impact_target_depth_requested` ist der vom Nutzer angeforderte
-  Wert (`AnalyzeImpactRequest::impact_target_depth`) oder der
-  CLI-Default `2`, wenn der Nutzer nichts setzt. `std::nullopt` ist
-  reserviert fuer interne Aufrufe ohne Default-Erwartung; produktive
-  CLI-Pfade setzen den Wert immer.
+- `impact_target_depth_requested` ist der normalisierte angeforderte
+  Wert: `AnalyzeImpactRequest::impact_target_depth.value_or(2)`.
+  Der `ImpactAnalyzer` setzt dieses Feld fuer jeden erfolgreich
+  aufgebauten `ImpactResult`, auch fuer Nicht-CLI-Caller. Adapter
+  duerfen deshalb niemals `null` ausgeben oder das Feld auslassen.
 - `impact_target_depth_effective` ist die tatsaechlich angewendete
   maximale Reverse-BFS-Tiefe. Bei fehlendem Target-Graphen
   (`target_graph_status=not_loaded`) gilt `0` (M5-Fallback). Bei
@@ -321,6 +321,26 @@ Regeln:
 bestehenden M5-Logik (Compile-DB-/File-API-Lade-Pfad, TU-Sammlung,
 M4-Target-Zuordnung, M5-`affected_targets`-Aufbau) die Priorisierung
 ueber den Target-Graphen folgt.
+
+### Status-Verhalten des Target-Graphen
+
+- `target_graph_status=loaded`: Reverse-BFS laeuft ueber die
+  vollstaendige normalisierte `target_graph.edges`-Liste.
+- `target_graph_status=partial`: Reverse-BFS laeuft deterministisch
+  ueber die vorhandene normalisierte Teilmenge von
+  `target_graph.edges`. Fehlende oder nicht aufloesbare Kanten werden
+  nicht synthetisiert. `impact_target_depth_effective` wird wie bei
+  `loaded` aus der tatsaechlich erreichten maximalen Distanz innerhalb
+  dieses Teilgraphen berechnet; der Wert ist nicht pauschal `0` und
+  nicht pauschal `requested`.
+- Bei `partial` wird genau eine Diagnostic der Schwere `warning` an
+  `result.diagnostics` angehaengt:
+  `"target graph partially loaded; impact prioritisation uses available edges only"`.
+  Diese Diagnostic ist unabhaengig davon, ob die BFS vorzeitig endet;
+  eine zusaetzliche `stopped at depth N`-Note bleibt erlaubt, wenn der
+  vorhandene Teilgraph vor dem angeforderten Tiefenbudget endet.
+- `target_graph_status=not_loaded`: Es gilt der Fallback ohne
+  Reverse-BFS, siehe unten.
 
 ### Algorithmus
 
@@ -611,6 +631,10 @@ erweitert:
 - Neue Graph-Attribute fuer Impact-DOT:
   - `graph_impact_target_depth_requested` (integer).
   - `graph_impact_target_depth_effective` (integer).
+- Der `graph_`-Praefix ist bewusst DOT-spezifisch: Es sind
+  Graph-Attribute, die 1:1 auf die Modellfelder
+  `impact_target_depth_requested` und
+  `impact_target_depth_effective` abgebildet werden.
 - Beide Graph-Attribute sind Pflicht in Impact-DOT, unabhaengig von
   `target_graph_status`. Bei `not_loaded` uebernimmt
   `graph_impact_target_depth_requested` weiterhin den Wert aus
@@ -709,6 +733,12 @@ Service-Tests `tests/hexagon/test_impact_analyzer.cpp`:
 - File-API-`impact` mit Target-Graph, Default-Tiefe `2`: Reverse-BFS
   laeuft korrekt, alle erreichten Targets haben passende
   `priority_class` und `graph_distance`.
+- File-API-`impact` mit `target_graph_status=partial`: Reverse-BFS
+  laeuft ueber die vorhandenen Kanten, `impact_target_depth_effective`
+  entspricht der im Teilgraph tatsaechlich erreichten maximalen
+  Distanz, und die Diagnostic
+  `"target graph partially loaded; impact prioritisation uses available edges only"`
+  ist gesetzt.
 - File-API-`impact` mit `--impact-target-depth 0`: keine Reverse-BFS,
   nur Impact-Seed-Targets; `impact_target_depth_effective=0`.
 - File-API-`impact` mit `--impact-target-depth 1`: ein
@@ -780,6 +810,9 @@ Adapter-Tests:
   `graph_impact_target_depth_requested` und
   `graph_impact_target_depth_effective` immer gesetzt; bei
   `not_loaded` bleibt `requested` der Result-Wert und `effective=0`.
+  Ein Mapping-Test pinnt, dass die DOT-Graph-Attribute aus den
+  Modellfeldern `impact_target_depth_requested` und
+  `impact_target_depth_effective` stammen.
 - HTML-Adapter: `Prioritised Affected Targets`-Section vorhanden mit
   Tabelle (loaded), Leersatz (loaded mit leerer Liste) oder
   not_loaded-Hinweis (status not_loaded); Tiefenangabe sichtbar.
@@ -800,6 +833,9 @@ E2E-/Golden-Tests:
     nur Impact-Seed-Targets.
   - `impact-prioritised-cycle.<ext>`: Reverse-BFS in zyklischem Graph,
     Diagnostic vorhanden.
+  - `impact-prioritised-partial.<ext>`: File-API-`impact` mit
+    `target_graph_status=partial`, vorhandene Teilgraph-Hops sichtbar,
+    Partial-Diagnostic vorhanden.
   - `impact-not-loaded.<ext>`: Compile-DB-only, `not_loaded`-Pfad.
     Golden pinnt fuer alle fuenf Formate, dass `requested` sichtbar
     bleibt (Default `2`) und `effective=0` ist.
@@ -968,6 +1004,10 @@ AP 1.3 ist abgeschlossen, wenn:
   klarer Fehlermeldung und keinem Reportoutput fuehrt;
 - der Compile-DB-only-Fallback ohne `--require-target-graph`
   M5-kompatibles Verhalten plus eine klare Diagnostic liefert;
+- `target_graph_status=partial` als nutzbarer Teilgraph behandelt wird,
+  Reverse-BFS ueber vorhandene Kanten ausfuehrt, `effective` aus der
+  tatsaechlich erreichten Tiefe berechnet und eine klare
+  Partial-Diagnostic liefert;
 - `evidence_strength`-Klassifikation `direct`, `heuristic`, `uncertain`
   in Service-Tests fuer Impact-Seed-Targets und Reverse-BFS-Hops gepinnt
   ist;
