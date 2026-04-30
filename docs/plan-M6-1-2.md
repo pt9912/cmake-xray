@@ -219,8 +219,8 @@ Felder im Detail:
 | --- | --- | --- | --- |
 | `target_graph_status` | string | ja | `not_loaded`, `loaded`, `partial`. |
 | `target_graph` | object | ja | Container mit `nodes` und `edges`. Bei `not_loaded` beide leer. |
-| `target_graph.nodes` | array | ja | `TargetNode`-Objekte, sortiert nach `unique_key`. |
-| `target_graph.edges` | array | ja | `TargetEdge`-Objekte, sortiert nach `(from_unique_key, to_unique_key, kind)`. |
+| `target_graph.nodes` | array | ja | `TargetNode`-Objekte, sortiert nach `(unique_key, display_name, type)` gemaess M6-Hauptplan-Sortiervertrag. |
+| `target_graph.edges` | array | ja | `TargetEdge`-Objekte, sortiert nach `(from_unique_key, to_unique_key, kind, from_display_name, to_display_name)` gemaess M6-Hauptplan-Sortiervertrag. |
 
 `TargetNode`-Schema:
 
@@ -259,8 +259,8 @@ Felder fuer Hubs (nur `analyze`-JSON):
 | Feld | Typ | Pflicht | Beschreibung |
 | --- | --- | --- | --- |
 | `target_hubs` | object | ja | Pflichtcontainer im Analyze-Output. |
-| `target_hubs.inbound` | array | ja | `TargetNode`-Objekte mit `in_count >= in_threshold`, sortiert nach `unique_key`. |
-| `target_hubs.outbound` | array | ja | `TargetNode`-Objekte mit `out_count >= out_threshold`, sortiert nach `unique_key`. |
+| `target_hubs.inbound` | array | ja | `TargetNode`-Objekte mit `in_count >= in_threshold`, sortiert nach `(unique_key, display_name, type)`. |
+| `target_hubs.outbound` | array | ja | `TargetNode`-Objekte mit `out_count >= out_threshold`, sortiert nach `(unique_key, display_name, type)`. |
 | `target_hubs.thresholds.in_threshold` | integer | ja | Wirksamer Schwellenwert; in AP 1.2 hardcoded `10`. |
 | `target_hubs.thresholds.out_threshold` | integer | ja | Wirksamer Schwellenwert; in AP 1.2 hardcoded `10`. |
 
@@ -804,11 +804,12 @@ E2E-/Golden-Tests:
   - `impact-file-api-loaded.<ext>`: `loaded`, mehrere Kanten. Pflicht fuer
     alle fuenf Formate.
   - `impact-file-api-partial.<ext>`: `partial`, mindestens eine
-    `external`-Kante. Pflicht fuer JSON, HTML und DOT. Fuer Console und
-    Markdown ist das Golden optional, wenn der `Target Graph Reference`-
-    Abschnitt strukturell identisch zum Analyze-Pendant ist und nur durch
-    Goldens fuer den Analyze-Partial-Pfad abgedeckt wird; in diesem Fall
-    pinnt ein expliziter Adapter-Unit-Test den Code-Pfad.
+    `external`-Kante. Pflicht fuer alle fuenf Formate. Fuer Console und
+    Markdown wurde die ursprueglich angedachte Optionalitaet verworfen,
+    weil ein Strukturidentitaets-Adapter-Test kuenftige Pfadabweichungen
+    (Praefix-Aenderungen, Label-Anpassungen, neue Spalten) nicht
+    zuverlaessig auffaengt; ein eigenes Golden ist die billigere und
+    robustere Absicherung.
 - Manifeste werden um die neuen Goldens erweitert; `validate_doc_examples.py`
   prueft sie ebenfalls.
 - JSON-Schema-Validation gegen `format_version=2`-Schema laeuft als
