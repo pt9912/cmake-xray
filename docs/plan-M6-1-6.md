@@ -53,8 +53,7 @@ Umsetzen:
 - Compile-DB-Fingerprint-Algorithmus (SHA-256 ueber kanonische
   JSON-Payload).
 - Compare-Kompatibilitaetsmatrix in `docs/report-json.md` und
-  in einer neuen Datei `docs/compare-matrix.md` oder als Sektion in
-  `docs/report-json.md`.
+  verpflichtend gespiegelt in `docs/compare-matrix.md`.
 - Pfadnormalisierungs-Helper fuer Compare-Schluessel.
 - Diff-Result-Modell und Diagnostik: drei serialisierte
   Output-Diagnostics (`configuration_drift`, `data_availability_drift`,
@@ -65,8 +64,7 @@ Umsetzen:
   `format: cmake-xray.compare`,
   `format_version=1`,
   `report_type: compare`.
-- Schema-Datei `docs/report-compare.schema.json` (oder neue Sektion
-  in `report-json.schema.json`).
+- Schema-Datei `docs/report-compare.schema.json`.
 - Goldens fuer Console, Markdown und JSON.
 
 Nicht umsetzen:
@@ -169,8 +167,7 @@ Neue Dateien:
   Berechnung)
 - `src/hexagon/services/compare_path_normalization.{h,cpp}` (oder
   Wiederverwendung in `analysis_support`)
-- `docs/report-compare.md` (eigener Compare-Output-Vertrag) oder
-  Compare-Sektion in `docs/report-json.md`
+- `docs/report-compare.md` (eigener Compare-Output-Vertrag)
 - `docs/report-compare.schema.json` (eigenes Compare-Schema)
 - `docs/compare-matrix.md` (Compatibility-Matrix)
 - `tests/hexagon/test_compare_service.cpp`
@@ -283,11 +280,14 @@ Validierungsreihenfolge:
 2. JSON parsen.
 3. `report_type` und `format_version` lesen und die
    Kompatibilitaetsmatrix pruefen.
-4. Analyze-JSON-Schema validieren, aber die Felder
-   `inputs.project_identity` und `inputs.project_identity_source`
-   zusaetzlich fachlich pruefen, damit die spezifischen
-   `invalid project identity source`-/`project identity is empty`-
-   Fehlerphrasen erreichbar und stabil bleiben.
+4. Analyze-JSON-Schema validieren. Wenn die Schema-Validierung
+   ausschliesslich wegen `inputs.project_identity` oder
+   `inputs.project_identity_source` fehlschlaegt, wird der Fehler auf
+   die spezifischen Fachfehler
+   `invalid project identity source` bzw.
+   `project identity is empty or unrecoverable` gemappt. Andere
+   Schemafehler bleiben die generischen
+   `"does not match the analyze JSON schema"`-Fehler.
 5. Projektidentitaets-Source, Identitaet und Drift-Regeln pruefen.
 
 ### Atomarer Schreibvertrag
@@ -312,8 +312,10 @@ Das Analyze-JSON erhaelt zwei neue Pflichtfelder im `inputs`-Block:
 - Verwendet die normalisierte File-API-Source-Root als
   Projektidentitaet.
 - Wert-Format: roher normalisierter Pfad, z. B. `/repo/cmake-xray`.
-- Pfadnormalisierung: lexikalisch (Backslashes zu `/`,
-  redundante `.`-Segmente entfernt, kein Symlink-Resolve).
+- Pfadnormalisierung: lexikalisch (Backslashes zu `/`, redundante
+  `.`-Segmente entfernt, Trailing Slash entfernt, Windows-Drive-Letter
+  lowercase, kein Symlink-Resolve). Pfade werden NICHT case-gefoldet;
+  POSIX bleibt case-sensitiv.
 - Bedingung fuer Verfuegbarkeit: `BuildModelResult::source_root` ist
   nicht leer und stammt aus einer File-API-Reply.
 
@@ -904,6 +906,12 @@ CLI-Tests `tests/e2e/test_cli.cpp`:
 - Versions-Kombinationen ausserhalb der Matrix: Exit-Code `1`.
 - project_identity-Mismatch ohne Drift-Option: Exit-Code `1`.
 - project_identity-Source-Mismatch: Exit-Code `1`.
+- Analyze-JSON mit ungueltigem `inputs.project_identity_source` liefert
+  den spezifischen Fehler
+  `"compare: invalid project identity source '<value>'"` statt des
+  generischen Schemafehlers.
+- Analyze-JSON mit leerem `inputs.project_identity` liefert
+  `"compare: project identity is empty or unrecoverable"`.
 
 Adapter-Tests:
 
@@ -912,6 +920,9 @@ Adapter-Tests:
 - Compile-DB-Fingerprint: kanonische Payload, lexikografische
   Sortierung, deterministische Reproduktion mit denselben Eingangs-
   Source-Paths in unterschiedlicher Reply-Reihenfolge.
+- File-API-`project_identity`-Normalisierung: Backslash-/Slash-
+  Varianten, Trailing Slash und Windows-Drive-Letter-Grossschreibung
+  erzeugen denselben Identity-Wert.
 - Console-/Markdown-/JSON-Compare-Adapter: Output-Vertrag pro
   Diff-Gruppe und Diagnostic byteweise gepinnt.
 
