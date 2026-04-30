@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-## [1.2.0] - 2026-04-29
+## [1.2.0] - 2026-04-30
 
 M5 hardens the report formats, ships a reproducible release pipeline and
 documents the platform support boundary. No breaking changes for users on
@@ -78,11 +78,22 @@ existing console/markdown goldens stay byte-stable in normal mode.
   pending external Branch-Protection and a green CI audit.
 - Synthetic UNC and Extended-Length path tests across DOT, HTML, JSON
   adapters and atomic-writer (Windows-conditional via `#ifdef _WIN32`).
-- `docs/examples/` drift gate
-  (CTest `doc_examples_validation` via
-  `tests/validate_doc_examples.py` against
-  `docs/examples/manifest.txt` SHA-256 hashes plus per-format
-  validators).
+- `docs/examples/` drift gate covering all four artefact formats
+  (console, markdown, JSON, DOT, HTML): CTest
+  `doc_examples_validation` via `tests/validate_doc_examples.py`
+  against `docs/examples/manifest.txt` SHA-256 hashes, per-format
+  validators, and against the current generator output via
+  `docs/examples/generation-spec.json` and the validator's
+  `--binary` mode. The drift check normalises CRLF and DOT
+  `unique_key` host paths so the gate is byte-stable across
+  Linux, macOS and Windows runners.
+- `docs/examples/` host-path portability check
+  (`scripts/verify-doc-examples-portability.sh`, CTest
+  `doc_examples_host_portability`, plus a dedicated
+  `docs-examples-portability` job in
+  `.github/workflows/build.yml`) that runs the drift gate under a
+  divergent bind-mount prefix so host-path leakage in the binary
+  output is caught before the native matrix runs.
 - File-API performance baseline in `docs/performance.md` plus
   versioned reply fixtures under
   `tests/reference/scale_*/build/.cmake/api/v1/reply/`. Regenerate
@@ -110,8 +121,16 @@ existing console/markdown goldens stay byte-stable in normal mode.
 
 ### Fixed
 
-(none specific to this release — see commit history for individual
-review-fixup commits absorbed into AP M5-1.2 through AP M5-1.8.)
+- `impact --format json` and `impact --format json --output <path>`
+  now reject `unresolved_file_api_source_root` like DOT and HTML
+  do. Previously the JSON path produced a report on stdout (or at
+  the target path) and exited `0`, contradicting the JSON v1
+  "Textfehler ohne JSON-Report" contract pinned in
+  `docs/report-json.md`.
+- `docs/guide.md` OCI tag references aligned with the AP M5-1.6
+  release contract: container pulls use `X.Y.Z` (no leading `v`),
+  consistent with `README.md`, `scripts/oci-image-publish.sh` and
+  the `release.yml` push step.
 
 ### Platform status (M5)
 
