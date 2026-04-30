@@ -133,6 +133,7 @@ Voraussichtlich zu aendern:
 - `docs/examples/manifest.txt`
 - `docs/examples/generation-spec.json`
 - `tests/reference/file-api-performance-manifest.json`
+- `tests/hexagon/test_m6_versionspin_consistency.cpp`
 - `tests/validate_doc_examples.py` (falls neue Validierungen noetig)
 - `docs/plan-M6.md` (Liefer-Stand-Tabelle aus den Sub-Plaenen
   konsolidiert)
@@ -170,6 +171,10 @@ Regeln (analog M5 AP 1.8):
   Release-Tag melden dieselbe veroeffentlichte Semver-Version
   ohne fuehrendes `v`, inkl. Prerelease-Suffix bei Tags wie
   `v1.3.0-rc.1`.
+- Abnahmekriterien unterscheiden zwei Kontexte: Der finale M6-Release
+  ohne Prerelease-Tag meldet exakt `1.3.0`; ein expliziter
+  Pre-Release-Build mit `XRAY_APP_VERSION=1.3.0-rc.1` meldet exakt
+  `1.3.0-rc.1`.
 
 ## README und Guide
 
@@ -339,7 +344,13 @@ Neue M6-Baseline-Sektionen:
 - AP 1.7 setzt KEINE absolute Performance-Schwelle. Die Baseline
   dient als Referenz fuer kuenftige Phasen.
 - Performance-Manifest in `tests/reference/file-api-performance-manifest.json`
-  wird um die neuen M6-Eintraege erweitert.
+  wird um die neuen M6-Eintraege erweitert. Das bestehende Manifest
+  bleibt die zentrale Performance-Manifest-Datei, erhaelt aber
+  getrennte Datensatztypen/Sections fuer `file_api_extraction`,
+  `reverse_bfs` und `compare`. Compare-Datensaetze verwenden
+  `kind=compare`, `json_size_class`, `tu_count`, `hotspot_count`,
+  `target_count` und `compare_ms`; File-API-spezifische Felder sind
+  dort nicht Pflicht.
 
 ## CHANGELOG.md
 
@@ -444,6 +455,9 @@ bestaetigt die in AP 1.1-1.6 geforderten Tests:
 - HTML-Adapter-Tests fuer Sonderzeichen-Escaping gruen.
 - Console-, Markdown-, HTML-, JSON-, DOT-Goldens unter
   `tests/e2e/testdata/m5/` und `m6/` byte-stabil.
+  Compare-Goldens sind davon bewusst nur fuer die in AP 1.6
+  implementierten Formate `console`/`txt`, `markdown` und `json`
+  gefordert; HTML- und DOT-Compare bleiben post-M6.
 - Docker-Gates (`test`, `coverage-check`, `quality-check`,
   `runtime`) gruen.
 
@@ -451,17 +465,23 @@ Zusaetzlich ergaenzt AP 1.7 einen Abnahmeselbsttest/Gating-Test fuer
 den Release-Schnitt:
 
 - **`m6_versionspin_consistency`**: Test, dass
-  `cmake-xray --version` exakt `1.3.0` ausgibt, dass das Schema
+  `cmake-xray --version` im finalen Release-Kontext exakt `1.3.0`
+  ausgibt, dass ein Pre-Release-Kontext den Suffix exakt uebernimmt,
+  dass das Schema
   `kReportFormatVersion == M6_ANALYZE_FORMAT_VERSION` und
   `kCompareFormatVersion == M6_COMPARE_FORMAT_VERSION` widerspiegelt,
   und dass keine Roh-Version `1.2.0` mehr im Code uebrig ist.
+  Konkreter Testpfad: `tests/hexagon/test_m6_versionspin_consistency.cpp`
+  mit CTest-Name `m6_versionspin_consistency`.
 
 ## Implementierungsreihenfolge
 
 Innerhalb von **A.1 (Versionspin und CHANGELOG)**:
 
 1. Root-`CMakeLists.txt` auf `project(... VERSION 1.3.0)`.
-2. `cmake-xray --version` liefert `1.3.0`.
+2. `cmake-xray --version` liefert im finalen Release-Kontext
+   `1.3.0` und im expliziten Pre-Release-Kontext den gesetzten
+   Prerelease-Suffix.
 3. CHANGELOG `[1.3.0]`-Sektion mit Added/Changed/Fixed/Migration/
    Platform status.
 4. Versionspin-Konsistenztest.
@@ -535,7 +555,9 @@ Bis dahin ist AP 1.7 nicht abnahmefaehig.
 AP 1.7 ist abgeschlossen, wenn:
 
 - Root-`CMakeLists.txt` meldet exakt `project(... VERSION 1.3.0)`;
-- `cmake-xray --version` liefert `1.3.0`;
+- `cmake-xray --version` liefert im finalen Release-Kontext exakt
+  `1.3.0`; ein expliziter Pre-Release-Build mit
+  `XRAY_APP_VERSION=1.3.0-rc.1` liefert exakt `1.3.0-rc.1`;
 - `kReportFormatVersion == M6_ANALYZE_FORMAT_VERSION` und
   `kCompareFormatVersion == M6_COMPARE_FORMAT_VERSION` in C++ und
   Schema;
@@ -556,7 +578,8 @@ AP 1.7 ist abgeschlossen, wenn:
   existieren, sind gegen den finalen Ist-Stand validiert und enthalten
   keine offenen AP-1.6-Platzhalter;
 - `docs/examples/` ist um M6-Beispiele erweitert und das
-  Drift-Gate `doc_examples_validation` ist gruen;
+  Drift-Gate `doc_examples_validation` ist gruen; Compare-Beispiele
+  sind dabei auf `txt`/Console, Markdown und JSON begrenzt;
 - `m6_versionspin_consistency`-Test ist gruen;
 - alle anderen CTest-Gates aus M5 und AP 1.1-1.6 sind gruen;
 - der Docker-Gate-Lauf gemaess `docs/quality.md` ist gruen;
