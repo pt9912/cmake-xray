@@ -612,8 +612,11 @@ erweitert:
   - `graph_impact_target_depth_requested` (integer).
   - `graph_impact_target_depth_effective` (integer).
 - Beide Graph-Attribute sind Pflicht in Impact-DOT, unabhaengig von
-  `target_graph_status`. Bei `not_loaded` sind beide `0` bzw. der
-  Default-Wert.
+  `target_graph_status`. Bei `not_loaded` uebernimmt
+  `graph_impact_target_depth_requested` weiterhin den Wert aus
+  `ImpactResult` (z. B. `2` beim Default);
+  `graph_impact_target_depth_effective` ist `0`, weil ohne Graph keine
+  Reverse-BFS-Hops ausgefuehrt werden.
 - Die bestehende Knotenprioritaet im Impact-DOT aus AP 1.2 bleibt
   unveraendert; AP 1.3 fuegt nur neue Attribute auf bestehenden Knoten
   hinzu, keine neue Knotenart.
@@ -640,10 +643,12 @@ Prioritised Affected Targets (requested depth: 2, effective depth: 1):
   vor dem `display_name`. Bei Namens-Kollision haengt
   `disambiguate_target_display_names()` aus AP 1.2 `[key:
   <unique_key>]` an, nach dem `display_name`.
-- Wenn `target_graph_status=not_loaded`: Abschnitt entfaellt komplett
-  (gemaess Empty-Section-Vertrag aus AP 1.2). Die Diagnostic
-  `"target graph not loaded; impact prioritisation degrades to direct
-  owner targets only"` macht den Status sichtbar.
+- Wenn `target_graph_status=not_loaded`: Abschnitt erscheint ohne
+  Target-Zeilen als reine Metadaten-/Fallback-Zeile:
+  `Prioritised Affected Targets (requested depth: 2, effective depth: 0, no graph).`
+  Die Diagnostic
+  `"target graph not loaded; impact prioritisation degrades to impact seed targets only"`
+  macht den Grund ebenfalls sichtbar.
 - Wenn `prioritized_affected_targets` nicht leer ist, erscheint der
   Abschnitt mit allen Eintraegen, sortiert nach dem 6-Tupel.
 - Wenn `prioritized_affected_targets` leer ist und
@@ -667,7 +672,9 @@ Requested depth: `2`. Effective depth: `1`.
 
 - Markdown-Tabellen-Escaping aus AP 1.2 gilt fuer alle Zellen
   (`|` zu `\|`, Whitespace-Normalisierung).
-- Bei `not_loaded`: Section entfaellt komplett.
+- Bei `not_loaded`: Section bleibt mit Tiefenangabe erhalten:
+  ``Requested depth: `2`. Effective depth: `0` (no graph).``,
+  gefolgt vom Absatz `Target graph not loaded; prioritisation skipped.`.
 - Bei leerem `prioritized_affected_targets`: Leersatz-Absatz `No
   prioritised targets.`.
 
@@ -771,15 +778,18 @@ Adapter-Tests:
   `priority_class`-, `graph_distance`- und `evidence_strength`-
   Attribute, sobald `target_graph_status != not_loaded`.
   `graph_impact_target_depth_requested` und
-  `graph_impact_target_depth_effective` immer gesetzt.
+  `graph_impact_target_depth_effective` immer gesetzt; bei
+  `not_loaded` bleibt `requested` der Result-Wert und `effective=0`.
 - HTML-Adapter: `Prioritised Affected Targets`-Section vorhanden mit
   Tabelle (loaded), Leersatz (loaded mit leerer Liste) oder
   not_loaded-Hinweis (status not_loaded); Tiefenangabe sichtbar.
 - Console-Adapter: Suffix-Format
   `[<priority_class>, distance=<n>, evidence=<strength>]` byteweise
-  gepinnt.
+  gepinnt; bei `not_loaded` ist die Metadaten-/Fallback-Zeile mit
+  `requested depth` und `effective depth: 0` sichtbar.
 - Markdown-Adapter: Tabelle korrekt; Markdown-Tabellen-Escaping aus
-  AP 1.2 wird angewendet.
+  AP 1.2 wird angewendet; bei `not_loaded` bleibt die Section mit
+  Tiefenangabe und Fallback-Absatz sichtbar.
 
 E2E-/Golden-Tests:
 
@@ -791,6 +801,8 @@ E2E-/Golden-Tests:
   - `impact-prioritised-cycle.<ext>`: Reverse-BFS in zyklischem Graph,
     Diagnostic vorhanden.
   - `impact-not-loaded.<ext>`: Compile-DB-only, `not_loaded`-Pfad.
+    Golden pinnt fuer alle fuenf Formate, dass `requested` sichtbar
+    bleibt (Default `2`) und `effective=0` ist.
   - `impact-require-target-graph-error.txt`: Stderr-Output bei
     `--require-target-graph` ohne File-API.
 - Manifeste werden um die neuen Goldens erweitert;
@@ -805,6 +817,16 @@ Schema-Tests:
   `prioritized_affected_targets` validiert NICHT.
 - Negativtest: ein `priority_class`-Wert ausserhalb
   `{direct, direct_dependent, transitive_dependent}` validiert NICHT.
+- Boundary-Negativtests: `impact_target_depth_requested=-1`,
+  `impact_target_depth_requested=33` und
+  `impact_target_depth_effective=-1` validieren NICHT gegen das
+  v3-Schema.
+- Invariant-Negativtest: ein Impact-JSON mit
+  `impact_target_depth_effective > impact_target_depth_requested`
+  validiert NICHT bzw. wird, falls die verwendete JSON-Schema-Dialekt-
+  Unterstuetzung keine felduebergreifende `<=`-Constraint ausdruecken
+  kann, durch einen expliziten Schema-Companion-Test als ungueltig
+  gepinnt.
 
 Regressionstests:
 
