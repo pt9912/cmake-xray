@@ -378,7 +378,9 @@ Regeln:
   `--include-scope unknown|project|external` erhalten keinen eigenen
   Zaehler; `include_hotspot_total_count` und
   `include_hotspot_returned_count` bleiben die vollstaendige
-  Mengenbilanz.
+  Mengenbilanz. Das ist ein bewusster Reporting-Tradeoff fuer AP 1.4:
+  Die Detailzaehler markieren nur die neu eingefuehrten Risikoklassen
+  `unknown` und `mixed`, nicht jede Filter-Ursache.
 - Die beiden Exclusion-Zaehler sind disjunkt und werden in
   Filterreihenfolge ermittelt: zuerst Scope, danach Depth. Ein Hotspot,
   der am Scope-Filter scheitert, wird nicht mehr fuer
@@ -396,13 +398,18 @@ TU-Daten (`quote_include_paths`, `include_paths`,
 Plus `BuildModelResult::source_root` als Projektwurzel-Hint.
 AP 1.4 modelliert genau dieses eine Attribut; mehrere Projektwurzeln
 oder Workspace-Roots sind nicht Teil dieses Arbeitspakets.
+Wenn `source_root` leer ist oder lexikalisch nicht normalisierbar ist,
+wird Schritt 1 uebersprungen; daraus folgt nicht automatisch
+`unknown`, sondern die Klassifikation faellt deterministisch auf die
+System- und Quote-/Include-Pfad-Tests in Schritt 2/3 zurueck.
 
 Regeln (in dieser Reihenfolge angewendet):
 
 1. **Projekt-Wurzel-Test**: Wenn `header_path` lexikalisch unter
    `BuildModelResult::source_root` liegt (segment-basiert nach
    Normalisierung, nicht per String-Praefix), dann
-   `IncludeOrigin::project`.
+   `IncludeOrigin::project`. Ein leerer oder ungueltiger `source_root`
+   matched nie.
 2. **System-Include-Test**: Wenn `header_path` lexikalisch unter
    mindestens einem `system_include_paths`-Eintrag der TUs liegt
    und nicht zugleich unter `BuildModelResult::source_root` liegt,
@@ -580,7 +587,9 @@ filtered_hotspots = [
 Die Exclusion-Zaehler werden aus derselben Filterreihenfolge abgeleitet
 und sind nicht als Summe aller ausgeschlossenen Hotspots zu lesen. Sie
 weisen nur die beiden fuer AP 1.4 relevanten Sonderfaelle `unknown` und
-`mixed` aus; die Gesamtbilanz ergibt sich aus
+`mixed` aus; ausgeschlossene `project`- oder `external`-Hotspots bei
+`--include-scope unknown|project|external` bleiben in den Detailzaehlern
+bewusst unsichtbar. Die Gesamtbilanz ergibt sich aus
 `include_hotspot_total_count` und `include_hotspot_returned_count`:
 
 ```
@@ -638,6 +647,12 @@ Reproduzierbarkeit aus.
   - `"--include-scope: missing value"` bei fehlendem Wert.
   - Kommas, leere Werte und ASCII-Whitespace-getrimmte Tokens werden
     nicht akzeptiert; CLI parst exakt einen Token.
+  - Der Parser prueft vor der Enum-Konvertierung, dass der Rohwert exakt
+    einem nichtleeren Token ohne ASCII-Whitespace am Anfang oder Ende
+    entspricht. `--include-scope=project` und
+    `--include-scope project` sind gleichwertig; Werte wie
+    `" project"`, `"project "`, `"project,external"` oder `""`
+    fallen unter `invalid value`.
 
 ### `--include-depth <value>`
 
@@ -647,6 +662,8 @@ Reproduzierbarkeit aus.
   - `"--include-depth: invalid value '<value>'; allowed: all, direct, indirect"`.
   - `"--include-depth: option specified more than once"`.
   - `"--include-depth: missing value"`.
+  - Derselbe Rohwert-Check wie bei `--include-scope` gilt vor der
+    Enum-Konvertierung.
 
 ### Kompatibilitaet mit M5-CLI
 
@@ -853,6 +870,8 @@ Service-Tests `tests/hexagon/test_project_analyzer.cpp`:
   der NICHT zugleich System-Include ist.
 - Klassifikation `unknown` fuer Header, der weder unter `source_root`
   noch unter Include-/System-Pfaden liegt.
+- Klassifikation bei leerem oder ungueltigem `source_root`: Schritt 1
+  matched nie; System- und Quote-/Include-Pfade entscheiden weiter.
 - Praefix-Praezisionstest: `/repo2/include/foo.h` mit `source_root=/repo`
   → `unknown` (segment-basiert, nicht String-Praefix).
 - Konflikt: System gewinnt gegen Quote-Pfad bei demselben TU.
@@ -912,6 +931,10 @@ CLI-Tests `tests/e2e/test_cli.cpp`:
   Exit-Code `2`, `"--include-scope: option specified more than once"`.
 - `--include-scope` ohne Wert ergibt Exit-Code `2`,
   `"--include-scope: missing value"`.
+- `--include-scope=project` und `--include-scope project` werden
+  akzeptiert; `--include-scope=project,external`,
+  `--include-scope=" project"` und `--include-scope="project "` ergeben
+  jeweils die `invalid value`-Fehlerphrase.
 - `--include-depth` analog mit drei Fehlerphrasen.
 - Default-Test: ohne `--include-scope`/`--include-depth` zeigen alle
   Reports `include_scope=all` und `include_depth=all` in
