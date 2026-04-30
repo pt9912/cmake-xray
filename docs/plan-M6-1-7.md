@@ -25,12 +25,16 @@ Doku-Quellen sind synchron, das Beispielverzeichnis ist gegen
 Generator-Drift gepinnt, der CHANGELOG dokumentiert alle
 Versionsspruenge, und der Versionspin ist auf `v1.3.0` gesetzt.
 
-AP 1.7 fuehrt **keinen** weiteren Versionssprung ein. Der finale
-`kReportFormatVersion` aus AP 1.5 (`5`) und der
-`kCompareFormatVersion` aus AP 1.6 (`1`) bleiben unveraendert.
-Falls AP 1.6 statt AP 1.5 das Schema auf `6` gehoben hat (siehe
+AP 1.7 fuehrt **keinen** weiteren Versionssprung ein. AP 1.7 verwendet
+zwei symbolische Release-Konstanten: `M6_ANALYZE_FORMAT_VERSION` ist
+der tatsaechliche finale `kReportFormatVersion` aus dem Ergebnis von
+AP 1.6 (`5`, falls AP 1.5 `project_identity` schon enthielt; sonst
+`6`), und `M6_COMPARE_FORMAT_VERSION` ist `1`. Alle Checklisten,
+CHANGELOG-Texte und Tests in AP 1.7 referenzieren diese Konstanten
+statt einer hart codierten Analyze-Formatversion. Falls AP 1.6 statt
+AP 1.5 das Schema auf `6` gehoben hat (siehe
 `docs/plan-M6-1-6.md` Tranchen-Schnitt), reflektiert AP 1.7 diesen
-Stand.
+finalen Stand nur in Doku, Tests und Changelog.
 
 ## Scope
 
@@ -117,8 +121,7 @@ Voraussichtlich zu aendern:
   Inkonsistenzen findet; sonst unveraendert)
 - `docs/report-dot.md`
 - `docs/report-html.md`
-- `docs/report-compare.md` oder Compare-Sektion in
-  `docs/report-json.md` (aus AP 1.6 uebernommen, hier konsolidiert)
+- `docs/report-compare.md` (aus AP 1.6 uebernommen, hier konsolidiert)
 - `docs/compare-matrix.md` (aus AP 1.6 uebernommen)
 - `docs/quality.md`
 - `docs/performance.md`
@@ -127,6 +130,7 @@ Voraussichtlich zu aendern:
 - `docs/examples/` (neue/aktualisierte Beispiele)
 - `docs/examples/manifest.txt`
 - `docs/examples/generation-spec.json`
+- `tests/reference/file-api-performance-manifest.json`
 - `tests/validate_doc_examples.py` (falls neue Validierungen noetig)
 - `docs/plan-M6.md` (Liefer-Stand-Tabelle aus den Sub-Plaenen
   konsolidiert)
@@ -179,9 +183,10 @@ Neue Abschnitte oder erweiterte Beispiele:
   `cmake-xray compare --baseline a.json --current b.json --format markdown --output diff.md`.
 - **Plattformstatus-Tabelle**: aus M5 weitergefuehrt (Linux
   `supported`, macOS arm64 / Windows x86_64 `validated_smoke`).
-- **Format-Versions-Tabelle**: `kReportFormatVersion=5` und
-  `kCompareFormatVersion=1` mit Verweisen auf die Format-Vertrags-
-  Dokumente.
+- **Format-Versions-Tabelle**: `kReportFormatVersion` entspricht
+  `M6_ANALYZE_FORMAT_VERSION`, `kCompareFormatVersion` entspricht
+  `M6_COMPARE_FORMAT_VERSION`; beide verweisen auf die
+  Format-Vertrags-Dokumente.
 
 ### docs/guide.md
 
@@ -207,13 +212,12 @@ Dokumente durch:
 
 - `docs/report-json.md`: Verweise auf
   `docs/compare-matrix.md` und `docs/report-compare.schema.json`
-  (oder Compare-Sektion intern) sind vollstaendig.
+  sind vollstaendig.
 - `docs/report-dot.md`: alle ab AP 1.2 eingefuehrten Knoten- und
   Kantenarten sowie Graph-Attribute sind dokumentiert.
 - `docs/report-html.md`: alle ab AP 1.2 eingefuehrten Sections und
   CSS-Klassen sind dokumentiert.
-- `docs/report-compare.md` (oder Compare-Sektion in
-  `report-json.md`): Compare-Output-Vertrag und Beispiele.
+- `docs/report-compare.md`: Compare-Output-Vertrag und Beispiele.
 
 Wenn der Final-Sweep Inkonsistenzen findet (z. B. fehlende
 Kreuzverweise, veraltete Beispiele in einem Dokument), werden sie
@@ -265,8 +269,8 @@ M6-Testumfang dokumentiert:
   angefordert und leer, widerspruechliche Auswahl.
 - Golden-Tests fuer Console, Markdown, HTML, JSON und DOT mit
   Target-Graph-Daten und Impact-Priorisierung.
-- JSON-Schema-Tests fuer `format_version=5` und
-  `kCompareFormatVersion=1`.
+- JSON-Schema-Tests fuer `M6_ANALYZE_FORMAT_VERSION` und
+  `M6_COMPARE_FORMAT_VERSION`.
 - DOT-Syntax-Tests mit Target-zu-Target-Kanten und Zyklen.
 - Compare-Tests fuer added/removed/changed,
   asymmetrische Datenverfuegbarkeit, configuration_drift,
@@ -355,9 +359,11 @@ Neuer Abschnitt `[1.3.0] - <Release-Datum>`:
   API source root or a deterministic compile-database fingerprint.
 
 ### Changed
-- `kReportFormatVersion` bumped from `1` (M5) to `5` over the M6
-  arc. Each AP 1.2 through AP 1.5 added mandatory fields and
-  bumped the version. Consumers must migrate to v5; the
+- `kReportFormatVersion` bumped from `1` (M5) to
+  `M6_ANALYZE_FORMAT_VERSION` over the M6 arc. Each AP 1.2 through
+  AP 1.5, and AP 1.6 if it had to carry `project_identity`, added
+  mandatory fields and bumped the version. Consumers must migrate to
+  the final M6 analyze format version; the
   closed-schema rule (`additionalProperties: false`) makes
   unmigrated consumers fail validation.
 - `cmake-xray --version` reports `1.3.0`.
@@ -373,9 +379,9 @@ Neuer Abschnitt `[1.3.0] - <Release-Datum>`:
 - (entries from any A.5 audit-pass fixups across AP 1.1-1.6)
 
 ### Migration
-- v1-v4 JSON reports are not consumable by v1.3.0 tools. Re-run
-  cmake-xray on your project to regenerate v5 reports before
-  using `compare`.
+- pre-M6 JSON reports are not consumable by v1.3.0 tools. Re-run
+  cmake-xray on your project to regenerate reports with
+  `M6_ANALYZE_FORMAT_VERSION` before using `compare`.
 - The new `compare` subcommand only accepts `analyze` JSON
   reports. Impact compare is post-M6.
 
@@ -417,8 +423,9 @@ AP 1.1-1.6 geforderten Tests:
   verifiziert (Audit-Pass-Konvention aus M5).
 - `docs/examples/`-Drift-Gate (`doc_examples_validation`) ist
   gruen.
-- `json_schema_check` ist gruen fuer `kReportFormatVersion=5` und
-  `kCompareFormatVersion=1`.
+- `json_schema_check` ist gruen fuer
+  `kReportFormatVersion == M6_ANALYZE_FORMAT_VERSION` und
+  `kCompareFormatVersion == M6_COMPARE_FORMAT_VERSION`.
 - DOT-Syntax-Gates (`dot -Tsvg` Docker-Pfad und
   `tests/validate_dot_reports.py` native Pfad) gruen.
 - HTML-Adapter-Tests fuer Sonderzeichen-Escaping gruen.
@@ -427,11 +434,13 @@ AP 1.1-1.6 geforderten Tests:
 - Docker-Gates (`test`, `coverage-check`, `quality-check`,
   `runtime`) gruen.
 
-Neuer Abnahmetest in AP 1.7:
+AP 1.7 fuehrt keinen neuen fachlichen Feature-Test ein. Ergaenzt wird
+ein Abnahmeselbsttest/Gating-Test fuer den Release-Schnitt:
 
 - **`m6_versionspin_consistency`**: Test, dass
   `cmake-xray --version` exakt `1.3.0` ausgibt, dass das Schema
-  `kReportFormatVersion=5` und `kCompareFormatVersion=1` widerspiegelt,
+  `kReportFormatVersion == M6_ANALYZE_FORMAT_VERSION` und
+  `kCompareFormatVersion == M6_COMPARE_FORMAT_VERSION` widerspiegelt,
   und dass keine Roh-Version `1.2.0` mehr im Code uebrig ist.
 
 ## Implementierungsreihenfolge
@@ -514,8 +523,9 @@ AP 1.7 ist abgeschlossen, wenn:
 
 - Root-`CMakeLists.txt` meldet exakt `project(... VERSION 1.3.0)`;
 - `cmake-xray --version` liefert `1.3.0`;
-- `kReportFormatVersion == 5` und `kCompareFormatVersion == 1`
-  in C++ und Schema;
+- `kReportFormatVersion == M6_ANALYZE_FORMAT_VERSION` und
+  `kCompareFormatVersion == M6_COMPARE_FORMAT_VERSION` in C++ und
+  Schema;
 - `CHANGELOG.md` enthaelt einen finalen `[1.3.0]`-Abschnitt mit
   Added/Changed/Fixed/Migration/Platform-status;
 - `README.md` und `docs/guide.md` enthalten M6-Beispiele und
