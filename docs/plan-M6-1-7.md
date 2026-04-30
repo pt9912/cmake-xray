@@ -27,14 +27,15 @@ Versionsspruenge, und der Versionspin ist auf `v1.3.0` gesetzt.
 
 AP 1.7 fuehrt **keinen** weiteren Versionssprung ein. AP 1.7 verwendet
 zwei symbolische Release-Konstanten: `M6_ANALYZE_FORMAT_VERSION` ist
-der tatsaechliche finale `kReportFormatVersion` aus dem Ergebnis von
-AP 1.6 (`5`, falls AP 1.5 `project_identity` schon enthielt; sonst
-`6`), und `M6_COMPARE_FORMAT_VERSION` ist `1`. Alle Checklisten,
-CHANGELOG-Texte und Tests in AP 1.7 referenzieren diese Konstanten
-statt einer hart codierten Analyze-Formatversion. Falls AP 1.6 statt
-AP 1.5 das Schema auf `6` gehoben hat (siehe
-`docs/plan-M6-1-6.md` Tranchen-Schnitt), reflektiert AP 1.7 diesen
-finalen Stand nur in Doku, Tests und Changelog.
+exakt der in Code und Schema bereits implementierte finale
+`kReportFormatVersion` nach AP 1.6, und `M6_COMPARE_FORMAT_VERSION` ist
+der in Code und Schema implementierte finale `kCompareFormatVersion`
+(`1`). AP 1.7 liest diese Werte aus dem Ist-Stand ab und referenziert
+sie in Checklisten, CHANGELOG-Texten und Tests, statt einen eigenen
+Entscheidungsbaum oder eine hart codierte Analyze-Formatversion zu
+definieren. Wenn AP 1.6 das Analyze-Schema auf `6` gehoben hat,
+reflektiert AP 1.7 diesen finalen Stand nur in Doku, Tests und
+Changelog.
 
 ## Scope
 
@@ -122,6 +123,7 @@ Voraussichtlich zu aendern:
 - `docs/report-dot.md`
 - `docs/report-html.md`
 - `docs/report-compare.md` (aus AP 1.6 uebernommen, hier konsolidiert)
+- `docs/report-compare.schema.json` (aus AP 1.6 uebernommen, hier validiert)
 - `docs/compare-matrix.md` (aus AP 1.6 uebernommen)
 - `docs/quality.md`
 - `docs/performance.md`
@@ -141,6 +143,14 @@ Neue Dateien (optional):
 - `docs/migration-m5-to-m6.md` falls Migrations-Hinweise umfangreich
   genug sind, um eigene Datei zu rechtfertigen. Sonst inline in
   `CHANGELOG.md`.
+
+Hard Dependency: `docs/report-compare.md`,
+`docs/report-compare.schema.json` und `docs/compare-matrix.md` muessen
+vor Abschluss von AP 1.7 existieren. Wenn AP 1.6 sie bereits geliefert
+hat, prueft AP 1.7 sie nur gegen den finalen Ist-Stand und korrigiert
+Drift. Fehlt eines dieser Artefakte, legt AP 1.7 es nicht als neues
+Feature an, sondern schliesst die AP-1.6-Lieferluecke im Audit-Scope
+und dokumentiert den Diff in der Liefer-Stand-Tabelle.
 
 ## Versionspin
 
@@ -218,6 +228,10 @@ Dokumente durch:
 - `docs/report-html.md`: alle ab AP 1.2 eingefuehrten Sections und
   CSS-Klassen sind dokumentiert.
 - `docs/report-compare.md`: Compare-Output-Vertrag und Beispiele.
+- `docs/report-compare.schema.json`: Compare-JSON-Schema ist
+  vollstaendig und passt zu `M6_COMPARE_FORMAT_VERSION`.
+- `docs/compare-matrix.md`: Matrix ist identisch zur Matrix in
+  `docs/report-json.md`.
 
 Wenn der Final-Sweep Inkonsistenzen findet (z. B. fehlende
 Kreuzverweise, veraltete Beispiele in einem Dokument), werden sie
@@ -360,9 +374,8 @@ Neuer Abschnitt `[1.3.0] - <Release-Datum>`:
 
 ### Changed
 - `kReportFormatVersion` bumped from `1` (M5) to
-  `M6_ANALYZE_FORMAT_VERSION` over the M6 arc. Each AP 1.2 through
-  AP 1.5, and AP 1.6 if it had to carry `project_identity`, added
-  mandatory fields and bumped the version. Consumers must migrate to
+  `M6_ANALYZE_FORMAT_VERSION` over the M6 arc. This value is copied
+  from the final AP 1.6 code/schema state. Consumers must migrate to
   the final M6 analyze format version; the
   closed-schema rule (`additionalProperties: false`) makes
   unmigrated consumers fail validation.
@@ -536,12 +549,12 @@ AP 1.7 ist abgeschlossen, wenn:
 - `docs/roadmap.md` markiert M6 als abgeschlossen;
 - `docs/plan-M6.md` enthaelt den konsolidierten Liefer-Stand
   ueber alle sieben APs;
-- alle vier Format-Vertrags-Dokumente
+- alle Format-Vertrags-Dokumente
   (`report-json.md`, `report-json.schema.json`, `report-dot.md`,
-  `report-html.md`) sind konsistent zum Ist-Stand;
-- Compare-Schema und Compare-Kompatibilitaetsmatrix sind
-  dokumentiert (in `report-compare.md`/-`.schema.json` oder als
-  Sektion in den bestehenden Doks);
+  `report-html.md`, `report-compare.md`) sind konsistent zum Ist-Stand;
+- `docs/report-compare.schema.json` und `docs/compare-matrix.md`
+  existieren, sind gegen den finalen Ist-Stand validiert und enthalten
+  keine offenen AP-1.6-Platzhalter;
 - `docs/examples/` ist um M6-Beispiele erweitert und das
   Drift-Gate `doc_examples_validation` ist gruen;
 - `m6_versionspin_consistency`-Test ist gruen;
