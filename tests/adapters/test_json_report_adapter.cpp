@@ -789,3 +789,40 @@ TEST_CASE("json impact v2: target_graph is serialized but target_hubs is absent 
     // The schema-enforced asymmetry: target_hubs must NOT appear in impact JSON.
     CHECK_FALSE(doc.contains("target_hubs"));
 }
+
+// ---- AP M6-1.3 A.3: shared text mappings for v3 priority enums --------
+
+#include "adapters/output/impact_priority_text.h"
+
+TEST_CASE("AP1.3 A.3: priority_class_text_v3 maps the three TargetPriorityClass values byte-stably") {
+    using xray::adapters::output::priority_class_text_v3;
+    using xray::hexagon::model::TargetPriorityClass;
+    CHECK(priority_class_text_v3(TargetPriorityClass::direct) == "direct");
+    CHECK(priority_class_text_v3(TargetPriorityClass::direct_dependent) ==
+          "direct_dependent");
+    CHECK(priority_class_text_v3(TargetPriorityClass::transitive_dependent) ==
+          "transitive_dependent");
+}
+
+TEST_CASE("AP1.3 A.3: evidence_strength_text_v3 maps the three TargetEvidenceStrength values byte-stably") {
+    using xray::adapters::output::evidence_strength_text_v3;
+    using xray::hexagon::model::TargetEvidenceStrength;
+    CHECK(evidence_strength_text_v3(TargetEvidenceStrength::direct) == "direct");
+    CHECK(evidence_strength_text_v3(TargetEvidenceStrength::heuristic) ==
+          "heuristic");
+    CHECK(evidence_strength_text_v3(TargetEvidenceStrength::uncertain) ==
+          "uncertain");
+}
+
+TEST_CASE("AP1.3 A.3: kReportFormatVersion stays at 2 in A.3 (v3 wiring is statically discarded)") {
+    // The if-constexpr branches in write_impact_report and the DOT
+    // emit_impact_target_node only fire once kReportFormatVersion>=3. The
+    // tranche-invariant from plan-M6-1-3.md "Format-Versionierung"
+    // requires that A.3 keeps the constant at 2 so v2 reports stay
+    // byte-stable; the version flips in A.4.
+    static_assert(xray::hexagon::model::kReportFormatVersion == 2,
+                  "AP1.3 A.3 must keep kReportFormatVersion at 2; the v3 "
+                  "switch belongs to A.4 alongside the HTML/Markdown/Console "
+                  "adapters and the schema-const update.");
+    CHECK(xray::hexagon::model::kReportFormatVersion == 2);
+}

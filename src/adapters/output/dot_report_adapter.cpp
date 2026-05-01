@@ -1,5 +1,7 @@
 #include "adapters/output/dot_report_adapter.h"
 
+#include "adapters/output/impact_priority_text.h"
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -157,6 +159,13 @@ struct GraphHeader {
     DotBudget budget;
     bool truncated;
     TargetGraphStatus target_graph_status{TargetGraphStatus::not_loaded};
+    // AP M6-1.3 A.3: v3 graph-level depth attributes for impact reports.
+    // emit_graph_header consults kReportFormatVersion via if constexpr;
+    // in A.3 with kReportFormatVersion=2 the branch is statically
+    // discarded so v2 reports stay byte-stable. A.4 flips the constant
+    // and the attributes start appearing in impact-DOT output.
+    std::size_t impact_target_depth_requested{0};
+    std::size_t impact_target_depth_effective{0};
 };
 
 std::string target_graph_status_text(TargetGraphStatus status) {
@@ -188,6 +197,22 @@ void emit_graph_header(std::ostringstream& out, const GraphHeader& header) {
     append_string_attribute(out, "graph_target_graph_status",
                             target_graph_status_text(header.target_graph_status));
     out << ";\n";
+    // AP M6-1.3 A.3: graph_impact_target_depth_{requested,effective} are
+    // pflicht in Impact-DOT v3 (plan-M6-1-3.md "Neue Graph-Attribute fuer
+    // Impact-DOT"). The if-constexpr is dead in A.3 (kReportFormatVersion=2)
+    // and activates in A.4. Analyze-DOT does not carry these attributes.
+    if constexpr (xray::hexagon::model::kReportFormatVersion >= 3) {
+        if (header.report_type == "impact") {
+            out << "  ";
+            append_integer_attribute(out, "graph_impact_target_depth_requested",
+                                      header.impact_target_depth_requested);
+            out << ";\n";
+            out << "  ";
+            append_integer_attribute(out, "graph_impact_target_depth_effective",
+                                      header.impact_target_depth_effective);
+            out << ";\n";
+        }
+    }
 }
 
 void emit_graph_footer(std::ostringstream& out) { out << "}\n"; }
@@ -786,6 +811,16 @@ struct ImpactTargetNode {
     // and must not advertise an impact attribute per docs/report-dot.md
     // (impact is optional on target nodes).
     bool has_impact_attribute{true};
+    // AP M6-1.3 A.3: v3 priority attributes carried alongside the M5
+    // impact classification. Filled by enrich_impact_target_nodes_with_priorities
+    // when the result has a usable target graph and a matching
+    // prioritized_affected_targets entry; emitted by emit_impact_target_node
+    // only when kReportFormatVersion >= 3 (A.4 flips the constant). In
+    // A.3 these stay default-initialized and unused.
+    std::string priority_class_text;
+    std::string evidence_strength_text;
+    std::size_t graph_distance{0};
+    bool has_priority_attributes{false};
 };
 
 struct ImpactEdge {
@@ -1088,6 +1123,21 @@ void emit_impact_target_node(std::ostringstream& out, const ImpactTargetNode& no
         out << ", ";
         append_string_attribute(out, "impact", node.direct ? "direct" : "heuristic");
     }
+    // AP M6-1.3 A.3: v3 priority attributes on impact target nodes.
+    // Plan-M6-1-3.md "Diese Attribute erscheinen ausschliesslich an
+    // Target-Knoten in der Impact-Sicht ... und nur wenn
+    // target_graph_status != not_loaded". The if-constexpr is dead in
+    // A.3 (kReportFormatVersion=2); A.4 flips the constant.
+    if constexpr (xray::hexagon::model::kReportFormatVersion >= 3) {
+        if (node.has_priority_attributes) {
+            out << ", ";
+            append_string_attribute(out, "priority_class", node.priority_class_text);
+            out << ", ";
+            append_integer_attribute(out, "graph_distance", node.graph_distance);
+            out << ", ";
+            append_string_attribute(out, "evidence_strength", node.evidence_strength_text);
+        }
+    }
     out << ", ";
     append_string_attribute(out, "label", node.target.display_name);
     out << ", ";
@@ -1107,11 +1157,20 @@ void emit_impact_edge(std::ostringstream& out, const ImpactEdge& edge) {
     out << "];\n";
 }
 
+struct ImpactDepthFields {
+    std::size_t impact_target_depth_requested{0};
+    std::size_t impact_target_depth_effective{0};
+};
+
 void emit_impact_graph(std::ostringstream& out, const ImpactGraph& graph,
                        const DotBudget& budget,
-                       TargetGraphStatus target_graph_status) {
-    emit_graph_header(out, GraphHeader{"cmake_xray_impact", "impact", budget,
-                                       graph.truncated, target_graph_status});
+                       TargetGraphStatus target_graph_status,
+                       ImpactDepthFields depth) {
+    emit_graph_header(
+        out,
+        GraphHeader{"cmake_xray_impact", "impact", budget, graph.truncated,
+                    target_graph_status, depth.impact_target_depth_requested,
+                    depth.impact_target_depth_effective});
     if (graph.has_changed_file) {
         emit_impact_changed_file_node(out, graph.changed_file_path);
     }
@@ -1122,6 +1181,32 @@ void emit_impact_graph(std::ostringstream& out, const ImpactGraph& graph,
     for (const auto& edge : graph.dependency_edges)
         emit_target_dependency_edge(out, edge);
     emit_graph_footer(out);
+}
+
+// AP M6-1.3 A.3: join the prioritised-targets data onto the impact
+// target nodes so emit_impact_target_node can attach the v3 attributes
+// per plan-M6-1-3.md "Neue Knotenattribute". The function runs always,
+// but the resulting fields are only emitted when kReportFormatVersion
+// >= 3; in A.3 they stay dormant.
+void enrich_impact_target_nodes_with_priorities(
+    std::vector<ImpactTargetNode>& nodes,
+    const std::vector<xray::hexagon::model::PrioritizedImpactedTarget>& priorities,
+    TargetGraphStatus status) {
+    if (status == TargetGraphStatus::not_loaded) return;
+    std::map<std::string, const xray::hexagon::model::PrioritizedImpactedTarget*>
+        by_key;
+    for (const auto& priority : priorities) {
+        by_key.emplace(priority.target.unique_key, &priority);
+    }
+    for (auto& node : nodes) {
+        const auto it = by_key.find(node.target.unique_key);
+        if (it == by_key.end()) continue;
+        node.priority_class_text = priority_class_text_v3(it->second->priority_class);
+        node.evidence_strength_text =
+            evidence_strength_text_v3(it->second->evidence_strength);
+        node.graph_distance = it->second->graph_distance;
+        node.has_priority_attributes = true;
+    }
 }
 
 std::string render_impact(const ImpactResult& result) {
@@ -1136,8 +1221,13 @@ std::string render_impact(const ImpactResult& result) {
     build_impact_edges(ctx, result);
     build_extra_impact_target_nodes(ctx, result.target_graph);
     build_impact_target_dependency_edges(ctx, result.target_graph);
+    enrich_impact_target_nodes_with_priorities(
+        graph.target_nodes, result.prioritized_affected_targets,
+        result.target_graph_status);
     std::ostringstream out;
-    emit_impact_graph(out, graph, budget, result.target_graph_status);
+    emit_impact_graph(out, graph, budget, result.target_graph_status,
+                       ImpactDepthFields{result.impact_target_depth_requested,
+                                         result.impact_target_depth_effective});
     return out.str();
 }
 

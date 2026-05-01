@@ -1,5 +1,7 @@
 #include "adapters/output/json_report_adapter.h"
 
+#include "adapters/output/impact_priority_text.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <map>
@@ -542,6 +544,10 @@ std::string JsonReportAdapter::write_impact_report(const ImpactResult& impact_re
     document["target_graph_status"] =
         target_graph_status_text(impact_result.target_graph_status);
     document["target_graph"] = render_target_graph(impact_result.target_graph);
+    // AP M6-1.3 A.3 stops at the shared impact_priority_text.h helpers;
+    // the JSON v3 emission of prioritized_affected_targets +
+    // impact_target_depth_{requested,effective} lands in A.4 alongside
+    // the kReportFormatVersion=3 flip and the schema-const update.
     document["diagnostics"] = std::move(diagnostics_array);
     return document.dump(2) + "\n";
 }
