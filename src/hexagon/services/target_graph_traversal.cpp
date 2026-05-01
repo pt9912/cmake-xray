@@ -92,20 +92,30 @@ void seed_reached_map(const std::vector<ImpactSeed>& seeds,
     }
 }
 
-IncomingIndex build_incoming_index(const TargetGraph& graph) {
+IncomingIndex build_incoming_index(const TargetGraph& graph,
+                                    const NodeIndex& nodes_by_key) {
     IncomingIndex incoming_by_to;
     for (const auto& edge : graph.edges) {
         incoming_by_to[edge.to_unique_key].push_back(&edge);
     }
-    // Determinism guard: AP 1.1's sort_target_graph already dedups
-    // edges by (from_unique_key, to_unique_key, kind), so the
-    // from_unique_key key alone is sufficient inside a single
-    // to_unique_key bucket.
+    // Determinism guard per plan-M6-1-3.md "ausgehende reverse Kanten
+    // werden vor jedem Schritt nach
+    // (stable_target_key, edge_kind, display_name, target_type)
+    // sortiert". Comparator lives in internal:: for direct unit
+    // testing of the tie-breaker chain.
+    const auto node_for = [&nodes_by_key](const std::string& key)
+        -> const TargetInfo* {
+        const auto it = nodes_by_key.find(key);
+        return it == nodes_by_key.end() ? nullptr : it->second;
+    };
     for (auto& [_, edges] : incoming_by_to) {
         std::stable_sort(edges.begin(), edges.end(),
-                         [](const TargetDependency* lhs,
-                            const TargetDependency* rhs) {
-                             return lhs->from_unique_key < rhs->from_unique_key;
+                         [&node_for](const TargetDependency* lhs,
+                                     const TargetDependency* rhs) {
+                             return internal::less_by_bfs_edge_tuple(
+                                 *lhs, *rhs,
+                                 node_for(lhs->from_unique_key),
+                                 node_for(rhs->from_unique_key));
                          });
     }
     // NRVO-defeat per src/adapters/output/dot_report_adapter.cpp Z. 291.
@@ -120,11 +130,23 @@ NodeIndex build_node_index(const TargetGraph& graph) {
     return NodeIndex(std::move(nodes_by_key));
 }
 
+// Plan-M6-1-3.md "Frontier-Knoten ... werden vor jedem Schritt nach
+// (stable_target_key, edge_kind, display_name, target_type) sortiert."
+// edge_kind is only meaningful on edges; at node level the tuple
+// collapses to (unique_key, display_name, type), implemented in
+// internal::less_by_bfs_node_tuple so tests can drive every column.
 std::vector<std::string> sorted_keys(const ReachedMap& reached) {
+    std::vector<const ReachedTarget*> entries;
+    entries.reserve(reached.size());
+    for (const auto& [_, entry] : reached) entries.push_back(&entry);
+    std::stable_sort(entries.begin(), entries.end(),
+                      [](const ReachedTarget* lhs, const ReachedTarget* rhs) {
+                          return internal::less_by_bfs_node_tuple(
+                              lhs->target, rhs->target);
+                      });
     std::vector<std::string> keys;
-    keys.reserve(reached.size());
-    for (const auto& [key, _] : reached) keys.push_back(key);
-    std::sort(keys.begin(), keys.end());
+    keys.reserve(entries.size());
+    for (const auto* entry : entries) keys.push_back(entry->target.unique_key);
     return std::vector<std::string>(std::move(keys));
 }
 
@@ -199,8 +221,8 @@ ReverseBfsResult reverse_target_graph_bfs(const TargetGraph& graph,
 
     ReachedMap reached;
     seed_reached_map(seeds, reached);
-    const auto incoming_by_to = build_incoming_index(graph);
     const auto nodes_by_key = build_node_index(graph);
+    const auto incoming_by_to = build_incoming_index(graph, nodes_by_key);
     auto frontier = sorted_keys(reached);
 
     for (std::size_t step = 1; step <= requested_depth; ++step) {
@@ -244,5 +266,45 @@ void sort_prioritized_impacted_targets(
                           return lhs.target.unique_key < rhs.target.unique_key;
                       });
 }
+
+namespace internal {
+
+int rank_edge_kind(model::TargetDependencyKind kind) {
+    if (kind == model::TargetDependencyKind::direct) return 0;
+    return 1;  // reserved for future kinds; AP M6-1.3 only emits direct
+}
+
+bool less_by_bfs_node_tuple(const model::TargetInfo& lhs,
+                            const model::TargetInfo& rhs) {
+    if (lhs.unique_key != rhs.unique_key) {
+        return lhs.unique_key < rhs.unique_key;
+    }
+    if (lhs.display_name != rhs.display_name) {
+        return lhs.display_name < rhs.display_name;
+    }
+    return lhs.type < rhs.type;
+}
+
+bool less_by_bfs_edge_tuple(const model::TargetDependency& lhs,
+                            const model::TargetDependency& rhs,
+                            const model::TargetInfo* lhs_from_node,
+                            const model::TargetInfo* rhs_from_node) {
+    if (lhs.from_unique_key != rhs.from_unique_key) {
+        return lhs.from_unique_key < rhs.from_unique_key;
+    }
+    const int lhs_kind = rank_edge_kind(lhs.kind);
+    const int rhs_kind = rank_edge_kind(rhs.kind);
+    if (lhs_kind != rhs_kind) return lhs_kind < rhs_kind;
+    if (lhs.from_display_name != rhs.from_display_name) {
+        return lhs.from_display_name < rhs.from_display_name;
+    }
+    const std::string_view lhs_type =
+        lhs_from_node ? std::string_view{lhs_from_node->type} : std::string_view{};
+    const std::string_view rhs_type =
+        rhs_from_node ? std::string_view{rhs_from_node->type} : std::string_view{};
+    return lhs_type < rhs_type;
+}
+
+}  // namespace internal
 
 }  // namespace xray::hexagon::services

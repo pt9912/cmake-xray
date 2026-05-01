@@ -66,4 +66,40 @@ ReverseBfsResult reverse_target_graph_bfs(const model::TargetGraph& graph,
 void sort_prioritized_impacted_targets(
     std::vector<model::PrioritizedImpactedTarget>& targets);
 
+namespace internal {
+
+// Helpers exposed for direct unit-testing of the determinism contract
+// pinned in plan-M6-1-3.md "Determinismus-Anforderungen" Z. 174-175.
+// In production the AP-1.1 sort_target_graph invariant
+//   - dedups edges by (from_unique_key, to_unique_key, kind), and
+//   - guarantees unique_keys are unique across nodes,
+// so the secondary tie-breakers never fire on real File-API graphs.
+// They are still wired into the BFS (and unit-tested here) so that a
+// future kind enters the mix or a node-aliasing bug is caught the
+// moment it appears.
+
+// Maps TargetDependencyKind to a stable rank used by the edge sort
+// tuple. Plan-M6-1-3 forbids enum-ordinal reliance ("explizite
+// Rangtabelle"); a future kind only needs to add a row here.
+int rank_edge_kind(model::TargetDependencyKind kind);
+
+// Less-than over the "node" sort tuple
+//   (unique_key, display_name, type)
+// used to order frontier candidates and the prioritized output.
+bool less_by_bfs_node_tuple(const model::TargetInfo& lhs,
+                            const model::TargetInfo& rhs);
+
+// Less-than over the "edge" sort tuple
+//   (from_unique_key, edge_kind, from_display_name, from_type)
+// used to order incoming-edge buckets before each BFS step. Callers
+// resolve `from_unique_key` to its TargetInfo via the BFS NodeIndex
+// and pass the pointers (nullptr when the from-side target is missing
+// from the node set, mirroring the production lookup).
+bool less_by_bfs_edge_tuple(const model::TargetDependency& lhs,
+                            const model::TargetDependency& rhs,
+                            const model::TargetInfo* lhs_from_node,
+                            const model::TargetInfo* rhs_from_node);
+
+}  // namespace internal
+
 }  // namespace xray::hexagon::services

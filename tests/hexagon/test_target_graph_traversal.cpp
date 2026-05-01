@@ -260,6 +260,113 @@ TEST_CASE("reverse-bfs: stopped_early_no_more_targets fires when frontier exhaus
     CHECK_FALSE(result.stopped_at_depth_limit);
 }
 
+// Plan-M6-1-3.md "Determinismus-Anforderungen" Z. 174-175 pins the
+// reverse-BFS sort tuples; the AP-1.1 sort_target_graph invariant
+// (dedup edges by (from, to, kind); unique_keys unique) means the
+// BFS public API never produces ties at the higher tuple levels in
+// real graphs. To still verify each tie-breaker the contract exposes
+// the comparators as services::internal:: helpers; the four cases
+// below exercise every column the production lambdas would consult.
+TEST_CASE("internal::less_by_bfs_node_tuple: unique_key wins over display_name and type") {
+    using xray::hexagon::services::internal::less_by_bfs_node_tuple;
+    const TargetInfo a{"alpha", "STATIC_LIBRARY", "alpha::STATIC_LIBRARY"};
+    const TargetInfo b{"beta", "EXECUTABLE", "beta::EXECUTABLE"};
+    CHECK(less_by_bfs_node_tuple(a, b));
+    CHECK_FALSE(less_by_bfs_node_tuple(b, a));
+}
+
+TEST_CASE("internal::less_by_bfs_node_tuple: equal unique_key falls through to display_name") {
+    using xray::hexagon::services::internal::less_by_bfs_node_tuple;
+    // TargetInfo layout is (display_name, type, unique_key); aliased
+    // entries share unique_key + type but differ on display_name.
+    const TargetInfo lhs{"alphaName", "STATIC_LIBRARY", "libcore"};
+    const TargetInfo rhs{"zetaName", "STATIC_LIBRARY", "libcore"};
+    CHECK(less_by_bfs_node_tuple(lhs, rhs));
+    CHECK_FALSE(less_by_bfs_node_tuple(rhs, lhs));
+}
+
+TEST_CASE("internal::less_by_bfs_node_tuple: equal unique_key + display_name falls through to type") {
+    using xray::hexagon::services::internal::less_by_bfs_node_tuple;
+    const TargetInfo lhs{"core", "EXECUTABLE", "libcore"};
+    const TargetInfo rhs{"core", "STATIC_LIBRARY", "libcore"};
+    CHECK(less_by_bfs_node_tuple(lhs, rhs));
+    CHECK_FALSE(less_by_bfs_node_tuple(rhs, lhs));
+    // Reflexive equality: not less-than in either direction.
+    CHECK_FALSE(less_by_bfs_node_tuple(lhs, lhs));
+}
+
+TEST_CASE("internal::less_by_bfs_edge_tuple: from_unique_key wins over later columns") {
+    using xray::hexagon::services::internal::less_by_bfs_edge_tuple;
+    const TargetDependency a{"a::STATIC_LIBRARY", "a",
+                              "hub::STATIC_LIBRARY", "hub",
+                              TargetDependencyKind::direct,
+                              TargetDependencyResolution::resolved};
+    const TargetDependency b{"b::STATIC_LIBRARY", "b",
+                              "hub::STATIC_LIBRARY", "hub",
+                              TargetDependencyKind::direct,
+                              TargetDependencyResolution::resolved};
+    // TargetInfo layout is (display_name, type, unique_key).
+    const TargetInfo a_node{"a", "STATIC_LIBRARY", "a::STATIC_LIBRARY"};
+    const TargetInfo b_node{"b", "STATIC_LIBRARY", "b::STATIC_LIBRARY"};
+    CHECK(less_by_bfs_edge_tuple(a, b, &a_node, &b_node));
+    CHECK_FALSE(less_by_bfs_edge_tuple(b, a, &b_node, &a_node));
+}
+
+TEST_CASE("internal::less_by_bfs_edge_tuple: equal from_unique_key + kind falls through to from_display_name") {
+    // Construct two edges with identical from_unique_key and kind,
+    // differing only on from_display_name. AP 1.1 dedups would
+    // collapse this in production, but the comparator still needs to
+    // be deterministic.
+    using xray::hexagon::services::internal::less_by_bfs_edge_tuple;
+    const TargetDependency a{"shared::STATIC_LIBRARY", "alphaName",
+                              "hub::STATIC_LIBRARY", "hub",
+                              TargetDependencyKind::direct,
+                              TargetDependencyResolution::resolved};
+    const TargetDependency b{"shared::STATIC_LIBRARY", "zetaName",
+                              "hub::STATIC_LIBRARY", "hub",
+                              TargetDependencyKind::direct,
+                              TargetDependencyResolution::resolved};
+    const TargetInfo node{"shared", "STATIC_LIBRARY",
+                           "shared::STATIC_LIBRARY"};
+    CHECK(less_by_bfs_edge_tuple(a, b, &node, &node));
+    CHECK_FALSE(less_by_bfs_edge_tuple(b, a, &node, &node));
+}
+
+TEST_CASE("internal::less_by_bfs_edge_tuple: equal from_unique_key + kind + display_name falls through to from-target type") {
+    using xray::hexagon::services::internal::less_by_bfs_edge_tuple;
+    const TargetDependency edge{"shared::STATIC_LIBRARY", "shared",
+                                 "hub::STATIC_LIBRARY", "hub",
+                                 TargetDependencyKind::direct,
+                                 TargetDependencyResolution::resolved};
+    // TargetInfo layout is (display_name, type, unique_key); both
+    // nodes use display_name="shared" so the comparator falls past
+    // display_name and lands on type ("EXECUTABLE" < "STATIC_LIBRARY").
+    const TargetInfo exec_node{"shared", "EXECUTABLE",
+                                "shared::EXECUTABLE"};
+    const TargetInfo lib_node{"shared", "STATIC_LIBRARY",
+                               "shared::STATIC_LIBRARY"};
+    CHECK(less_by_bfs_edge_tuple(edge, edge, &exec_node, &lib_node));
+    CHECK_FALSE(less_by_bfs_edge_tuple(edge, edge, &lib_node, &exec_node));
+    // nullptr from-node mirrors the production "node missing from
+    // NodeIndex" path; an empty type compares less than any populated
+    // type so missing-node entries sort first deterministically.
+    CHECK(less_by_bfs_edge_tuple(edge, edge, nullptr, &lib_node));
+    CHECK_FALSE(less_by_bfs_edge_tuple(edge, edge, &lib_node, nullptr));
+    // Two missing nodes: both empty types -> not less in either dir.
+    CHECK_FALSE(less_by_bfs_edge_tuple(edge, edge, nullptr, nullptr));
+}
+
+TEST_CASE("internal::rank_edge_kind: direct ranks before any future kind") {
+    using xray::hexagon::services::internal::rank_edge_kind;
+    CHECK(rank_edge_kind(TargetDependencyKind::direct) == 0);
+    // Casting an out-of-range value mimics how a future kind (added
+    // to the enum but not the rank table) would land in the catch-all
+    // "1" bucket. The cast is well-defined for unsigned underlying
+    // types; static_cast<int> documents intent.
+    const auto future_kind = static_cast<TargetDependencyKind>(99);
+    CHECK(rank_edge_kind(future_kind) == 1);
+}
+
 TEST_CASE("sort_prioritized_impacted_targets follows the documented 4-tuple") {
     std::vector<PrioritizedImpactedTarget> targets;
     targets.push_back({make_target("z"), TargetPriorityClass::direct, 0,
