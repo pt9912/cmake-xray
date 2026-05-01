@@ -58,10 +58,10 @@ M5 unterscheidet drei Statusklassen:
 
 Aktueller M5-Stand:
 
-| Plattform | Status |
-|---|---|
-| Linux x86_64 | `supported` |
-| macOS arm64 | `validated_smoke` |
+| Plattform      | Status            |
+| -------------- | ----------------- |
+| Linux x86_64   | `supported`       |
+| macOS arm64    | `validated_smoke` |
 | Windows x86_64 | `validated_smoke` |
 
 Linux ist die einzige offizielle Releaseplattform; macOS arm64 und
@@ -267,8 +267,9 @@ cmake-xray analyze \
 
 Include-Hotspots und Header-Impact beruhen auf heuristischer Include-Aufloesung. `cmake-xray` kennzeichnet diese Ergebnisse explizit und gibt Datenluecken als Diagnostics aus. Direkte Treffer auf bekannte Quelldateien werden ohne heuristische Klassifikation ausgewiesen. Target-Aussagen erscheinen nur, wenn File-API-Daten ueber `--cmake-file-api` bereitgestellt werden.
 
-## Beispielausgaben
 
+<details>
+<summary><b>Beispielausgaben</b></summary>
 Kuratierte Beispielartefakte liegen unter [docs/examples](./docs/examples):
 
 Ohne Target-Sicht (nur `compile_commands.json`):
@@ -296,18 +297,22 @@ Mit Target-Sicht (File API):
 - [docs/examples/impact-report-targets.html](./docs/examples/impact-report-targets.html)
 - [docs/examples/impact-report-targets.json](./docs/examples/impact-report-targets.json)
 - [docs/examples/impact-report-targets.dot](./docs/examples/impact-report-targets.dot)
+</details>
 
-## Exit-Codes
+<details>
+<summary><b>Exit-Codes</b></summary>
 
-| Code | Bedeutung                           | Typischer Ausloeser                                                                 |
-| ---- | ----------------------------------- | ----------------------------------------------------------------------------------- |
-| `0`  | Erfolg                              | gueltige CLI-Verwendung und gueltige Eingabedaten                                   |
-| `1`  | Laufzeit- oder Report-Schreibfehler | nicht beschreibbarer `--output`-Pfad, unerwarteter Fehler                           |
-| `2`  | CLI-Verwendungsfehler               | unbekanntes Unterkommando, fehlendes Pflichtargument, ungueltige Optionskombination |
-| `3`  | Eingabedatei nicht lesbar           | Datei fehlt, kein Zugriff, Pfad ungueltig; gilt auch fuer explizite `--cmake-file-api`-Pfade |
+| Code | Bedeutung                           | Typischer Ausloeser                                                                                                                    |
+| ---- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | Erfolg                              | gueltige CLI-Verwendung und gueltige Eingabedaten                                                                                      |
+| `1`  | Laufzeit- oder Report-Schreibfehler | nicht beschreibbarer `--output`-Pfad, unerwarteter Fehler                                                                              |
+| `2`  | CLI-Verwendungsfehler               | unbekanntes Unterkommando, fehlendes Pflichtargument, ungueltige Optionskombination                                                    |
+| `3`  | Eingabedatei nicht lesbar           | Datei fehlt, kein Zugriff, Pfad ungueltig; gilt auch fuer explizite `--cmake-file-api`-Pfade                                           |
 | `4`  | Eingabedaten ungueltig              | JSON fehlerhaft, kein Array, leer, Pflichtfelder fehlen; gilt auch fuer ungueltige oder strukturell unzureichende File-API-Reply-Daten |
+</details>
 
-## Tests und Quality Gates
+<details>
+<summary><b>Tests und Quality Gates</b></summary>
 
 Docker-basierte Referenzpfade ueber das Makefile:
 
@@ -322,12 +327,18 @@ Separat verfuegbare Reports:
 make coverage-report
 make quality-report
 ```
+</details>
 
-## Performance-Baseline
+<details>
+<summary><b>Performance-Baseline</b></summary>
+
 
 Die versionierten Referenzprojekte liegen unter [tests/reference](./tests/reference). Die dokumentierte Baseline fuer `scale_250`, `scale_500` und `scale_1000` sowie die Impact-Stichprobe steht in [docs/performance.md](./docs/performance.md). Die zugehoerigen Messartefakte werden unter `build/reports/performance/` erzeugt.
 
-## Dokumente
+</details>
+
+<details>
+<summary><b>Dokumente</b></summary>
 
 Weitere Dokumentation:
 
@@ -339,6 +350,8 @@ Weitere Dokumentation:
 - [docs/releasing.md](./docs/releasing.md)
 - [docs/quality.md](./docs/quality.md)
 - [docs/performance.md](./docs/performance.md)
+</details>
+
 
 ## Lizenz
 
