@@ -43,6 +43,23 @@ struct CliOptions {
     bool quiet_flag{false};
     bool verbose_flag{false};
     OutputVerbosity verbosity{OutputVerbosity::normal};
+    // AP M6-1.3 A.2: raw CLI text for --impact-target-depth. CLI11 captures
+    // the user-supplied string verbatim; manual parsing in
+    // validate_impact_target_depth produces the four documented error
+    // phrases (negative value / not an integer / value exceeds maximum 32 /
+    // option specified more than once). Empty text means "user did not
+    // supply --impact-target-depth"; the service applies its default of 2.
+    // The Option* pointer is captured in configure_impact_command so the
+    // duplicate-occurrence check can read CLI11's parse-time count;
+    // CLI11's ->each() callback only fires on the final value, not per
+    // instance.
+    std::string impact_target_depth_text;
+    CLI::Option* impact_target_depth_option{nullptr};
+    std::optional<std::size_t> parsed_impact_target_depth;
+    // AP M6-1.3 A.2: --require-target-graph flag. When set and no usable
+    // target graph is loaded, impact ends with exit 1 + the documented
+    // error message (CLI maps the service code target_graph_required).
+    bool require_target_graph_flag{false};
 };
 
 OutputVerbosity resolve_verbosity(const CliOptions& options) {
@@ -192,6 +209,20 @@ void configure_impact_command(CLI::App& app, CliOptions& options, CLI::App*& imp
         "Changed file path; relative paths are interpreted relative to the "
         "compile_commands.json directory (with --compile-commands) or the "
         "top-level source directory from the codemodel (with --cmake-file-api only)");
+    // AP M6-1.3 A.2: reverse-target-graph traversal depth. Captured as
+    // raw text so manual parsing can emit the four documented error
+    // phrases; ->take_last() lets CLI11 accept duplicate occurrences
+    // silently so validate_impact_target_depth (not CLI11) owns the
+    // "option specified more than once" error phrase via the option's
+    // post-parse count().
+    options.impact_target_depth_option = impact_cmd->add_option(
+        "--impact-target-depth", options.impact_target_depth_text,
+        "Reverse-target-graph traversal depth for impact prioritisation "
+        "(default 2, range 0-32)");
+    options.impact_target_depth_option->take_last();
+    impact_cmd->add_flag(
+        "--require-target-graph", options.require_target_graph_flag,
+        "Reject the impact run when no target graph data is available");
     configure_report_options(*impact_cmd, options);
     configure_verbosity_options(*impact_cmd, options);
 }
@@ -219,6 +250,69 @@ std::optional<int> validate_report_options(const CliOptions& options, std::ostre
     err << "error: --output is not supported with --format console\n";
     err << "hint: use an artifact-oriented format such as --format markdown, "
            "--format json, --format dot or --format html when writing a report file\n";
+    return ExitCode::cli_usage_error;
+}
+
+// AP M6-1.3 A.2: classify a non-empty --impact-target-depth text. The
+// result is one of: a valid depth value, or one of the three text-form
+// failure phrases. Cycle protection note: any non-empty input is
+// classified in O(text.size()) without exceptions.
+struct DepthParseOutcome {
+    enum class Status { ok, not_an_integer, negative, out_of_range };
+    Status status;
+    std::size_t value;
+};
+
+DepthParseOutcome classify_depth_text(std::string_view text) {
+    constexpr std::size_t kMaxDepth = 32;
+    constexpr std::size_t kMaxDigits = 5;  // any 6+ digit number > kMaxDepth
+    if (text.front() == '-') {
+        return {DepthParseOutcome::Status::negative, 0};
+    }
+    for (const char ch : text) {
+        if (ch < '0' || ch > '9') {
+            return {DepthParseOutcome::Status::not_an_integer, 0};
+        }
+    }
+    if (text.size() > kMaxDigits) {
+        return {DepthParseOutcome::Status::out_of_range, 0};
+    }
+    std::size_t value = 0;
+    for (const char ch : text) {
+        value = value * 10 + static_cast<std::size_t>(ch - '0');
+    }
+    if (value > kMaxDepth) {
+        return {DepthParseOutcome::Status::out_of_range, 0};
+    }
+    return {DepthParseOutcome::Status::ok, value};
+}
+
+std::string_view depth_error_phrase(DepthParseOutcome::Status status) {
+    if (status == DepthParseOutcome::Status::negative) return "negative value";
+    if (status == DepthParseOutcome::Status::not_an_integer) return "not an integer";
+    return "value exceeds maximum 32";
+}
+
+// AP M6-1.3 A.2: parse and validate --impact-target-depth per
+// docs/plan-M6-1-3.md "CLI-Vertrag". Captures the parsed depth in
+// options.parsed_impact_target_depth on success; emits one of the four
+// documented error phrases on failure.
+std::optional<int> validate_impact_target_depth(CliOptions& options, std::ostream& err) {
+    if (options.impact_target_depth_option != nullptr &&
+        options.impact_target_depth_option->count() > 1) {
+        err << "error: --impact-target-depth: option specified more than once\n";
+        return ExitCode::cli_usage_error;
+    }
+    if (options.impact_target_depth_text.empty()) {
+        return std::nullopt;  // service applies default 2
+    }
+    const auto outcome = classify_depth_text(options.impact_target_depth_text);
+    if (outcome.status == DepthParseOutcome::Status::ok) {
+        options.parsed_impact_target_depth = outcome.value;
+        return std::nullopt;
+    }
+    err << "error: --impact-target-depth: " << depth_error_phrase(outcome.status)
+        << "\n";
     return ExitCode::cli_usage_error;
 }
 
@@ -638,15 +732,18 @@ xray::hexagon::ports::driving::AnalyzeImpactRequest build_impact_request(
     return {optional_input_path(options.compile_commands_path, report_display_base),
             make_changed_file_argument(options.changed_file_path),
             optional_input_path(options.cmake_file_api_path, report_display_base),
-            report_display_base};
+            report_display_base,
+            options.parsed_impact_target_depth,
+            options.require_target_graph_flag};
 }
 
-std::optional<int> validate_subcommand_options(const CliOptions& options, bool is_impact,
+std::optional<int> validate_subcommand_options(CliOptions& options, bool is_impact,
                                                 std::ostream& err) {
     if (const auto e = validate_verbosity_options(options, err); e.has_value()) return e;
     if (const auto e = validate_report_options(options, err); e.has_value()) return e;
     if (is_impact) {
         if (const auto e = validate_changed_file_required(options, err); e.has_value()) return e;
+        if (const auto e = validate_impact_target_depth(options, err); e.has_value()) return e;
     }
     return validate_input_options(options, err);
 }
@@ -657,6 +754,26 @@ struct CliDispatchContext {
     const ReportPorts& report_ports;
 };
 
+// AP M6-1.3 A.2: map a service-side AnalyzeImpactRequest rejection to
+// the documented CLI exit code and stderr phrase. The CLI's own
+// validate_impact_target_depth catches depth issues before the request
+// reaches the service, so the only service-validation code that can
+// surface here is target_graph_required (triggered by
+// --require-target-graph + missing target graph).
+//
+// Plan-M6-1-3.md "Exit-Code-Begruendung": exit 1 marks the input
+// failure mode -- the CLI parser was syntactically clean, the request
+// became invalid only after the build model load produced
+// target_graph_status=not_loaded. The numeric value is the
+// plan-mandated 1 (mapped to ExitCode::unexpected_error in
+// src/adapters/cli/exit_codes.h despite the name).
+int handle_impact_service_validation_error(
+    const xray::hexagon::model::ServiceValidationError& info,
+    std::ostream& err) {
+    err << "error: --require-target-graph: " << info.message << "\n";
+    return ExitCode::unexpected_error;
+}
+
 int dispatch_subcommand(const CliOptions& options, bool is_impact,
                           const CliDispatchContext& ctx, CliOutputStreams streams) {
     const auto report_format = parse_report_format(options.report_format);
@@ -665,6 +782,10 @@ int dispatch_subcommand(const CliOptions& options, bool is_impact,
     if (is_impact) {
         const auto result = ctx.analyze_impact_port.analyze_impact(
             build_impact_request(options, report_display_base));
+        if (result.service_validation_error.has_value()) {
+            return handle_impact_service_validation_error(
+                *result.service_validation_error, streams.err);
+        }
         return handle_impact_result(result, report_port, report_format, options, streams);
     }
     const auto result = ctx.analyze_project_port.analyze_project(

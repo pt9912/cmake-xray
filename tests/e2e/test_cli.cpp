@@ -1310,3 +1310,101 @@ TEST_CASE_FIXTURE(CliFixture, "m3 output remains unchanged without file api") {
     CHECK(err.str().empty());
 }
 
+// ---- AP M6-1.3 A.2: --impact-target-depth + --require-target-graph ----
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.3 A.2: --impact-target-depth abc returns exit 2 with 'not an integer'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--impact-target-depth", "abc"}) ==
+          ExitCode::cli_usage_error);
+    CHECK(err.str().find("--impact-target-depth: not an integer") != std::string::npos);
+    CHECK(out.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.3 A.2: --impact-target-depth 1.5 returns exit 2 with 'not an integer'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--impact-target-depth", "1.5"}) ==
+          ExitCode::cli_usage_error);
+    CHECK(err.str().find("--impact-target-depth: not an integer") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.3 A.2: --impact-target-depth -1 returns exit 2 with 'negative value'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--impact-target-depth", "-1"}) ==
+          ExitCode::cli_usage_error);
+    CHECK(err.str().find("--impact-target-depth: negative value") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.3 A.2: --impact-target-depth 33 returns exit 2 with 'value exceeds maximum 32'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--impact-target-depth", "33"}) ==
+          ExitCode::cli_usage_error);
+    CHECK(err.str().find("--impact-target-depth: value exceeds maximum 32") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.3 A.2: --impact-target-depth 100000 (5+ digits) returns exit 2 with 'value exceeds maximum 32'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--impact-target-depth", "999999"}) ==
+          ExitCode::cli_usage_error);
+    CHECK(err.str().find("--impact-target-depth: value exceeds maximum 32") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.3 A.2: --impact-target-depth specified twice returns exit 2 with 'option specified more than once'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--impact-target-depth", "2",
+               "--impact-target-depth", "3"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--impact-target-depth: option specified more than once") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.3 A.2: --impact-target-depth 0 is accepted") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--impact-target-depth", "0"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.3 A.2: --impact-target-depth 32 is accepted at the upper bound") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--impact-target-depth", "32"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.3 A.2: --require-target-graph without target graph returns exit 1") {
+    // Compile-DB-only run: target_graph_status=not_loaded; --require-target-graph
+    // promotes that to a hard CLI failure with the documented message.
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--require-target-graph"}) ==
+          ExitCode::unexpected_error);
+    CHECK(err.str().find("--require-target-graph: target graph data is required "
+                          "but not available") != std::string::npos);
+    CHECK(out.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.3 A.2: --require-target-graph + --impact-target-depth 0 keeps the documented combo error mapping") {
+    // Even with depth=0 (which makes BFS a no-op), --require-target-graph
+    // still demands a usable target graph; without one, exit 1 fires.
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--require-target-graph",
+               "--impact-target-depth", "0"}) == ExitCode::unexpected_error);
+    CHECK(err.str().find("--require-target-graph: target graph data is required "
+                          "but not available") != std::string::npos);
+}
