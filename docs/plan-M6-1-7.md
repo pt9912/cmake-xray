@@ -622,4 +622,3 @@ Diese Punkte werden bewusst in spaeteren Phasen umgesetzt:
   (offen aus AP 1.6).
 - Impact-Compare als eigener Diff-Vertrag (offen aus AP 1.6).
 - HTML- und DOT-Compare-Output (offen aus AP 1.6).
-- Praeprozessor-getreue Include-Aufloesung (offen aus AP 1.4).

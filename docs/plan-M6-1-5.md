@@ -71,8 +71,10 @@ Nicht umsetzen:
 
 - Konfigurationsdatei (z. B. `cmake-xray.toml`). M6 verwendet
   ausschliesslich CLI-Optionen.
-- CLI-Steuerung von `include_depth_limit` und `include_node_budget`
-  aus AP 1.4. Beide bleiben in M6 hardcoded auf `32`/`10000`.
+- CLI-Steuerung der Include-Budgetwerte (`include_depth_limit`,
+  `include_node_budget` aus AP 1.4) bleibt in AP 1.5 bewusst
+  nicht umgesetzt; Defaults `32`/`10000` bleiben stabil. Die optionale
+  CLI-Steuerung wird als gesonderter M6-Folgeumfang gepflegt.
 - Aenderung am Verhalten von `--top` aus M5. AP 1.5 ergaenzt
   Schwellenwerte vor dem `--top`-Schritt, nicht parallel dazu.
 - Neue CLI-Aliase oder Kurzformen fuer die neuen Optionen.
@@ -990,8 +992,6 @@ Diese Punkte werden bewusst in spaeteren Arbeitspaketen umgesetzt:
 
 - Konfigurationsdatei (`cmake-xray.toml` o. ae.) fuer wiederkehrende
   Analyseprofile. M6 verwendet ausschliesslich CLI-Optionen.
-- CLI-Steuerung von `include_depth_limit` und
-  `include_node_budget` aus AP 1.4. Beide bleiben in M6 hardcoded.
 - Compare-Vertrag fuer `format_version=5`-Reports mit
   Compare-Kompatibilitaetsmatrix (AP 1.6). AP 1.6 muss
   `analysis_configuration`-Drift als `configuration_drift`-

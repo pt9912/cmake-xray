@@ -18,17 +18,25 @@ DOCKER_BINARY ?= /tmp/cmake-xray
 
 .DEFAULT_GOAL := help
 
-.PHONY: help dev configure build test smoke lint docker-test docker-build docker-binary docker-gates coverage-gate quality-gate coverage-report quality-report runtime docs-portability release-dry-run clean
+.PHONY: help dev configure build test smoke lint docker-test docker-build docker-binary docker-gates docker-coverage coverage-gate quality-gate coverage-report quality-report runtime docs-portability release-dry-run clean
 
 help:
 	@printf '%s\n' \
 		'Targets:' \
+		'  make configure         Configure the build directory' \
+		'  make build             Configure (if needed) and build the binary' \
 		'  make dev                Configure and build the local Release binary' \
+		'  make lint              Run quality checks and lint gates' \
 		'  make test               Build locally and run ctest' \
 		'  make smoke              Run local --help and --version smoke checks' \
+		'  make docker-test        Build test image and run tests in Docker' \
 		'  make docker-gates       Run Docker test, coverage and quality gates' \
 		'  make docker-binary      Build the Docker binary stage and extract /workspace/build/cmake-xray to DOCKER_BINARY (default /tmp/cmake-xray)' \
 		'  make runtime            Build and smoke-test the runtime image' \
+		'  make docs-portability   Validate documentation example portability' \
+		'  make release-dry-run    Run the release dry-run script' \
+		'  make docker-coverage    Build and print the Docker coverage report' \
+		'  make clean              Clean build artifacts' \
 		'  make coverage-report    Build and print the Docker coverage report' \
 		'  make quality-report     Build and print the Docker quality report' \
 		'' \
@@ -83,8 +91,10 @@ quality-gate:
 		--build-arg XRAY_LIZARD_MAX_PARAMETERS=$(LIZARD_MAX_PARAMETERS) \
 		-t $(IMAGE):quality-check .
 
-coverage-report:
+docker-coverage:
 	$(DOCKER) build --target coverage -t $(IMAGE):coverage .
+
+coverage-report: docker-coverage
 	$(DOCKER) run --rm $(IMAGE):coverage
 
 quality-report:

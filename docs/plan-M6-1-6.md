@@ -52,6 +52,10 @@ Umsetzen:
   Serialisierung (siehe AP-1.6-Ergaenzung an `report-json.md`).
 - Compile-DB-Fingerprint-Algorithmus (SHA-256 ueber kanonische
   JSON-Payload).
+- Compare-Kontrakt schliesst `format_version=4`-Reports mit ein, inklusive
+  `configuration_drift` fuer `include_scope`/`include_depth`-Filter und
+  neu eingefuegte Include-Hotspot-Felder (`include_origin`,
+  `include_depth_kind`).
 - Compare-Kompatibilitaetsmatrix in `docs/report-json.md` und
   verpflichtend gespiegelt in `docs/compare-matrix.md`.
 - Pfadnormalisierungs-Helper fuer Compare-Schluessel.

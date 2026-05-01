@@ -1144,33 +1144,6 @@ Docker-Gate-Lauf gemaess `docs/quality.md` auf dem `c99045e`-Commit
 lokal gruen: `make docker-gates` (Test 39/39 inkl. der vier neuen
 v3-Schema-Negativ-Gates, Coverage 100%, clang-tidy 0, lizard 0).
 
-## Offene Folgearbeiten
-
-Aus dem AP-1.3-Scope bewusst ausgelassen, dokumentiert fuer spaetere
-Zyklen:
-
-- `impact-prioritised-cycle.<ext>` (5 Formate): braucht ein dediziertes
-  zyklisches CMake-File-API-Reply-Fixture. Die zyklische BFS-Logik selbst
-  ist ueber den "reverse-bfs cycle"-Helper-Test und den
-  "depth-limited BFS over a long chain"-Service-Test in den
-  C++-Test-Suiten gepinnt; das fehlende E2E-Golden ist ein
-  Reproduzierbarkeits-Anker, kein zusaetzlicher Vertragstest.
-- `evidence_strength="uncertain"` als Service-Pfad: die aktuelle
-  `compute_affected_targets`-Implementierung emittiert nur direct/
-  heuristic-Owner. Header-Only- bzw. Build-Metadaten-only-Targets
-  ohne TU-Anker haetten `evidence_strength="uncertain"`. Das Modell
-  und die Reverse-BFS unterstuetzen den Wert; die Helfer- und
-  Sortierfunktionen sind in `test_target_graph_traversal.cpp` direkt
-  per synthetischem Seed abgedeckt. Ein dedizierter Service-Pfad,
-  der uncertain-Seeds erzeugt, ist Folgearbeit.
-- Cross-Field-Schema-Companion-Test fuer
-  `impact_target_depth_effective <= impact_target_depth_requested` und
-  `graph_distance <= impact_target_depth_requested`: das verwendete
-  JSON-Schema-Dialekt unterstuetzt diese felduebergreifenden
-  Constraints nicht direkt; der Plan akzeptiert einen
-  Companion-Test als Ersatz, dieser landet im AP 1.6-Compare-Patch
-  zusammen mit der Versions-Kompatibilitaetsmatrix.
-
 ## Abnahmekriterien
 
 AP 1.3 ist abgeschlossen, wenn:
@@ -1215,24 +1188,4 @@ AP 1.3 ist abgeschlossen, wenn:
   sind;
 - der Docker-Gate-Lauf gemaess `docs/quality.md` (Tranchen-Gate fuer
   M6 AP 1.3) gruen ist;
-- `git diff --check` sauber ist.
-
-## Offene Folgearbeiten
-
-Diese Punkte werden bewusst in spaeteren M6-Arbeitspaketen umgesetzt:
-
-- CLI-Steuerung der Hub- und Priorisierungs-Schwellenwerte (AP 1.5).
-  AP 1.5 darf den `target_hubs.thresholds`-Block aus AP 1.2 nutzen
-  und ergaenzt voraussichtlich keine neuen Pflichtfelder im
-  Impact-JSON.
-- Compare-Vertrag fuer `format_version=3`-Reports mit
-  Compare-Kompatibilitaetsmatrix (AP 1.6). AP 1.6 ist `analyze`-only;
-  Impact-Compare wuerde die `prioritized_affected_targets`-Sicht
-  betreffen, ist aber explizit kein Bestandteil von M6.
-- Weitere Evidenz-Stufen oder Provenienz-Felder pro Target. M6
-  verwendet bewusst die drei festen Werte; eine Erweiterung auf
-  `weighted_evidence` oder `provenance_path` braeuchte einen eigenen
-  Vertrag und Versionssprung.
-- Deprecation der alten M5-Felder `affected_targets` etc. M6 behaelt
-  sie. Eine spaetere Deprecation-Welle waere ein eigenes M7- oder
-  M8-Thema.
+`git diff --check` sauber ist.

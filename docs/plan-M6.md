@@ -400,6 +400,16 @@ Tests und Abnahme muessen mindestens abdecken:
 
 **Ergebnis**: M6 ist nicht nur implementiert, sondern ueber stabile Beispiele, Schemata und Tests nachvollziehbar abnehmbar.
 
+### 1.8 Praeprozessorgenaue Include-Aufloesung und Konfigurations-Uebersteuerung
+
+AP 1.8 nimmt zwei bislang offene Punkte als geplante, getrennte Folgearbeitsposition auf:
+
+- Praeprozessorgenaue Include-Aufloesung als eigener Adapter-Vertrag (`PreprocessorIncludeAdapter`) mit eigenem Diagnostik-Vertrag.
+- Konfigurationsdatei-basierter Override der Include-Origin-Klassifikation (`IncludeOrigin`) fuer heuristisch nicht eindeutig klassifizierbare Pfade; die Steuerung erfolgt ueber Konfigurationsdatei statt CLI.
+- M6 bleibt CLI-zentriert, diese Punkte werden in AP 1.8 als eigener Vertragshorizont ohne Rückwirkung auf M6-Funktionsumfang abgeschlossen.
+
+**Ergebnis**: AP 1.8 schafft die technische Grundlage fuer präzisere Include-Aufloesung und Datei-basierte Herkunftssteuerung in einem definierten Folgepaket.
+
 ## 2. Reihenfolge
 
 | Schritt | Arbeitspaket | Abhaengig von |
@@ -411,6 +421,7 @@ Tests und Abnahme muessen mindestens abdecken:
 | 5 | 1.5 Analyseauswahl, Schwellenwerte und Impact-Budget konfigurierbar machen | 1.2, 1.3, 1.4 |
 | 6 | 1.6 Vergleich zweier Analysezeitpunkte einfuehren | 1.2, 1.5 |
 | 7 | 1.7 Referenzdaten, Dokumentation und Abnahme aktualisieren | 1.2 bis 1.6 |
+| 8 | 1.8 Praeprozessorgenaue Include-Aufloesung und Konfigurations-Uebersteuerung | 1.7 |
 
 Schritte 2, 3 und 4 koennen teilweise parallel bearbeitet werden, sobald die Kernmodelle aus 1.1 stabil sind. AP 1.5 darf erst starten, wenn die Target-Graph-Impact-Vertraege aus 1.3 fuer `AnalyzeImpactRequest`, Fallback und `--require-target-graph` stabil sind. `compare` sollte erst nach der JSON-Formatentscheidung aus 1.2 beginnen.
 
@@ -461,4 +472,3 @@ Nach M6 zu bewerten:
 - `compare --format html` und `compare --format dot` als moegliche Folgearbeit getrennt bewerten
 - Impact-Report-Vergleiche als moeglichen Folgeumfang mit eigenem Diff-Vertrag bewerten
 - Cross-Mode-Compare zwischen File-API-Projektidentitaet und `fallback_compile_database_fingerprint` als moeglichen Folgeumfang mit expliziter Override-Option und Risiko-Diagnostics bewerten
-- nach M6 bewerten, ob eine Konfigurationsdatei fuer wiederkehrende Analyseprofile sinnvoll ist

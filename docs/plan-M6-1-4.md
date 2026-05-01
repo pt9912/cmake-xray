@@ -1141,24 +1141,24 @@ AP 1.4 ist abgeschlossen, wenn:
   M6 AP 1.4) gruen ist;
 - `git diff --check` sauber ist.
 
-## Offene Folgearbeiten
+## Integration aus AP 1.3
 
-Diese Punkte werden bewusst in spaeteren Arbeitspaketen umgesetzt:
+Die offenen Punkte aus AP 1.3 sind in der laufenden Planung so berücksichtigt:
 
-- CLI-Steuerung von `include_depth_limit` und `include_node_budget`
-  (gehoert zu AP 1.5 oder bleibt als M6-Hardcoded). M6 verwendet die
-  festen Defaults `32`/`10000`, damit Goldens stabil reproduzierbar
-  sind.
-- Compare-Vertrag fuer `format_version=4`-Reports mit
-  Compare-Kompatibilitaetsmatrix (AP 1.6). AP 1.6 muss die neuen
-  Hotspot-Felder und Filter-Konfigurationsfelder beruecksichtigen,
-  insbesondere die `include_scope`/`include_depth`-Drift als
-  `configuration_drift`-Diagnostic.
-- Praeprozessor-getreue Include-Aufloesung. AP 1.4 bleibt
-  heuristisch; eine Praeprozessor-basierte Loesung waere ein eigener
-  Adapter-Vertrag (`PreprocessorIncludeAdapter`) mit eigenem
-  Diagnostik-Vertrag.
-- Optionaler `IncludeOrigin`-Override per Konfigurationsdatei (z. B.
-  fuer Pfade, die heuristisch nicht klassifizierbar sind). M6
-  verwendet keine Konfigurationsdatei; AP 1.5 entscheidet, ob das
-  ueber CLI oder Folge-Phase erweitert wird.
+- `impact-prioritised-cycle.<ext>` (5 Formate): E2E-Golden mit
+  dediziertem zyklischem CMake-File-API-Reply-Fixture ergänzt.
+- `evidence_strength="uncertain"` als dedizierter Service-Pfad für einen
+  reproduzierbaren uncertain-Seed-Vertrag.
+- Cross-Field-Schema-Companion-Test fuer
+  `impact_target_depth_effective <= impact_target_depth_requested` sowie
+  `graph_distance <= impact_target_depth_requested`, da der vorhandene
+  Schema-Dialekt keine felduebergreifenden Constraints direkt abbildet.
+- Compare-Vertrag fuer `format_version=3`-Reports mit
+  Compare-Kompatibilitaetsmatrix (AP 1.6), insbesondere zu
+  `prioritized_affected_targets`.
+- Weitere Evidenz-Stufen oder Provenienz-Felder je Target sind nicht im
+  M6-Scope; eine Erweiterung wie `weighted_evidence` oder
+  `provenance_path` würde neuen Vertrag plus ggf. Versionssprung
+  benötigen.
+- Deprecation der alten M5-Felder (`affected_targets` etc.) ist
+  ein späteres Paket.
