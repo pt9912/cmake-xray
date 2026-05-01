@@ -1096,23 +1096,80 @@ Invariant eingehalten wird.
   AP-1.3-Diagnostics. M3/M4/M5/M6-Goldens und `docs/examples/`
   inhaltlich auf v3 migriert; `make docker-binary` als neuer
   Makefile-Target hilft beim Goldens-Generieren ohne lokale Toolchain.
-- A.5 (Audit-Pass + Liefer-Stand pinnen): dieser Commit (`docs: pin
-  M6 AP 1.3 Liefer-Stand with A.1-A.5 commit hashes`); identifizierbar
-  ueber `git log -- docs/plan-M6-1-3.md`. Audit-Befunde:
-  Reverse-BFS-Determinismus, evidence-strength-Klassifikation,
-  Tiefenbudget-Schnitte, Zyklen-Behandlung und externe Targets sind
-  in `tests/hexagon/test_target_graph_traversal.cpp` und
-  `tests/hexagon/test_impact_analyzer.cpp` abgedeckt; CLI-Vier-Phrasen-
-  Fehlervertrag und `--require-target-graph`-Exit-Mapping sind in
-  `tests/e2e/test_cli.cpp` gepinnt; alle fuenf Reportformate liefern
-  `prioritized_affected_targets`, `impact_target_depth_requested` und
-  `impact_target_depth_effective`, JSON-Schema-Const und C++-Konstante
-  stimmen ueberein, die existierende M5-Felder bleiben byte-identisch
-  in v3.
+- A.5 (Audit-Pass + Liefer-Stand pinnen): erster Pinning-Versuch
+  `99c0631` docs: pin M6 AP 1.3 Liefer-Stand with A.1-A.5 commit
+  hashes; daraufhin folgendes Review-Audit deckte fuenf Plan-Pflicht-
+  luecken auf, die ueber die folgenden A.5-Folge-Commits geschlossen
+  wurden:
+  - `06f2307` docs: bring docs/report-{json,dot,html}.md to v3.
+    `format_version`-Anhebung und neue v3-Sektionen in den
+    Prosa-Vertraegen, die bei A.4 nur im Schema, nicht in der
+    Dokumentation gelandet waren.
+  - `2334623` test: add v3 schema-rejection gates and broken-sample
+    fixtures. Vier neue WILL_FAIL-CTest-Eintraege fuer die in
+    plan-M6-1-3.md "Schema-Tests" gelisteten Negativfaelle
+    (v2-format_version, fehlendes prioritized_affected_targets,
+    ungueltiger priority_class-Wert, graph_distance ueber 32).
+  - `ccb7ae0` test: adapter unit tests for v3 prioritised sections.
+    Direkte Adapter-Unit-Tests fuer HTML/Markdown/Console
+    Prioritised-Affected-Targets-Section und DOT-Knoten-Attribute
+    plus `graph_impact_target_depth_*`; pinned Suffix-Format,
+    Spaltenreihenfolge und Asymmetrie zwischen Analyze-DOT
+    (kein depth-Attribut) und Impact-DOT.
+  - `837f848` fix: derive Windows DOT goldens from v3 POSIX
+    counterparts. Schliesst Native-(windows-x86_64)-CI-Failure aus
+    der A.4-Goldens-Migration; die Plattform-getrennten DOT-Goldens
+    `analyze_escaping_windows.dot` und
+    `impact_file_api_only_windows.dot` waren vorher noch auf v2.
+  - `c99045e` test: add impact-prioritised-* golden family. Vier
+    der fuenf Plan-pflichtigen E2E-Szenarien (default, depth-zero,
+    partial, not-loaded) inklusive der `impact-require-target-graph-error.txt`-
+    Stderr-Fixture sind unter `tests/e2e/testdata/m6/` abgelegt.
+  - dieser Commit pinnt den Liefer-Stand neu mit den Folge-Commit-
+    Hashes.
 
-Docker-Gate-Lauf gemaess `docs/quality.md` auf dem A.4-Commit lokal
-gruen: `make docker-gates` (Test 35/35, Coverage 100%, clang-tidy 0,
-lizard 0).
+Audit-Befunde nach Folge-Patches: Reverse-BFS-Determinismus,
+evidence-strength-Klassifikation, Tiefenbudget-Schnitte, Zyklen-
+Behandlung und externe Targets sind in `test_target_graph_traversal.cpp`
+und `test_impact_analyzer.cpp` abgedeckt; CLI-Vier-Phrasen-
+Fehlervertrag und `--require-target-graph`-Exit-Mapping sind in
+`test_cli.cpp` gepinnt; HTML/Markdown/Console/DOT-Adapter rendern
+die priorisierte Sicht ueber direkte Adapter-Tests; alle fuenf
+Reportformate liefern `prioritized_affected_targets`,
+`impact_target_depth_requested` und `impact_target_depth_effective`;
+JSON-Schema-Const, C++-Konstante und alle Goldens stehen synchron auf
+v3; die bestehenden M5-Felder bleiben byte-identisch in v3.
+
+Docker-Gate-Lauf gemaess `docs/quality.md` auf dem `c99045e`-Commit
+lokal gruen: `make docker-gates` (Test 39/39 inkl. der vier neuen
+v3-Schema-Negativ-Gates, Coverage 100%, clang-tidy 0, lizard 0).
+
+## Offene Folgearbeiten
+
+Aus dem AP-1.3-Scope bewusst ausgelassen, dokumentiert fuer spaetere
+Zyklen:
+
+- `impact-prioritised-cycle.<ext>` (5 Formate): braucht ein dediziertes
+  zyklisches CMake-File-API-Reply-Fixture. Die zyklische BFS-Logik selbst
+  ist ueber den "reverse-bfs cycle"-Helper-Test und den
+  "depth-limited BFS over a long chain"-Service-Test in den
+  C++-Test-Suiten gepinnt; das fehlende E2E-Golden ist ein
+  Reproduzierbarkeits-Anker, kein zusaetzlicher Vertragstest.
+- `evidence_strength="uncertain"` als Service-Pfad: die aktuelle
+  `compute_affected_targets`-Implementierung emittiert nur direct/
+  heuristic-Owner. Header-Only- bzw. Build-Metadaten-only-Targets
+  ohne TU-Anker haetten `evidence_strength="uncertain"`. Das Modell
+  und die Reverse-BFS unterstuetzen den Wert; die Helfer- und
+  Sortierfunktionen sind in `test_target_graph_traversal.cpp` direkt
+  per synthetischem Seed abgedeckt. Ein dedizierter Service-Pfad,
+  der uncertain-Seeds erzeugt, ist Folgearbeit.
+- Cross-Field-Schema-Companion-Test fuer
+  `impact_target_depth_effective <= impact_target_depth_requested` und
+  `graph_distance <= impact_target_depth_requested`: das verwendete
+  JSON-Schema-Dialekt unterstuetzt diese felduebergreifenden
+  Constraints nicht direkt; der Plan akzeptiert einen
+  Companion-Test als Ersatz, dieser landet im AP 1.6-Compare-Patch
+  zusammen mit der Versions-Kompatibilitaetsmatrix.
 
 ## Abnahmekriterien
 
