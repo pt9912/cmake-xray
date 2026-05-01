@@ -1066,15 +1066,53 @@ Invariant eingehalten wird.
 
 ## Liefer-Stand
 
-Wird nach dem Schnitt der A-Tranchen mit Commit-Hashes befuellt. Bis
-dahin ist AP 1.3 nicht abnahmefaehig. Format analog zu
-`docs/plan-M5-1-8.md` Z. 151ff.:
+- A.1 (Modelle und Service-Logik): `92c719a` feat: add M6 AP 1.3 A.1
+  reverse-target-graph traversal models and service logic. Fuehrt die
+  AP-1.3-Modelle (`TargetPriorityClass`, `TargetEvidenceStrength`,
+  `PrioritizedImpactedTarget`, `ServiceValidationError`), die
+  `AnalyzeImpactRequest`-Erweiterung um `impact_target_depth` und
+  `require_target_graph`, den
+  `target_graph_traversal`-Reverse-BFS-Helfer und die
+  Service-Eingabevalidierung im `ImpactAnalyzer` ein. v2-Reports
+  bleiben byte-stabil; die vier AP-1.3-Diagnostics werden bewusst
+  zurueckgehalten.
+- A.2 (CLI und Schema-Zielvertrag): `535194c` feat: add M6 AP 1.3 A.2
+  --impact-target-depth + --require-target-graph CLI options. CLI
+  validiert die Tiefe mit den vier dokumentierten Fehlerphrasen,
+  mappt `target_graph_required` auf Exit-Code 1 mit klarer
+  Fehlermeldung, und reicht die Werte unveraendert in den
+  `AnalyzeImpactRequest` durch. `kReportFormatVersion` bleibt auf 2.
+- A.3 (JSON- und DOT-Adapter): `dfc3cd5` feat: add M6 AP 1.3 A.3
+  JSON+DOT v3 groundwork (priority text mappings, dormant DOT wiring).
+  Fuehrt `src/adapters/output/impact_priority_text.h` als
+  format-uebergreifende Stringquelle ein, ruestet den DOT-Adapter
+  intern um und reserviert die JSON-Slots; produktive Reports bleiben
+  v2 dank `if constexpr (kReportFormatVersion >= 3)`.
+- A.4 (HTML/Markdown/Console v3 + globale Aktivierung): `87f3a25`
+  feat: add M6 AP 1.3 A.4 v3 activation across all five report
+  formats. `kReportFormatVersion` springt auf 3, die Schema-Const in
+  `report-json.schema.json` zieht nach, alle fuenf Adapter rendern
+  die priorisierte Sicht inklusive der Tiefen-Metadaten und der vier
+  AP-1.3-Diagnostics. M3/M4/M5/M6-Goldens und `docs/examples/`
+  inhaltlich auf v3 migriert; `make docker-binary` als neuer
+  Makefile-Target hilft beim Goldens-Generieren ohne lokale Toolchain.
+- A.5 (Audit-Pass + Liefer-Stand pinnen): dieser Commit (`docs: pin
+  M6 AP 1.3 Liefer-Stand with A.1-A.5 commit hashes`); identifizierbar
+  ueber `git log -- docs/plan-M6-1-3.md`. Audit-Befunde:
+  Reverse-BFS-Determinismus, evidence-strength-Klassifikation,
+  Tiefenbudget-Schnitte, Zyklen-Behandlung und externe Targets sind
+  in `tests/hexagon/test_target_graph_traversal.cpp` und
+  `tests/hexagon/test_impact_analyzer.cpp` abgedeckt; CLI-Vier-Phrasen-
+  Fehlervertrag und `--require-target-graph`-Exit-Mapping sind in
+  `tests/e2e/test_cli.cpp` gepinnt; alle fuenf Reportformate liefern
+  `prioritized_affected_targets`, `impact_target_depth_requested` und
+  `impact_target_depth_effective`, JSON-Schema-Const und C++-Konstante
+  stimmen ueberein, die existierende M5-Felder bleiben byte-identisch
+  in v3.
 
-- A.1 (Modelle und Service-Logik): noch nicht ausgeliefert.
-- A.2 (CLI und Schema): noch nicht ausgeliefert.
-- A.3 (JSON- und DOT-Adapter): noch nicht ausgeliefert.
-- A.4 (HTML-, Markdown- und Console-Adapter): noch nicht ausgeliefert.
-- A.5 (Audit-Pass): noch nicht ausgeliefert.
+Docker-Gate-Lauf gemaess `docs/quality.md` auf dem A.4-Commit lokal
+gruen: `make docker-gates` (Test 35/35, Coverage 100%, clang-tidy 0,
+lizard 0).
 
 ## Abnahmekriterien
 
