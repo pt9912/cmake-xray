@@ -29,6 +29,12 @@ Status: `loaded`.
 
 No direct target dependencies.
 
+## Prioritised Affected Targets
+
+Requested depth: `2`. Effective depth: `0`.
+
+No prioritised targets.
+
 ## Diagnostics
 - warning: cannot read source file for include analysis: /project/src/main.cpp
 - note: 1 of 2 targets have no compilable sources and are not included in the analysis

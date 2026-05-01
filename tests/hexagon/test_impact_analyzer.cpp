@@ -1402,7 +1402,7 @@ TEST_CASE("AP1.3 A.1: depth=0 with loaded graph still emits seeds at distance 0 
     CHECK(result.impact_target_depth_effective == 0);
 }
 
-TEST_CASE("AP1.3 A.1: partial target graph runs BFS over the available edges (diagnostic deferred to A.3 / A.4)") {
+TEST_CASE("AP1.3 A.4: partial target graph emits the partial-prioritisation warning alongside the BFS result") {
     using xray::hexagon::model::TargetAssignment;
     using xray::hexagon::model::TargetDependency;
     using xray::hexagon::model::TargetDependencyKind;
@@ -1431,17 +1431,68 @@ TEST_CASE("AP1.3 A.1: partial target graph runs BFS over the available edges (di
         make_impact_request("", "/project/src/main.cpp", "/tmp/build"));
 
     CHECK(result.target_graph_status == m6_ia::TargetGraphStatus::partial);
-    // BFS still runs and emits the seed; external candidates are
-    // dropped, so prioritized_affected_targets contains only `lib`.
     REQUIRE(result.prioritized_affected_targets.size() == 1);
     CHECK(result.prioritized_affected_targets[0].target.unique_key ==
           "lib::STATIC_LIBRARY");
-    // AP M6-1.3 A.1: the partial-graph diagnostic is deferred to A.3 /
-    // A.4 to keep v2 reports byte-stable. Verify it does NOT appear.
+    bool partial_seen = false;
     for (const auto& d : result.diagnostics) {
-        CHECK(d.message.find("target graph partially loaded") ==
-              std::string::npos);
+        if (d.message.find("target graph partially loaded") !=
+            std::string::npos) {
+            partial_seen = true;
+        }
     }
+    CHECK(partial_seen);
+}
+
+TEST_CASE("AP1.3 A.4: depth-limited BFS over a long chain emits the 'hit depth limit' warning") {
+    using xray::hexagon::model::TargetAssignment;
+    using xray::hexagon::model::TargetDependency;
+    using xray::hexagon::model::TargetDependencyKind;
+    using xray::hexagon::model::TargetDependencyResolution;
+    using xray::hexagon::model::TargetGraph;
+    using xray::hexagon::model::TargetInfo;
+    TargetGraph graph;
+    // Chain: hub <- d1 <- d2 <- d3 (length 3 reverse-edges).
+    for (const auto& name : {"hub", "d1", "d2", "d3"}) {
+        graph.nodes.push_back(TargetInfo{name, "STATIC_LIBRARY",
+                                          std::string{name} + "::STATIC_LIBRARY"});
+    }
+    auto edge = [](std::string from_uk, std::string to_uk) {
+        return TargetDependency{from_uk, from_uk.substr(0, from_uk.find("::")),
+                                to_uk, to_uk.substr(0, to_uk.find("::")),
+                                TargetDependencyKind::direct,
+                                TargetDependencyResolution::resolved};
+    };
+    graph.edges.push_back(edge("d1::STATIC_LIBRARY", "hub::STATIC_LIBRARY"));
+    graph.edges.push_back(edge("d2::STATIC_LIBRARY", "d1::STATIC_LIBRARY"));
+    graph.edges.push_back(edge("d3::STATIC_LIBRARY", "d2::STATIC_LIBRARY"));
+
+    std::vector<TargetAssignment> assignments;
+    assignments.push_back(TargetAssignment{
+        "/project/src/main.cpp|/project/build/debug",
+        {TargetInfo{"hub", "STATIC_LIBRARY", "hub::STATIC_LIBRARY"}}});
+    const m6_ia::FileApiPortWithGraph file_api_port{
+        std::move(graph), m6_ia::TargetGraphStatus::loaded,
+        std::move(assignments)};
+    const UnusedBuildModelPort compile_db_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{
+        compile_db_port, include_resolver_port, file_api_port};
+
+    auto request =
+        make_impact_request("", "/project/src/main.cpp", "/tmp/build");
+    request.impact_target_depth = 2;  // chain has 3 reverse hops, budget cuts at 2
+    const auto result = analyzer.analyze_impact(request);
+
+    bool depth_limit_seen = false;
+    for (const auto& d : result.diagnostics) {
+        if (d.message.find("hit depth limit 2 within a cycle") !=
+            std::string::npos) {
+            depth_limit_seen = true;
+        }
+    }
+    CHECK(depth_limit_seen);
+    CHECK(result.impact_target_depth_effective == 2);
 }
 
 TEST_CASE("AP1.3 A.1: require_target_graph with loaded graph runs without service error") {

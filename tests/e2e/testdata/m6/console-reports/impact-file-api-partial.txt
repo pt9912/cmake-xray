@@ -13,4 +13,9 @@ no heuristically affected targets
 
 Target Graph Reference (target_graph_status: partial):
   app -> ghost::@99 [external]
+
+Prioritised Affected Targets (requested depth: 2, effective depth: 0):
+  [direct, distance=0, evidence=direct] app
+warning: target graph partially loaded; impact prioritisation uses available edges only
+note: reverse target graph traversal stopped at depth 0 (no further reachable targets)
 note: target 'app' references unknown target id 'ghost::@99'

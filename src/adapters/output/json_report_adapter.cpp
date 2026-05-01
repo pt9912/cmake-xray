@@ -169,6 +169,28 @@ std::string severity_text(DiagnosticSeverity severity) {
     return severity == DiagnosticSeverity::warning ? "warning" : "note";
 }
 
+// AP M6-1.3 A.4: Impact-JSON v3 prioritised-targets renderer. Lives in
+// the adapter-private anonymous namespace so the
+// nlohmann::ordered_json dependency stays out of json_report_adapter.h.
+ordered_json render_prioritized_target_v3(
+    const xray::hexagon::model::PrioritizedImpactedTarget& entry) {
+    ordered_json out;
+    out["target"] = render_target_node(entry.target);
+    out["priority_class"] = priority_class_text_v3(entry.priority_class);
+    out["graph_distance"] = entry.graph_distance;
+    out["evidence_strength"] = evidence_strength_text_v3(entry.evidence_strength);
+    return ordered_json(std::move(out));
+}
+
+ordered_json render_prioritized_targets_v3(
+    const std::vector<xray::hexagon::model::PrioritizedImpactedTarget>& entries) {
+    auto array = ordered_json::array();
+    for (const auto& entry : entries) {
+        array.push_back(render_prioritized_target_v3(entry));
+    }
+    return ordered_json(std::move(array));
+}
+
 void append_diagnostics(ordered_json& array, const std::vector<Diagnostic>& diagnostics) {
     for (const auto& diagnostic : diagnostics) {
         array.push_back(ordered_json{
@@ -544,10 +566,15 @@ std::string JsonReportAdapter::write_impact_report(const ImpactResult& impact_re
     document["target_graph_status"] =
         target_graph_status_text(impact_result.target_graph_status);
     document["target_graph"] = render_target_graph(impact_result.target_graph);
-    // AP M6-1.3 A.3 stops at the shared impact_priority_text.h helpers;
-    // the JSON v3 emission of prioritized_affected_targets +
-    // impact_target_depth_{requested,effective} lands in A.4 alongside
-    // the kReportFormatVersion=3 flip and the schema-const update.
+    // AP M6-1.3 A.4: v3 Pflichtfelder. kReportFormatVersion=3 aktiviert
+    // die Branch; Schema-Const in report-json.schema.json muss synchron
+    // sein.
+    document["prioritized_affected_targets"] =
+        render_prioritized_targets_v3(impact_result.prioritized_affected_targets);
+    document["impact_target_depth_requested"] =
+        impact_result.impact_target_depth_requested;
+    document["impact_target_depth_effective"] =
+        impact_result.impact_target_depth_effective;
     document["diagnostics"] = std::move(diagnostics_array);
     return document.dump(2) + "\n";
 }

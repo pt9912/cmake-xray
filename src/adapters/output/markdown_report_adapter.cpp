@@ -9,6 +9,7 @@
 #include <string_view>
 #include <vector>
 
+#include "adapters/output/impact_priority_text.h"
 #include "adapters/output/target_display_support.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
@@ -531,6 +532,42 @@ void append_target_graph_reference_section(std::ostringstream& out,
     append_target_graph_table(out, result.target_graph);
 }
 
+// AP M6-1.3 A.4: Impact-Markdown "Prioritised Affected Targets" section
+// per docs/plan-M6-1-3.md "Markdown". Always present in v3 impact
+// output; body shape varies by target_graph_status.
+void append_prioritised_affected_targets_section(std::ostringstream& out,
+                                                  const ImpactResult& result) {
+    out << "## Prioritised Affected Targets\n\n";
+    if (result.target_graph_status == TargetGraphStatus::not_loaded) {
+        out << "Requested depth: `" << result.impact_target_depth_requested
+            << "`. Effective depth: `0` (no graph).\n\n";
+        out << "Target graph not loaded; prioritisation skipped.\n";
+        return;
+    }
+    out << "Requested depth: `" << result.impact_target_depth_requested
+        << "`. Effective depth: `" << result.impact_target_depth_effective
+        << "`.\n\n";
+    if (result.prioritized_affected_targets.empty()) {
+        out << "No prioritised targets.\n";
+        return;
+    }
+    out << "| Display name | Type | Priority class | Graph distance | Evidence strength | Unique key |\n";
+    out << "|---|---|---|---|---|---|\n";
+    for (const auto& entry : result.prioritized_affected_targets) {
+        out << "| ";
+        append_table_cell_target(out, entry.target.display_name);
+        out << " | ";
+        append_table_cell_plain(out, entry.target.type);
+        out << " | ";
+        append_table_cell_plain(out, priority_class_text_v3(entry.priority_class));
+        out << " | " << entry.graph_distance << " | ";
+        append_table_cell_plain(out, evidence_strength_text_v3(entry.evidence_strength));
+        out << " | ";
+        append_table_cell_target(out, entry.target.unique_key);
+        out << " |\n";
+    }
+}
+
 }  // namespace
 
 std::string MarkdownReportAdapter::write_analysis_report(const AnalysisResult& analysis_result,
@@ -591,6 +628,10 @@ std::string MarkdownReportAdapter::write_impact_report(const ImpactResult& impac
         out << '\n';
         append_target_graph_reference_section(out, impact_result);
     }
+    // AP M6-1.3 A.4: Prioritised section appears in every v3 impact
+    // output, regardless of target_graph_status.
+    out << '\n';
+    append_prioritised_affected_targets_section(out, impact_result);
     out << '\n';
     append_report_diagnostics(out, impact_result.diagnostics);
 

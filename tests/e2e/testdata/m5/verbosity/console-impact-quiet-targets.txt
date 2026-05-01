@@ -3,6 +3,6 @@ changed file: include/common/shared.h
 affected translation units: 3
 classification: heuristic
 affected targets: 3
-diagnostics: 2
+diagnostics: 3
 target metadata: loaded
 warnings: present

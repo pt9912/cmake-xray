@@ -1,17 +1,19 @@
 digraph cmake_xray_impact {
   xray_report_type="impact";
-  format_version=2;
+  format_version=3;
   graph_node_limit=100;
   graph_edge_limit=200;
   graph_truncated=false;
   graph_target_graph_status="loaded";
+  graph_impact_target_depth_requested=2;
+  graph_impact_target_depth_effective=0;
   changed_file [kind="changed_file", label="shared.h", path="include/common/shared.h"];
   heuristic_tu_1 [kind="translation_unit", impact="heuristic", label="main.cpp", path="src/app/main.cpp", directory="build/app", unique_key="HOSTPATH"];
   heuristic_tu_2 [kind="translation_unit", impact="heuristic", label="core.cpp", path="src/lib/core.cpp", directory="build/lib", unique_key="HOSTPATH"];
   heuristic_tu_3 [kind="translation_unit", impact="heuristic", label="tool.cpp", path="src/tools/tool.cpp", directory="build/tools", unique_key="HOSTPATH"];
-  target_1 [kind="target", impact="heuristic", label="app", name="app", type="EXECUTABLE", unique_key="app::EXECUTABLE"];
-  target_2 [kind="target", impact="heuristic", label="core", name="core", type="STATIC_LIBRARY", unique_key="core::STATIC_LIBRARY"];
-  target_3 [kind="target", impact="heuristic", label="tool", name="tool", type="EXECUTABLE", unique_key="tool::EXECUTABLE"];
+  target_1 [kind="target", impact="heuristic", priority_class="direct", graph_distance=0, evidence_strength="heuristic", label="app", name="app", type="EXECUTABLE", unique_key="app::EXECUTABLE"];
+  target_2 [kind="target", impact="heuristic", priority_class="direct", graph_distance=0, evidence_strength="heuristic", label="core", name="core", type="STATIC_LIBRARY", unique_key="core::STATIC_LIBRARY"];
+  target_3 [kind="target", impact="heuristic", priority_class="direct", graph_distance=0, evidence_strength="heuristic", label="tool", name="tool", type="EXECUTABLE", unique_key="tool::EXECUTABLE"];
   changed_file -> heuristic_tu_1 [kind="changed_file_heuristic_tu", style="dashed"];
   changed_file -> heuristic_tu_2 [kind="changed_file_heuristic_tu", style="dashed"];
   changed_file -> heuristic_tu_3 [kind="changed_file_heuristic_tu", style="dashed"];

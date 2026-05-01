@@ -14,10 +14,11 @@ LIZARD_MAX_PARAMETERS ?= 5
 
 PARALLEL_FLAG := $(if $(PARALLEL),--parallel $(PARALLEL),--parallel)
 BINARY := $(BUILD_DIR)/cmake-xray
+DOCKER_BINARY ?= /tmp/cmake-xray
 
 .DEFAULT_GOAL := help
 
-.PHONY: help dev configure build test smoke lint docker-test docker-gates coverage-gate quality-gate coverage-report quality-report runtime docs-portability release-dry-run clean
+.PHONY: help dev configure build test smoke lint docker-test docker-build docker-binary docker-gates coverage-gate quality-gate coverage-report quality-report runtime docs-portability release-dry-run clean
 
 help:
 	@printf '%s\n' \
@@ -26,6 +27,7 @@ help:
 		'  make test               Build locally and run ctest' \
 		'  make smoke              Run local --help and --version smoke checks' \
 		'  make docker-gates       Run Docker test, coverage and quality gates' \
+		'  make docker-binary      Build the Docker binary stage and extract /workspace/build/cmake-xray to DOCKER_BINARY (default /tmp/cmake-xray)' \
 		'  make runtime            Build and smoke-test the runtime image' \
 		'  make coverage-report    Build and print the Docker coverage report' \
 		'  make quality-report     Build and print the Docker quality report' \
@@ -53,6 +55,20 @@ lint: quality-gate
 
 docker-test:
 	$(DOCKER) build --target test -t $(IMAGE):test .
+
+# AP M6-1.3 follow-up: build only the Dockerfile `build` stage (no
+# tests) and copy the resulting cmake-xray binary out of the image so
+# host-side scripts (e.g. golden regeneration) can run it without a
+# local cmake/clang toolchain. Override DOCKER_BINARY=/path/to/output to
+# control where the binary lands; default is /tmp/cmake-xray.
+docker-build:
+	$(DOCKER) build --target build -t $(IMAGE):build .
+
+docker-binary: docker-build
+	@cid="$$($(DOCKER) create $(IMAGE):build)" \
+		&& trap "$(DOCKER) rm $$cid >/dev/null 2>&1 || true" EXIT \
+		&& $(DOCKER) cp "$$cid":/workspace/build/cmake-xray $(DOCKER_BINARY) \
+		&& printf 'cmake-xray binary extracted to %s\n' '$(DOCKER_BINARY)'
 
 docker-gates: docker-test coverage-gate quality-gate
 

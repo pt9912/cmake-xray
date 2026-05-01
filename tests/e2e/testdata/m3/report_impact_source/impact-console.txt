@@ -1,3 +1,5 @@
 impact analysis for src/app/main.cpp
 affected translation units: 1
   src/app/main.cpp [directory: build/app] [direct]
+
+Prioritised Affected Targets (requested depth: 2, effective depth: 0, no graph).

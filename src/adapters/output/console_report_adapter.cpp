@@ -9,6 +9,7 @@
 #include <string_view>
 #include <vector>
 
+#include "adapters/output/impact_priority_text.h"
 #include "adapters/output/target_display_support.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
@@ -296,6 +297,42 @@ void append_target_graph_reference_section(std::ostringstream& out,
     append_target_graph_edge_lines(out, result.target_graph.edges);
 }
 
+// AP M6-1.3 A.4: Impact-Console "Prioritised Affected Targets" section.
+// Format per docs/plan-M6-1-3.md "Console":
+//   `[<priority_class>, distance=<n>, evidence=<strength>] <display_name>`
+// One line per target; metadata-only header line for not_loaded.
+void append_prioritised_affected_targets_section(std::ostringstream& out,
+                                                  const ImpactResult& result) {
+    out << '\n';
+    if (result.target_graph_status == TargetGraphStatus::not_loaded) {
+        out << "Prioritised Affected Targets (requested depth: "
+            << result.impact_target_depth_requested
+            << ", effective depth: 0, no graph).\n";
+        return;
+    }
+    out << "Prioritised Affected Targets (requested depth: "
+        << result.impact_target_depth_requested
+        << ", effective depth: " << result.impact_target_depth_effective
+        << "):\n";
+    if (result.prioritized_affected_targets.empty()) {
+        out << "  No prioritised targets.\n";
+        return;
+    }
+    std::vector<TargetDisplayEntry> entries;
+    entries.reserve(result.prioritized_affected_targets.size());
+    for (const auto& t : result.prioritized_affected_targets) {
+        entries.push_back({t.target.display_name, t.target.unique_key});
+    }
+    const auto names = disambiguate_target_display_names(entries);
+    for (std::size_t i = 0; i < result.prioritized_affected_targets.size(); ++i) {
+        const auto& t = result.prioritized_affected_targets[i];
+        out << "  [" << priority_class_text_v3(t.priority_class)
+            << ", distance=" << t.graph_distance
+            << ", evidence=" << evidence_strength_text_v3(t.evidence_strength)
+            << "] " << names[i] << '\n';
+    }
+}
+
 // Bundle the hub-row parameters so `append_hub_line` stays inside the
 // project's 5-parameter cap; mirrors the TargetHubsView struct in the
 // JSON adapter.
@@ -391,6 +428,10 @@ std::string ConsoleReportAdapter::write_impact_report(const ImpactResult& impact
     if (impact_result.target_graph_status != TargetGraphStatus::not_loaded) {
         append_target_graph_reference_section(out, impact_result);
     }
+    // AP M6-1.3 A.4: Prioritised Affected Targets is always present in
+    // v3 console impact output, regardless of target_graph_status (the
+    // not_loaded path renders the metadata-only header line).
+    append_prioritised_affected_targets_section(out, impact_result);
 
     append_diagnostics(out, impact_result.diagnostics, "");
 

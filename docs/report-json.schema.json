@@ -10,7 +10,26 @@
   "$defs": {
     "FormatVersion": {
       "type": "integer",
-      "const": 2
+      "const": 3
+    },
+    "TargetPriorityClass": {
+      "type": "string",
+      "enum": ["direct", "direct_dependent", "transitive_dependent"]
+    },
+    "TargetEvidenceStrength": {
+      "type": "string",
+      "enum": ["direct", "heuristic", "uncertain"]
+    },
+    "PrioritizedImpactedTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "priority_class", "graph_distance", "evidence_strength"],
+      "properties": {
+        "target": {"$ref": "#/$defs/TargetNode"},
+        "priority_class": {"$ref": "#/$defs/TargetPriorityClass"},
+        "graph_distance": {"type": "integer", "minimum": 0, "maximum": 32},
+        "evidence_strength": {"$ref": "#/$defs/TargetEvidenceStrength"}
+      }
     },
     "Severity": {
       "type": "string",
@@ -382,6 +401,9 @@
         "heuristically_affected_targets",
         "target_graph_status",
         "target_graph",
+        "prioritized_affected_targets",
+        "impact_target_depth_requested",
+        "impact_target_depth_effective",
         "diagnostics"
       ],
       "properties": {
@@ -402,6 +424,20 @@
         "heuristically_affected_targets": {"$ref": "#/$defs/TargetArray"},
         "target_graph_status": {"$ref": "#/$defs/TargetGraphStatus"},
         "target_graph": {"$ref": "#/$defs/TargetGraph"},
+        "prioritized_affected_targets": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/PrioritizedImpactedTarget"}
+        },
+        "impact_target_depth_requested": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "impact_target_depth_effective": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
         "diagnostics": {"$ref": "#/$defs/DiagnosticArray"}
       }
     }

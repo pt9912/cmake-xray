@@ -8,6 +8,7 @@
 #include <string_view>
 #include <vector>
 
+#include "adapters/output/impact_priority_text.h"
 #include "adapters/output/target_display_support.h"
 #include "hexagon/model/analysis_result.h"
 #include "hexagon/model/diagnostic.h"
@@ -662,6 +663,50 @@ void emit_target_graph_reference_section(std::ostringstream& out,
     out << "</section>";
 }
 
+// AP M6-1.3 A.4: Impact-HTML "Prioritised Affected Targets" section
+// per docs/plan-M6-1-3.md "HTML". Always present in v3 impact output;
+// the body shape varies by target_graph_status.
+void emit_prioritised_affected_targets_section(std::ostringstream& out,
+                                                 const ImpactResult& result) {
+    using xray::hexagon::model::PrioritizedImpactedTarget;
+    out << "<section class=\"prioritised-affected-targets\">"
+        << "<h2>Prioritised Affected Targets</h2>\n";
+    if (result.target_graph_status == TargetGraphStatus::not_loaded) {
+        out << "<p>Requested depth: " << result.impact_target_depth_requested
+            << ". Effective depth: 0 (no graph).</p>\n"
+            << "<p class=\"empty\">Target graph not loaded; prioritisation skipped.</p>"
+            << "</section>";
+        return;
+    }
+    out << "<p>Requested depth: " << result.impact_target_depth_requested
+        << ". Effective depth: " << result.impact_target_depth_effective
+        << ".</p>\n";
+    if (result.prioritized_affected_targets.empty()) {
+        out << "<p class=\"empty\">No prioritised targets.</p></section>";
+        return;
+    }
+    out << "<div class=\"table-wrap\"><table>\n"
+        << "<thead><tr>"
+        << "<th scope=\"col\">Display name</th>"
+        << "<th scope=\"col\">Type</th>"
+        << "<th scope=\"col\">Priority class</th>"
+        << "<th scope=\"col\">Graph distance</th>"
+        << "<th scope=\"col\">Evidence strength</th>"
+        << "<th scope=\"col\">Unique key</th>"
+        << "</tr></thead>\n<tbody>\n";
+    for (const auto& entry : result.prioritized_affected_targets) {
+        out << "<tr>"
+            << "<td>" << render_text(entry.target.display_name) << "</td>"
+            << "<td>" << render_text(entry.target.type) << "</td>"
+            << "<td>" << priority_class_text_v3(entry.priority_class) << "</td>"
+            << "<td>" << entry.graph_distance << "</td>"
+            << "<td>" << evidence_strength_text_v3(entry.evidence_strength) << "</td>"
+            << "<td>" << render_text(entry.target.unique_key) << "</td>"
+            << "</tr>\n";
+    }
+    out << "</tbody>\n</table></div></section>";
+}
+
 // ---- Impact sections ----------------------------------------------------
 
 void emit_impact_summary(std::ostringstream& out, const ImpactResult& result) {
@@ -860,6 +905,8 @@ std::string render_impact(const ImpactResult& result) {
                                                          "badge-heuristic"});
     out << "\n";
     emit_target_graph_reference_section(out, result);
+    out << "\n";
+    emit_prioritised_affected_targets_section(out, result);
     out << "\n";
     emit_diagnostics_section(out, result.diagnostics);
     emit_doc_close(out);

@@ -436,31 +436,67 @@ PrioritizedImpactedTarget seed_to_prioritized(ImpactSeed seed) {
     return out;
 }
 
+void apply_not_loaded_fallback(ImpactResult& result,
+                                std::vector<ImpactSeed> seeds) {
+    for (auto& seed : seeds) {
+        result.prioritized_affected_targets.push_back(
+            seed_to_prioritized(std::move(seed)));
+    }
+    sort_prioritized_impacted_targets(result.prioritized_affected_targets);
+    result.impact_target_depth_effective = 0;
+    if (!result.prioritized_affected_targets.empty()) {
+        append_unique_diagnostic(
+            result.diagnostics,
+            {DiagnosticSeverity::note,
+             "target graph not loaded; impact prioritisation degrades to "
+             "impact seed targets only"});
+    }
+}
+
+void emit_bfs_diagnostics(ImpactResult& result, const ReverseBfsResult& bfs,
+                           bool seeds_present, std::size_t requested) {
+    if (result.target_graph_status == TargetGraphStatus::partial) {
+        append_unique_diagnostic(
+            result.diagnostics,
+            {DiagnosticSeverity::warning,
+             "target graph partially loaded; impact prioritisation uses "
+             "available edges only"});
+    }
+    if (seeds_present && bfs.stopped_early_no_more_targets &&
+        result.impact_target_depth_effective < requested) {
+        append_unique_diagnostic(
+            result.diagnostics,
+            {DiagnosticSeverity::note,
+             "reverse target graph traversal stopped at depth " +
+                 std::to_string(result.impact_target_depth_effective) +
+                 " (no further reachable targets)"});
+    }
+    if (bfs.stopped_at_depth_limit) {
+        append_unique_diagnostic(
+            result.diagnostics,
+            {DiagnosticSeverity::warning,
+             "reverse target graph traversal hit depth limit " +
+                 std::to_string(requested) +
+                 " within a cycle; some transitively dependent targets may be "
+                 "missing"});
+    }
+}
+
 void apply_reverse_bfs_priorisation(ImpactResult& result) {
-    // AP M6-1.3 A.1 emits the new model fields but stays byte-stable
-    // against v2 reports: existing adapters render `result.diagnostics`
-    // verbatim, so the four AP-1.3 diagnostics ("target graph not
-    // loaded ...", "target graph partially loaded ...", "reverse target
-    // graph traversal stopped at depth N", "hit depth limit N within a
-    // cycle") are deliberately NOT appended in A.1. They will be added
-    // in A.3 / A.4 alongside the prioritised target sections in the
-    // report adapters, where the diagnostic finally has render context.
+    // AP M6-1.3 A.4: alongside the report-adapter activation of the
+    // prioritised view the four documented diagnostics start firing.
     auto seeds = collect_impact_seeds(result.affected_targets);
     const auto requested = result.impact_target_depth_requested;
-
     if (result.target_graph_status == TargetGraphStatus::not_loaded) {
-        for (auto& seed : seeds) {
-            result.prioritized_affected_targets.push_back(
-                seed_to_prioritized(std::move(seed)));
-        }
-        sort_prioritized_impacted_targets(result.prioritized_affected_targets);
-        result.impact_target_depth_effective = 0;
+        apply_not_loaded_fallback(result, std::move(seeds));
         return;
     }
-
-    auto bfs = reverse_target_graph_bfs(result.target_graph, seeds, requested);
+    const bool seeds_present = !seeds.empty();
+    auto bfs = reverse_target_graph_bfs(result.target_graph, std::move(seeds),
+                                         requested);
     result.prioritized_affected_targets = std::move(bfs.prioritized_targets);
     result.impact_target_depth_effective = bfs.effective_depth;
+    emit_bfs_diagnostics(result, bfs, seeds_present, requested);
 }
 
 void collect_and_classify_impacts(

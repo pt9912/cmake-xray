@@ -1,10 +1,12 @@
 digraph cmake_xray_impact {
   xray_report_type="impact";
-  format_version=2;
+  format_version=3;
   graph_node_limit=100;
   graph_edge_limit=200;
   graph_truncated=true;
   graph_target_graph_status="not_loaded";
+  graph_impact_target_depth_requested=2;
+  graph_impact_target_depth_effective=0;
   changed_file [kind="changed_file", label="common.h", path="include/common.h"];
   heuristic_tu_1 [kind="translation_unit", impact="heuristic", label="tu_000.cpp", path="src/tu_000.cpp", directory="build", unique_key="HOSTPATH"];
   heuristic_tu_2 [kind="translation_unit", impact="heuristic", label="tu_001.cpp", path="src/tu_001.cpp", directory="build", unique_key="HOSTPATH"];

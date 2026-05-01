@@ -1,6 +1,6 @@
 digraph cmake_xray_analysis {
   xray_report_type="analyze";
-  format_version=2;
+  format_version=3;
   graph_node_limit=50;
   graph_edge_limit=80;
   graph_truncated=false;

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="xray-report-format-version" content="2">
+<meta name="xray-report-format-version" content="3">
 <title>cmake-xray impact report</title>
 <style>
 body{margin:0;padding:1.5rem;background:#ffffff;color:#1a1a1a;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;}
@@ -26,12 +26,12 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 </style>
 </head>
 <body>
-<main class="report" data-report-type="impact" data-format-version="2">
+<main class="report" data-report-type="impact" data-format-version="3">
 <header class="summary">
 <h1>cmake-xray impact report</h1>
 <dl>
 <dt>report_type</dt><dd>impact</dd>
-<dt>format_version</dt><dd>2</dd>
+<dt>format_version</dt><dd>3</dd>
 <dt>changed_file</dt><dd>/project/src/main.cpp</dd>
 <dt>affected_translation_units</dt><dd>1</dd>
 <dt>classification</dt><dd>direct</dd>
@@ -69,9 +69,18 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 <section class="target-graph-reference"><h2>Target Graph Reference</h2>
 <p>Status: <span class="badge badge--loaded">loaded</span></p>
 <p class="empty">No direct target dependencies.</p></section>
+<section class="prioritised-affected-targets"><h2>Prioritised Affected Targets</h2>
+<p>Requested depth: 2. Effective depth: 0.</p>
+<div class="table-wrap"><table>
+<thead><tr><th scope="col">Display name</th><th scope="col">Type</th><th scope="col">Priority class</th><th scope="col">Graph distance</th><th scope="col">Evidence strength</th><th scope="col">Unique key</th></tr></thead>
+<tbody>
+<tr><td>app</td><td>EXECUTABLE</td><td>direct</td><td>0</td><td>direct</td><td>app::EXECUTABLE</td></tr>
+</tbody>
+</table></div></section>
 <section class="diagnostics"><h2>Diagnostics</h2>
 <ul>
 <li><span class="badge">note</span> 1 of 2 targets have no compilable sources and are not included in the analysis</li>
+<li><span class="badge">note</span> reverse target graph traversal stopped at depth 0 (no further reachable targets)</li>
 </ul></section>
 </main>
 </body>

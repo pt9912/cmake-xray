@@ -22,3 +22,17 @@ Target Graph Reference (target_graph_status: loaded):
   src07 -> hub
   src08 -> hub
   src09 -> hub
+
+Prioritised Affected Targets (requested depth: 2, effective depth: 1):
+  [direct, distance=0, evidence=direct] hub
+  [direct_dependent, distance=1, evidence=direct] src00
+  [direct_dependent, distance=1, evidence=direct] src01
+  [direct_dependent, distance=1, evidence=direct] src02
+  [direct_dependent, distance=1, evidence=direct] src03
+  [direct_dependent, distance=1, evidence=direct] src04
+  [direct_dependent, distance=1, evidence=direct] src05
+  [direct_dependent, distance=1, evidence=direct] src06
+  [direct_dependent, distance=1, evidence=direct] src07
+  [direct_dependent, distance=1, evidence=direct] src08
+  [direct_dependent, distance=1, evidence=direct] src09
+note: reverse target graph traversal stopped at depth 1 (no further reachable targets)

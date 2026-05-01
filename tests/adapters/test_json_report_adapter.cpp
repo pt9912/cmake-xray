@@ -713,7 +713,7 @@ TEST_CASE("json analyze v2: not_loaded status yields empty target_graph and empt
     const auto rendered = adapter.write_analysis_report(result, 10);
     const auto doc = nlohmann::json::parse(rendered);
 
-    CHECK(doc["format_version"] == 2);
+    CHECK(doc["format_version"] == kReportFormatVersion);
     CHECK(doc["target_graph_status"] == "not_loaded");
     CHECK(doc["target_graph"]["nodes"].empty());
     CHECK(doc["target_graph"]["edges"].empty());
@@ -782,7 +782,7 @@ TEST_CASE("json impact v2: target_graph is serialized but target_hubs is absent 
     const JsonReportAdapter adapter;
     const auto doc = nlohmann::json::parse(adapter.write_impact_report(result));
 
-    CHECK(doc["format_version"] == 2);
+    CHECK(doc["format_version"] == kReportFormatVersion);
     CHECK(doc["target_graph_status"] == "loaded");
     CHECK(doc["target_graph"]["nodes"].size() == 2);
     CHECK(doc["target_graph"]["edges"].size() == 1);
@@ -814,15 +814,11 @@ TEST_CASE("AP1.3 A.3: evidence_strength_text_v3 maps the three TargetEvidenceStr
           "uncertain");
 }
 
-TEST_CASE("AP1.3 A.3: kReportFormatVersion stays at 2 in A.3 (v3 wiring is statically discarded)") {
-    // The if-constexpr branches in write_impact_report and the DOT
-    // emit_impact_target_node only fire once kReportFormatVersion>=3. The
-    // tranche-invariant from plan-M6-1-3.md "Format-Versionierung"
-    // requires that A.3 keeps the constant at 2 so v2 reports stay
-    // byte-stable; the version flips in A.4.
-    static_assert(xray::hexagon::model::kReportFormatVersion == 2,
-                  "AP1.3 A.3 must keep kReportFormatVersion at 2; the v3 "
-                  "switch belongs to A.4 alongside the HTML/Markdown/Console "
-                  "adapters and the schema-const update.");
-    CHECK(xray::hexagon::model::kReportFormatVersion == 2);
+TEST_CASE("AP1.3 A.4: kReportFormatVersion is 3 once all five adapters render the v3 fields") {
+    // AP M6-1.3 A.4 flips the production format-version constant. The
+    // schema-side FormatVersion.const must follow in
+    // docs/report-json.schema.json; report_json_schema_validation
+    // verifies the pair stays in sync.
+    static_assert(xray::hexagon::model::kReportFormatVersion == 3);
+    CHECK(xray::hexagon::model::kReportFormatVersion == 3);
 }

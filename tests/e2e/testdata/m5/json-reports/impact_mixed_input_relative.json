@@ -1,6 +1,6 @@
 {
   "format": "cmake-xray.impact",
-  "format_version": 2,
+  "format_version": 3,
   "report_type": "impact",
   "inputs": {
     "compile_database_path": "tests/e2e/testdata/m4/with_targets/compile_commands.json",
@@ -97,6 +97,40 @@
     ],
     "edges": []
   },
+  "prioritized_affected_targets": [
+    {
+      "target": {
+        "display_name": "app",
+        "type": "EXECUTABLE",
+        "unique_key": "app::EXECUTABLE"
+      },
+      "priority_class": "direct",
+      "graph_distance": 0,
+      "evidence_strength": "heuristic"
+    },
+    {
+      "target": {
+        "display_name": "core",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "core::STATIC_LIBRARY"
+      },
+      "priority_class": "direct",
+      "graph_distance": 0,
+      "evidence_strength": "heuristic"
+    },
+    {
+      "target": {
+        "display_name": "tool",
+        "type": "EXECUTABLE",
+        "unique_key": "tool::EXECUTABLE"
+      },
+      "priority_class": "direct",
+      "graph_distance": 0,
+      "evidence_strength": "heuristic"
+    }
+  ],
+  "impact_target_depth_requested": 2,
+  "impact_target_depth_effective": 0,
   "diagnostics": [
     {
       "severity": "warning",
@@ -105,6 +139,10 @@
     {
       "severity": "note",
       "message": "conditional or generated includes may be missing from this result"
+    },
+    {
+      "severity": "note",
+      "message": "reverse target graph traversal stopped at depth 0 (no further reachable targets)"
     }
   ]
 }

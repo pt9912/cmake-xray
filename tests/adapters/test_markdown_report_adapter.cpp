@@ -204,6 +204,12 @@ TEST_CASE("markdown report adapter renders heuristic and uncertain impact classi
           "## Heuristically Affected Translation Units\n"
           "No heuristically affected translation units.\n"
           "\n"
+          "## Prioritised Affected Targets\n"
+          "\n"
+          "Requested depth: `2`. Effective depth: `0` (no graph).\n"
+          "\n"
+          "Target graph not loaded; prioritisation skipped.\n"
+          "\n"
           "## Diagnostics\n"
           "- note: conditional or generated includes may be missing from this result\n");
 }

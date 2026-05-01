@@ -1,6 +1,6 @@
 {
   "format": "cmake-xray.impact",
-  "format_version": 2,
+  "format_version": 3,
   "report_type": "impact",
   "inputs": {
     "compile_database_path": null,
@@ -69,7 +69,29 @@
       }
     ]
   },
+  "prioritized_affected_targets": [
+    {
+      "target": {
+        "display_name": "app",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "app::STATIC_LIBRARY"
+      },
+      "priority_class": "direct",
+      "graph_distance": 0,
+      "evidence_strength": "direct"
+    }
+  ],
+  "impact_target_depth_requested": 2,
+  "impact_target_depth_effective": 0,
   "diagnostics": [
+    {
+      "severity": "warning",
+      "message": "target graph partially loaded; impact prioritisation uses available edges only"
+    },
+    {
+      "severity": "note",
+      "message": "reverse target graph traversal stopped at depth 0 (no further reachable targets)"
+    },
     {
       "severity": "note",
       "message": "target 'app' references unknown target id 'ghost::@99'"

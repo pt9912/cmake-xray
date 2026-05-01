@@ -29,5 +29,15 @@ Status: `partial`.
 |---|---|---|---|
 | `app` | `ghost::@99` | external | `ghost::@99` |
 
+## Prioritised Affected Targets
+
+Requested depth: `2`. Effective depth: `0`.
+
+| Display name | Type | Priority class | Graph distance | Evidence strength | Unique key |
+|---|---|---|---|---|---|
+| `app` | STATIC_LIBRARY | direct | 0 | direct | `app::STATIC_LIBRARY` |
+
 ## Diagnostics
+- warning: target graph partially loaded; impact prioritisation uses available edges only
+- note: reverse target graph traversal stopped at depth 0 (no further reachable targets)
 - note: target 'app' references unknown target id 'ghost::@99'

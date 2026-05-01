@@ -1,14 +1,16 @@
 digraph cmake_xray_impact {
   xray_report_type="impact";
-  format_version=2;
+  format_version=3;
   graph_node_limit=100;
   graph_edge_limit=200;
   graph_truncated=false;
   graph_target_graph_status="not_loaded";
+  graph_impact_target_depth_requested=2;
+  graph_impact_target_depth_effective=0;
   changed_file [kind="changed_file", label="shared.h", path="include/common/shared.h"];
-  heuristic_tu_1 [kind="translation_unit", impact="heuristic", label="main.cpp", path="src/app/main.cpp", directory="build/app", unique_key="/workspace/tests/e2e/testdata/m2/basic_project/src/app/main.cpp|/workspace/tests/e2e/testdata/m2/basic_project/build/app"];
-  heuristic_tu_2 [kind="translation_unit", impact="heuristic", label="core.cpp", path="src/lib/core.cpp", directory="build/lib", unique_key="/workspace/tests/e2e/testdata/m2/basic_project/src/lib/core.cpp|/workspace/tests/e2e/testdata/m2/basic_project/build/lib"];
-  heuristic_tu_3 [kind="translation_unit", impact="heuristic", label="tool.cpp", path="src/tools/tool.cpp", directory="build/tools", unique_key="/workspace/tests/e2e/testdata/m2/basic_project/src/tools/tool.cpp|/workspace/tests/e2e/testdata/m2/basic_project/build/tools"];
+  heuristic_tu_1 [kind="translation_unit", impact="heuristic", label="main.cpp", path="src/app/main.cpp", directory="build/app", unique_key="/Development/cmake-xray/tests/e2e/testdata/m2/basic_project/src/app/main.cpp|/Development/cmake-xray/tests/e2e/testdata/m2/basic_project/build/app"];
+  heuristic_tu_2 [kind="translation_unit", impact="heuristic", label="core.cpp", path="src/lib/core.cpp", directory="build/lib", unique_key="/Development/cmake-xray/tests/e2e/testdata/m2/basic_project/src/lib/core.cpp|/Development/cmake-xray/tests/e2e/testdata/m2/basic_project/build/lib"];
+  heuristic_tu_3 [kind="translation_unit", impact="heuristic", label="tool.cpp", path="src/tools/tool.cpp", directory="build/tools", unique_key="/Development/cmake-xray/tests/e2e/testdata/m2/basic_project/src/tools/tool.cpp|/Development/cmake-xray/tests/e2e/testdata/m2/basic_project/build/tools"];
   changed_file -> heuristic_tu_1 [kind="changed_file_heuristic_tu", style="dashed"];
   changed_file -> heuristic_tu_2 [kind="changed_file_heuristic_tu", style="dashed"];
   changed_file -> heuristic_tu_3 [kind="changed_file_heuristic_tu", style="dashed"];

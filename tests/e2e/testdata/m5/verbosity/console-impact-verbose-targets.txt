@@ -1,11 +1,11 @@
 verbose impact summary
   report_type: impact
-  format_version: 2
+  format_version: 3
   changed_file: include/common/shared.h
   affected_translation_units: 3
   classification: heuristic
   affected_targets: 3
-  diagnostics: 2
+  diagnostics: 3
 
 inputs
   compile_database_path: tests/e2e/testdata/m4/with_targets/compile_commands.json
@@ -39,3 +39,4 @@ heuristically affected targets
 diagnostics
   warning: could not resolve include "generated/version.h" from src/app/main.cpp
   note: conditional or generated includes may be missing from this result
+  note: reverse target graph traversal stopped at depth 0 (no further reachable targets)

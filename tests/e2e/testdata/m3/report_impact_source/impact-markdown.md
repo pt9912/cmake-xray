@@ -12,5 +12,11 @@
 ## Heuristically Affected Translation Units
 No heuristically affected translation units.
 
+## Prioritised Affected Targets
+
+Requested depth: `2`. Effective depth: `0` (no graph).
+
+Target graph not loaded; prioritisation skipped.
+
 ## Diagnostics
 No diagnostics.

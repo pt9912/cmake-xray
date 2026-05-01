@@ -14,6 +14,12 @@ No directly affected translation units.
 - src/lib/core.cpp [directory: build/lib]
 - src/tools/tool.cpp [directory: build/tools]
 
+## Prioritised Affected Targets
+
+Requested depth: `2`. Effective depth: `0` (no graph).
+
+Target graph not loaded; prioritisation skipped.
+
 ## Diagnostics
 - warning: could not resolve include "generated/version.h" from src/app/main.cpp
 - note: conditional or generated includes may be missing from this result

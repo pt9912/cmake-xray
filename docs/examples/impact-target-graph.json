@@ -1,6 +1,6 @@
 {
   "format": "cmake-xray.impact",
-  "format_version": 2,
+  "format_version": 3,
   "report_type": "impact",
   "inputs": {
     "compile_database_path": null,
@@ -186,5 +186,124 @@
       }
     ]
   },
-  "diagnostics": []
+  "prioritized_affected_targets": [
+    {
+      "target": {
+        "display_name": "hub",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "hub::STATIC_LIBRARY"
+      },
+      "priority_class": "direct",
+      "graph_distance": 0,
+      "evidence_strength": "direct"
+    },
+    {
+      "target": {
+        "display_name": "src00",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src00::STATIC_LIBRARY"
+      },
+      "priority_class": "direct_dependent",
+      "graph_distance": 1,
+      "evidence_strength": "direct"
+    },
+    {
+      "target": {
+        "display_name": "src01",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src01::STATIC_LIBRARY"
+      },
+      "priority_class": "direct_dependent",
+      "graph_distance": 1,
+      "evidence_strength": "direct"
+    },
+    {
+      "target": {
+        "display_name": "src02",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src02::STATIC_LIBRARY"
+      },
+      "priority_class": "direct_dependent",
+      "graph_distance": 1,
+      "evidence_strength": "direct"
+    },
+    {
+      "target": {
+        "display_name": "src03",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src03::STATIC_LIBRARY"
+      },
+      "priority_class": "direct_dependent",
+      "graph_distance": 1,
+      "evidence_strength": "direct"
+    },
+    {
+      "target": {
+        "display_name": "src04",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src04::STATIC_LIBRARY"
+      },
+      "priority_class": "direct_dependent",
+      "graph_distance": 1,
+      "evidence_strength": "direct"
+    },
+    {
+      "target": {
+        "display_name": "src05",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src05::STATIC_LIBRARY"
+      },
+      "priority_class": "direct_dependent",
+      "graph_distance": 1,
+      "evidence_strength": "direct"
+    },
+    {
+      "target": {
+        "display_name": "src06",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src06::STATIC_LIBRARY"
+      },
+      "priority_class": "direct_dependent",
+      "graph_distance": 1,
+      "evidence_strength": "direct"
+    },
+    {
+      "target": {
+        "display_name": "src07",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src07::STATIC_LIBRARY"
+      },
+      "priority_class": "direct_dependent",
+      "graph_distance": 1,
+      "evidence_strength": "direct"
+    },
+    {
+      "target": {
+        "display_name": "src08",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src08::STATIC_LIBRARY"
+      },
+      "priority_class": "direct_dependent",
+      "graph_distance": 1,
+      "evidence_strength": "direct"
+    },
+    {
+      "target": {
+        "display_name": "src09",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src09::STATIC_LIBRARY"
+      },
+      "priority_class": "direct_dependent",
+      "graph_distance": 1,
+      "evidence_strength": "direct"
+    }
+  ],
+  "impact_target_depth_requested": 2,
+  "impact_target_depth_effective": 1,
+  "diagnostics": [
+    {
+      "severity": "note",
+      "message": "reverse target graph traversal stopped at depth 1 (no further reachable targets)"
+    }
+  ]
 }

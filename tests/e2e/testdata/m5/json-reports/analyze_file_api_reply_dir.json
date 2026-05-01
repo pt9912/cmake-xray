@@ -1,6 +1,6 @@
 {
   "format": "cmake-xray.analysis",
-  "format_version": 2,
+  "format_version": 3,
   "report_type": "analyze",
   "inputs": {
     "compile_database_path": null,

@@ -38,5 +38,23 @@ Status: `loaded`.
 | `src08` | `hub` | resolved |  |
 | `src09` | `hub` | resolved |  |
 
+## Prioritised Affected Targets
+
+Requested depth: `2`. Effective depth: `1`.
+
+| Display name | Type | Priority class | Graph distance | Evidence strength | Unique key |
+|---|---|---|---|---|---|
+| `hub` | STATIC_LIBRARY | direct | 0 | direct | `hub::STATIC_LIBRARY` |
+| `src00` | STATIC_LIBRARY | direct_dependent | 1 | direct | `src00::STATIC_LIBRARY` |
+| `src01` | STATIC_LIBRARY | direct_dependent | 1 | direct | `src01::STATIC_LIBRARY` |
+| `src02` | STATIC_LIBRARY | direct_dependent | 1 | direct | `src02::STATIC_LIBRARY` |
+| `src03` | STATIC_LIBRARY | direct_dependent | 1 | direct | `src03::STATIC_LIBRARY` |
+| `src04` | STATIC_LIBRARY | direct_dependent | 1 | direct | `src04::STATIC_LIBRARY` |
+| `src05` | STATIC_LIBRARY | direct_dependent | 1 | direct | `src05::STATIC_LIBRARY` |
+| `src06` | STATIC_LIBRARY | direct_dependent | 1 | direct | `src06::STATIC_LIBRARY` |
+| `src07` | STATIC_LIBRARY | direct_dependent | 1 | direct | `src07::STATIC_LIBRARY` |
+| `src08` | STATIC_LIBRARY | direct_dependent | 1 | direct | `src08::STATIC_LIBRARY` |
+| `src09` | STATIC_LIBRARY | direct_dependent | 1 | direct | `src09::STATIC_LIBRARY` |
+
 ## Diagnostics
-No diagnostics.
+- note: reverse target graph traversal stopped at depth 1 (no further reachable targets)

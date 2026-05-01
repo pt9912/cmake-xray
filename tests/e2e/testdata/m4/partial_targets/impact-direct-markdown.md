@@ -27,5 +27,14 @@ Status: `loaded`.
 
 No direct target dependencies.
 
+## Prioritised Affected Targets
+
+Requested depth: `2`. Effective depth: `0`.
+
+| Display name | Type | Priority class | Graph distance | Evidence strength | Unique key |
+|---|---|---|---|---|---|
+| `app` | EXECUTABLE | direct | 0 | direct | `app::EXECUTABLE` |
+
 ## Diagnostics
 - note: 1 of 2 targets have no compilable sources and are not included in the analysis
+- note: reverse target graph traversal stopped at depth 0 (no further reachable targets)
