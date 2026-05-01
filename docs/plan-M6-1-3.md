@@ -1127,6 +1127,29 @@ Invariant eingehalten wird.
     Stderr-Fixture sind unter `tests/e2e/testdata/m6/` abgelegt.
   - dieser Commit pinnt den Liefer-Stand neu mit den Folge-Commit-
     Hashes.
+  - Review-Wave 2 schliesst die drei verbleibenden Befunde:
+    - `af5fc5c` fix: align reverse-BFS sort tuple with plan-M6-1-3.
+      Der Sort-Vertrag aus
+      `plan-M6-1-3.md` "Determinismus-Anforderungen"
+      Z. 174-175 ist nun 1:1 in
+      `services::internal::less_by_bfs_node_tuple` und
+      `less_by_bfs_edge_tuple` gepinnt; Edge- und Node-Komparatoren
+      konsultieren `(stable_target_key, edge_kind, display_name,
+      target_type)` end-to-end, mit direkten Tie-Breaker-Tests pro
+      Spalte.
+    - `4b0785f` test: add cross-field invariant companion tests.
+      `validate_json_schema.py` prueft nach erfolgreicher Schema-
+      Validierung die beiden vom Schema-Dialekt nicht abbildbaren
+      Cross-Field-Invarianten
+      (`impact_target_depth_effective <= impact_target_depth_requested`,
+      `graph_distance <= impact_target_depth_requested`); zwei neue
+      WILL_FAIL-Gates pinnen die Negativfaelle.
+    - `90b6534` test: add impact-prioritised-cycle goldens with
+      synthetic file-api fixture. Drei-Target-Zyklus
+      (`cycA -> cycB -> cycC -> cycA`) unter
+      `tests/e2e/testdata/m6/file_api_cycle/` reproduziert das
+      "hit depth limit N within a cycle"-Diagnostic in allen fuenf
+      Reportformaten end-to-end.
 
 Audit-Befunde nach Folge-Patches: Reverse-BFS-Determinismus,
 evidence-strength-Klassifikation, Tiefenbudget-Schnitte, Zyklen-
