@@ -1,0 +1,204 @@
+{
+  "format": "cmake-xray.impact",
+  "format_version": 3,
+  "report_type": "impact",
+  "inputs": {
+    "compile_database_path": null,
+    "compile_database_source": null,
+    "cmake_file_api_path": "tests/e2e/testdata/m6/file_api_loaded/build",
+    "cmake_file_api_resolved_path": "tests/e2e/testdata/m6/file_api_loaded/build/.cmake/api/v1/reply",
+    "cmake_file_api_source": "cli",
+    "changed_file": "src/hub.cpp",
+    "changed_file_source": "file_api_source_root"
+  },
+  "summary": {
+    "affected_translation_unit_count": 1,
+    "direct_translation_unit_count": 1,
+    "heuristic_translation_unit_count": 0,
+    "classification": "direct",
+    "observation_source": "derived",
+    "target_metadata": "loaded",
+    "affected_target_count": 1,
+    "direct_target_count": 1,
+    "heuristic_target_count": 0
+  },
+  "directly_affected_translation_units": [
+    {
+      "reference": {
+        "source_path": "src/hub.cpp",
+        "directory": "build"
+      },
+      "targets": [
+        {
+          "display_name": "hub",
+          "type": "STATIC_LIBRARY"
+        }
+      ]
+    }
+  ],
+  "heuristically_affected_translation_units": [],
+  "directly_affected_targets": [
+    {
+      "display_name": "hub",
+      "type": "STATIC_LIBRARY"
+    }
+  ],
+  "heuristically_affected_targets": [],
+  "target_graph_status": "loaded",
+  "target_graph": {
+    "nodes": [
+      {
+        "display_name": "hub",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "hub::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src00",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src00::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src01",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src01::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src02",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src02::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src03",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src03::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src04",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src04::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src05",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src05::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src06",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src06::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src07",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src07::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src08",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src08::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src09",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src09::STATIC_LIBRARY"
+      }
+    ],
+    "edges": [
+      {
+        "from_display_name": "src00",
+        "from_unique_key": "src00::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src01",
+        "from_unique_key": "src01::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src02",
+        "from_unique_key": "src02::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src03",
+        "from_unique_key": "src03::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src04",
+        "from_unique_key": "src04::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src05",
+        "from_unique_key": "src05::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src06",
+        "from_unique_key": "src06::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src07",
+        "from_unique_key": "src07::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src08",
+        "from_unique_key": "src08::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src09",
+        "from_unique_key": "src09::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      }
+    ]
+  },
+  "prioritized_affected_targets": [
+    {
+      "target": {
+        "display_name": "hub",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "hub::STATIC_LIBRARY"
+      },
+      "priority_class": "direct",
+      "graph_distance": 0,
+      "evidence_strength": "direct"
+    }
+  ],
+  "impact_target_depth_requested": 0,
+  "impact_target_depth_effective": 0,
+  "diagnostics": []
+}

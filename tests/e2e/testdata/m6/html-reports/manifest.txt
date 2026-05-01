@@ -18,3 +18,7 @@ analyze-file-api-partial.html
 impact-compile-db-only.html
 impact-file-api-loaded.html
 impact-file-api-partial.html
+impact-not-loaded.html
+impact-prioritised-default.html
+impact-prioritised-depth-zero.html
+impact-prioritised-partial.html

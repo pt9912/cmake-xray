@@ -1,0 +1,35 @@
+digraph cmake_xray_impact {
+  xray_report_type="impact";
+  format_version=3;
+  graph_node_limit=100;
+  graph_edge_limit=200;
+  graph_truncated=false;
+  graph_target_graph_status="loaded";
+  graph_impact_target_depth_requested=2;
+  graph_impact_target_depth_effective=1;
+  changed_file [kind="changed_file", label="hub.cpp", path="src/hub.cpp"];
+  direct_tu_1 [kind="translation_unit", impact="direct", label="hub.cpp", path="src/hub.cpp", directory="build", unique_key="/project/src/hub.cpp|/project/build"];
+  target_1 [kind="target", impact="direct", priority_class="direct", graph_distance=0, evidence_strength="direct", label="hub", name="hub", type="STATIC_LIBRARY", unique_key="hub::STATIC_LIBRARY"];
+  target_2 [kind="target", priority_class="direct_dependent", graph_distance=1, evidence_strength="direct", label="src00", name="src00", type="STATIC_LIBRARY", unique_key="src00::STATIC_LIBRARY"];
+  target_3 [kind="target", priority_class="direct_dependent", graph_distance=1, evidence_strength="direct", label="src01", name="src01", type="STATIC_LIBRARY", unique_key="src01::STATIC_LIBRARY"];
+  target_4 [kind="target", priority_class="direct_dependent", graph_distance=1, evidence_strength="direct", label="src02", name="src02", type="STATIC_LIBRARY", unique_key="src02::STATIC_LIBRARY"];
+  target_5 [kind="target", priority_class="direct_dependent", graph_distance=1, evidence_strength="direct", label="src03", name="src03", type="STATIC_LIBRARY", unique_key="src03::STATIC_LIBRARY"];
+  target_6 [kind="target", priority_class="direct_dependent", graph_distance=1, evidence_strength="direct", label="src04", name="src04", type="STATIC_LIBRARY", unique_key="src04::STATIC_LIBRARY"];
+  target_7 [kind="target", priority_class="direct_dependent", graph_distance=1, evidence_strength="direct", label="src05", name="src05", type="STATIC_LIBRARY", unique_key="src05::STATIC_LIBRARY"];
+  target_8 [kind="target", priority_class="direct_dependent", graph_distance=1, evidence_strength="direct", label="src06", name="src06", type="STATIC_LIBRARY", unique_key="src06::STATIC_LIBRARY"];
+  target_9 [kind="target", priority_class="direct_dependent", graph_distance=1, evidence_strength="direct", label="src07", name="src07", type="STATIC_LIBRARY", unique_key="src07::STATIC_LIBRARY"];
+  target_10 [kind="target", priority_class="direct_dependent", graph_distance=1, evidence_strength="direct", label="src08", name="src08", type="STATIC_LIBRARY", unique_key="src08::STATIC_LIBRARY"];
+  target_11 [kind="target", priority_class="direct_dependent", graph_distance=1, evidence_strength="direct", label="src09", name="src09", type="STATIC_LIBRARY", unique_key="src09::STATIC_LIBRARY"];
+  changed_file -> direct_tu_1 [kind="changed_file_direct_tu", style="solid"];
+  direct_tu_1 -> target_1 [kind="direct_tu_target", style="solid"];
+  target_2 -> target_1 [kind="target_dependency", style="solid", resolution="resolved"];
+  target_3 -> target_1 [kind="target_dependency", style="solid", resolution="resolved"];
+  target_4 -> target_1 [kind="target_dependency", style="solid", resolution="resolved"];
+  target_5 -> target_1 [kind="target_dependency", style="solid", resolution="resolved"];
+  target_6 -> target_1 [kind="target_dependency", style="solid", resolution="resolved"];
+  target_7 -> target_1 [kind="target_dependency", style="solid", resolution="resolved"];
+  target_8 -> target_1 [kind="target_dependency", style="solid", resolution="resolved"];
+  target_9 -> target_1 [kind="target_dependency", style="solid", resolution="resolved"];
+  target_10 -> target_1 [kind="target_dependency", style="solid", resolution="resolved"];
+  target_11 -> target_1 [kind="target_dependency", style="solid", resolution="resolved"];
+}
