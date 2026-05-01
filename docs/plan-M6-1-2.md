@@ -1237,14 +1237,34 @@ Schema-Datei noch als Goldens-Inhalt.
 
 ## Liefer-Stand
 
-Wird nach dem Schnitt der A-Tranchen mit Commit-Hashes befuellt. Bis dahin
-ist AP 1.2 nicht abnahmefaehig. Format analog zu `docs/plan-M5-1-8.md`
-Z. 151ff.:
+- A.1 (Schema, JSON-Adapter und JSON-Goldens): `e02944f` feat: add M6 AP
+  1.2 A.1 JSON v2 contract with target-graph and hubs;
+  Fixture-Follow-up `48c7ca5` feat: add M6 AP 1.2 A.1 JSON v2 contract
+  with target-graph and hubs (m6/file_api_loaded und m6/file_api_partial
+  Reply-Fixtures).
+- A.2 (DOT-Adapter und DOT-Goldens): `953f2b1` feat: add M6 AP 1.2 A.2
+  DOT v2 contract with target-graph and external-target nodes;
+  Folge-Fix `24e4b33` fix: drop impact attribute on graph-only target
+  nodes in impact DOT.
+- A.3 (HTML-, Markdown- und Console-Adapter): `f228676` feat: add M6 AP
+  1.2 A.3 HTML/Markdown/Console v2 contracts with target-graph
+  sections; vorbereitender Plan-Wording-Fix `e3a1f7e` docs: clarify
+  plan-M6-1-2.md A.3 wording on m5 console/markdown goldens location.
+- A.4 (Audit-Pass: Plan-Test-Liste gegen Ist-Stand verifiziert,
+  Liefer-Stand gepinnt): dieser Commit (`docs: pin M6 AP 1.2
+  Liefer-Stand with A.1-A.4 commit hashes`); identifizierbar ueber
+  `git log -- docs/plan-M6-1-2.md`. Audit-Befunde: HTML/Markdown/
+  Console Status-Matrizen vollstaendig getestet, Disambiguierungs- und
+  External-Suffix-Mischfaelle byteweise gepinnt, M6-Pflichtszenarien
+  unter `tests/e2e/testdata/m6/{html,markdown,console}-reports/`
+  vorhanden inklusive Partial-Diagnostic im File-API-Partial-Pfad,
+  Compile-DB-only Console/Markdown-Goldens unter `tests/e2e/testdata/
+  m3/<scenario>/` byte-stabil, drei neue CTest-Gates
+  (`html_structure_validation_m6`, `markdown_manifest_validation_m6`,
+  `console_manifest_validation_m6`) registriert.
 
-- A.1 (Schema, JSON-Adapter und JSON-Goldens): noch nicht ausgeliefert.
-- A.2 (DOT-Adapter und DOT-Goldens): noch nicht ausgeliefert.
-- A.3 (HTML-, Markdown- und Console-Adapter): noch nicht ausgeliefert.
-- A.4 (Audit-Pass): noch nicht ausgeliefert.
+Docker-Gate-Lauf gemaess `docs/quality.md` auf dem A.4-Commit lokal gruen:
+`make docker-gates` (Test 35/35, Coverage 100%, clang-tidy 0, lizard 0).
 
 ## Abnahmekriterien
 
