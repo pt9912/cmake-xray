@@ -1219,3 +1219,254 @@ TEST_CASE("impact analyzer: mixed-input path propagates target_graph from file-a
     REQUIRE(result.affected_targets.size() == 1);
     CHECK(result.affected_targets[0].target.unique_key == "a::STATIC_LIBRARY");
 }
+
+// ---- AP M6-1.3 A.1: service validation + reverse-BFS prioritisation ----
+
+namespace m6_ia_a1 {
+
+using xray::hexagon::model::TargetEvidenceStrength;
+using xray::hexagon::model::TargetPriorityClass;
+
+}  // namespace m6_ia_a1
+
+TEST_CASE("AP1.3 A.1: impact_target_depth=33 is rejected with impact_target_depth_out_of_range") {
+    const StubBuildModelPort build_model_port;
+    const UnusedBuildModelPort unused_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{
+        build_model_port, include_resolver_port, unused_port};
+
+    auto request = make_impact_request("/tmp/compile_commands.json",
+                                        "/project/src/main.cpp", "");
+    request.impact_target_depth = 33;
+
+    const auto result = analyzer.analyze_impact(request);
+
+    REQUIRE(result.service_validation_error.has_value());
+    CHECK(result.service_validation_error->code ==
+          "impact_target_depth_out_of_range");
+    CHECK(result.service_validation_error->message ==
+          "impact_target_depth: value exceeds maximum 32");
+    // No partial result: every analysis-bearing field stays at its
+    // default-initialized state.
+    CHECK(result.affected_translation_units.empty());
+    CHECK(result.affected_targets.empty());
+    CHECK(result.prioritized_affected_targets.empty());
+    CHECK(result.diagnostics.empty());
+}
+
+TEST_CASE("AP1.3 A.1: require_target_graph + not_loaded is rejected with target_graph_required") {
+    const StubBuildModelPort build_model_port;
+    const UnusedBuildModelPort unused_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{
+        build_model_port, include_resolver_port, unused_port};
+
+    auto request = make_impact_request("/tmp/compile_commands.json",
+                                        "/project/src/main.cpp", "");
+    request.require_target_graph = true;
+    request.impact_target_depth = 2;
+
+    const auto result = analyzer.analyze_impact(request);
+
+    REQUIRE(result.service_validation_error.has_value());
+    CHECK(result.service_validation_error->code == "target_graph_required");
+    CHECK(result.service_validation_error->message ==
+          "target graph data is required but not available");
+    // Validated depth is preserved on the rejected result so callers can
+    // mirror the request provenance even when no analysis ran.
+    CHECK(result.impact_target_depth_requested == 2);
+    CHECK(result.affected_translation_units.empty());
+    CHECK(result.prioritized_affected_targets.empty());
+}
+
+TEST_CASE("AP1.3 A.1: compile-DB-only impact populates depth fields without affecting v2 byte-stability") {
+    const StubBuildModelPort build_model_port;
+    const UnusedBuildModelPort unused_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{
+        build_model_port, include_resolver_port, unused_port};
+
+    const auto result = analyzer.analyze_impact(make_impact_request(
+        "/tmp/compile_commands.json", "/project/src/main.cpp", ""));
+
+    CHECK(result.target_graph_status == m6_ia::TargetGraphStatus::not_loaded);
+    CHECK(result.impact_target_depth_requested == 2);  // service default
+    CHECK(result.impact_target_depth_effective == 0);
+    // Compile-DB-only path produces no affected_targets, so the seed
+    // list is empty and there are no prioritised entries.
+    CHECK(result.prioritized_affected_targets.empty());
+    // AP M6-1.3 A.1 explicitly suppresses the four prioritisation
+    // diagnostics until A.3 / A.4 surfaces the prioritised section in
+    // the report adapters; the v2 diagnostics stay byte-stable.
+    for (const auto& d : result.diagnostics) {
+        CHECK(d.message.find("impact prioritisation") == std::string::npos);
+        CHECK(d.message.find("reverse target graph traversal") ==
+              std::string::npos);
+    }
+}
+
+TEST_CASE("AP1.3 A.1: file-API-loaded impact runs reverse-BFS, prioritised list contains seeds + reverse hops") {
+    // Graph: lib --> common, app --> lib (incoming-edge to lib from app
+    // and to common from lib). Changed file is in lib's TU; expected
+    // priority list: lib (direct, 0), app (direct_dependent, 1).
+    using xray::hexagon::model::TargetAssignment;
+    using xray::hexagon::model::TargetDependency;
+    using xray::hexagon::model::TargetDependencyKind;
+    using xray::hexagon::model::TargetDependencyResolution;
+    using xray::hexagon::model::TargetGraph;
+    using xray::hexagon::model::TargetInfo;
+    TargetGraph graph;
+    graph.nodes.push_back(TargetInfo{"app", "EXECUTABLE", "app::EXECUTABLE"});
+    graph.nodes.push_back(TargetInfo{"lib", "STATIC_LIBRARY", "lib::STATIC_LIBRARY"});
+    graph.nodes.push_back(TargetInfo{"common", "STATIC_LIBRARY", "common::STATIC_LIBRARY"});
+    graph.edges.push_back(TargetDependency{
+        "lib::STATIC_LIBRARY", "lib", "common::STATIC_LIBRARY", "common",
+        TargetDependencyKind::direct, TargetDependencyResolution::resolved});
+    graph.edges.push_back(TargetDependency{
+        "app::EXECUTABLE", "app", "lib::STATIC_LIBRARY", "lib",
+        TargetDependencyKind::direct, TargetDependencyResolution::resolved});
+
+    std::vector<TargetAssignment> assignments;
+    assignments.push_back(TargetAssignment{
+        "/project/src/main.cpp|/project/build/debug",
+        {TargetInfo{"lib", "STATIC_LIBRARY", "lib::STATIC_LIBRARY"}}});
+    const m6_ia::FileApiPortWithGraph file_api_port{
+        std::move(graph), m6_ia::TargetGraphStatus::loaded,
+        std::move(assignments)};
+    const UnusedBuildModelPort compile_db_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{
+        compile_db_port, include_resolver_port, file_api_port};
+
+    auto request = make_impact_request("", "/project/src/main.cpp",
+                                        "/tmp/build");
+    request.impact_target_depth = 2;
+    const auto result = analyzer.analyze_impact(request);
+
+    REQUIRE_FALSE(result.service_validation_error.has_value());
+    CHECK(result.target_graph_status == m6_ia::TargetGraphStatus::loaded);
+    CHECK(result.impact_target_depth_requested == 2);
+    // BFS finds lib (seed), then app (reverse-hop from lib via the
+    // app -> lib edge). common is not reverse-reachable from lib; lib
+    // depends ON common, not the other way around.
+    REQUIRE(result.prioritized_affected_targets.size() == 2);
+    CHECK(result.prioritized_affected_targets[0].target.unique_key ==
+          "lib::STATIC_LIBRARY");
+    CHECK(result.prioritized_affected_targets[0].graph_distance == 0);
+    CHECK(result.prioritized_affected_targets[0].priority_class ==
+          m6_ia_a1::TargetPriorityClass::direct);
+    CHECK(result.prioritized_affected_targets[1].target.unique_key ==
+          "app::EXECUTABLE");
+    CHECK(result.prioritized_affected_targets[1].graph_distance == 1);
+    CHECK(result.prioritized_affected_targets[1].priority_class ==
+          m6_ia_a1::TargetPriorityClass::direct_dependent);
+    CHECK(result.impact_target_depth_effective == 1);
+}
+
+TEST_CASE("AP1.3 A.1: depth=0 with loaded graph still emits seeds at distance 0 but no hops") {
+    using xray::hexagon::model::TargetAssignment;
+    using xray::hexagon::model::TargetDependency;
+    using xray::hexagon::model::TargetDependencyKind;
+    using xray::hexagon::model::TargetDependencyResolution;
+    using xray::hexagon::model::TargetGraph;
+    using xray::hexagon::model::TargetInfo;
+    TargetGraph graph;
+    graph.nodes.push_back(TargetInfo{"app", "EXECUTABLE", "app::EXECUTABLE"});
+    graph.nodes.push_back(TargetInfo{"lib", "STATIC_LIBRARY", "lib::STATIC_LIBRARY"});
+    graph.edges.push_back(TargetDependency{
+        "app::EXECUTABLE", "app", "lib::STATIC_LIBRARY", "lib",
+        TargetDependencyKind::direct, TargetDependencyResolution::resolved});
+
+    std::vector<TargetAssignment> assignments;
+    assignments.push_back(TargetAssignment{
+        "/project/src/main.cpp|/project/build/debug",
+        {TargetInfo{"lib", "STATIC_LIBRARY", "lib::STATIC_LIBRARY"}}});
+    const m6_ia::FileApiPortWithGraph file_api_port{
+        std::move(graph), m6_ia::TargetGraphStatus::loaded,
+        std::move(assignments)};
+    const UnusedBuildModelPort compile_db_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{
+        compile_db_port, include_resolver_port, file_api_port};
+
+    auto request = make_impact_request("", "/project/src/main.cpp",
+                                        "/tmp/build");
+    request.impact_target_depth = 0;
+    const auto result = analyzer.analyze_impact(request);
+
+    REQUIRE(result.prioritized_affected_targets.size() == 1);
+    CHECK(result.prioritized_affected_targets[0].target.unique_key ==
+          "lib::STATIC_LIBRARY");
+    CHECK(result.prioritized_affected_targets[0].graph_distance == 0);
+    CHECK(result.impact_target_depth_effective == 0);
+}
+
+TEST_CASE("AP1.3 A.1: partial target graph runs BFS over the available edges (diagnostic deferred to A.3 / A.4)") {
+    using xray::hexagon::model::TargetAssignment;
+    using xray::hexagon::model::TargetDependency;
+    using xray::hexagon::model::TargetDependencyKind;
+    using xray::hexagon::model::TargetDependencyResolution;
+    using xray::hexagon::model::TargetGraph;
+    using xray::hexagon::model::TargetInfo;
+    TargetGraph graph;
+    graph.nodes.push_back(TargetInfo{"lib", "STATIC_LIBRARY", "lib::STATIC_LIBRARY"});
+    graph.edges.push_back(TargetDependency{
+        "lib::STATIC_LIBRARY", "lib", "<external>::ghost", "ghost",
+        TargetDependencyKind::direct, TargetDependencyResolution::external});
+
+    std::vector<TargetAssignment> assignments;
+    assignments.push_back(TargetAssignment{
+        "/project/src/main.cpp|/project/build/debug",
+        {TargetInfo{"lib", "STATIC_LIBRARY", "lib::STATIC_LIBRARY"}}});
+    const m6_ia::FileApiPortWithGraph file_api_port{
+        std::move(graph), m6_ia::TargetGraphStatus::partial,
+        std::move(assignments)};
+    const UnusedBuildModelPort compile_db_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{
+        compile_db_port, include_resolver_port, file_api_port};
+
+    const auto result = analyzer.analyze_impact(
+        make_impact_request("", "/project/src/main.cpp", "/tmp/build"));
+
+    CHECK(result.target_graph_status == m6_ia::TargetGraphStatus::partial);
+    // BFS still runs and emits the seed; external candidates are
+    // dropped, so prioritized_affected_targets contains only `lib`.
+    REQUIRE(result.prioritized_affected_targets.size() == 1);
+    CHECK(result.prioritized_affected_targets[0].target.unique_key ==
+          "lib::STATIC_LIBRARY");
+    // AP M6-1.3 A.1: the partial-graph diagnostic is deferred to A.3 /
+    // A.4 to keep v2 reports byte-stable. Verify it does NOT appear.
+    for (const auto& d : result.diagnostics) {
+        CHECK(d.message.find("target graph partially loaded") ==
+              std::string::npos);
+    }
+}
+
+TEST_CASE("AP1.3 A.1: require_target_graph with loaded graph runs without service error") {
+    using xray::hexagon::model::TargetAssignment;
+    using xray::hexagon::model::TargetGraph;
+    using xray::hexagon::model::TargetInfo;
+    TargetGraph graph;
+    graph.nodes.push_back(TargetInfo{"lib", "STATIC_LIBRARY", "lib::STATIC_LIBRARY"});
+    std::vector<TargetAssignment> assignments;
+    assignments.push_back(TargetAssignment{
+        "/project/src/main.cpp|/project/build/debug",
+        {TargetInfo{"lib", "STATIC_LIBRARY", "lib::STATIC_LIBRARY"}}});
+    const m6_ia::FileApiPortWithGraph file_api_port{
+        std::move(graph), m6_ia::TargetGraphStatus::loaded,
+        std::move(assignments)};
+    const UnusedBuildModelPort compile_db_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ImpactAnalyzer analyzer{
+        compile_db_port, include_resolver_port, file_api_port};
+
+    auto request = make_impact_request("", "/project/src/main.cpp",
+                                        "/tmp/build");
+    request.require_target_graph = true;
+    const auto result = analyzer.analyze_impact(request);
+
+    CHECK_FALSE(result.service_validation_error.has_value());
+    CHECK(result.target_graph_status == m6_ia::TargetGraphStatus::loaded);
+}

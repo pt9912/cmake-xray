@@ -5,6 +5,7 @@ add_executable(
     hexagon/test_project_analyzer.cpp
     hexagon/test_impact_analyzer.cpp
     hexagon/test_target_graph_support.cpp
+    hexagon/test_target_graph_traversal.cpp
     adapters/test_atomic_report_writer.cpp
     adapters/test_cli_console_renderers.cpp
     adapters/test_port_wiring.cpp

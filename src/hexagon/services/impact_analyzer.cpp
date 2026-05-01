@@ -16,6 +16,7 @@
 #include "services/analysis_support.h"
 #include "services/diagnostic_support.h"
 #include "services/target_graph_support.h"
+#include "services/target_graph_traversal.h"
 
 namespace xray::hexagon::services {
 
@@ -30,8 +31,21 @@ using xray::hexagon::model::ImpactedTarget;
 using xray::hexagon::model::ImpactedTranslationUnit;
 using xray::hexagon::model::ImpactKind;
 using xray::hexagon::model::ImpactResult;
+using xray::hexagon::model::PrioritizedImpactedTarget;
+using xray::hexagon::model::ServiceValidationError;
+using xray::hexagon::model::TargetEvidenceStrength;
+using xray::hexagon::model::TargetGraphStatus;
 using xray::hexagon::model::TargetImpactClassification;
+using xray::hexagon::model::TargetPriorityClass;
 using xray::hexagon::model::TranslationUnitObservation;
+
+// AP M6-1.3 A.1: deepest reverse-BFS budget the service accepts. Beyond
+// this the analyzer rejects the request as
+// `impact_target_depth_out_of_range` without producing an ImpactResult.
+constexpr std::size_t kMaxImpactTargetDepth = 32;
+// AP M6-1.3 A.1: default reverse-BFS depth applied when neither the CLI
+// adapter nor a non-CLI caller specifies a value.
+constexpr std::size_t kDefaultImpactTargetDepth = 2;
 
 struct LoadedInputs {
     std::filesystem::path base_directory;
@@ -382,6 +396,73 @@ void attach_targets_to_impacted_units(
     }
 }
 
+// AP M6-1.3 A.1: convert the M5 affected_targets list into reverse-BFS
+// seeds. Existing compute_affected_targets only emits direct/heuristic
+// classifications -- "uncertain" header-only-library seeds are an
+// extension point for a future code path that surfaces targets affected
+// purely through indirect target_assignments. Service-level tests
+// exercise the uncertain branch directly via reverse_target_graph_bfs.
+TargetEvidenceStrength evidence_for_classification(
+    TargetImpactClassification classification) {
+    return classification == TargetImpactClassification::direct
+               ? TargetEvidenceStrength::direct
+               : TargetEvidenceStrength::heuristic;
+}
+
+std::vector<ImpactSeed> collect_impact_seeds(
+    const std::vector<ImpactedTarget>& affected_targets) {
+    // compute_affected_targets above already dedups affected_targets by
+    // TargetInfo::unique_key and prefers the direct classification over
+    // heuristic on collisions; the BFS helper itself also dedups seeds
+    // defensively. A flat 1:1 map from ImpactedTarget to ImpactSeed is
+    // therefore enough and avoids a second by-key dedup that the test
+    // suite cannot reach without bypassing compute_affected_targets.
+    std::vector<ImpactSeed> seeds;
+    seeds.reserve(affected_targets.size());
+    for (const auto& impacted : affected_targets) {
+        seeds.push_back(
+            {impacted.target,
+             evidence_for_classification(impacted.classification)});
+    }
+    return seeds;
+}
+
+PrioritizedImpactedTarget seed_to_prioritized(ImpactSeed seed) {
+    PrioritizedImpactedTarget out;
+    out.target = std::move(seed.target);
+    out.graph_distance = 0;
+    out.priority_class = TargetPriorityClass::direct;
+    out.evidence_strength = seed.evidence_strength;
+    return out;
+}
+
+void apply_reverse_bfs_priorisation(ImpactResult& result) {
+    // AP M6-1.3 A.1 emits the new model fields but stays byte-stable
+    // against v2 reports: existing adapters render `result.diagnostics`
+    // verbatim, so the four AP-1.3 diagnostics ("target graph not
+    // loaded ...", "target graph partially loaded ...", "reverse target
+    // graph traversal stopped at depth N", "hit depth limit N within a
+    // cycle") are deliberately NOT appended in A.1. They will be added
+    // in A.3 / A.4 alongside the prioritised target sections in the
+    // report adapters, where the diagnostic finally has render context.
+    auto seeds = collect_impact_seeds(result.affected_targets);
+    const auto requested = result.impact_target_depth_requested;
+
+    if (result.target_graph_status == TargetGraphStatus::not_loaded) {
+        for (auto& seed : seeds) {
+            result.prioritized_affected_targets.push_back(
+                seed_to_prioritized(std::move(seed)));
+        }
+        sort_prioritized_impacted_targets(result.prioritized_affected_targets);
+        result.impact_target_depth_effective = 0;
+        return;
+    }
+
+    auto bfs = reverse_target_graph_bfs(result.target_graph, seeds, requested);
+    result.prioritized_affected_targets = std::move(bfs.prioritized_targets);
+    result.impact_target_depth_effective = bfs.effective_depth;
+}
+
 void collect_and_classify_impacts(
     const std::vector<TranslationUnitObservation>& observations,
     const model::IncludeResolutionResult& include_resolution,
@@ -468,10 +549,48 @@ bool load_inputs(const ImpactLoadContext& ctx, ImpactLoadState& state, ImpactRes
     return load_inputs_file_api_only(ctx, state, result);
 }
 
+// AP M6-1.3 A.1: factored out so analyze_impact stays under the lizard
+// length cap. Returns a rejected ImpactResult when the request is
+// invalid; std::nullopt when the request can proceed past depth
+// validation. The require_target_graph guard runs separately after the
+// build model load.
+std::optional<ImpactResult> validate_request_depth(
+    const AnalyzeImpactRequest& request, std::size_t requested_depth) {
+    if (requested_depth <= kMaxImpactTargetDepth) return std::nullopt;
+    (void)request;
+    ImpactResult rejected;
+    rejected.service_validation_error = ServiceValidationError{
+        "impact_target_depth_out_of_range",
+        "impact_target_depth: value exceeds maximum 32"};
+    return rejected;
+}
+
+ImpactResult build_target_graph_required_rejection(std::size_t requested_depth) {
+    ImpactResult rejected;
+    rejected.service_validation_error = ServiceValidationError{
+        "target_graph_required",
+        "target graph data is required but not available"};
+    rejected.impact_target_depth_requested = requested_depth;
+    // NRVO-defeating return so the closing brace counts as a covered
+    // line under gcov; mirrors src/adapters/output/dot_report_adapter.cpp Z. 291.
+    return ImpactResult(std::move(rejected));
+}
+
 }  // namespace
 
 ImpactResult ImpactAnalyzer::analyze_impact(AnalyzeImpactRequest request) const {
+    // AP M6-1.3 A.1: depth validation runs before any I/O so a misuse
+    // (depth > 32) cannot leak partial input data into the rejected
+    // result. The plan reserves "negative value" / "not an integer" /
+    // "option specified more than once" for the CLI layer (A.2).
+    const auto requested_depth =
+        request.impact_target_depth.value_or(kDefaultImpactTargetDepth);
+    if (auto rejected = validate_request_depth(request, requested_depth)) {
+        return std::move(*rejected);
+    }
+
     ImpactResult result;
+    result.impact_target_depth_requested = requested_depth;
     result.application = model::application_info();
     populate_initial_inputs(request, result.inputs);
     set_legacy_compile_database_path(result);
@@ -481,6 +600,14 @@ ImpactResult ImpactAnalyzer::analyze_impact(AnalyzeImpactRequest request) const 
                                  path_for_io_string(request.cmake_file_api_path)};
     ImpactLoadState state;
     if (!load_inputs(ctx, state, result)) return result;
+
+    // AP M6-1.3 A.1: post-load require_target_graph guard. Status is
+    // only known after the build model load, so the rejected branch
+    // discards the partial result and returns one with only the error.
+    if (request.require_target_graph &&
+        result.target_graph_status == TargetGraphStatus::not_loaded) {
+        return build_target_graph_required_rejection(requested_depth);
+    }
 
     const auto observations = build_translation_unit_observations(
         result.compile_database.entries(), state.loaded.base_directory);
@@ -494,6 +621,7 @@ ImpactResult ImpactAnalyzer::analyze_impact(AnalyzeImpactRequest request) const 
                           state.source_root, result);
     collect_and_classify_impacts(observations, include_resolution, observations_by_key,
                                 result.changed_file_key, result);
+    apply_reverse_bfs_priorisation(result);
     normalize_report_diagnostics(result.diagnostics);
     return result;
 }

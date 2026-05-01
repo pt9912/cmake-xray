@@ -6,6 +6,7 @@ add_library(
     services/project_analyzer.cpp
     services/report_generator.cpp
     services/target_graph_support.cpp
+    services/target_graph_traversal.cpp
 )
 
 target_include_directories(xray_hexagon
