@@ -19,6 +19,7 @@ impact-compile-db-only.json
 impact-file-api-loaded.json
 impact-file-api-partial.json
 impact-not-loaded.json
+impact-prioritised-cycle.json
 impact-prioritised-default.json
 impact-prioritised-depth-zero.json
 impact-prioritised-partial.json

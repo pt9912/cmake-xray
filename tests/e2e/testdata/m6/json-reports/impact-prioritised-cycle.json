@@ -1,0 +1,133 @@
+{
+  "format": "cmake-xray.impact",
+  "format_version": 3,
+  "report_type": "impact",
+  "inputs": {
+    "compile_database_path": null,
+    "compile_database_source": null,
+    "cmake_file_api_path": "tests/e2e/testdata/m6/file_api_cycle/build",
+    "cmake_file_api_resolved_path": "tests/e2e/testdata/m6/file_api_cycle/build/.cmake/api/v1/reply",
+    "cmake_file_api_source": "cli",
+    "changed_file": "src/cycA.cpp",
+    "changed_file_source": "file_api_source_root"
+  },
+  "summary": {
+    "affected_translation_unit_count": 1,
+    "direct_translation_unit_count": 1,
+    "heuristic_translation_unit_count": 0,
+    "classification": "direct",
+    "observation_source": "derived",
+    "target_metadata": "loaded",
+    "affected_target_count": 1,
+    "direct_target_count": 1,
+    "heuristic_target_count": 0
+  },
+  "directly_affected_translation_units": [
+    {
+      "reference": {
+        "source_path": "src/cycA.cpp",
+        "directory": "build"
+      },
+      "targets": [
+        {
+          "display_name": "cycA",
+          "type": "STATIC_LIBRARY"
+        }
+      ]
+    }
+  ],
+  "heuristically_affected_translation_units": [],
+  "directly_affected_targets": [
+    {
+      "display_name": "cycA",
+      "type": "STATIC_LIBRARY"
+    }
+  ],
+  "heuristically_affected_targets": [],
+  "target_graph_status": "loaded",
+  "target_graph": {
+    "nodes": [
+      {
+        "display_name": "cycA",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "cycA::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "cycB",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "cycB::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "cycC",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "cycC::STATIC_LIBRARY"
+      }
+    ],
+    "edges": [
+      {
+        "from_display_name": "cycA",
+        "from_unique_key": "cycA::STATIC_LIBRARY",
+        "to_display_name": "cycB",
+        "to_unique_key": "cycB::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "cycB",
+        "from_unique_key": "cycB::STATIC_LIBRARY",
+        "to_display_name": "cycC",
+        "to_unique_key": "cycC::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "cycC",
+        "from_unique_key": "cycC::STATIC_LIBRARY",
+        "to_display_name": "cycA",
+        "to_unique_key": "cycA::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      }
+    ]
+  },
+  "prioritized_affected_targets": [
+    {
+      "target": {
+        "display_name": "cycA",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "cycA::STATIC_LIBRARY"
+      },
+      "priority_class": "direct",
+      "graph_distance": 0,
+      "evidence_strength": "direct"
+    },
+    {
+      "target": {
+        "display_name": "cycC",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "cycC::STATIC_LIBRARY"
+      },
+      "priority_class": "direct_dependent",
+      "graph_distance": 1,
+      "evidence_strength": "direct"
+    },
+    {
+      "target": {
+        "display_name": "cycB",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "cycB::STATIC_LIBRARY"
+      },
+      "priority_class": "transitive_dependent",
+      "graph_distance": 2,
+      "evidence_strength": "direct"
+    }
+  ],
+  "impact_target_depth_requested": 2,
+  "impact_target_depth_effective": 2,
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "message": "reverse target graph traversal hit depth limit 2 within a cycle; some transitively dependent targets may be missing"
+    }
+  ]
+}

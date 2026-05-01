@@ -1,0 +1,32 @@
+{
+  "name": "cycC",
+  "id": "cycC::@c",
+  "type": "STATIC_LIBRARY",
+  "paths": {
+    "source": ".",
+    "build": "."
+  },
+  "sources": [
+    {
+      "path": "src/cycC.cpp",
+      "compileGroupIndex": 0
+    }
+  ],
+  "compileGroups": [
+    {
+      "sourceIndexes": [
+        0
+      ],
+      "language": "CXX",
+      "includes": [],
+      "defines": [],
+      "compileCommandFragments": []
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "cycA::@a",
+      "backtrace": 0
+    }
+  ]
+}

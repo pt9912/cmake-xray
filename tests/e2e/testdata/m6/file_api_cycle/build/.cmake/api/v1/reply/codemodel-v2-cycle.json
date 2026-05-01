@@ -1,0 +1,65 @@
+{
+  "kind": "codemodel",
+  "version": {
+    "major": 2,
+    "minor": 6
+  },
+  "paths": {
+    "source": "/project",
+    "build": "/project/build"
+  },
+  "configurations": [
+    {
+      "name": "",
+      "directories": [
+        {
+          "source": ".",
+          "build": ".",
+          "projectIndex": 0,
+          "childIndexes": [],
+          "targetIndexes": [
+            0,
+            1,
+            2
+          ]
+        }
+      ],
+      "projects": [
+        {
+          "name": "myproject",
+          "directoryIndexes": [
+            0
+          ],
+          "targetIndexes": [
+            0,
+            1,
+            2
+          ]
+        }
+      ],
+      "targets": [
+        {
+          "name": "cycA",
+          "id": "cycA::@a",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-cycA-0.json"
+        },
+        {
+          "name": "cycB",
+          "id": "cycB::@b",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-cycB-1.json"
+        },
+        {
+          "name": "cycC",
+          "id": "cycC::@c",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-cycC-2.json"
+        }
+      ]
+    }
+  ]
+}

@@ -18,6 +18,7 @@ impact-compile-db-only.txt
 impact-file-api-loaded.txt
 impact-file-api-partial.txt
 impact-not-loaded.txt
+impact-prioritised-cycle.txt
 impact-prioritised-default.txt
 impact-prioritised-depth-zero.txt
 impact-prioritised-partial.txt

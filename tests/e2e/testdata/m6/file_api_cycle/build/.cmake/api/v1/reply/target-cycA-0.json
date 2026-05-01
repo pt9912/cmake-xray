@@ -1,0 +1,32 @@
+{
+  "name": "cycA",
+  "id": "cycA::@a",
+  "type": "STATIC_LIBRARY",
+  "paths": {
+    "source": ".",
+    "build": "."
+  },
+  "sources": [
+    {
+      "path": "src/cycA.cpp",
+      "compileGroupIndex": 0
+    }
+  ],
+  "compileGroups": [
+    {
+      "sourceIndexes": [
+        0
+      ],
+      "language": "CXX",
+      "includes": [],
+      "defines": [],
+      "compileCommandFragments": []
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "cycB::@b",
+      "backtrace": 0
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+digraph cmake_xray_impact {
+  xray_report_type="impact";
+  format_version=3;
+  graph_node_limit=100;
+  graph_edge_limit=200;
+  graph_truncated=false;
+  graph_target_graph_status="loaded";
+  graph_impact_target_depth_requested=2;
+  graph_impact_target_depth_effective=2;
+  changed_file [kind="changed_file", label="cycA.cpp", path="src/cycA.cpp"];
+  direct_tu_1 [kind="translation_unit", impact="direct", label="cycA.cpp", path="src/cycA.cpp", directory="build", unique_key="/project/src/cycA.cpp|/project/build"];
+  target_1 [kind="target", impact="direct", priority_class="direct", graph_distance=0, evidence_strength="direct", label="cycA", name="cycA", type="STATIC_LIBRARY", unique_key="cycA::STATIC_LIBRARY"];
+  target_2 [kind="target", priority_class="transitive_dependent", graph_distance=2, evidence_strength="direct", label="cycB", name="cycB", type="STATIC_LIBRARY", unique_key="cycB::STATIC_LIBRARY"];
+  target_3 [kind="target", priority_class="direct_dependent", graph_distance=1, evidence_strength="direct", label="cycC", name="cycC", type="STATIC_LIBRARY", unique_key="cycC::STATIC_LIBRARY"];
+  changed_file -> direct_tu_1 [kind="changed_file_direct_tu", style="solid"];
+  direct_tu_1 -> target_1 [kind="direct_tu_target", style="solid"];
+  target_1 -> target_2 [kind="target_dependency", style="solid", resolution="resolved"];
+  target_2 -> target_3 [kind="target_dependency", style="solid", resolution="resolved"];
+  target_3 -> target_1 [kind="target_dependency", style="solid", resolution="resolved"];
+}

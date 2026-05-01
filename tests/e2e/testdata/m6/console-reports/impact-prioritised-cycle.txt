@@ -1,0 +1,23 @@
+impact analysis for src/cycA.cpp
+affected translation units: 1
+observation source: derived
+target metadata: loaded
+affected targets: 1
+  src/cycA.cpp [directory: build] [targets: cycA] [direct]
+
+directly affected targets
+- cycA [type: STATIC_LIBRARY]
+
+heuristically affected targets
+no heuristically affected targets
+
+Target Graph Reference (target_graph_status: loaded):
+  cycA -> cycB
+  cycB -> cycC
+  cycC -> cycA
+
+Prioritised Affected Targets (requested depth: 2, effective depth: 2):
+  [direct, distance=0, evidence=direct] cycA
+  [direct_dependent, distance=1, evidence=direct] cycC
+  [transitive_dependent, distance=2, evidence=direct] cycB
+warning: reverse target graph traversal hit depth limit 2 within a cycle; some transitively dependent targets may be missing

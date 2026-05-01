@@ -21,6 +21,7 @@ impact-compile-db-only.dot
 impact-file-api-loaded.dot
 impact-file-api-partial.dot
 impact-not-loaded.dot
+impact-prioritised-cycle.dot
 impact-prioritised-default.dot
 impact-prioritised-depth-zero.dot
 impact-prioritised-partial.dot
