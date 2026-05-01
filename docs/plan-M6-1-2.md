@@ -1104,9 +1104,13 @@ Schema-Tests:
 Regressionstests:
 
 - Compile-DB-only-Goldens fuer Console und Markdown bleiben byte-stabil
-  (es gibt keinen Target-Graph-Abschnitt). Diese Goldens leben unter
-  `m5/console-reports/` bzw. `m5/markdown-reports/` und werden in A.3
-  weder migriert noch geloescht.
+  (es gibt keinen Target-Graph-Abschnitt). Diese Goldens leben historisch
+  unter `tests/e2e/testdata/m3/<scenario>/{analyze,impact}-{console.txt,
+  markdown.md}` (per-Szenario, nicht zentralisiert wie JSON/DOT/HTML).
+  Sie werden in A.3 weder migriert noch geloescht; ein paralleles
+  `m5/console-reports/`- bzw. `m5/markdown-reports/`-Verzeichnis wird
+  bewusst nicht eingefuehrt, damit die bestehende per-Szenario-Struktur
+  und die `run_e2e_smoke.sh`-Pfade unangetastet bleiben.
 - File-API- und Mixed-Input-Goldens unter `m5/<format>-reports/`
   **veraendern sich** durch AP 1.2 inhaltlich, weil sie nun v2-Schema
   und v2-Sektionen tragen. Die Aenderung ist erwartet und wird im
