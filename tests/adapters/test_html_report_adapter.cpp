@@ -1042,3 +1042,281 @@ TEST_CASE("HTML impact report renders both direct and heuristic sections in fixe
     CHECK(report.find("badge-direct") != std::string::npos);
     CHECK(report.find("badge-heuristic") != std::string::npos);
 }
+
+// ---- M6 AP 1.2 Tranche A.3: Target Graph / Target Hubs / Target Graph
+// Reference sections. Status matrix per docs/plan-M6-1-2.md "HTML-Adapter
+// (Status-Matrix Reporttyp x Status)" plus disambiguation regressions.
+
+namespace m6_html {
+
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyKind;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraphStatus;
+
+TargetDependency resolved_edge(std::string from_uk, std::string from_dn,
+                               std::string to_uk, std::string to_dn) {
+    return TargetDependency{std::move(from_uk),       std::move(from_dn),
+                            std::move(to_uk),         std::move(to_dn),
+                            TargetDependencyKind::direct,
+                            TargetDependencyResolution::resolved};
+}
+
+TargetDependency external_edge(std::string from_uk, std::string from_dn,
+                               std::string to_uk, std::string to_dn) {
+    return TargetDependency{std::move(from_uk),       std::move(from_dn),
+                            std::move(to_uk),         std::move(to_dn),
+                            TargetDependencyKind::direct,
+                            TargetDependencyResolution::external};
+}
+
+}  // namespace m6_html
+
+TEST_CASE("HTML analyze v2: not_loaded keeps Target Graph and Target Hubs sections with empty paragraphs") {
+    // Compile-DB-only run: target_graph_status defaults to not_loaded, both
+    // sections must remain present with h2 and the documented empty paragraph.
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(make_minimal_analysis_result(), 3);
+    CHECK(report.find("class=\"target-graph\"") != std::string::npos);
+    CHECK(report.find("<h2>Target Graph</h2>") != std::string::npos);
+    CHECK(report.find("Target graph not loaded.") != std::string::npos);
+    CHECK(report.find("class=\"target-hubs\"") != std::string::npos);
+    CHECK(report.find("<h2>Target Hubs</h2>") != std::string::npos);
+    CHECK(report.find("Target hubs not available.") != std::string::npos);
+    // No Target Graph table or Hub table when not_loaded.
+    CHECK(report.find("<th scope=\"col\">From</th>") == std::string::npos);
+    CHECK(report.find("<th scope=\"col\">Direction</th>") == std::string::npos);
+}
+
+TEST_CASE("HTML analyze v2: pflichtsection order extends to eight sections including Target Graph and Target Hubs") {
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(make_minimal_analysis_result(), 3);
+    const auto pos_targets = report.find("class=\"target-metadata\"");
+    const auto pos_graph = report.find("class=\"target-graph\"");
+    const auto pos_hubs = report.find("class=\"target-hubs\"");
+    const auto pos_diags = report.find("class=\"diagnostics\"");
+    REQUIRE(pos_targets != std::string::npos);
+    REQUIRE(pos_graph != std::string::npos);
+    REQUIRE(pos_hubs != std::string::npos);
+    REQUIRE(pos_diags != std::string::npos);
+    CHECK(pos_targets < pos_graph);
+    CHECK(pos_graph < pos_hubs);
+    CHECK(pos_hubs < pos_diags);
+}
+
+TEST_CASE("HTML analyze v2: loaded status emits status badge, populated edge table and hubs with thresholds") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = m6_html::TargetGraphStatus::loaded;
+    result.target_graph.nodes = {
+        TargetInfo{"app", "EXECUTABLE", "app::EXECUTABLE"},
+        TargetInfo{"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"},
+    };
+    result.target_graph.edges = {
+        m6_html::resolved_edge("app::EXECUTABLE", "app",
+                               "core::STATIC_LIBRARY", "core"),
+    };
+    result.target_hubs_in.push_back({"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"});
+    result.target_hubs_out.push_back({"app", "EXECUTABLE", "app::EXECUTABLE"});
+
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+
+    CHECK(report.find("Status: <span class=\"badge badge--loaded\">loaded</span>") !=
+          std::string::npos);
+    CHECK(report.find("<th scope=\"col\">From</th>") != std::string::npos);
+    CHECK(report.find("<th scope=\"col\">Resolution</th>") != std::string::npos);
+    CHECK(report.find("<th scope=\"col\">External target</th>") != std::string::npos);
+    CHECK(report.find("<td>app</td><td>core</td><td>resolved</td><td></td>") !=
+          std::string::npos);
+    // No leersatz when edges are present.
+    CHECK(report.find("No direct target dependencies.") == std::string::npos);
+    // Target Hubs section: thresholds line + 2 hub rows.
+    CHECK(report.find("Incoming threshold: 10. Outgoing threshold: 10.") !=
+          std::string::npos);
+    CHECK(report.find("<th scope=\"col\">Direction</th>") != std::string::npos);
+    CHECK(report.find("<th scope=\"col\">Threshold</th>") != std::string::npos);
+    CHECK(report.find("<th scope=\"col\">Targets</th>") != std::string::npos);
+    CHECK(report.find("<td>Inbound</td><td>10</td><td>core</td>") != std::string::npos);
+    CHECK(report.find("<td>Outbound</td><td>10</td><td>app</td>") != std::string::npos);
+}
+
+TEST_CASE("HTML analyze v2: partial status with external edge fills External target column") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = m6_html::TargetGraphStatus::partial;
+    result.target_graph.nodes = {
+        TargetInfo{"app", "EXECUTABLE", "app::EXECUTABLE"},
+    };
+    result.target_graph.edges = {
+        m6_html::external_edge("app::EXECUTABLE", "app",
+                               "<external>::ghost", "ghost"),
+    };
+
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+    CHECK(report.find("Status: <span class=\"badge badge--partial\">partial</span>") !=
+          std::string::npos);
+    // External row carries the raw_id in the External target column.
+    CHECK(report.find("<td>app</td><td>ghost</td><td>external</td><td>ghost</td>") !=
+          std::string::npos);
+}
+
+TEST_CASE("HTML analyze v2: loaded status with empty edge list emits No direct target dependencies leersatz") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = m6_html::TargetGraphStatus::loaded;
+    // Nodes loaded but no edges: leersatz, no table.
+    result.target_graph.nodes = {
+        TargetInfo{"only_one", "EXECUTABLE", "only_one::EXECUTABLE"},
+    };
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+    CHECK(report.find("Status: <span class=\"badge badge--loaded\">loaded</span>") !=
+          std::string::npos);
+    CHECK(report.find("No direct target dependencies.") != std::string::npos);
+    CHECK(report.find("<th scope=\"col\">From</th>") == std::string::npos);
+}
+
+TEST_CASE("HTML analyze v2: empty inbound and outbound hub vectors render leersaetze in Targets cell") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = m6_html::TargetGraphStatus::loaded;
+    // Status loaded but no hubs computed → cell carries the leersatz text.
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+    CHECK(report.find("<td>Inbound</td><td>10</td><td>No incoming hubs.</td>") !=
+          std::string::npos);
+    CHECK(report.find("<td>Outbound</td><td>10</td><td>No outgoing hubs.</td>") !=
+          std::string::npos);
+}
+
+TEST_CASE("HTML analyze v2: hub list disambiguation suffix uses identity_key for collisions") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = m6_html::TargetGraphStatus::loaded;
+    // Two hubs share display_name="foo" but live under different unique_keys.
+    // Adapter consumes the model in the AP-1.1 sort order
+    // (unique_key, display_name, type); foo::EXECUTABLE precedes
+    // foo::STATIC_LIBRARY, so we feed the test input in the same order to
+    // mirror production data flow.
+    result.target_hubs_in = {
+        TargetInfo{"foo", "EXECUTABLE", "foo::EXECUTABLE"},
+        TargetInfo{"foo", "STATIC_LIBRARY", "foo::STATIC_LIBRARY"},
+    };
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+    // Both entries get [key: ...] suffix; comma-separated inside the Targets
+    // cell, byte-stable in the model's pre-sorted order.
+    CHECK(report.find(
+              "<td>Inbound</td><td>10</td>"
+              "<td>foo [key: foo::EXECUTABLE], foo [key: foo::STATIC_LIBRARY]</td>") !=
+          std::string::npos);
+}
+
+TEST_CASE("HTML analyze v2: external edge raw_id with HTML specials is escaped without leaking tags") {
+    // Plan-Test 'evil<script>' regression: <external>::raw_id strings get HTML
+    // escaped to &lt;external&gt;::raw_id; raw <script> tags must never reach
+    // the rendered DOM.
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = m6_html::TargetGraphStatus::partial;
+    result.target_graph.edges = {
+        m6_html::external_edge("app::EXECUTABLE", "app",
+                               "<external>::evil<script>", "evil<script>"),
+    };
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+    // The raw_id appears HTML-escaped both in the To and the External target
+    // cells.
+    CHECK(report.find("evil&lt;script&gt;") != std::string::npos);
+    // No raw <script> tags survive into the output.
+    CHECK(report.find("<script>") == std::string::npos);
+}
+
+TEST_CASE("HTML analyze v2: mixed disambiguation across to-column escapes <external>::* keys") {
+    // Plan mischfall: edge to internal "foo" (foo::STATIC_LIBRARY) and edge
+    // to external raw_id "foo" (<external>::foo) both appear in the same To
+    // column. Both rows get [key: ...] suffix; HTML adapter must HTML-escape
+    // the < and > in the external suffix to &lt;external&gt;::foo.
+    AnalysisResult result = make_minimal_analysis_result();
+    result.target_graph_status = m6_html::TargetGraphStatus::loaded;
+    result.target_graph.nodes = {
+        TargetInfo{"app", "EXECUTABLE", "app::EXECUTABLE"},
+        TargetInfo{"foo", "STATIC_LIBRARY", "foo::STATIC_LIBRARY"},
+    };
+    result.target_graph.edges = {
+        m6_html::resolved_edge("app::EXECUTABLE", "app",
+                               "foo::STATIC_LIBRARY", "foo"),
+        m6_html::external_edge("app::EXECUTABLE", "app",
+                               "<external>::foo", "foo"),
+    };
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+    // Internal foo row: To cell shows "foo [key: foo::STATIC_LIBRARY]".
+    CHECK(report.find("<td>foo [key: foo::STATIC_LIBRARY]</td>") != std::string::npos);
+    // External foo row: To cell shows "foo [key: &lt;external&gt;::foo]".
+    CHECK(report.find("<td>foo [key: &lt;external&gt;::foo]</td>") != std::string::npos);
+    // Suffix angle brackets are escaped, never raw.
+    CHECK(report.find("[key: <external>::") == std::string::npos);
+}
+
+TEST_CASE("HTML impact v2: not_loaded keeps Target Graph Reference section with empty paragraph and no Hub section") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = std::string{"include/x.h"};
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("class=\"target-graph-reference\"") != std::string::npos);
+    CHECK(report.find("<h2>Target Graph Reference</h2>") != std::string::npos);
+    CHECK(report.find("Target graph not loaded.") != std::string::npos);
+    // Impact never carries a hub section.
+    CHECK(report.find("class=\"target-hubs\"") == std::string::npos);
+    CHECK(report.find("<h2>Target Hubs</h2>") == std::string::npos);
+}
+
+TEST_CASE("HTML impact v2: pflichtsection order extends with Target Graph Reference between targets and diagnostics") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = std::string{"include/x.h"};
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    const auto pos_heuristic_tgts =
+        report.find("class=\"impact-heuristic-targets\"");
+    const auto pos_graph_ref = report.find("class=\"target-graph-reference\"");
+    const auto pos_diags = report.find("class=\"diagnostics\"");
+    REQUIRE(pos_heuristic_tgts != std::string::npos);
+    REQUIRE(pos_graph_ref != std::string::npos);
+    REQUIRE(pos_diags != std::string::npos);
+    CHECK(pos_heuristic_tgts < pos_graph_ref);
+    CHECK(pos_graph_ref < pos_diags);
+}
+
+TEST_CASE("HTML impact v2: loaded status renders Target Graph Reference table with edges") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = std::string{"include/x.h"};
+    result.target_graph_status = m6_html::TargetGraphStatus::loaded;
+    result.target_graph.nodes = {
+        TargetInfo{"app", "EXECUTABLE", "app::EXECUTABLE"},
+        TargetInfo{"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"},
+    };
+    result.target_graph.edges = {
+        m6_html::resolved_edge("app::EXECUTABLE", "app",
+                               "core::STATIC_LIBRARY", "core"),
+    };
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("Status: <span class=\"badge badge--loaded\">loaded</span>") !=
+          std::string::npos);
+    CHECK(report.find("<th scope=\"col\">From</th>") != std::string::npos);
+    CHECK(report.find("<td>app</td><td>core</td><td>resolved</td><td></td>") !=
+          std::string::npos);
+}
+
+TEST_CASE("HTML impact v2: partial status with external edge fills External target column") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = std::string{"include/x.h"};
+    result.target_graph_status = m6_html::TargetGraphStatus::partial;
+    result.target_graph.edges = {
+        m6_html::external_edge("app::EXECUTABLE", "app",
+                               "<external>::boost", "boost"),
+    };
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("Status: <span class=\"badge badge--partial\">partial</span>") !=
+          std::string::npos);
+    CHECK(report.find("<td>app</td><td>boost</td><td>external</td><td>boost</td>") !=
+          std::string::npos);
+}

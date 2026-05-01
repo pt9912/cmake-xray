@@ -1,0 +1,448 @@
+{
+  "format": "cmake-xray.analysis",
+  "format_version": 2,
+  "report_type": "analyze",
+  "inputs": {
+    "compile_database_path": null,
+    "compile_database_source": null,
+    "cmake_file_api_path": "tests/e2e/testdata/m6/file_api_loaded/build",
+    "cmake_file_api_resolved_path": "tests/e2e/testdata/m6/file_api_loaded/build/.cmake/api/v1/reply",
+    "cmake_file_api_source": "cli"
+  },
+  "summary": {
+    "translation_unit_count": 11,
+    "ranking_total_count": 11,
+    "hotspot_total_count": 0,
+    "top_limit": 10,
+    "include_analysis_heuristic": true,
+    "observation_source": "derived",
+    "target_metadata": "loaded"
+  },
+  "translation_unit_ranking": {
+    "limit": 10,
+    "total_count": 11,
+    "returned_count": 10,
+    "truncated": true,
+    "items": [
+      {
+        "rank": 1,
+        "reference": {
+          "source_path": "src/hub.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 3,
+          "include_path_count": 0,
+          "define_count": 0,
+          "score": 3
+        },
+        "targets": [
+          {
+            "display_name": "hub",
+            "type": "STATIC_LIBRARY"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/hub.cpp"
+          }
+        ]
+      },
+      {
+        "rank": 2,
+        "reference": {
+          "source_path": "src/src00.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 3,
+          "include_path_count": 0,
+          "define_count": 0,
+          "score": 3
+        },
+        "targets": [
+          {
+            "display_name": "src00",
+            "type": "STATIC_LIBRARY"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/src00.cpp"
+          }
+        ]
+      },
+      {
+        "rank": 3,
+        "reference": {
+          "source_path": "src/src01.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 3,
+          "include_path_count": 0,
+          "define_count": 0,
+          "score": 3
+        },
+        "targets": [
+          {
+            "display_name": "src01",
+            "type": "STATIC_LIBRARY"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/src01.cpp"
+          }
+        ]
+      },
+      {
+        "rank": 4,
+        "reference": {
+          "source_path": "src/src02.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 3,
+          "include_path_count": 0,
+          "define_count": 0,
+          "score": 3
+        },
+        "targets": [
+          {
+            "display_name": "src02",
+            "type": "STATIC_LIBRARY"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/src02.cpp"
+          }
+        ]
+      },
+      {
+        "rank": 5,
+        "reference": {
+          "source_path": "src/src03.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 3,
+          "include_path_count": 0,
+          "define_count": 0,
+          "score": 3
+        },
+        "targets": [
+          {
+            "display_name": "src03",
+            "type": "STATIC_LIBRARY"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/src03.cpp"
+          }
+        ]
+      },
+      {
+        "rank": 6,
+        "reference": {
+          "source_path": "src/src04.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 3,
+          "include_path_count": 0,
+          "define_count": 0,
+          "score": 3
+        },
+        "targets": [
+          {
+            "display_name": "src04",
+            "type": "STATIC_LIBRARY"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/src04.cpp"
+          }
+        ]
+      },
+      {
+        "rank": 7,
+        "reference": {
+          "source_path": "src/src05.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 3,
+          "include_path_count": 0,
+          "define_count": 0,
+          "score": 3
+        },
+        "targets": [
+          {
+            "display_name": "src05",
+            "type": "STATIC_LIBRARY"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/src05.cpp"
+          }
+        ]
+      },
+      {
+        "rank": 8,
+        "reference": {
+          "source_path": "src/src06.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 3,
+          "include_path_count": 0,
+          "define_count": 0,
+          "score": 3
+        },
+        "targets": [
+          {
+            "display_name": "src06",
+            "type": "STATIC_LIBRARY"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/src06.cpp"
+          }
+        ]
+      },
+      {
+        "rank": 9,
+        "reference": {
+          "source_path": "src/src07.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 3,
+          "include_path_count": 0,
+          "define_count": 0,
+          "score": 3
+        },
+        "targets": [
+          {
+            "display_name": "src07",
+            "type": "STATIC_LIBRARY"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/src07.cpp"
+          }
+        ]
+      },
+      {
+        "rank": 10,
+        "reference": {
+          "source_path": "src/src08.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 3,
+          "include_path_count": 0,
+          "define_count": 0,
+          "score": 3
+        },
+        "targets": [
+          {
+            "display_name": "src08",
+            "type": "STATIC_LIBRARY"
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "cannot read source file for include analysis: src/src08.cpp"
+          }
+        ]
+      }
+    ]
+  },
+  "include_hotspots": {
+    "limit": 10,
+    "total_count": 0,
+    "returned_count": 0,
+    "truncated": false,
+    "items": []
+  },
+  "target_graph_status": "loaded",
+  "target_graph": {
+    "nodes": [
+      {
+        "display_name": "hub",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "hub::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src00",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src00::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src01",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src01::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src02",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src02::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src03",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src03::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src04",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src04::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src05",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src05::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src06",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src06::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src07",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src07::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src08",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src08::STATIC_LIBRARY"
+      },
+      {
+        "display_name": "src09",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "src09::STATIC_LIBRARY"
+      }
+    ],
+    "edges": [
+      {
+        "from_display_name": "src00",
+        "from_unique_key": "src00::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src01",
+        "from_unique_key": "src01::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src02",
+        "from_unique_key": "src02::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src03",
+        "from_unique_key": "src03::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src04",
+        "from_unique_key": "src04::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src05",
+        "from_unique_key": "src05::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src06",
+        "from_unique_key": "src06::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src07",
+        "from_unique_key": "src07::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src08",
+        "from_unique_key": "src08::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      },
+      {
+        "from_display_name": "src09",
+        "from_unique_key": "src09::STATIC_LIBRARY",
+        "to_display_name": "hub",
+        "to_unique_key": "hub::STATIC_LIBRARY",
+        "kind": "direct",
+        "resolution": "resolved"
+      }
+    ]
+  },
+  "target_hubs": {
+    "inbound": [
+      {
+        "display_name": "hub",
+        "type": "STATIC_LIBRARY",
+        "unique_key": "hub::STATIC_LIBRARY"
+      }
+    ],
+    "outbound": [],
+    "thresholds": {
+      "in_threshold": 10,
+      "out_threshold": 10
+    }
+  },
+  "diagnostics": [
+    {
+      "severity": "note",
+      "message": "include-based results are heuristic; conditional or generated includes may be missing"
+    }
+  ]
+}

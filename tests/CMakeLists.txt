@@ -341,6 +341,17 @@ add_test(
             --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/html-reports/manifest.txt
 )
 
+# AP M6-1.2 Tranche A.3: M6 dataset HTML goldens validate against the same
+# stdlib structure smoke as m5/html-reports. Both directories carry only
+# format_version=2 goldens; the m5/m6 split is dataset-scenario-driven.
+add_test(
+    NAME html_structure_validation_m6
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_html_reports.py
+            --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/html-reports
+            --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/html-reports/manifest.txt
+)
+
 # Negative gate: a deliberately broken HTML fixture must fail validation so
 # we have evidence the smoke actually rejects violations rather than silently
 # passing. WILL_FAIL inverts the test outcome.
@@ -351,6 +362,28 @@ add_test(
             --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/html_broken_sample.html
 )
 set_tests_properties(html_structure_validation_rejects_broken_html PROPERTIES WILL_FAIL TRUE)
+
+# AP M6-1.2 Tranche A.3: manifest/directory parity gates for the M6
+# Markdown and Console reference goldens. There is no dedicated structure
+# validator for these formats (markdown/console are line-based text without
+# a formal contract beyond docs/plan-M6-1-2.md); the parity check stops a
+# stray file or an out-of-date manifest from passing review unnoticed.
+add_test(
+    NAME markdown_manifest_validation_m6
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_manifest_parity.py
+            --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/markdown-reports
+            --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/markdown-reports/manifest.txt
+            --suffix .md
+)
+add_test(
+    NAME console_manifest_validation_m6
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_manifest_parity.py
+            --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/console-reports
+            --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/console-reports/manifest.txt
+            --suffix .txt
+)
 
 # AP M5-1.5 Tranche B.1: verbosity manifest/parity gate. Stdlib-only Python
 # validator covering the same manifest+content invariants the JSON/DOT/HTML

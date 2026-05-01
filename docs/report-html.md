@@ -1,6 +1,8 @@
 # HTML Report Contract
 
 > **Implementierungsstand:** AP M5-1.4 Tranche A liefert den HTML-Vertrag, das statische CSS, file-locale Escaping- und Whitespace-Hilfen und das Adapter-Testskelett. Tranche B implementiert den produktiven `HtmlReportAdapter` und schaltet `--format html` an der CLI frei. Bis dahin lehnt die CLI `--format html` weiterhin als `recognized but not implemented in this build` ab. Die in diesem Dokument festgehaltenen Regeln sind ab Tranche A bindend; folgende Tranchen erweitern den Vertrag nicht ohne Update dieses Dokuments.
+>
+> **M6 AP 1.2 Tranche A.3:** `format_version` steigt auf `2`. Analyze-HTML traegt zwei zusaetzliche Pflichtsections `Target Graph` und `Target Hubs` zwischen `Target Metadata` und `Diagnostics`. Impact-HTML traegt eine zusaetzliche Pflichtsection `Target Graph Reference` zwischen `Heuristically Affected Targets` und `Diagnostics`. Beide Reporttypen behalten die neuen Sections auch bei `target_graph_status="not_loaded"` mit `h2` und sichtbarem Leersatz, analog zu `Target Metadata` aus M5.
 
 ## Zweck
 
@@ -35,12 +37,12 @@ Das Geruest ist fuer Analyze und Impact identisch:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="xray-report-format-version" content="1">
+  <meta name="xray-report-format-version" content="2">
   <title>cmake-xray analyze report</title>
   <style>...</style>
 </head>
 <body>
-  <main class="report" data-report-type="analyze" data-format-version="1">
+  <main class="report" data-report-type="analyze" data-format-version="2">
     ...
   </main>
 </body>
@@ -97,6 +99,13 @@ Whitespace in fachlichen Textwerten wird vor dem HTML-Escaping einheitlich norma
 
 Pfade, Target-Namen, Directories, Diagnostics-, Input- und Summary-Werte verwenden denselben Whitespace-Vertrag. AP 1.4 erzeugt keine `pre`/`code`-Elemente fuer fachliche Werte und keine Links aus fachlichen Pfaden. Leere Strings werden als leerer Textwert nur ausgegeben, wenn das Modell tatsaechlich einen leeren String enthaelt; fehlende optionale Eingaben aus `ReportInputs` werden als sichtbarer Text `not provided` ausgegeben.
 
+### Disambiguierung kollidierender Target-Display-Namen (M6 AP 1.2)
+
+- Die `Target Graph`-, `Target Hubs`- und `Target Graph Reference`-Sections nutzen denselben gemeinsamen Helper `disambiguate_target_display_names()` wie Console und Markdown. Eindeutigkeitspruefung erfolgt pro Liste (Direct Target Dependencies, Inbound-Hubs, Outbound-Hubs, Target Graph Reference).
+- Wenn ein `display_text` innerhalb der jeweiligen Liste nicht eindeutig ist, ergaenzt der Helper das Suffix ` [key: <unique_key>]`. Eindeutige `display_text`-Werte bleiben unveraendert.
+- `<external>::*`-Schluessel im Suffix enthalten spitze Klammern; das Standard-HTML-Escaping macht daraus `&lt;external&gt;::<raw_id>`. Adapter-Tests pinnen das Verhalten als Regression gegen versehentliche Roh-HTML-Ausgabe.
+- Externe Edge-Ziele werden in der `Target Graph`-Tabelle nicht zusaetzlich mit einem `[external]`-Wort markiert; die `Resolution`-Spalte traegt bereits den Wert `external`, und der `External target`-Zelleninhalt enthaelt die HTML-escapte `raw_id`. Die Console- und Markdown-Suffix-Reihenfolge `[external] [key: ...]` gilt nicht fuer HTML, weil die Zellenstruktur bereits dieselbe Information traegt.
+
 ## Deterministische Reihenfolge
 
 Dokumentreihenfolge:
@@ -144,7 +153,9 @@ Pflichtsections (in Reihenfolge):
 3. Translation Unit Ranking
 4. Include Hotspots
 5. Target Metadata
-6. Diagnostics
+6. Target Graph (M6 AP 1.2)
+7. Target Hubs (M6 AP 1.2)
+8. Diagnostics
 
 ### Header / Summary (analyze)
 
@@ -169,6 +180,24 @@ Spalten: `Header`, `Affected translation units`, `Translation unit context`. Hoe
 
 Observation Source, Target Metadata Status, Anzahl TU mit Target-Mapping, Liste eindeutiger Targets sortiert nach `display_name`, `type`, `unique_key`. Leersatz `No target metadata loaded.`.
 
+### Target Graph (analyze, M6 AP 1.2)
+
+- `h2`: `Target Graph`.
+- Sichtbarer Statuswert: `Status: <target_graph_status>`. Die Status-Badge-Klassen `badge--loaded`, `badge--partial` und `badge--not-loaded` aus M5 werden dafuer wiederverwendet; keine neuen CSS-Klassen.
+- Wenn `target_graph_status="not_loaded"`: nur ein Absatz mit dem Leersatz `Target graph not loaded.`. Keine Tabelle. Section bleibt im Output (nicht weggelassen), analog zur M5-`Target Metadata`-Section.
+- Wenn `target_graph_status="loaded"` oder `"partial"` und `target_graph.edges` leer: Tabelle entfaellt, Leersatz `No direct target dependencies.`.
+- Wenn `target_graph_status="loaded"` oder `"partial"` und `target_graph.edges` nicht leer: Tabelle mit Spalten `From`, `To`, `Resolution`, `External target`. `External target`-Zelle bleibt leer fuer `resolution="resolved"` und enthaelt den HTML-escapten `raw_id` fuer `resolution="external"`.
+- Zeilenreihenfolge nach `(from_unique_key, to_unique_key, kind, from_display_name, to_display_name)`, identisch zu JSON `target_graph.edges` und Console/Markdown. HTML-Adapter rufen `target_graph_support::sort_target_graph` NICHT erneut auf; sie verlassen sich auf die bereits sortierten Modelldaten aus `AnalysisResult`.
+
+### Target Hubs (analyze, M6 AP 1.2)
+
+- `h2`: `Target Hubs`.
+- Wenn `target_graph_status="not_loaded"`: Section bleibt mit `h2` und Absatz `Target hubs not available.`. Keine Tabelle.
+- Sonst sichtbare Schwellenwerte: `Incoming threshold: <in_threshold>. Outgoing threshold: <out_threshold>.`. In AP 1.2 sind beide Werte fest auf `10` gesetzt; AP 1.5 macht sie ueber CLI konfigurierbar.
+- Tabelle mit Spalten `Direction`, `Threshold`, `Targets`. Eine Zeile fuer `Inbound`, eine fuer `Outbound` (feste Reihenfolge).
+- `Targets`-Zelle: kommagetrennte Display-Namen, jeweils HTML-escapt. Bei Namens-Kollision innerhalb der Liste mit ` [key: <unique_key>]`-Suffix; spitze Klammern aus `<external>::*`-Schluesseln werden HTML-escaped. Innerhalb jeder Zelle ist die kommaweise Reihenfolge nach `(unique_key, display_name, type)` sortiert, identisch zu JSON `target_hubs.inbound`/`target_hubs.outbound`.
+- Leerer `inbound`- bzw. `outbound`-Vector: `Targets`-Zelle traegt den Leersatz `No incoming hubs.` bzw. `No outgoing hubs.` als Textinhalt.
+
 ### Diagnostics (analyze)
 
 Reportweite Diagnostics aus `AnalysisResult::diagnostics`, Severity als Text, Reihenfolge bleibt Modellreihenfolge. Leersatz `No diagnostics.`.
@@ -183,7 +212,8 @@ Pflichtsections (in Reihenfolge):
 4. Heuristically Affected Translation Units
 5. Directly Affected Targets
 6. Heuristically Affected Targets
-7. Diagnostics
+7. Target Graph Reference (M6 AP 1.2)
+8. Diagnostics
 
 ### Header / Summary (impact)
 
@@ -198,17 +228,28 @@ Spalten: `Source path`, `Directory`, `Targets`. Reihenfolge folgt der Reihenfolg
 
 Spalten: `Display name`, `Type`. Reihenfolge: `display_name`, `type`, `unique_key`. Gleichnamige Targets mit unterschiedlichem `type` bleiben ueber die `Type`-Spalte unterscheidbar. Leersatz `No directly affected targets.` bzw. `No heuristically affected targets.`.
 
+### Target Graph Reference (impact, M6 AP 1.2)
+
+- Identischer Tabellen-Vertrag wie `Target Graph` im Analyze-HTML (Spalten `From`, `To`, `Resolution`, `External target`; Sortierung nach `(from_unique_key, to_unique_key, kind, from_display_name, to_display_name)`).
+- `h2`: `Target Graph Reference`.
+- Sichtbarer Statuswert: `Status: <target_graph_status>` mit denselben Status-Badge-Klassen.
+- Bei `target_graph_status="not_loaded"`: `h2` plus Absatz `Target graph not loaded.` (gleicher Leersatz wie Analyze; Section bleibt im Output).
+- Bei `target_graph_status="loaded"` oder `"partial"` mit leerer `target_graph.edges`-Liste: Leersatz `No direct target dependencies.` ohne Tabelle.
+- Es gibt KEINE Hub-Section im Impact-HTML; diese Asymmetrie spiegelt den JSON-Vertrag (`target_hubs` existiert nur im Analyze-Output).
+- AP 1.3 darf den Section-Titel auf `Target Graph (prioritised)` aendern und die Tabelle um Priorisierungs-Spalten erweitern; AP 1.2 schreibt nur die reine Lesedaten-Sicht.
+
 ### Diagnostics (impact)
 
 Reportweite Diagnostics aus `ImpactResult::diagnostics`. Leersatz `No diagnostics.`.
 
 ## Goldens
 
-- Goldens liegen unter `tests/e2e/testdata/m5/html-reports/`.
-- Manifest `tests/e2e/testdata/m5/html-reports/manifest.txt` listet jeden Goldenpfad einmal; Verzeichnis und Manifest werden beidseitig abgeglichen.
+- Goldens liegen unter `tests/e2e/testdata/m5/html-reports/` und `tests/e2e/testdata/m6/html-reports/`. Beide Verzeichnisse enthalten ausschliesslich `format_version=2`-Goldens; die `m5/`-/`m6/`-Trennung ist fachlich (Datensatz-Szenarien), nicht versionell, analog zur JSON- und DOT-Goldens-Aufteilung.
+- Manifeste `tests/e2e/testdata/m5/html-reports/manifest.txt` und `tests/e2e/testdata/m6/html-reports/manifest.txt` listen jeden Goldenpfad einmal; Verzeichnis und Manifest werden beidseitig abgeglichen.
 - Goldens enthalten keine Host-/Workspace-spezifischen Absolutpfade. Synthetische Pfade wie `/project/...` oder `C:/project/...` bleiben erlaubt.
 - Goldens enthalten keine Zeitstempel, Hostnamen, zufaellige IDs oder Buildpfade.
 - Goldens fuer absolute `--changed-file`-Eingaben werden per Plattform gesplittet (`*_windows.html` neben dem POSIX-Golden), weil die Pfadsemantik auf Windows abweicht (siehe `docs/plan-M5-1-4.md`, Tranche C).
+- M6-Pflichtszenarien sind `analyze-compile-db-only`, `analyze-file-api-loaded`, `analyze-file-api-partial`, `impact-compile-db-only`, `impact-file-api-loaded` und `impact-file-api-partial` jeweils als `.html` unter `tests/e2e/testdata/m6/html-reports/`. M5-File-API- und Mixed-Input-Goldens unter `tests/e2e/testdata/m5/html-reports/` werden in AP 1.2 A.3 inhaltlich auf v2 migriert.
 
 ## Aenderungsregeln
 

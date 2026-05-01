@@ -1,15 +1,22 @@
 #include "adapters/output/console_report_adapter.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <map>
+#include <set>
 #include <sstream>
+#include <string>
+#include <string_view>
 #include <vector>
 
+#include "adapters/output/target_display_support.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
 #include "hexagon/model/observation_source.h"
+#include "hexagon/model/target_graph.h"
 #include "hexagon/model/target_info.h"
 #include "hexagon/model/translation_unit.h"
+#include "hexagon/services/target_graph_support.h"
 
 namespace xray::adapters::output {
 
@@ -20,6 +27,9 @@ using xray::hexagon::model::Diagnostic;
 using xray::hexagon::model::DiagnosticSeverity;
 using xray::hexagon::model::ImpactKind;
 using xray::hexagon::model::ImpactResult;
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraphStatus;
 using xray::hexagon::model::TargetImpactClassification;
 using xray::hexagon::model::TargetInfo;
 using xray::hexagon::model::TargetMetadataStatus;
@@ -207,6 +217,134 @@ void append_target_section(std::ostringstream& out, std::string_view title,
     if (!any) out << empty_text << '\n';
 }
 
+// ---- M6 AP 1.2 Tranche A.3: Target-Graph-related sections ---------------
+
+std::string target_graph_status_text(TargetGraphStatus status) {
+    // Caller filters not_loaded before reaching here; the not_loaded path
+    // omits the entire section per docs/plan-M6-1-2.md "Console- und
+    // Markdown-Vertragsregeln". Mapping the remaining two enum values via
+    // a ternary keeps the helper byte-stable without an unreachable third
+    // branch that would otherwise miss coverage.
+    return status == TargetGraphStatus::loaded ? "loaded" : "partial";
+}
+
+std::vector<std::string> render_from_column_with_suffix(
+    const std::vector<TargetDependency>& edges) {
+    // From-column has no [external] marker; use the shared display helper
+    // verbatim per docs/plan-M6-1-2.md "Adapter-Implementierungs-Hinweise".
+    std::vector<TargetDisplayEntry> entries;
+    entries.reserve(edges.size());
+    for (const auto& edge : edges) {
+        entries.push_back({edge.from_display_name, edge.from_unique_key});
+    }
+    return disambiguate_target_display_names(entries);
+}
+
+std::vector<std::string> render_to_column_with_suffixes(
+    const std::vector<TargetDependency>& edges) {
+    // Console-specific to-column: the suffix order is documented in
+    // docs/plan-M6-1-2.md "Reihenfolge der Suffixe bei kombiniertem
+    // Mischfall: <to_display_name> [external] [key: <to_unique_key>]". The
+    // shared disambiguation helper does not own the [external] suffix
+    // because it knows nothing about edge resolution; assemble suffixes
+    // here so the [external] marker always sits between the display name
+    // and the [key:...] disambiguation marker.
+    std::map<std::string, std::set<std::string>> distinct_keys_by_text;
+    for (const auto& edge : edges) {
+        distinct_keys_by_text[edge.to_display_name].insert(edge.to_unique_key);
+    }
+    std::vector<std::string> out;
+    out.reserve(edges.size());
+    for (const auto& edge : edges) {
+        std::string assembled = edge.to_display_name;
+        if (edge.resolution == TargetDependencyResolution::external) {
+            assembled.append(" [external]");
+        }
+        if (distinct_keys_by_text.at(edge.to_display_name).size() > 1) {
+            assembled.append(" [key: ").append(edge.to_unique_key).append("]");
+        }
+        out.push_back(std::move(assembled));
+    }
+    return out;
+}
+
+void append_target_graph_edge_lines(
+    std::ostringstream& out, const std::vector<TargetDependency>& edges) {
+    if (edges.empty()) {
+        out << "  No direct target dependencies.\n";
+        return;
+    }
+    const auto from_names = render_from_column_with_suffix(edges);
+    const auto to_names = render_to_column_with_suffixes(edges);
+    for (std::size_t i = 0; i < edges.size(); ++i) {
+        out << "  " << from_names[i] << " -> " << to_names[i] << '\n';
+    }
+}
+
+void append_target_graph_section(std::ostringstream& out, const AnalysisResult& result) {
+    out << '\n';
+    out << "Direct Target Dependencies (target_graph_status: "
+        << target_graph_status_text(result.target_graph_status) << "):\n";
+    append_target_graph_edge_lines(out, result.target_graph.edges);
+}
+
+void append_target_graph_reference_section(std::ostringstream& out,
+                                            const ImpactResult& result) {
+    out << '\n';
+    out << "Target Graph Reference (target_graph_status: "
+        << target_graph_status_text(result.target_graph_status) << "):\n";
+    append_target_graph_edge_lines(out, result.target_graph.edges);
+}
+
+// Bundle the hub-row parameters so `append_hub_line` stays inside the
+// project's 5-parameter cap; mirrors the TargetHubsView struct in the
+// JSON adapter.
+struct ConsoleHubLine {
+    std::string_view direction;       // "Inbound" or "Outbound"
+    std::string_view direction_word;  // "incoming" or "outgoing"
+    std::size_t threshold;
+    const std::vector<TargetInfo>& hubs;
+    std::string_view empty_text;
+};
+
+void append_hub_line(std::ostringstream& out, const ConsoleHubLine& line) {
+    out << "  " << line.direction << " (>= " << line.threshold << " "
+        << line.direction_word << "): ";
+    if (line.hubs.empty()) {
+        out << line.empty_text;
+    } else {
+        std::vector<TargetDisplayEntry> entries;
+        entries.reserve(line.hubs.size());
+        for (const auto& info : line.hubs) {
+            entries.push_back({info.display_name, info.unique_key});
+        }
+        const auto names = disambiguate_target_display_names(entries);
+        for (std::size_t i = 0; i < names.size(); ++i) {
+            if (i > 0) {
+                out << ", ";
+            }
+            out << names[i];
+        }
+    }
+    out << '\n';
+}
+
+void append_target_hubs_section(std::ostringstream& out, const AnalysisResult& result) {
+    out << '\n';
+    constexpr auto in_threshold =
+        xray::hexagon::services::kDefaultTargetHubInThreshold;
+    constexpr auto out_threshold =
+        xray::hexagon::services::kDefaultTargetHubOutThreshold;
+    out << "Target Hubs (in_threshold: " << in_threshold
+        << ", out_threshold: " << out_threshold << "):\n";
+    append_hub_line(
+        out, ConsoleHubLine{"Inbound", "incoming", in_threshold,
+                            result.target_hubs_in, "No incoming hubs."});
+    append_hub_line(
+        out, ConsoleHubLine{"Outbound", "outgoing", out_threshold,
+                            result.target_hubs_out, "No outgoing hubs."});
+}
+
 }  // namespace
 
 std::string ConsoleReportAdapter::write_analysis_report(const AnalysisResult& analysis_result,
@@ -216,6 +354,10 @@ std::string ConsoleReportAdapter::write_analysis_report(const AnalysisResult& an
     append_analysis_target_overview(out, analysis_result);
     const auto counts = append_ranking_section(out, analysis_result, top_limit);
     append_hotspot_section(out, analysis_result, counts.hotspot_count);
+    if (analysis_result.target_graph_status != TargetGraphStatus::not_loaded) {
+        append_target_graph_section(out, analysis_result);
+        append_target_hubs_section(out, analysis_result);
+    }
     append_diagnostics(out, analysis_result.diagnostics, "");
 
     return out.str();
@@ -244,6 +386,10 @@ std::string ConsoleReportAdapter::write_impact_report(const ImpactResult& impact
         append_target_section(out, "heuristically affected targets",
                               TargetImpactClassification::heuristic, impact_result,
                               "no heuristically affected targets");
+    }
+
+    if (impact_result.target_graph_status != TargetGraphStatus::not_loaded) {
+        append_target_graph_reference_section(out, impact_result);
     }
 
     append_diagnostics(out, impact_result.diagnostics, "");

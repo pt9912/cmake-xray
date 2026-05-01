@@ -10,4 +10,7 @@ directly affected targets
 
 heuristically affected targets
 no heuristically affected targets
+
+Target Graph Reference (target_graph_status: loaded):
+  No direct target dependencies.
 note: 1 of 2 targets have no compilable sources and are not included in the analysis

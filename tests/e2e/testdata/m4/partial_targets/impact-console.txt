@@ -9,6 +9,9 @@ no directly affected targets
 
 heuristically affected targets
 no heuristically affected targets
+
+Target Graph Reference (target_graph_status: loaded):
+  No direct target dependencies.
 warning: cannot read source file for include analysis: /project/src/main.cpp
 note: 1 of 2 targets have no compilable sources and are not included in the analysis
 note: conditional or generated includes may be missing from this result

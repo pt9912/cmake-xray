@@ -21,5 +21,11 @@ No heuristically affected translation units.
 ## Heuristically Affected Targets
 No heuristically affected targets.
 
+## Target Graph Reference
+
+Status: `loaded`.
+
+No direct target dependencies.
+
 ## Diagnostics
 - note: 1 of 2 targets have no compilable sources and are not included in the analysis

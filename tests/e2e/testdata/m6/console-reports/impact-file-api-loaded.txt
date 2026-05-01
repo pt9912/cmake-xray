@@ -1,0 +1,24 @@
+impact analysis for src/hub.cpp
+affected translation units: 1
+observation source: derived
+target metadata: loaded
+affected targets: 1
+  src/hub.cpp [directory: build] [targets: hub] [direct]
+
+directly affected targets
+- hub [type: STATIC_LIBRARY]
+
+heuristically affected targets
+no heuristically affected targets
+
+Target Graph Reference (target_graph_status: loaded):
+  src00 -> hub
+  src01 -> hub
+  src02 -> hub
+  src03 -> hub
+  src04 -> hub
+  src05 -> hub
+  src06 -> hub
+  src07 -> hub
+  src08 -> hub
+  src09 -> hub

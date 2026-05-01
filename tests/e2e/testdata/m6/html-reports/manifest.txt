@@ -1,0 +1,20 @@
+# Manifest of cmake-xray M6 HTML report goldens (AP M6-1.2 Tranche A.3).
+#
+# Each non-comment, non-blank line names exactly one golden file in this
+# directory. tests/validate_html_reports.py checks that the manifest and the
+# directory contents agree, and validates each listed golden against the
+# documented HTML structure rules from docs/report-html.md.
+#
+# Coverage per plan-M6-1-2.md "E2E-/Golden-Tests":
+#   analyze-compile-db-only.html  -> not_loaded, empty Target Graph and Target Hubs sections
+#   analyze-file-api-loaded.html  -> loaded, multiple direct target edges, at least one hub
+#   analyze-file-api-partial.html -> partial, at least one external edge
+#   impact-compile-db-only.html   -> not_loaded, empty Target Graph Reference (no Hubs in impact)
+#   impact-file-api-loaded.html   -> loaded, populated Target Graph Reference
+#   impact-file-api-partial.html  -> partial, at least one external edge
+analyze-compile-db-only.html
+analyze-file-api-loaded.html
+analyze-file-api-partial.html
+impact-compile-db-only.html
+impact-file-api-loaded.html
+impact-file-api-partial.html

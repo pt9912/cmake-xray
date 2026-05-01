@@ -16,4 +16,11 @@ top 3 of 3 translation units
 
 include hotspots [heuristic]
 no include hotspots found
+
+Direct Target Dependencies (target_graph_status: loaded):
+  No direct target dependencies.
+
+Target Hubs (in_threshold: 10, out_threshold: 10):
+  Inbound (>= 10 incoming): No incoming hubs.
+  Outbound (>= 10 outgoing): No outgoing hubs.
 note: include-based results are heuristic; conditional or generated includes may be missing

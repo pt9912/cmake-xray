@@ -1,0 +1,16 @@
+impact analysis for src/app.cpp
+affected translation units: 1
+observation source: derived
+target metadata: loaded
+affected targets: 1
+  src/app.cpp [directory: build] [targets: app] [direct]
+
+directly affected targets
+- app [type: STATIC_LIBRARY]
+
+heuristically affected targets
+no heuristically affected targets
+
+Target Graph Reference (target_graph_status: partial):
+  app -> ghost::@99 [external]
+note: target 'app' references unknown target id 'ghost::@99'

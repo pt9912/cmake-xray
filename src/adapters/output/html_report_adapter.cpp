@@ -8,6 +8,7 @@
 #include <string_view>
 #include <vector>
 
+#include "adapters/output/target_display_support.h"
 #include "hexagon/model/analysis_result.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
@@ -15,8 +16,10 @@
 #include "hexagon/model/observation_source.h"
 #include "hexagon/model/report_format_version.h"
 #include "hexagon/model/report_inputs.h"
+#include "hexagon/model/target_graph.h"
 #include "hexagon/model/target_info.h"
 #include "hexagon/model/translation_unit.h"
+#include "hexagon/services/target_graph_support.h"
 
 namespace xray::adapters::output {
 
@@ -163,6 +166,10 @@ using xray::hexagon::model::RankedTranslationUnit;
 using xray::hexagon::model::ReportInputs;
 using xray::hexagon::model::ReportInputSource;
 using xray::hexagon::model::TargetAssignment;
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraph;
+using xray::hexagon::model::TargetGraphStatus;
 using xray::hexagon::model::TargetImpactClassification;
 using xray::hexagon::model::TargetInfo;
 using xray::hexagon::model::TargetMetadataStatus;
@@ -199,6 +206,26 @@ std::string target_metadata_text(TargetMetadataStatus status) {
     if (status == TargetMetadataStatus::loaded) return "loaded";
     if (status == TargetMetadataStatus::partial) return "partial";
     return "not_loaded";
+}
+
+std::string target_graph_status_text(TargetGraphStatus status) {
+    // emit_target_graph_status_line is only invoked for loaded/partial
+    // (the not_loaded branch routes through a dedicated empty-section
+    // paragraph without a Status banner); the helper therefore needs to
+    // map only the two reachable enum values.
+    return status == TargetGraphStatus::loaded ? "loaded" : "partial";
+}
+
+std::string target_graph_status_badge_class(TargetGraphStatus status) {
+    // NRVO-defeating return so the closing brace counts as a covered line
+    // under gcov; mirrors src/adapters/output/dot_report_adapter.cpp Z. 291.
+    std::string out = status == TargetGraphStatus::loaded ? "badge--loaded"
+                                                          : "badge--partial";
+    return std::string(std::move(out));
+}
+
+std::string target_dependency_resolution_text(TargetDependencyResolution res) {
+    return res == TargetDependencyResolution::external ? "external" : "resolved";
 }
 
 std::string severity_text(DiagnosticSeverity severity) {
@@ -504,6 +531,137 @@ void emit_target_metadata_section(std::ostringstream& out, const AnalysisResult&
     out << "</tbody>\n</table></div></section>";
 }
 
+// ---- M6 AP 1.2 Tranche A.3: Target-Graph-related sections ---------------
+
+void emit_target_graph_status_line(std::ostringstream& out, TargetGraphStatus status) {
+    // Hold the helper results in named locals so the temporary
+    // std::string destructors live on a stable line (the function
+    // closing brace) under gcov; the inline `<<` chain otherwise leaves
+    // an inconsistent destructor-line hit count between the loaded and
+    // partial paths.
+    const auto badge = target_graph_status_badge_class(status);
+    const auto label = target_graph_status_text(status);
+    out << "<p>Status: <span class=\"badge " << badge << "\">" << label
+        << "</span></p>\n";
+}
+
+std::vector<std::string> disambiguate_edge_column(
+    const std::vector<TargetDependency>& edges, bool from_column) {
+    std::vector<TargetDisplayEntry> entries;
+    entries.reserve(edges.size());
+    for (const auto& edge : edges) {
+        if (from_column) {
+            entries.push_back({edge.from_display_name, edge.from_unique_key});
+        } else {
+            entries.push_back({edge.to_display_name, edge.to_unique_key});
+        }
+    }
+    return disambiguate_target_display_names(entries);
+}
+
+void emit_target_graph_table(std::ostringstream& out, const TargetGraph& graph) {
+    if (graph.edges.empty()) {
+        out << "<p class=\"empty\">No direct target dependencies.</p>";
+        return;
+    }
+    const auto from_names = disambiguate_edge_column(graph.edges, /*from_column=*/true);
+    const auto to_names = disambiguate_edge_column(graph.edges, /*from_column=*/false);
+    out << "<div class=\"table-wrap\"><table>\n"
+        << "<thead><tr>"
+        << "<th scope=\"col\">From</th>"
+        << "<th scope=\"col\">To</th>"
+        << "<th scope=\"col\">Resolution</th>"
+        << "<th scope=\"col\">External target</th>"
+        << "</tr></thead>\n<tbody>\n";
+    for (std::size_t i = 0; i < graph.edges.size(); ++i) {
+        const auto& edge = graph.edges[i];
+        out << "<tr>"
+            << "<td>" << render_text(from_names[i]) << "</td>"
+            << "<td>" << render_text(to_names[i]) << "</td>"
+            << "<td>" << target_dependency_resolution_text(edge.resolution) << "</td>"
+            << "<td>";
+        if (edge.resolution == TargetDependencyResolution::external) {
+            out << render_text(edge.to_display_name);
+        }
+        out << "</td></tr>\n";
+    }
+    out << "</tbody>\n</table></div>";
+}
+
+void emit_target_graph_section(std::ostringstream& out, const AnalysisResult& result) {
+    out << "<section class=\"target-graph\"><h2>Target Graph</h2>\n";
+    if (result.target_graph_status == TargetGraphStatus::not_loaded) {
+        out << "<p class=\"empty\">Target graph not loaded.</p></section>";
+        return;
+    }
+    emit_target_graph_status_line(out, result.target_graph_status);
+    emit_target_graph_table(out, result.target_graph);
+    out << "</section>";
+}
+
+void emit_hub_row(std::ostringstream& out, std::string_view direction,
+                  std::size_t threshold, const std::vector<TargetInfo>& hubs,
+                  std::string_view empty_text) {
+    out << "<tr>"
+        << "<td>" << direction << "</td>"
+        << "<td>" << threshold << "</td>"
+        << "<td>";
+    if (hubs.empty()) {
+        out << empty_text;
+    } else {
+        std::vector<TargetDisplayEntry> entries;
+        entries.reserve(hubs.size());
+        for (const auto& info : hubs) {
+            entries.push_back({info.display_name, info.unique_key});
+        }
+        const auto names = disambiguate_target_display_names(entries);
+        for (std::size_t i = 0; i < names.size(); ++i) {
+            if (i > 0) {
+                out << ", ";
+            }
+            out << render_text(names[i]);
+        }
+    }
+    out << "</td></tr>\n";
+}
+
+void emit_target_hubs_section(std::ostringstream& out, const AnalysisResult& result) {
+    out << "<section class=\"target-hubs\"><h2>Target Hubs</h2>\n";
+    if (result.target_graph_status == TargetGraphStatus::not_loaded) {
+        out << "<p class=\"empty\">Target hubs not available.</p></section>";
+        return;
+    }
+    constexpr auto in_threshold =
+        xray::hexagon::services::kDefaultTargetHubInThreshold;
+    constexpr auto out_threshold =
+        xray::hexagon::services::kDefaultTargetHubOutThreshold;
+    out << "<p>Incoming threshold: " << in_threshold
+        << ". Outgoing threshold: " << out_threshold << ".</p>\n"
+        << "<div class=\"table-wrap\"><table>\n"
+        << "<thead><tr>"
+        << "<th scope=\"col\">Direction</th>"
+        << "<th scope=\"col\">Threshold</th>"
+        << "<th scope=\"col\">Targets</th>"
+        << "</tr></thead>\n<tbody>\n";
+    emit_hub_row(out, "Inbound", in_threshold, result.target_hubs_in,
+                 "No incoming hubs.");
+    emit_hub_row(out, "Outbound", out_threshold, result.target_hubs_out,
+                 "No outgoing hubs.");
+    out << "</tbody>\n</table></div></section>";
+}
+
+void emit_target_graph_reference_section(std::ostringstream& out,
+                                          const ImpactResult& result) {
+    out << "<section class=\"target-graph-reference\"><h2>Target Graph Reference</h2>\n";
+    if (result.target_graph_status == TargetGraphStatus::not_loaded) {
+        out << "<p class=\"empty\">Target graph not loaded.</p></section>";
+        return;
+    }
+    emit_target_graph_status_line(out, result.target_graph_status);
+    emit_target_graph_table(out, result.target_graph);
+    out << "</section>";
+}
+
 // ---- Impact sections ----------------------------------------------------
 
 void emit_impact_summary(std::ostringstream& out, const ImpactResult& result) {
@@ -659,6 +817,10 @@ std::string render_analyze(const AnalysisResult& result, std::size_t top_limit) 
     out << "\n";
     emit_target_metadata_section(out, result);
     out << "\n";
+    emit_target_graph_section(out, result);
+    out << "\n";
+    emit_target_hubs_section(out, result);
+    out << "\n";
     emit_diagnostics_section(out, result.diagnostics);
     emit_doc_close(out);
     return out.str();
@@ -696,6 +858,8 @@ std::string render_impact(const ImpactResult& result) {
                                                          "No heuristically affected targets.",
                                                          TargetImpactClassification::heuristic,
                                                          "badge-heuristic"});
+    out << "\n";
+    emit_target_graph_reference_section(out, result);
     out << "\n";
     emit_diagnostics_section(out, result.diagnostics);
     emit_doc_close(out);

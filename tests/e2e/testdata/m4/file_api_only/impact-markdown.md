@@ -23,6 +23,12 @@ No directly affected targets.
 ## Heuristically Affected Targets
 No heuristically affected targets.
 
+## Target Graph Reference
+
+Status: `loaded`.
+
+No direct target dependencies.
+
 ## Diagnostics
 - warning: cannot read source file for include analysis: src/core.cpp
 - warning: cannot read source file for include analysis: src/main.cpp

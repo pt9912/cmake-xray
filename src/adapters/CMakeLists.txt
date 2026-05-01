@@ -11,6 +11,7 @@ add_library(
     output/html_report_adapter.cpp
     output/json_report_adapter.cpp
     output/markdown_report_adapter.cpp
+    output/target_display_support.cpp
 )
 
 target_include_directories(xray_adapters PUBLIC ${PROJECT_SOURCE_DIR}/src)

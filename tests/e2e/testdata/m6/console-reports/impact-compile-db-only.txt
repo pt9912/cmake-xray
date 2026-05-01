@@ -1,0 +1,7 @@
+impact analysis for include/common/shared.h [heuristic]
+affected translation units: 3
+  src/app/main.cpp [directory: build/app] [heuristic]
+  src/lib/core.cpp [directory: build/lib] [heuristic]
+  src/tools/tool.cpp [directory: build/tools] [heuristic]
+warning: could not resolve include "generated/version.h" from src/app/main.cpp
+note: conditional or generated includes may be missing from this result

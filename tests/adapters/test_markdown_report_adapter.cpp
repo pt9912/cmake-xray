@@ -377,3 +377,321 @@ TEST_CASE("markdown report adapter preserves marker-dependent indentation for tw
                       "     Diagnostics:\n"
                       "     - note: hotspot 10 diagnostic\n") != std::string::npos);
 }
+
+// ---- M6 AP 1.2 Tranche A.3: Target Graph / Target Hubs / Target Graph
+// Reference Markdown sections. Status matrix per docs/plan-M6-1-2.md
+// "Markdown-Adapter (Status-Matrix Reporttyp x Status, identisch zu Console)"
+// plus disambiguation, table-cell escaping and Compile-DB-only byte-stability
+// regressions.
+
+namespace m6_md {
+
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyKind;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraphStatus;
+
+TargetDependency resolved_edge(std::string from_uk, std::string from_dn,
+                               std::string to_uk, std::string to_dn) {
+    return TargetDependency{std::move(from_uk),       std::move(from_dn),
+                            std::move(to_uk),         std::move(to_dn),
+                            TargetDependencyKind::direct,
+                            TargetDependencyResolution::resolved};
+}
+
+TargetDependency external_edge(std::string from_uk, std::string from_dn,
+                               std::string to_uk, std::string to_dn) {
+    return TargetDependency{std::move(from_uk),       std::move(from_dn),
+                            std::move(to_uk),         std::move(to_dn),
+                            TargetDependencyKind::direct,
+                            TargetDependencyResolution::external};
+}
+
+}  // namespace m6_md
+
+TEST_CASE(
+    "markdown analyze v2: target_graph_status=not_loaded omits Direct Target "
+    "Dependencies and Target Hubs sections") {
+    // Compile-DB-only run: status defaults to not_loaded; the M5 byte-stable
+    // contract requires neither section to surface in the report.
+    AnalysisResult result = make_analysis_result();
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 10);
+    CHECK(report.find("## Direct Target Dependencies") == std::string::npos);
+    CHECK(report.find("## Target Hubs") == std::string::npos);
+    // The hotspot section is followed directly by the diagnostics section.
+    CHECK(report.find("\n## Diagnostics\n") != std::string::npos);
+}
+
+TEST_CASE(
+    "markdown analyze v2: loaded status renders Direct Target Dependencies "
+    "section with status line and edge table") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    result.target_graph.nodes = {
+        TargetInfo{"app", "EXECUTABLE", "app::EXECUTABLE"},
+        TargetInfo{"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"},
+    };
+    result.target_graph.edges = {
+        m6_md::resolved_edge("app::EXECUTABLE", "app",
+                              "core::STATIC_LIBRARY", "core"),
+    };
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 10);
+    CHECK(report.find("## Direct Target Dependencies\n\n"
+                      "Status: `loaded`.\n\n"
+                      "| From | To | Resolution | External Target |\n"
+                      "|---|---|---|---|\n"
+                      "| `app` | `core` | resolved |  |\n") != std::string::npos);
+    CHECK(report.find("No direct target dependencies.") == std::string::npos);
+}
+
+TEST_CASE(
+    "markdown analyze v2: partial status with external edge fills External "
+    "Target column") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::partial;
+    result.target_graph.edges = {
+        m6_md::external_edge("app::EXECUTABLE", "app",
+                              "<external>::ghost", "ghost"),
+    };
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 10);
+    CHECK(report.find("Status: `partial`.") != std::string::npos);
+    // Resolved column carries plain "external"; External Target cell carries
+    // the raw_id wrapped in backticks.
+    CHECK(report.find("| `app` | `ghost` | external | `ghost` |") !=
+          std::string::npos);
+}
+
+TEST_CASE(
+    "markdown analyze v2: loaded status with empty edges renders leersatz "
+    "paragraph instead of an empty table") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    // Nodes loaded but zero edges: leersatz paragraph, no table header.
+    result.target_graph.nodes = {
+        TargetInfo{"only_one", "EXECUTABLE", "only_one::EXECUTABLE"},
+    };
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 10);
+    CHECK(report.find("## Direct Target Dependencies\n\n"
+                      "Status: `loaded`.\n\n"
+                      "No direct target dependencies.\n") != std::string::npos);
+    CHECK(report.find("| From | To | Resolution | External Target |") ==
+          std::string::npos);
+}
+
+TEST_CASE(
+    "markdown analyze v2: Target Hubs section emits 2-row table with "
+    "thresholds in the Threshold column") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    result.target_hubs_in.push_back(
+        {"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"});
+    result.target_hubs_out.push_back({"app", "EXECUTABLE", "app::EXECUTABLE"});
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 10);
+    CHECK(report.find("## Target Hubs\n\n"
+                      "| Direction | Threshold | Targets |\n"
+                      "|---|---|---|\n"
+                      "| Inbound | 10 | `core` |\n"
+                      "| Outbound | 10 | `app` |\n") != std::string::npos);
+}
+
+TEST_CASE(
+    "markdown analyze v2: empty inbound and outbound hub vectors render "
+    "leersaetze in the Targets cell") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 10);
+    CHECK(report.find("| Inbound | 10 | No incoming hubs. |") != std::string::npos);
+    CHECK(report.find("| Outbound | 10 | No outgoing hubs. |") != std::string::npos);
+}
+
+TEST_CASE(
+    "markdown analyze v2: hub list disambiguation suffix uses identity_key "
+    "for collisions") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    result.target_hubs_in = {
+        // Pre-sorted by (unique_key, display_name, type): foo::EXECUTABLE
+        // precedes foo::STATIC_LIBRARY.
+        TargetInfo{"foo", "EXECUTABLE", "foo::EXECUTABLE"},
+        TargetInfo{"foo", "STATIC_LIBRARY", "foo::STATIC_LIBRARY"},
+    };
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 10);
+    CHECK(report.find(
+              "| Inbound | 10 | "
+              "`foo [key: foo::EXECUTABLE]`, `foo [key: foo::STATIC_LIBRARY]` |") !=
+          std::string::npos);
+}
+
+TEST_CASE(
+    "markdown analyze v2: mixed disambiguation across to-column keeps "
+    "<external>::* keys verbatim in suffix") {
+    // Plan mischfall: edge to internal `foo` and edge to external `foo`.
+    // Both rows get [key: ...] suffix; markdown does not HTML-escape the
+    // angle brackets, the backtick wrapper preserves them verbatim.
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    result.target_graph.edges = {
+        m6_md::resolved_edge("app::EXECUTABLE", "app",
+                              "foo::STATIC_LIBRARY", "foo"),
+        m6_md::external_edge("app::EXECUTABLE", "app",
+                              "<external>::foo", "foo"),
+    };
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 10);
+    CHECK(report.find("`foo [key: foo::STATIC_LIBRARY]`") != std::string::npos);
+    CHECK(report.find("`foo [key: <external>::foo]`") != std::string::npos);
+}
+
+TEST_CASE(
+    "markdown analyze v2: pipe in display name escapes to backslash-pipe in "
+    "table cells") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    result.target_graph.edges = {
+        m6_md::resolved_edge("lib|name::STATIC_LIBRARY", "lib|name",
+                              "core::STATIC_LIBRARY", "core"),
+    };
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 10);
+    CHECK(report.find("`lib\\|name`") != std::string::npos);
+    // Make sure no unescaped `|` lands in the cell content where the column
+    // separator lives.
+    CHECK(report.find("| `lib|name` |") == std::string::npos);
+}
+
+TEST_CASE(
+    "markdown analyze v2: backtick in display name switches to double "
+    "backtick wrapper with surrounding spaces") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    result.target_graph.edges = {
+        m6_md::resolved_edge("a`b::STATIC_LIBRARY", "a`b",
+                              "core::STATIC_LIBRARY", "core"),
+    };
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 10);
+    CHECK(report.find("`` a`b ``") != std::string::npos);
+}
+
+TEST_CASE(
+    "markdown analyze v2: newline in display name normalizes to slash "
+    "separator inside the table cell") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    result.target_graph.edges = {
+        m6_md::resolved_edge("before\nafter::STATIC_LIBRARY", "before\nafter",
+                              "core::STATIC_LIBRARY", "core"),
+    };
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 10);
+    CHECK(report.find("`before / after`") != std::string::npos);
+}
+
+TEST_CASE(
+    "markdown analyze v2: CRLF, lone CR, tab and ASCII control bytes in "
+    "display name normalize to slash separator and single space") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    result.target_graph.edges = {
+        // \r\n collapses to a single " / "; lone \r turns into " / "; \t
+        // and other control bytes (\x01) collapse to a single space. The
+        // display name combines all four so a single edge row exercises
+        // every branch of normalize_table_cell_whitespace.
+        m6_md::resolved_edge(
+            "weird::STATIC_LIBRARY",
+            // String concat terminates the \x01 hex escape so the trailing
+            // `e` is a literal character (and not a third hex digit).
+            std::string("a\r\nb\rc\td\x01" "e"),
+            "core::STATIC_LIBRARY", "core"),
+    };
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 10);
+    // Whitespace contract: \r\n → " / ", lone \r → " / ", \t → " ", \x01
+    // → " ". Sequence "a\r\nb\rc\td\x01e" therefore becomes
+    // "a / b / c d e". Single backtick wrapper applies (no backtick in
+    // value).
+    CHECK(report.find("`a / b / c d e`") != std::string::npos);
+}
+
+TEST_CASE(
+    "markdown analyze v2: combined pipe, backtick and newline in display "
+    "name compose escape, normalize, double-backtick wrapper") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    result.target_graph.edges = {
+        m6_md::resolved_edge("weird::STATIC_LIBRARY", "a|b`c\nd",
+                              "core::STATIC_LIBRARY", "core"),
+    };
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 10);
+    // Whitespace normalization first → "a|b`c / d", then double-backtick
+    // wrapper with inner spaces, plus pipe escape → "`` a\|b`c / d ``".
+    CHECK(report.find("`` a\\|b`c / d ``") != std::string::npos);
+}
+
+TEST_CASE(
+    "markdown impact v2: target_graph_status=not_loaded omits Target Graph "
+    "Reference section") {
+    auto result = make_impact_result();
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("## Target Graph Reference") == std::string::npos);
+    // Impact never carries hub data even when status is loaded.
+    CHECK(report.find("## Target Hubs") == std::string::npos);
+}
+
+TEST_CASE(
+    "markdown impact v2: loaded status renders Target Graph Reference "
+    "section between affected targets and diagnostics") {
+    auto result = make_impact_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    result.target_graph.nodes = {
+        TargetInfo{"app", "EXECUTABLE", "app::EXECUTABLE"},
+        TargetInfo{"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"},
+    };
+    result.target_graph.edges = {
+        m6_md::resolved_edge("app::EXECUTABLE", "app",
+                              "core::STATIC_LIBRARY", "core"),
+    };
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("## Target Graph Reference\n\n"
+                      "Status: `loaded`.\n\n"
+                      "| From | To | Resolution | External Target |\n"
+                      "|---|---|---|---|\n"
+                      "| `app` | `core` | resolved |  |\n") != std::string::npos);
+    // Section ordering: Target Graph Reference appears AFTER the heuristic
+    // targets section and BEFORE the diagnostics section.
+    const auto pos_h_targets = report.find("## Heuristically Affected Targets");
+    const auto pos_graph_ref = report.find("## Target Graph Reference");
+    const auto pos_diags = report.find("## Diagnostics");
+    REQUIRE(pos_graph_ref != std::string::npos);
+    REQUIRE(pos_diags != std::string::npos);
+    if (pos_h_targets != std::string::npos) {
+        CHECK(pos_h_targets < pos_graph_ref);
+    }
+    CHECK(pos_graph_ref < pos_diags);
+}
+
+TEST_CASE(
+    "markdown impact v2: partial status with external edge fills External "
+    "Target column") {
+    auto result = make_impact_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::partial;
+    result.target_graph.edges = {
+        m6_md::external_edge("app::EXECUTABLE", "app",
+                              "<external>::boost", "boost"),
+    };
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("Status: `partial`.") != std::string::npos);
+    CHECK(report.find("| `app` | `boost` | external | `boost` |") !=
+          std::string::npos);
+}

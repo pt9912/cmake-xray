@@ -275,3 +275,205 @@ TEST_CASE("console report adapter preserves inline diagnostics and handles empty
               "include-based results are heuristic; conditional or generated includes may be missing") ==
           1);
 }
+
+// ---- M6 AP 1.2 Tranche A.3: Direct Target Dependencies / Target Hubs /
+// Target Graph Reference console sections. Status matrix per
+// docs/plan-M6-1-2.md "Console-Adapter (Status-Matrix Reporttyp x Status)"
+// plus disambiguation and external-suffix order regressions.
+
+namespace m6_console {
+
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyKind;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraphStatus;
+
+TargetDependency resolved_edge(std::string from_uk, std::string from_dn,
+                               std::string to_uk, std::string to_dn) {
+    return TargetDependency{std::move(from_uk),       std::move(from_dn),
+                            std::move(to_uk),         std::move(to_dn),
+                            TargetDependencyKind::direct,
+                            TargetDependencyResolution::resolved};
+}
+
+TargetDependency external_edge(std::string from_uk, std::string from_dn,
+                               std::string to_uk, std::string to_dn) {
+    return TargetDependency{std::move(from_uk),       std::move(from_dn),
+                            std::move(to_uk),         std::move(to_dn),
+                            TargetDependencyKind::direct,
+                            TargetDependencyResolution::external};
+}
+
+ImpactResult make_impact_result_for_graph() {
+    ImpactResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.changed_file = "include/x.h";
+    return result;
+}
+
+}  // namespace m6_console
+
+TEST_CASE(
+    "console analyze v2: target_graph_status=not_loaded omits Direct Target "
+    "Dependencies and Target Hubs sections (Compile-DB-only byte-stable)") {
+    AnalysisResult result = make_analysis_result();
+    const ConsoleReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 5);
+    CHECK(report.find("Direct Target Dependencies") == std::string::npos);
+    CHECK(report.find("Target Hubs") == std::string::npos);
+}
+
+TEST_CASE(
+    "console analyze v2: loaded status renders Direct Target Dependencies "
+    "section with edge lines and Target Hubs section with thresholds") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_console::TargetGraphStatus::loaded;
+    result.target_graph.nodes = {
+        TargetInfo{"app", "EXECUTABLE", "app::EXECUTABLE"},
+        TargetInfo{"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"},
+    };
+    result.target_graph.edges = {
+        m6_console::resolved_edge("app::EXECUTABLE", "app",
+                                   "core::STATIC_LIBRARY", "core"),
+    };
+    result.target_hubs_in.push_back(
+        {"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"});
+    result.target_hubs_out.push_back({"app", "EXECUTABLE", "app::EXECUTABLE"});
+    const ConsoleReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 5);
+    CHECK(report.find("Direct Target Dependencies (target_graph_status: loaded):\n"
+                      "  app -> core\n") != std::string::npos);
+    CHECK(report.find(
+              "Target Hubs (in_threshold: 10, out_threshold: 10):\n"
+              "  Inbound (>= 10 incoming): core\n"
+              "  Outbound (>= 10 outgoing): app\n") != std::string::npos);
+}
+
+TEST_CASE(
+    "console analyze v2: partial status with external edge appends "
+    "[external] suffix to the to-element") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_console::TargetGraphStatus::partial;
+    result.target_graph.edges = {
+        m6_console::external_edge("app::EXECUTABLE", "app",
+                                   "<external>::ghost", "ghost"),
+    };
+    const ConsoleReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 5);
+    CHECK(report.find(
+              "Direct Target Dependencies (target_graph_status: partial):\n"
+              "  app -> ghost [external]\n") != std::string::npos);
+}
+
+TEST_CASE(
+    "console analyze v2: loaded status with empty edges emits the leersatz "
+    "instead of edge lines") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_console::TargetGraphStatus::loaded;
+    const ConsoleReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 5);
+    CHECK(report.find("Direct Target Dependencies (target_graph_status: loaded):\n"
+                      "  No direct target dependencies.\n") != std::string::npos);
+}
+
+TEST_CASE(
+    "console analyze v2: empty inbound and outbound hub vectors render "
+    "leersaetze instead of comma-separated lists") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_console::TargetGraphStatus::loaded;
+    const ConsoleReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 5);
+    CHECK(report.find("  Inbound (>= 10 incoming): No incoming hubs.\n") !=
+          std::string::npos);
+    CHECK(report.find("  Outbound (>= 10 outgoing): No outgoing hubs.\n") !=
+          std::string::npos);
+}
+
+TEST_CASE(
+    "console analyze v2: hub-list disambiguation suffix uses identity_key "
+    "for collisions") {
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_console::TargetGraphStatus::loaded;
+    // Pre-sorted: foo::EXECUTABLE precedes foo::STATIC_LIBRARY.
+    result.target_hubs_in = {
+        TargetInfo{"foo", "EXECUTABLE", "foo::EXECUTABLE"},
+        TargetInfo{"foo", "STATIC_LIBRARY", "foo::STATIC_LIBRARY"},
+    };
+    const ConsoleReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 5);
+    CHECK(report.find(
+              "  Inbound (>= 10 incoming): "
+              "foo [key: foo::EXECUTABLE], foo [key: foo::STATIC_LIBRARY]\n") !=
+          std::string::npos);
+}
+
+TEST_CASE(
+    "console analyze v2: mixed disambiguation across to-column places "
+    "[external] before [key:...] suffix") {
+    // Plan-Mischfall: an edge to internal `foo` and an edge to external
+    // `foo` in the same section both get [key: ...] suffix; the plan
+    // pins the suffix order [external] [key: ...] for the external row,
+    // and the [key: ...] suffix alone for the internal row.
+    AnalysisResult result = make_analysis_result();
+    result.target_graph_status = m6_console::TargetGraphStatus::loaded;
+    result.target_graph.edges = {
+        m6_console::resolved_edge("app::EXECUTABLE", "app",
+                                   "foo::STATIC_LIBRARY", "foo"),
+        m6_console::external_edge("app::EXECUTABLE", "app",
+                                   "<external>::foo", "foo"),
+    };
+    const ConsoleReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 5);
+    CHECK(report.find("  app -> foo [key: foo::STATIC_LIBRARY]\n") !=
+          std::string::npos);
+    CHECK(report.find("  app -> foo [external] [key: <external>::foo]\n") !=
+          std::string::npos);
+}
+
+TEST_CASE(
+    "console impact v2: target_graph_status=not_loaded omits Target Graph "
+    "Reference and stays Hub-free") {
+    auto result = m6_console::make_impact_result_for_graph();
+    const ConsoleReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("Target Graph Reference") == std::string::npos);
+    // Impact never carries hubs even when graph is loaded.
+    CHECK(report.find("Target Hubs") == std::string::npos);
+}
+
+TEST_CASE(
+    "console impact v2: loaded status renders Target Graph Reference "
+    "section with edge lines") {
+    auto result = m6_console::make_impact_result_for_graph();
+    result.target_graph_status = m6_console::TargetGraphStatus::loaded;
+    result.target_graph.nodes = {
+        TargetInfo{"app", "EXECUTABLE", "app::EXECUTABLE"},
+        TargetInfo{"core", "STATIC_LIBRARY", "core::STATIC_LIBRARY"},
+    };
+    result.target_graph.edges = {
+        m6_console::resolved_edge("app::EXECUTABLE", "app",
+                                   "core::STATIC_LIBRARY", "core"),
+    };
+    const ConsoleReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("Target Graph Reference (target_graph_status: loaded):\n"
+                      "  app -> core\n") != std::string::npos);
+    // No hub section in impact.
+    CHECK(report.find("Target Hubs") == std::string::npos);
+}
+
+TEST_CASE(
+    "console impact v2: partial status with external edge appends "
+    "[external] suffix to the to-element") {
+    auto result = m6_console::make_impact_result_for_graph();
+    result.target_graph_status = m6_console::TargetGraphStatus::partial;
+    result.target_graph.edges = {
+        m6_console::external_edge("app::EXECUTABLE", "app",
+                                   "<external>::boost", "boost"),
+    };
+    const ConsoleReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("Target Graph Reference (target_graph_status: partial):\n"
+                      "  app -> boost [external]\n") != std::string::npos);
+}

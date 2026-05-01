@@ -28,5 +28,18 @@
 ## Include Hotspots
 No include hotspots found.
 
+## Direct Target Dependencies
+
+Status: `loaded`.
+
+No direct target dependencies.
+
+## Target Hubs
+
+| Direction | Threshold | Targets |
+|---|---|---|
+| Inbound | 10 | No incoming hubs. |
+| Outbound | 10 | No outgoing hubs. |
+
 ## Diagnostics
 - note: include-based results are heuristic; conditional or generated includes may be missing

@@ -2,16 +2,21 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <map>
 #include <sstream>
+#include <string>
 #include <string_view>
 #include <vector>
 
+#include "adapters/output/target_display_support.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
 #include "hexagon/model/observation_source.h"
+#include "hexagon/model/target_graph.h"
 #include "hexagon/model/target_info.h"
 #include "hexagon/model/translation_unit.h"
+#include "hexagon/services/target_graph_support.h"
 
 namespace xray::adapters::output {
 
@@ -22,6 +27,9 @@ using xray::hexagon::model::Diagnostic;
 using xray::hexagon::model::DiagnosticSeverity;
 using xray::hexagon::model::ImpactKind;
 using xray::hexagon::model::ImpactResult;
+using xray::hexagon::model::TargetDependency;
+using xray::hexagon::model::TargetDependencyResolution;
+using xray::hexagon::model::TargetGraphStatus;
 using xray::hexagon::model::TargetImpactClassification;
 using xray::hexagon::model::TargetInfo;
 using xray::hexagon::model::TargetMetadataStatus;
@@ -341,6 +349,188 @@ void append_target_section(std::ostringstream& out, std::string_view title,
     if (!any) out << empty_text << '\n';
 }
 
+// ---- M6 AP 1.2 Tranche A.3: Target-Graph-related sections ---------------
+
+std::string target_graph_status_text(TargetGraphStatus status) {
+    // Caller filters not_loaded before reaching here; the not_loaded path
+    // omits the entire section per docs/plan-M6-1-2.md "Console- und
+    // Markdown-Vertragsregeln". Mapping the remaining two enum values via
+    // a ternary keeps the helper byte-stable without an unreachable third
+    // branch that would otherwise miss coverage.
+    return status == TargetGraphStatus::loaded ? "loaded" : "partial";
+}
+
+std::string target_dependency_resolution_text(TargetDependencyResolution res) {
+    return res == TargetDependencyResolution::external ? "external" : "resolved";
+}
+
+std::string normalize_table_cell_whitespace(std::string_view value) {
+    // Mirrors docs/report-html.md "Escaping" whitespace contract so M6
+    // table cells stay byte-stable across HTML and Markdown for the same
+    // inputs. \r\n and \r → " / ", each \n → " / ", \t → one space, other
+    // ASCII control bytes < 0x20 → one space.
+    std::string out;
+    out.reserve(value.size());
+    for (std::size_t index = 0; index < value.size(); ++index) {
+        const auto ch = static_cast<unsigned char>(value[index]);
+        if (ch == '\r') {
+            const auto next = index + 1;
+            if (next < value.size() && value[next] == '\n') {
+                ++index;
+            }
+            out.append(" / ");
+            continue;
+        }
+        if (ch == '\n') {
+            out.append(" / ");
+            continue;
+        }
+        if (ch == '\t' || ch < 0x20) {
+            out.push_back(' ');
+            continue;
+        }
+        out.push_back(static_cast<char>(ch));
+    }
+    // NRVO-defeating return so the closing brace counts as a covered line
+    // under gcov, mirroring src/adapters/output/dot_report_adapter.cpp Z. 291.
+    return std::string(std::move(out));
+}
+
+void append_table_cell_plain(std::ostringstream& out, std::string_view value) {
+    // Plain-text cell: whitespace-normalize per docs/plan-M6-1-2.md
+    // "Markdown-Tabellen-Escaping". No backtick wrapping. Callers supply
+    // adapter-controlled fixed strings (Resolution values "resolved" /
+    // "external", direction labels, hub leersaetze) that cannot contain
+    // the column separator `|`; values that may carry `|` (target display
+    // names, raw_ids) flow through append_table_cell_target instead, which
+    // owns the escape rule alongside its backtick wrapper.
+    out << normalize_table_cell_whitespace(value);
+}
+
+void append_table_cell_target(std::ostringstream& out, std::string_view value) {
+    // Inline-code wrapped cell for target display names and raw_ids per
+    // docs/plan-M6-1-2.md "Markdown-Tabellen-Escaping". Whitespace-normalize
+    // first; if the value carries a backtick, wrap with double backticks
+    // and an inner space on each side so the inline-code span survives.
+    // `|` is escaped to `\|` even inside the code span so renderers without
+    // code-span pipe support still see one column.
+    const auto normalized = normalize_table_cell_whitespace(value);
+    const bool has_backtick = normalized.find('`') != std::string::npos;
+    const std::string_view delim = has_backtick ? "``" : "`";
+    out << delim;
+    if (has_backtick) {
+        out << ' ';
+    }
+    for (const char ch : normalized) {
+        if (ch == '|') {
+            out << "\\|";
+        } else {
+            out << ch;
+        }
+    }
+    if (has_backtick) {
+        out << ' ';
+    }
+    out << delim;
+}
+
+std::vector<std::string> disambiguate_edge_column(
+    const std::vector<TargetDependency>& edges, bool from_column) {
+    std::vector<TargetDisplayEntry> entries;
+    entries.reserve(edges.size());
+    for (const auto& edge : edges) {
+        if (from_column) {
+            entries.push_back({edge.from_display_name, edge.from_unique_key});
+        } else {
+            entries.push_back({edge.to_display_name, edge.to_unique_key});
+        }
+    }
+    return disambiguate_target_display_names(entries);
+}
+
+void append_target_graph_table(std::ostringstream& out,
+                                const xray::hexagon::model::TargetGraph& graph) {
+    out << "| From | To | Resolution | External Target |\n";
+    out << "|---|---|---|---|\n";
+    const auto from_names = disambiguate_edge_column(graph.edges, /*from_column=*/true);
+    const auto to_names = disambiguate_edge_column(graph.edges, /*from_column=*/false);
+    for (std::size_t i = 0; i < graph.edges.size(); ++i) {
+        const auto& edge = graph.edges[i];
+        out << "| ";
+        append_table_cell_target(out, from_names[i]);
+        out << " | ";
+        append_table_cell_target(out, to_names[i]);
+        out << " | ";
+        append_table_cell_plain(out, target_dependency_resolution_text(edge.resolution));
+        out << " | ";
+        if (edge.resolution == TargetDependencyResolution::external) {
+            append_table_cell_target(out, edge.to_display_name);
+        }
+        out << " |\n";
+    }
+}
+
+void append_target_graph_section(std::ostringstream& out, const AnalysisResult& result) {
+    // Caller guarantees status != not_loaded; the not_loaded branch omits the
+    // entire section per docs/plan-M6-1-2.md "Console- und
+    // Markdown-Vertragsregeln".
+    out << "## Direct Target Dependencies\n\n";
+    out << "Status: `" << target_graph_status_text(result.target_graph_status) << "`.\n\n";
+    if (result.target_graph.edges.empty()) {
+        out << "No direct target dependencies.\n";
+        return;
+    }
+    append_target_graph_table(out, result.target_graph);
+}
+
+void append_hub_row(std::ostringstream& out, std::string_view direction,
+                    std::size_t threshold, const std::vector<TargetInfo>& hubs,
+                    std::string_view empty_text) {
+    out << "| " << direction << " | " << threshold << " | ";
+    if (hubs.empty()) {
+        append_table_cell_plain(out, empty_text);
+    } else {
+        std::vector<TargetDisplayEntry> entries;
+        entries.reserve(hubs.size());
+        for (const auto& info : hubs) {
+            entries.push_back({info.display_name, info.unique_key});
+        }
+        const auto names = disambiguate_target_display_names(entries);
+        for (std::size_t i = 0; i < names.size(); ++i) {
+            if (i > 0) {
+                out << ", ";
+            }
+            append_table_cell_target(out, names[i]);
+        }
+    }
+    out << " |\n";
+}
+
+void append_target_hubs_section(std::ostringstream& out, const AnalysisResult& result) {
+    // Caller guarantees status != not_loaded.
+    out << "## Target Hubs\n\n";
+    out << "| Direction | Threshold | Targets |\n";
+    out << "|---|---|---|\n";
+    append_hub_row(out, "Inbound",
+                   xray::hexagon::services::kDefaultTargetHubInThreshold,
+                   result.target_hubs_in, "No incoming hubs.");
+    append_hub_row(out, "Outbound",
+                   xray::hexagon::services::kDefaultTargetHubOutThreshold,
+                   result.target_hubs_out, "No outgoing hubs.");
+}
+
+void append_target_graph_reference_section(std::ostringstream& out,
+                                            const ImpactResult& result) {
+    // Caller guarantees status != not_loaded.
+    out << "## Target Graph Reference\n\n";
+    out << "Status: `" << target_graph_status_text(result.target_graph_status) << "`.\n\n";
+    if (result.target_graph.edges.empty()) {
+        out << "No direct target dependencies.\n";
+        return;
+    }
+    append_target_graph_table(out, result.target_graph);
+}
+
 }  // namespace
 
 std::string MarkdownReportAdapter::write_analysis_report(const AnalysisResult& analysis_result,
@@ -357,6 +547,12 @@ std::string MarkdownReportAdapter::write_analysis_report(const AnalysisResult& a
     append_ranking_section(out, analysis_result, counts.ranking_count);
     out << '\n';
     append_hotspot_section(out, analysis_result, counts.hotspot_count);
+    if (analysis_result.target_graph_status != TargetGraphStatus::not_loaded) {
+        out << '\n';
+        append_target_graph_section(out, analysis_result);
+        out << '\n';
+        append_target_hubs_section(out, analysis_result);
+    }
     out << '\n';
     append_report_diagnostics(out, analysis_result.diagnostics);
 
@@ -390,6 +586,10 @@ std::string MarkdownReportAdapter::write_impact_report(const ImpactResult& impac
         append_target_section(out, "## Heuristically Affected Targets",
                               TargetImpactClassification::heuristic, impact_result,
                               "No heuristically affected targets.");
+    }
+    if (impact_result.target_graph_status != TargetGraphStatus::not_loaded) {
+        out << '\n';
+        append_target_graph_reference_section(out, impact_result);
     }
     out << '\n';
     append_report_diagnostics(out, impact_result.diagnostics);

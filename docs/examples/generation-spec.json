@@ -81,6 +81,47 @@
     {
       "file": "impact-report-targets.dot",
       "args": ["impact", "--compile-commands", "tests/e2e/testdata/m4/partial_targets/compile_commands.json", "--cmake-file-api", "tests/e2e/testdata/m4/partial_targets/build", "--changed-file", "/project/src/main.cpp", "--format", "dot"]
+    },
+    {
+      "$comment": "AP M6-1.2 Tranche A.3: target-graph showcase examples. The m6/file_api_loaded fixture carries 10 src* targets all linking against a hub target, so the analyze output exercises the loaded Direct Target Dependencies + Target Hubs sections, and the impact output exercises the Target Graph Reference section with src/hub.cpp as the changed file.",
+      "file": "analyze-target-graph.txt",
+      "args": ["analyze", "--cmake-file-api", "tests/e2e/testdata/m6/file_api_loaded/build", "--format", "console", "--top", "10"]
+    },
+    {
+      "file": "analyze-target-graph.md",
+      "args": ["analyze", "--cmake-file-api", "tests/e2e/testdata/m6/file_api_loaded/build", "--format", "markdown", "--top", "10"]
+    },
+    {
+      "file": "analyze-target-graph.html",
+      "args": ["analyze", "--cmake-file-api", "tests/e2e/testdata/m6/file_api_loaded/build", "--format", "html", "--top", "10"]
+    },
+    {
+      "file": "analyze-target-graph.json",
+      "args": ["analyze", "--cmake-file-api", "tests/e2e/testdata/m6/file_api_loaded/build", "--format", "json", "--top", "10"]
+    },
+    {
+      "file": "analyze-target-graph.dot",
+      "args": ["analyze", "--cmake-file-api", "tests/e2e/testdata/m6/file_api_loaded/build", "--format", "dot", "--top", "10"]
+    },
+    {
+      "file": "impact-target-graph.txt",
+      "args": ["impact", "--cmake-file-api", "tests/e2e/testdata/m6/file_api_loaded/build", "--changed-file", "src/hub.cpp", "--format", "console"]
+    },
+    {
+      "file": "impact-target-graph.md",
+      "args": ["impact", "--cmake-file-api", "tests/e2e/testdata/m6/file_api_loaded/build", "--changed-file", "src/hub.cpp", "--format", "markdown"]
+    },
+    {
+      "file": "impact-target-graph.html",
+      "args": ["impact", "--cmake-file-api", "tests/e2e/testdata/m6/file_api_loaded/build", "--changed-file", "src/hub.cpp", "--format", "html"]
+    },
+    {
+      "file": "impact-target-graph.json",
+      "args": ["impact", "--cmake-file-api", "tests/e2e/testdata/m6/file_api_loaded/build", "--changed-file", "src/hub.cpp", "--format", "json"]
+    },
+    {
+      "file": "impact-target-graph.dot",
+      "args": ["impact", "--cmake-file-api", "tests/e2e/testdata/m6/file_api_loaded/build", "--changed-file", "src/hub.cpp", "--format", "dot"]
     }
   ]
 }

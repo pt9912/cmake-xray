@@ -1,0 +1,19 @@
+# Manifest of cmake-xray M6 Markdown report goldens (AP M6-1.2 Tranche A.3).
+#
+# Each non-comment, non-blank line names exactly one golden file in this
+# directory. The doc_examples_validation gate (extended for AP 1.2 A.3)
+# checks that manifest and directory contents agree.
+#
+# Coverage per plan-M6-1-2.md "E2E-/Golden-Tests":
+#   analyze-compile-db-only.md  -> not_loaded, no Direct Target Dependencies / Target Hubs sections
+#   analyze-file-api-loaded.md  -> loaded, populated Direct Target Dependencies + Target Hubs tables
+#   analyze-file-api-partial.md -> partial, at least one external edge
+#   impact-compile-db-only.md   -> not_loaded, no Target Graph Reference section
+#   impact-file-api-loaded.md   -> loaded, populated Target Graph Reference table
+#   impact-file-api-partial.md  -> partial, at least one external edge
+analyze-compile-db-only.md
+analyze-file-api-loaded.md
+analyze-file-api-partial.md
+impact-compile-db-only.md
+impact-file-api-loaded.md
+impact-file-api-partial.md
