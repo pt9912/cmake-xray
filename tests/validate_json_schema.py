@@ -130,17 +130,57 @@ def diff_manifest_directory(manifest_entries: list[str],
     return EXIT_VALIDATION_FAILED
 
 
+def check_cross_field_invariants(document, report_path: Path) -> int:
+    # Companion check (AP M6-1.3 Finding 3 follow-up): the JSON Schema
+    # Draft 2020-12 dialect cannot express cross-field constraints, so
+    # the plan-M6-1-3.md "Determinismus-Anforderungen" invariants
+    #   impact_target_depth_effective <= impact_target_depth_requested
+    #   each prioritized_affected_targets[*].graph_distance <=
+    #     impact_target_depth_requested
+    # are validated here.
+    if not isinstance(document, dict) or document.get("report_type") != "impact":
+        return EXIT_OK
+    requested = document.get("impact_target_depth_requested")
+    effective = document.get("impact_target_depth_effective")
+    # Schema already enforces type+presence of these two fields on
+    # impact reports; defensive None-check still keeps this validator
+    # idempotent if a future schema change loosens that.
+    if requested is None or effective is None:
+        return EXIT_OK
+    violations: list[str] = []
+    if effective > requested:
+        violations.append(
+            f"impact_target_depth_effective ({effective}) > "
+            f"impact_target_depth_requested ({requested})")
+    prioritized = document.get("prioritized_affected_targets") or []
+    for index, entry in enumerate(prioritized):
+        distance = entry.get("graph_distance") if isinstance(entry, dict) else None
+        if distance is None:
+            continue
+        if distance > requested:
+            violations.append(
+                f"prioritized_affected_targets[{index}].graph_distance "
+                f"({distance}) > impact_target_depth_requested ({requested})")
+    if not violations:
+        return EXIT_OK
+    sys.stderr.write(
+        f"error: {report_path} violates plan-M6-1-3 cross-field invariants\n")
+    for violation in violations:
+        sys.stderr.write(f"  - {violation}\n")
+    return EXIT_VALIDATION_FAILED
+
+
 def validate_report(validator, report_path: Path,
                     validation_error_cls) -> int:
     document = read_json(report_path)
     errors = sorted(validator.iter_errors(document), key=lambda e: list(e.absolute_path))
-    if not errors:
-        return EXIT_OK
-    sys.stderr.write(f"error: {report_path} does not satisfy the report schema\n")
-    for error in errors:
-        location = "/".join(str(part) for part in error.absolute_path) or "(root)"
-        sys.stderr.write(f"  - {location}: {error.message}\n")
-    return EXIT_VALIDATION_FAILED
+    if errors:
+        sys.stderr.write(f"error: {report_path} does not satisfy the report schema\n")
+        for error in errors:
+            location = "/".join(str(part) for part in error.absolute_path) or "(root)"
+            sys.stderr.write(f"  - {location}: {error.message}\n")
+        return EXIT_VALIDATION_FAILED
+    return check_cross_field_invariants(document, report_path)
 
 
 def parse_args() -> argparse.Namespace:

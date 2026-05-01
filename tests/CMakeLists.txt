@@ -263,6 +263,29 @@ add_test(
 )
 set_tests_properties(report_json_schema_rejects_impact_v3_graph_distance_out_of_range PROPERTIES WILL_FAIL TRUE)
 
+# AP M6-1.3 Finding 3 follow-up: companion negative tests for the
+# cross-field invariants that the JSON Schema Draft 2020-12 dialect
+# cannot express. The validator runs the cross-field check after
+# successful schema validation, so these fixtures pass the schema
+# but fail the invariant.
+add_test(
+    NAME report_json_cross_field_rejects_depth_effective_exceeds_requested
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
+            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_depth_effective_exceeds_requested_broken_sample.json
+)
+set_tests_properties(report_json_cross_field_rejects_depth_effective_exceeds_requested PROPERTIES WILL_FAIL TRUE)
+
+add_test(
+    NAME report_json_cross_field_rejects_graph_distance_exceeds_requested
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
+            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_graph_distance_exceeds_requested_broken_sample.json
+)
+set_tests_properties(report_json_cross_field_rejects_graph_distance_exceeds_requested PROPERTIES WILL_FAIL TRUE)
+
 # AP M5-1.3 Tranche A: DOT contract gates. The Python fallback uses only
 # stdlib and runs in every environment with python3 on PATH. The Graphviz
 # path runs in addition wherever the `dot` binary is installed (Docker
