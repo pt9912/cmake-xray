@@ -222,6 +222,47 @@ add_test(
 )
 set_tests_properties(report_json_schema_rejects_analyze_without_target_hubs PROPERTIES WILL_FAIL TRUE)
 
+# AP M6-1.3 A.5 follow-up: schema-rejection gates for the v3 prioritised
+# impact contract. Each fixture deliberately violates exactly one
+# documented invariant; WILL_FAIL inverts the schema-validator outcome
+# so the gate fails loud whenever a regression makes the schema accept
+# bytes the contract explicitly forbids.
+add_test(
+    NAME report_json_schema_rejects_v3_with_format_version_two
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
+            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_v3_with_format_version_two_broken_sample.json
+)
+set_tests_properties(report_json_schema_rejects_v3_with_format_version_two PROPERTIES WILL_FAIL TRUE)
+
+add_test(
+    NAME report_json_schema_rejects_impact_v3_missing_prioritized
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
+            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_missing_prioritized_broken_sample.json
+)
+set_tests_properties(report_json_schema_rejects_impact_v3_missing_prioritized PROPERTIES WILL_FAIL TRUE)
+
+add_test(
+    NAME report_json_schema_rejects_impact_v3_invalid_priority_class
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
+            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_invalid_priority_class_broken_sample.json
+)
+set_tests_properties(report_json_schema_rejects_impact_v3_invalid_priority_class PROPERTIES WILL_FAIL TRUE)
+
+add_test(
+    NAME report_json_schema_rejects_impact_v3_graph_distance_out_of_range
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
+            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_graph_distance_out_of_range_broken_sample.json
+)
+set_tests_properties(report_json_schema_rejects_impact_v3_graph_distance_out_of_range PROPERTIES WILL_FAIL TRUE)
+
 # AP M5-1.3 Tranche A: DOT contract gates. The Python fallback uses only
 # stdlib and runs in every environment with python3 on PATH. The Graphviz
 # path runs in addition wherever the `dot` binary is installed (Docker
