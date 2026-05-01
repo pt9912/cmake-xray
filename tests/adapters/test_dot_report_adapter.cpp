@@ -1329,3 +1329,91 @@ TEST_CASE("dot impact v2: target_dependency edges beyond the impact edge budget 
 
     CHECK(rendered.find("graph_truncated=true") != std::string::npos);
 }
+
+// ---- AP M6-1.3 A.4: impact-DOT v3 priority attributes -----------------
+
+TEST_CASE("AP1.3 A.4: impact-DOT carries graph_impact_target_depth_{requested,effective}") {
+    using xray::hexagon::model::ImpactResult;
+    ImpactResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = xray::hexagon::model::CompileDatabaseResult{
+        xray::hexagon::model::CompileDatabaseError::none, {}, {}, {}};
+    result.changed_file = "include/x.h";
+    result.inputs.changed_file = std::string{"include/x.h"};
+    result.impact_target_depth_requested = 2;
+    result.impact_target_depth_effective = 1;
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_impact_report(result);
+    CHECK(rendered.find("graph_impact_target_depth_requested=2") !=
+          std::string::npos);
+    CHECK(rendered.find("graph_impact_target_depth_effective=1") !=
+          std::string::npos);
+}
+
+TEST_CASE("AP1.3 A.4: analyze-DOT does NOT carry graph_impact_target_depth_*") {
+    using xray::hexagon::model::AnalysisResult;
+    AnalysisResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = xray::hexagon::model::CompileDatabaseResult{
+        xray::hexagon::model::CompileDatabaseError::none, {}, {}, {}};
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_analysis_report(result, 5);
+    CHECK(rendered.find("graph_impact_target_depth_requested") == std::string::npos);
+    CHECK(rendered.find("graph_impact_target_depth_effective") == std::string::npos);
+}
+
+TEST_CASE("AP1.3 A.4: impact-DOT renders priority_class/graph_distance/evidence_strength on prioritised target nodes") {
+    using xray::hexagon::model::ImpactResult;
+    using xray::hexagon::model::PrioritizedImpactedTarget;
+    using xray::hexagon::model::TargetEvidenceStrength;
+    using xray::hexagon::model::TargetGraphStatus;
+    using xray::hexagon::model::TargetImpactClassification;
+    using xray::hexagon::model::TargetInfo;
+    using xray::hexagon::model::TargetPriorityClass;
+    ImpactResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = xray::hexagon::model::CompileDatabaseResult{
+        xray::hexagon::model::CompileDatabaseError::none, {}, {}, {}};
+    result.changed_file = "include/x.h";
+    result.inputs.changed_file = std::string{"include/x.h"};
+    result.target_graph_status = TargetGraphStatus::loaded;
+    result.impact_target_depth_requested = 2;
+    result.impact_target_depth_effective = 1;
+    const TargetInfo lib{"lib", "STATIC_LIBRARY", "lib::STATIC_LIBRARY"};
+    result.affected_targets.push_back({lib, TargetImpactClassification::direct});
+    result.prioritized_affected_targets.push_back(
+        PrioritizedImpactedTarget{lib, TargetPriorityClass::direct, 0,
+                                  TargetEvidenceStrength::direct});
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_impact_report(result);
+    CHECK(rendered.find("priority_class=\"direct\"") != std::string::npos);
+    CHECK(rendered.find("graph_distance=0") != std::string::npos);
+    CHECK(rendered.find("evidence_strength=\"direct\"") != std::string::npos);
+}
+
+TEST_CASE("AP1.3 A.4: impact-DOT skips priority attributes on graph-only target nodes that have no prioritised entry") {
+    using xray::hexagon::model::ImpactResult;
+    using xray::hexagon::model::TargetGraphStatus;
+    using xray::hexagon::model::TargetInfo;
+    ImpactResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = xray::hexagon::model::CompileDatabaseResult{
+        xray::hexagon::model::CompileDatabaseError::none, {}, {}, {}};
+    result.changed_file = "include/x.h";
+    result.inputs.changed_file = std::string{"include/x.h"};
+    result.target_graph_status = TargetGraphStatus::loaded;
+    // Graph-only floating target without an affected_targets or
+    // prioritised entry: the v3 attribute join must NOT attach.
+    result.target_graph.nodes.push_back(
+        TargetInfo{"floating", "STATIC_LIBRARY", "floating::STATIC_LIBRARY"});
+    const DotReportAdapter adapter;
+    const auto rendered = adapter.write_impact_report(result);
+    const auto floating_pos = rendered.find("name=\"floating\"");
+    REQUIRE(floating_pos != std::string::npos);
+    const auto close_pos = rendered.find("];", floating_pos);
+    REQUIRE(close_pos != std::string::npos);
+    const auto attrs = rendered.substr(floating_pos, close_pos - floating_pos);
+    CHECK(attrs.find("priority_class") == std::string::npos);
+    CHECK(attrs.find("graph_distance") == std::string::npos);
+    CHECK(attrs.find("evidence_strength") == std::string::npos);
+}

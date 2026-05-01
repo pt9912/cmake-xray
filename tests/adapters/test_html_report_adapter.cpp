@@ -1320,3 +1320,87 @@ TEST_CASE("HTML impact v2: partial status with external edge fills External targ
     CHECK(report.find("<td>app</td><td>boost</td><td>external</td><td>boost</td>") !=
           std::string::npos);
 }
+
+// ---- AP M6-1.3 A.4: Prioritised Affected Targets section --------------
+
+TEST_CASE("HTML impact v3: not_loaded keeps Prioritised Affected Targets section with depth header and skipped paragraph") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = std::string{"include/x.h"};
+    result.impact_target_depth_requested = 2;
+    result.impact_target_depth_effective = 0;  // service forces 0 on not_loaded
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("class=\"prioritised-affected-targets\"") != std::string::npos);
+    CHECK(report.find("<h2>Prioritised Affected Targets</h2>") != std::string::npos);
+    CHECK(report.find("Requested depth: 2. Effective depth: 0 (no graph).") !=
+          std::string::npos);
+    CHECK(report.find("Target graph not loaded; prioritisation skipped.") !=
+          std::string::npos);
+    // No table rendered when not_loaded.
+    CHECK(report.find("<th scope=\"col\">Priority class</th>") == std::string::npos);
+}
+
+TEST_CASE("HTML impact v3: loaded with empty prioritised list shows the leersatz, no table") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = std::string{"include/x.h"};
+    result.target_graph_status = xray::hexagon::model::TargetGraphStatus::loaded;
+    result.impact_target_depth_requested = 2;
+    result.impact_target_depth_effective = 1;
+    // prioritized_affected_targets stays empty.
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("Requested depth: 2. Effective depth: 1.") !=
+          std::string::npos);
+    CHECK(report.find("No prioritised targets.") != std::string::npos);
+    CHECK(report.find("<th scope=\"col\">Priority class</th>") == std::string::npos);
+}
+
+TEST_CASE("HTML impact v3: loaded with populated prioritised list emits the documented six-column table") {
+    using xray::hexagon::model::PrioritizedImpactedTarget;
+    using xray::hexagon::model::TargetEvidenceStrength;
+    using xray::hexagon::model::TargetGraphStatus;
+    using xray::hexagon::model::TargetPriorityClass;
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = std::string{"src/hub.cpp"};
+    result.target_graph_status = TargetGraphStatus::loaded;
+    result.impact_target_depth_requested = 2;
+    result.impact_target_depth_effective = 1;
+    result.prioritized_affected_targets = {
+        PrioritizedImpactedTarget{
+            TargetInfo{"hub", "STATIC_LIBRARY", "hub::STATIC_LIBRARY"},
+            TargetPriorityClass::direct, 0, TargetEvidenceStrength::direct},
+        PrioritizedImpactedTarget{
+            TargetInfo{"app", "EXECUTABLE", "app::EXECUTABLE"},
+            TargetPriorityClass::direct_dependent, 1,
+            TargetEvidenceStrength::heuristic},
+    };
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("<th scope=\"col\">Display name</th>") != std::string::npos);
+    CHECK(report.find("<th scope=\"col\">Type</th>") != std::string::npos);
+    CHECK(report.find("<th scope=\"col\">Priority class</th>") != std::string::npos);
+    CHECK(report.find("<th scope=\"col\">Graph distance</th>") != std::string::npos);
+    CHECK(report.find("<th scope=\"col\">Evidence strength</th>") != std::string::npos);
+    CHECK(report.find("<th scope=\"col\">Unique key</th>") != std::string::npos);
+    CHECK(report.find("<td>hub</td><td>STATIC_LIBRARY</td><td>direct</td>"
+                      "<td>0</td><td>direct</td><td>hub::STATIC_LIBRARY</td>") !=
+          std::string::npos);
+    CHECK(report.find("<td>app</td><td>EXECUTABLE</td><td>direct_dependent</td>"
+                      "<td>1</td><td>heuristic</td><td>app::EXECUTABLE</td>") !=
+          std::string::npos);
+}
+
+TEST_CASE("HTML impact v3: section ordering pins Prioritised Affected Targets between Target Graph Reference and Diagnostics") {
+    auto result = make_minimal_impact_result();
+    result.inputs.changed_file = std::string{"include/x.h"};
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    const auto pos_graph_ref = report.find("class=\"target-graph-reference\"");
+    const auto pos_prioritised = report.find("class=\"prioritised-affected-targets\"");
+    const auto pos_diags = report.find("class=\"diagnostics\"");
+    REQUIRE(pos_graph_ref != std::string::npos);
+    REQUIRE(pos_prioritised != std::string::npos);
+    REQUIRE(pos_diags != std::string::npos);
+    CHECK(pos_graph_ref < pos_prioritised);
+    CHECK(pos_prioritised < pos_diags);
+}

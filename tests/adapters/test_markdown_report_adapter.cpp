@@ -701,3 +701,59 @@ TEST_CASE(
     CHECK(report.find("| `app` | `boost` | external | `boost` |") !=
           std::string::npos);
 }
+
+// ---- AP M6-1.3 A.4: Prioritised Affected Targets section --------------
+
+TEST_CASE("markdown impact v3: not_loaded keeps Prioritised Affected Targets section with depth header and skipped paragraph") {
+    auto result = make_impact_result();
+    result.impact_target_depth_requested = 2;
+    result.impact_target_depth_effective = 0;
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("## Prioritised Affected Targets\n\n"
+                      "Requested depth: `2`. Effective depth: `0` (no graph).\n\n"
+                      "Target graph not loaded; prioritisation skipped.\n") !=
+          std::string::npos);
+    // No table rendered when not_loaded.
+    CHECK(report.find("| Priority class |") == std::string::npos);
+}
+
+TEST_CASE("markdown impact v3: loaded with empty prioritised list emits the leersatz, no table") {
+    auto result = make_impact_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    result.impact_target_depth_requested = 2;
+    result.impact_target_depth_effective = 1;
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("## Prioritised Affected Targets\n\n"
+                      "Requested depth: `2`. Effective depth: `1`.\n\n"
+                      "No prioritised targets.\n") != std::string::npos);
+    CHECK(report.find("| Priority class |") == std::string::npos);
+}
+
+TEST_CASE("markdown impact v3: populated prioritised list renders the six-column table with backticked target columns") {
+    using xray::hexagon::model::PrioritizedImpactedTarget;
+    using xray::hexagon::model::TargetEvidenceStrength;
+    using xray::hexagon::model::TargetPriorityClass;
+    auto result = make_impact_result();
+    result.target_graph_status = m6_md::TargetGraphStatus::loaded;
+    result.impact_target_depth_requested = 2;
+    result.impact_target_depth_effective = 1;
+    result.prioritized_affected_targets = {
+        PrioritizedImpactedTarget{
+            TargetInfo{"hub", "STATIC_LIBRARY", "hub::STATIC_LIBRARY"},
+            TargetPriorityClass::direct, 0, TargetEvidenceStrength::direct},
+        PrioritizedImpactedTarget{
+            TargetInfo{"app", "EXECUTABLE", "app::EXECUTABLE"},
+            TargetPriorityClass::direct_dependent, 1,
+            TargetEvidenceStrength::heuristic},
+    };
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find(
+              "| Display name | Type | Priority class | Graph distance | Evidence strength | Unique key |\n"
+              "|---|---|---|---|---|---|\n"
+              "| `hub` | STATIC_LIBRARY | direct | 0 | direct | `hub::STATIC_LIBRARY` |\n"
+              "| `app` | EXECUTABLE | direct_dependent | 1 | heuristic | `app::EXECUTABLE` |\n") !=
+          std::string::npos);
+}

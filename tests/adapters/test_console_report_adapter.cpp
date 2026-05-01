@@ -477,3 +477,60 @@ TEST_CASE(
     CHECK(report.find("Target Graph Reference (target_graph_status: partial):\n"
                       "  app -> boost [external]\n") != std::string::npos);
 }
+
+// ---- AP M6-1.3 A.4: Prioritised Affected Targets section --------------
+
+TEST_CASE("AP1.3 A.4: console impact not_loaded emits the metadata-only Prioritised Affected Targets header") {
+    auto result = m6_console::make_impact_result_for_graph();
+    result.impact_target_depth_requested = 2;
+    result.impact_target_depth_effective = 0;
+    const ConsoleReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("Prioritised Affected Targets (requested depth: 2, "
+                      "effective depth: 0, no graph).\n") != std::string::npos);
+    // No prioritised entries on the not_loaded path.
+    CHECK(report.find("[direct, distance=") == std::string::npos);
+}
+
+TEST_CASE("AP1.3 A.4: console impact loaded with empty prioritised list emits the leersatz") {
+    auto result = m6_console::make_impact_result_for_graph();
+    result.target_graph_status = m6_console::TargetGraphStatus::loaded;
+    result.impact_target_depth_requested = 2;
+    result.impact_target_depth_effective = 1;
+    const ConsoleReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("Prioritised Affected Targets (requested depth: 2, "
+                      "effective depth: 1):\n"
+                      "  No prioritised targets.\n") != std::string::npos);
+}
+
+TEST_CASE("AP1.3 A.4: console impact populated prioritised list pins the suffix-format byte-stably") {
+    using xray::hexagon::model::PrioritizedImpactedTarget;
+    using xray::hexagon::model::TargetEvidenceStrength;
+    using xray::hexagon::model::TargetPriorityClass;
+    auto result = m6_console::make_impact_result_for_graph();
+    result.target_graph_status = m6_console::TargetGraphStatus::loaded;
+    result.impact_target_depth_requested = 2;
+    result.impact_target_depth_effective = 1;
+    result.prioritized_affected_targets = {
+        PrioritizedImpactedTarget{
+            TargetInfo{"hub", "STATIC_LIBRARY", "hub::STATIC_LIBRARY"},
+            TargetPriorityClass::direct, 0, TargetEvidenceStrength::direct},
+        PrioritizedImpactedTarget{
+            TargetInfo{"app", "EXECUTABLE", "app::EXECUTABLE"},
+            TargetPriorityClass::direct_dependent, 1,
+            TargetEvidenceStrength::heuristic},
+        PrioritizedImpactedTarget{
+            TargetInfo{"deep", "STATIC_LIBRARY", "deep::STATIC_LIBRARY"},
+            TargetPriorityClass::transitive_dependent, 2,
+            TargetEvidenceStrength::uncertain},
+    };
+    const ConsoleReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+    CHECK(report.find("Prioritised Affected Targets (requested depth: 2, "
+                      "effective depth: 1):\n"
+                      "  [direct, distance=0, evidence=direct] hub\n"
+                      "  [direct_dependent, distance=1, evidence=heuristic] app\n"
+                      "  [transitive_dependent, distance=2, evidence=uncertain] deep\n") !=
+          std::string::npos);
+}
