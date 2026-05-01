@@ -3,6 +3,8 @@
 > **Implementierungsstand:** AP M5-1.4 Tranche A liefert den HTML-Vertrag, das statische CSS, file-locale Escaping- und Whitespace-Hilfen und das Adapter-Testskelett. Tranche B implementiert den produktiven `HtmlReportAdapter` und schaltet `--format html` an der CLI frei. Bis dahin lehnt die CLI `--format html` weiterhin als `recognized but not implemented in this build` ab. Die in diesem Dokument festgehaltenen Regeln sind ab Tranche A bindend; folgende Tranchen erweitern den Vertrag nicht ohne Update dieses Dokuments.
 >
 > **M6 AP 1.2 Tranche A.3:** `format_version` steigt auf `2`. Analyze-HTML traegt zwei zusaetzliche Pflichtsections `Target Graph` und `Target Hubs` zwischen `Target Metadata` und `Diagnostics`. Impact-HTML traegt eine zusaetzliche Pflichtsection `Target Graph Reference` zwischen `Heuristically Affected Targets` und `Diagnostics`. Beide Reporttypen behalten die neuen Sections auch bei `target_graph_status="not_loaded"` mit `h2` und sichtbarem Leersatz, analog zu `Target Metadata` aus M5.
+>
+> **M6 AP 1.3 Tranche A.4:** `format_version` steigt auf `3`. Impact-HTML traegt eine zusaetzliche Pflichtsection `Prioritised Affected Targets` zwischen `Target Graph Reference` und `Diagnostics`; sie zeigt die Reverse-BFS-priorisierte Sicht ueber den Target-Graphen mit Tiefen-Metadaten. Analyze-HTML aendert sich nicht (Reverse-BFS gilt nur fuer Impact). Die Section bleibt bei `target_graph_status="not_loaded"` mit `h2` plus Tiefen-Header und Fallback-Absatz erhalten.
 
 ## Zweck
 
@@ -37,12 +39,12 @@ Das Geruest ist fuer Analyze und Impact identisch:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="xray-report-format-version" content="2">
+  <meta name="xray-report-format-version" content="3">
   <title>cmake-xray analyze report</title>
   <style>...</style>
 </head>
 <body>
-  <main class="report" data-report-type="analyze" data-format-version="2">
+  <main class="report" data-report-type="analyze" data-format-version="3">
     ...
   </main>
 </body>
@@ -213,7 +215,8 @@ Pflichtsections (in Reihenfolge):
 5. Directly Affected Targets
 6. Heuristically Affected Targets
 7. Target Graph Reference (M6 AP 1.2)
-8. Diagnostics
+8. Prioritised Affected Targets (M6 AP 1.3)
+9. Diagnostics
 
 ### Header / Summary (impact)
 
@@ -236,7 +239,19 @@ Spalten: `Display name`, `Type`. Reihenfolge: `display_name`, `type`, `unique_ke
 - Bei `target_graph_status="not_loaded"`: `h2` plus Absatz `Target graph not loaded.` (gleicher Leersatz wie Analyze; Section bleibt im Output).
 - Bei `target_graph_status="loaded"` oder `"partial"` mit leerer `target_graph.edges`-Liste: Leersatz `No direct target dependencies.` ohne Tabelle.
 - Es gibt KEINE Hub-Section im Impact-HTML; diese Asymmetrie spiegelt den JSON-Vertrag (`target_hubs` existiert nur im Analyze-Output).
-- AP 1.3 darf den Section-Titel auf `Target Graph (prioritised)` aendern und die Tabelle um Priorisierungs-Spalten erweitern; AP 1.2 schreibt nur die reine Lesedaten-Sicht.
+- AP 1.3 ergaenzt eine separate Section `Prioritised Affected Targets` (siehe naechster Abschnitt); die Reverse-BFS-priorisierte Sicht lebt nicht in dieser Lesedaten-Section.
+
+### Prioritised Affected Targets (impact, M6 AP 1.3)
+
+- `h2`: `Prioritised Affected Targets`.
+- Sichtbare Tiefenangabe in einem `p`-Element direkt nach `h2`:
+  - `target_graph_status="loaded"` oder `"partial"`: `Requested depth: <n>. Effective depth: <m>.`
+  - `target_graph_status="not_loaded"`: `Requested depth: <n>. Effective depth: 0 (no graph).`
+- Wenn `target_graph_status="not_loaded"`: zusaetzlicher Absatz `Target graph not loaded; prioritisation skipped.`. Keine Tabelle.
+- Wenn `target_graph_status="loaded"` oder `"partial"` und `prioritized_affected_targets` leer: Absatz `No prioritised targets.`. Keine Tabelle.
+- Wenn `prioritized_affected_targets` nicht leer: Tabelle mit Spalten `Display name`, `Type`, `Priority class`, `Graph distance`, `Evidence strength`, `Unique key`. Zeilenreihenfolge nach dem 4-Tupel `(priority_class, graph_distance, evidence_strength, unique_key)`, identisch zur Service-Sortierung.
+- Die `Unique key`-Spalte uebernimmt die Disambiguierung kollidierender Display-Namen direkt aus dem Modellfeld; ein zusaetzlicher `[key: ...]`-Suffix wie in AP 1.2 ist nicht noetig, weil die Spalte den Schluessel sowieso fuehrt.
+- Section bleibt in jeder Statusvariante im Output (nicht weggelassen), damit Konsumenten die Tiefen-Metadaten zuverlaessig finden.
 
 ### Diagnostics (impact)
 
@@ -244,7 +259,7 @@ Reportweite Diagnostics aus `ImpactResult::diagnostics`. Leersatz `No diagnostic
 
 ## Goldens
 
-- Goldens liegen unter `tests/e2e/testdata/m5/html-reports/` und `tests/e2e/testdata/m6/html-reports/`. Beide Verzeichnisse enthalten ausschliesslich `format_version=2`-Goldens; die `m5/`-/`m6/`-Trennung ist fachlich (Datensatz-Szenarien), nicht versionell, analog zur JSON- und DOT-Goldens-Aufteilung.
+- Goldens liegen unter `tests/e2e/testdata/m5/html-reports/` und `tests/e2e/testdata/m6/html-reports/`. Beide Verzeichnisse enthalten ausschliesslich `format_version=3`-Goldens (AP M6-1.3 A.4 inhaltlich migriert); die `m5/`-/`m6/`-Trennung ist fachlich (Datensatz-Szenarien), nicht versionell, analog zur JSON- und DOT-Goldens-Aufteilung.
 - Manifeste `tests/e2e/testdata/m5/html-reports/manifest.txt` und `tests/e2e/testdata/m6/html-reports/manifest.txt` listen jeden Goldenpfad einmal; Verzeichnis und Manifest werden beidseitig abgeglichen.
 - Goldens enthalten keine Host-/Workspace-spezifischen Absolutpfade. Synthetische Pfade wie `/project/...` oder `C:/project/...` bleiben erlaubt.
 - Goldens enthalten keine Zeitstempel, Hostnamen, zufaellige IDs oder Buildpfade.

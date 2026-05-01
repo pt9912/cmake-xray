@@ -82,13 +82,19 @@ Jeder DOT-Report enthaelt mindestens:
 | Attribut | Typ | Beschreibung |
 | --- | --- | --- |
 | `xray_report_type` | quoted string | `analyze` oder `impact`. |
-| `format_version` | integer | identisch mit `xray::hexagon::model::kReportFormatVersion`, ab AP M6-1.2 `2`. |
+| `format_version` | integer | identisch mit `xray::hexagon::model::kReportFormatVersion`, ab AP M6-1.3 `3` (vorher `2` ab AP M6-1.2). |
 | `graph_node_limit` | integer | wirksames Node-Budget fuer diesen Report. |
 | `graph_edge_limit` | integer | wirksames Edge-Budget fuer diesen Report. |
 | `graph_truncated` | boolean | `true`, wenn ein Kandidatenknoten oder eine Kandidatenkante wegen `node_limit`, `edge_limit` oder Analyze-`context_limit` nicht im finalen Graph enthalten ist. Auch im ungekuerzten Fall verpflichtend ausgegeben (`false`). |
 | `graph_target_graph_status` | quoted string | `not_loaded`, `loaded`, `partial`. Pflicht ab AP M6-1.2 fuer Analyze und Impact. Spiegelt `AnalysisResult::target_graph_status` bzw. `ImpactResult::target_graph_status`. |
+| `graph_impact_target_depth_requested` | integer | nur Impact-DOT, Pflicht ab AP M6-1.3. Validierter angeforderter Reverse-BFS-Tiefenwert, identisch mit `ImpactResult::impact_target_depth_requested`. |
+| `graph_impact_target_depth_effective` | integer | nur Impact-DOT, Pflicht ab AP M6-1.3. Tatsaechlich erreichte Tiefe, identisch mit `ImpactResult::impact_target_depth_effective`. Bei `graph_target_graph_status="not_loaded"` immer `0`. |
 
 `graph_truncated` bezieht sich auf den finalen Graphzustand nach Entfernen reiner, unverbundener Kontextknoten.
+
+Die `graph_impact_target_depth_*`-Attribute erscheinen ausschliesslich in
+Impact-DOT, unabhaengig vom `graph_target_graph_status`. Analyze-DOT
+gibt sie nicht aus.
 
 ## Analyze-Vertrag
 
@@ -246,10 +252,32 @@ Pflichtattribute fuer Translation-Unit-Knoten:
 Pflichtattribute fuer Target-Knoten:
 
 - `kind="target"`.
-- `impact`: `direct` oder `heuristic`.
+- `impact`: `direct` oder `heuristic`. Optional: Knoten, die nur ueber
+  `target_graph.nodes` und nicht ueber Affected-Targets im Graph stehen,
+  fuehren `impact` nicht.
 - `label`, `name`, `type`, `unique_key`.
 
 Wenn ein Target sowohl direkt als auch heuristisch betroffen ist, gewinnt `impact="direct"`.
+
+Ab AP M6-1.3 ergaenzen optional drei Reverse-BFS-Attribute, sobald
+`graph_target_graph_status != not_loaded` und das Target in
+`ImpactResult::prioritized_affected_targets` enthalten ist:
+
+- `priority_class`: `direct`, `direct_dependent` oder `transitive_dependent` (quoted string).
+- `graph_distance`: integer in `[0, 32]`. Korrespondenz zur
+  `priority_class`: `direct=0`, `direct_dependent=1`,
+  `transitive_dependent>=2`.
+- `evidence_strength`: `direct`, `heuristic` oder `uncertain` (quoted string).
+
+Diese drei Attribute koexistieren mit dem bestehenden M5-`impact`-Attribut
+(`direct`/`heuristic` aus `ImpactedTarget::classification`). `impact` ist
+die M5-Klassifikation, `evidence_strength` ist die AP-1.3-Klassifikation
+aus der Reverse-BFS und kann sich von `impact` unterscheiden (z. B. bei
+Reverse-Hops, deren Owner nicht in `affected_targets` ist). Beide
+Attribute bleiben in v3 erhalten.
+
+`prioritised`-Attribute erscheinen NICHT in Analyze-DOT, weil
+Reverse-BFS in M6 ausschliesslich auf der Impact-Sicht laeuft.
 
 ### Kanten
 

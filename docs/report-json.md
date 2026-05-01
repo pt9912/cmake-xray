@@ -37,7 +37,7 @@ Jeder JSON-Report enthaelt diese Pflichtfelder in genau dieser Reihenfolge:
 | Feld | Typ | Pflicht | Beschreibung |
 | --- | --- | --- | --- |
 | `format` | string | ja | Maschinenlesbarer Dokumenttyp. `cmake-xray.analysis` oder `cmake-xray.impact`. |
-| `format_version` | integer | ja | Aktuell `2` (M6 AP 1.2). Erhoeht sich bei vertragsbrechenden Aenderungen. |
+| `format_version` | integer | ja | Aktuell `3` (M6 AP 1.3). Erhoeht sich bei vertragsbrechenden Aenderungen. |
 | `report_type` | string | ja | `analyze` oder `impact`. Kurzer Workflow-Identifier; nicht der CLI-Wert `--format json`. |
 | `inputs` | object | ja | Eingabeprovenienz aus `ReportInputs`. Schema je Reporttyp unten. |
 | `summary` | object | ja | Aggregierte Kennzahlen je Reporttyp. |
@@ -208,7 +208,10 @@ Format-Identifier und Reporttyp:
 9. `heuristically_affected_targets`
 10. `target_graph_status`
 11. `target_graph`
-12. `diagnostics`
+12. `prioritized_affected_targets`
+13. `impact_target_depth_requested`
+14. `impact_target_depth_effective`
+15. `diagnostics`
 
 ### `inputs` (impact)
 
@@ -345,19 +348,70 @@ Im Analyze-JSON ergaenzt ein Pflichtcontainer `target_hubs` die Hub-Sicht:
 
 `target_hubs` ist im Impact-JSON bewusst NICHT enthalten und wird vom Schema
 ueber die Kombination aus fehlender Property-Deklaration und
-`additionalProperties: false` hart abgelehnt. AP 1.3 entscheidet ueber
-Hub-Sichtbarkeit im Impact-Kontext zusammen mit der Priorisierung.
+`additionalProperties: false` hart abgelehnt. AP 1.3 hat sich gegen
+Hubs im Impact-Kontext entschieden; der Impact-Kontext nutzt
+stattdessen `prioritized_affected_targets` (siehe naechste Section).
 
 Im Analyze-JSON impliziert `target_graph_status="not_loaded"` zusaetzlich
 leere `target_hubs.inbound` und `target_hubs.outbound` sowie das
 `thresholds`-Objekt mit den hardcoded `10`/`10`-Defaults.
+
+## Prioritised Impact (M6 AP 1.3, `format_version=3`)
+
+Im Impact-JSON ergaenzen drei neue Pflichtfelder die Reverse-Target-Graph-
+Priorisierung:
+
+| Feld | Typ | Pflicht | Werte |
+| --- | --- | --- | --- |
+| `prioritized_affected_targets` | array | ja | `PrioritizedImpactedTarget`-Eintraege, sortiert nach `(priority_class, graph_distance, evidence_strength, unique_key)`. |
+| `impact_target_depth_requested` | integer | ja | Validierter angeforderter Wert in `[0, 32]`; entspricht `AnalyzeImpactRequest::impact_target_depth.value_or(2)`. |
+| `impact_target_depth_effective` | integer | ja | Tatsaechlich erreichte Reverse-BFS-Tiefe. `0 <= effective <= requested`; bei `target_graph_status="not_loaded"` immer `0`. |
+
+`PrioritizedImpactedTarget`-Schema:
+
+| Feld | Typ | Pflicht | Werte |
+| --- | --- | --- | --- |
+| `target` | object | ja | `TargetNode` aus AP 1.2. |
+| `priority_class` | string | ja | `direct`, `direct_dependent`, `transitive_dependent`. |
+| `graph_distance` | integer | ja | `0` bis `32`; `<= impact_target_depth_requested`. |
+| `evidence_strength` | string | ja | `direct`, `heuristic`, `uncertain`. |
+
+Korrespondenz-Regel `priority_class` ↔ `graph_distance`: `direct` gilt
+fuer `graph_distance=0`, `direct_dependent` fuer `graph_distance=1`,
+`transitive_dependent` fuer `graph_distance>=2`. Ein Eintrag mit
+nicht-passender Korrespondenz ist ein Service-Defekt.
+
+`evidence_strength`-Regel: Owner direkt betroffener TUs erben `direct`,
+Owner heuristisch betroffener TUs erben `heuristic`, Header-Only- oder
+Build-Metadaten-only-Targets ohne TU-Anker erhalten `uncertain`.
+Reverse-BFS-Hops uebernehmen die Evidenz vom Frontier-Vorgaenger; bei
+gleicher minimaler Distanz gewinnt die staerkste Evidenz
+(`direct > heuristic > uncertain`).
+
+Externe `<external>::*`-Targets erscheinen NICHT in
+`prioritized_affected_targets`, weil sie keine Owner-Targets sein
+koennen; AP 1.3 dropt entsprechende Reverse-BFS-Kandidaten
+defense-in-depth.
+
+`prioritized_affected_targets` ist im Analyze-JSON nicht enthalten und
+wird vom Schema dort hart abgelehnt; die analoge Hub-Sicht aus
+`target_hubs` bleibt analyze-only.
+
+Diagnostic-Korrespondenz:
+
+| Bedingung | Diagnostic-Schwere | Nachricht |
+| --- | --- | --- |
+| `target_graph_status=not_loaded` mit Seeds | `note` | `target graph not loaded; impact prioritisation degrades to impact seed targets only` |
+| `target_graph_status=partial` | `warning` | `target graph partially loaded; impact prioritisation uses available edges only` |
+| BFS endet vorzeitig vor Budget mit Seeds | `note` | `reverse target graph traversal stopped at depth N (no further reachable targets)` |
+| BFS erreicht Tiefenbudget mit nicht-leerer Frontier | `warning` | `reverse target graph traversal hit depth limit N within a cycle; some transitively dependent targets may be missing` |
 
 ## Schema-Validierung
 
 - `docs/report-json.schema.json` ist die formale Schema-Definition (JSON Schema Draft 2020-12).
 - Jedes Vertragsobjekt setzt `additionalProperties: false`. Unbekannte Felder werden hart abgelehnt.
 - Schema und C++-Konstante `kReportFormatVersion` werden in einem CTest-Gate gegeneinander geprueft. Ein abweichender `const`-Wert im Schema laesst den Gate-Test fehlschlagen.
-- Goldens unter `tests/e2e/testdata/m5/json-reports/` und `tests/e2e/testdata/m6/json-reports/` werden ueber `tests/validate_json_schema.py` gegen das Schema validiert. Der Validator gleicht Verzeichnisinhalt und Manifest beidseitig ab. Beide Verzeichnisse enthalten ausschliesslich `format_version=2`-Goldens; die `m5/`-/`m6/`-Trennung ist fachlich (Datensatz-Szenarien), nicht versionell.
+- Goldens unter `tests/e2e/testdata/m5/json-reports/` und `tests/e2e/testdata/m6/json-reports/` werden ueber `tests/validate_json_schema.py` gegen das Schema validiert. Der Validator gleicht Verzeichnisinhalt und Manifest beidseitig ab. Beide Verzeichnisse enthalten ausschliesslich `format_version=3`-Goldens (AP M6-1.3 A.4 inhaltlich migriert); die `m5/`-/`m6/`-Trennung ist fachlich (Datensatz-Szenarien), nicht versionell.
 - Schema-Asymmetrie analyze vs. impact wird durch zwei Negativtests gepinnt: `report_json_schema_rejects_impact_with_target_hubs` und `report_json_schema_rejects_analyze_without_target_hubs`. Beide Tests laufen mit `WILL_FAIL TRUE` und scheitern absichtlich am Schema, damit ein Adapter-Bug, der die Asymmetrie verletzt, sofort sichtbar wird.
 
 ## Manifest
