@@ -27,14 +27,12 @@ Vor einem Release:
 
 ## Verifikation
 
-Vor Tagging und Release-Erstellung muessen die Docker-Pfade erfolgreich sein:
+Vor Tagging und Release-Erstellung muessen die Docker-Pfade ueber das
+Makefile erfolgreich sein:
 
 ```bash
-docker build --target test -t cmake-xray:test .
-docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
-docker build --target quality-check -t cmake-xray:quality-check .
-docker build --target runtime -t cmake-xray .
-docker run --rm cmake-xray --help
+make docker-gates
+make runtime
 docker run --rm \
   -v "$PWD/tests/e2e/testdata/m3:/data:ro" \
   cmake-xray analyze --compile-commands /data/report_project/compile_commands.json --format markdown
@@ -63,10 +61,8 @@ docker run --rm \
 Optional koennen die Reports separat ausgegeben werden:
 
 ```bash
-docker build --target coverage -t cmake-xray:coverage .
-docker run --rm cmake-xray:coverage
-docker build --target quality -t cmake-xray:quality .
-docker run --rm cmake-xray:quality
+make coverage-report
+make quality-report
 ```
 
 Vor einem MVP-Release zusaetzlich pruefen:

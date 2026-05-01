@@ -31,12 +31,8 @@ Branch-Protection verankerten Nachweis aus
 cmake --version
 python3 --version
 
-# 2. Configure plus Toolchain-Minimums-Gate (FATAL_ERROR bei Drift).
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-# 3. Build und ctest.
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure --parallel
+# 2. Configure, Build und ctest.
+make test
 ```
 
 Linux ist die Referenzplattform; zusaetzlich gelten die Docker-Gates aus
@@ -49,9 +45,7 @@ Linux ist die Referenzplattform; zusaetzlich gelten die Docker-Gates aus
 ```bash
 cmake --version
 python3 --version
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure --parallel
+make test
 ```
 
 Hosts:
@@ -112,7 +106,7 @@ cmake --build build-ninja --parallel
 
 `docs/examples/` enthaelt DOT-Beispiele, die absolute Source-/Build-
 Pfade in `unique_key`-Attributen einbetten. Lokale Test-Laeufe via
-`docker build --target test` arbeiten unter `/workspace/...` und
+`make docker-test` arbeiten unter `/workspace/...` und
 maskieren damit Host-Pfad-Drift, die auf einem CI-Runner mit
 `/home/runner/...` (oder einem anderen Host-Layout) auftaucht.
 
@@ -120,7 +114,7 @@ Vor jeder "lokal gruen"-Aussage zur `docs/examples`-Drift einmal
 explizit unter einem alternativen Mount-Pfad pruefen:
 
 ```bash
-bash scripts/verify-doc-examples-portability.sh
+make docs-portability
 ```
 
 Das Skript baut `cmake-xray:test`, mountet das Repo unter
@@ -129,9 +123,7 @@ Das Skript baut `cmake-xray:test`, mountet das Repo unter
 Geometrie. Wenn die DOT-`unique_key`-Normalisierung im Validator
 korrekt ist, geht der Lauf gruen trotz divergentem Praefix; wenn
 nicht, bricht er mit derselben Fehlermeldung ab, die ein nativer
-GHA-Linux-Lauf produzieren wuerde. Der CTest-Eintrag
-`doc_examples_host_portability` ruft dasselbe Skript auf und
-skippt sauber, wenn `ctest` ohne Host-Docker laeuft.
+GHA-Linux-Lauf produzieren wuerde.
 
 ## Manueller Smoke-Report (optional)
 

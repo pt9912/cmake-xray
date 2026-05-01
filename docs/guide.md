@@ -99,8 +99,7 @@ abgesichert (siehe `docs/releasing.md`).
 Mit lokal gebautem Runtime-Image:
 
 ```bash
-docker build --target runtime -t cmake-xray .
-docker run --rm cmake-xray --help
+make runtime
 ```
 
 ### Lokaler Quellbuild
@@ -110,8 +109,7 @@ jeder Plattform sowie den unterstuetzten Nutzungsweg auf macOS arm64 und
 Windows x86_64, fuer die kein vorgefertigtes Release-Artefakt erzeugt wird:
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+make dev
 ```
 
 Resultat:
@@ -697,19 +695,14 @@ diff -u build/reports/xray-before.md build/reports/xray-after.md
 Lokale Tests:
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
-ctest --test-dir build --output-on-failure
+make test BUILD_TYPE=Debug
 ```
 
 Reproduzierbare Docker-Gates:
 
 ```bash
-docker build --target test -t cmake-xray:test .
-docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
-docker build --target quality-check -t cmake-xray:quality-check .
-docker build --target runtime -t cmake-xray .
-docker run --rm cmake-xray --help
+make docker-gates
+make runtime
 ```
 
 Details stehen in [docs/quality.md](./quality.md) und

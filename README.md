@@ -126,8 +126,7 @@ Quellbuild aus Source (Entwicklung auf jeder Plattform sowie unterstuetzter
 Nutzungsweg auf macOS arm64 und Windows x86_64):
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+make dev
 ```
 
 Resultat:
@@ -143,13 +142,7 @@ dort fuer Endnutzer-Aufrufe nicht empfohlen.
 Runtime-Image bauen:
 
 ```bash
-docker build --target runtime -t cmake-xray .
-```
-
-Danach steht das Binary im Container als Entrypoint zur Verfuegung:
-
-```bash
-docker run --rm cmake-xray --help
+make runtime
 ```
 
 ## Nutzung
@@ -316,23 +309,18 @@ Mit Target-Sicht (File API):
 
 ## Tests und Quality Gates
 
-Docker-basierte Referenzpfade:
+Docker-basierte Referenzpfade ueber das Makefile:
 
 ```bash
-docker build --target test -t cmake-xray:test .
-docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .
-docker build --target quality-check -t cmake-xray:quality-check .
-docker build --target runtime -t cmake-xray .
-docker run --rm cmake-xray --help
+make docker-gates
+make runtime
 ```
 
 Separat verfuegbare Reports:
 
 ```bash
-docker build --target coverage -t cmake-xray:coverage .
-docker run --rm cmake-xray:coverage
-docker build --target quality -t cmake-xray:quality .
-docker run --rm cmake-xray:quality
+make coverage-report
+make quality-report
 ```
 
 ## Performance-Baseline

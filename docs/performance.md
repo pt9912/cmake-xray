@@ -49,7 +49,7 @@ Container-/Toolchain-Umgebung:
 Vor der Messung wurde das Referenzimage gebaut:
 
 ```bash
-docker build --target test -t cmake-xray:test .
+make docker-test
 ```
 
 Messpfad:
@@ -105,7 +105,7 @@ docker run --rm -v "$PWD/build/reports/performance:/out" cmake-xray:test \
 Messdatum: `2026-04-29`
 
 Vorbedingung: das Test-Image enthaelt die AP-1.8-A.3-Reply-Fixtures
-(`docker build --target test -t cmake-xray:test .` re-baut das Image,
+(`make docker-test` re-baut das Image,
 nachdem `tests/reference/generate_file_api_fixtures.sh` lokal lief).
 Die Messlaeufe greifen auf die im Image gebackenen Reply-Verzeichnisse
 und die im Image gebackene Binary zu, sodass weder CMake-Configure noch

@@ -3,7 +3,7 @@
 ## Zweck
 
 Dieses Dokument beschreibt die verbindlichen Qualitaets- und Metrikpfade fuer `cmake-xray`.
-Es dokumentiert keine punktuelle Review-Historie und keine einmaligen KI-Befunde, sondern die aktuell gueltigen, reproduzierbaren Docker-Pruefwege.
+Es dokumentiert keine punktuelle Review-Historie und keine einmaligen KI-Befunde, sondern die aktuell gueltigen, reproduzierbaren Make-Targets fuer die Docker-Pruefwege.
 
 ## Statische Analyse und Metriken
 
@@ -16,8 +16,7 @@ Die statische Analyse und die Metriken werden Docker-basiert fuer den Produktcod
 ### Report-Pfad
 
 ```bash
-docker build --target quality -t cmake-xray:quality .
-docker run --rm cmake-xray:quality
+make quality-report
 ```
 
 Der `quality`-Stage erzeugt und zeigt diese Artefakte:
@@ -30,18 +29,17 @@ Der `quality`-Stage erzeugt und zeigt diese Artefakte:
 ### Gate-Pfad
 
 ```bash
-docker build --target quality-check -t cmake-xray:quality-check .
+make quality-gate
 ```
 
-Optional lassen sich die Grenzwerte per Build-Argument anpassen:
+Optional lassen sich die Grenzwerte per Make-Variable anpassen:
 
 ```bash
-docker build --target quality-check \
-  --build-arg XRAY_CLANG_TIDY_MAX_FINDINGS=0 \
-  --build-arg XRAY_LIZARD_MAX_CCN=10 \
-  --build-arg XRAY_LIZARD_MAX_LENGTH=50 \
-  --build-arg XRAY_LIZARD_MAX_PARAMETERS=5 \
-  -t cmake-xray:quality-check .
+make quality-gate \
+  CLANG_TIDY_MAX_FINDINGS=0 \
+  LIZARD_MAX_CCN=10 \
+  LIZARD_MAX_LENGTH=50 \
+  LIZARD_MAX_PARAMETERS=5
 ```
 
 Aktuelle Standardgrenzen:
@@ -51,12 +49,12 @@ Aktuelle Standardgrenzen:
 - `lizard` Funktionslaenge: maximal `50`
 - `lizard` Parameteranzahl: maximal `5`
 
-Konfigurierbare Build-Argumente:
+Konfigurierbare Make-Variablen:
 
-- `XRAY_CLANG_TIDY_MAX_FINDINGS`
-- `XRAY_LIZARD_MAX_CCN`
-- `XRAY_LIZARD_MAX_LENGTH`
-- `XRAY_LIZARD_MAX_PARAMETERS`
+- `CLANG_TIDY_MAX_FINDINGS`
+- `LIZARD_MAX_CCN`
+- `LIZARD_MAX_LENGTH`
+- `LIZARD_MAX_PARAMETERS`
 
 ## Testabdeckung
 
@@ -70,8 +68,7 @@ Die Coverage wird ebenfalls Docker-basiert fuer `src/` ermittelt:
 ### Report-Pfad
 
 ```bash
-docker build --target coverage -t cmake-xray:coverage .
-docker run --rm cmake-xray:coverage
+make coverage-report
 ```
 
 Der `coverage`-Stage erzeugt und zeigt diese Artefakte:
@@ -82,16 +79,14 @@ Der `coverage`-Stage erzeugt und zeigt diese Artefakte:
 ### Gate-Pfad
 
 ```bash
-docker build --target coverage-check \
-  --build-arg XRAY_COVERAGE_THRESHOLD=100 \
-  -t cmake-xray:coverage-check .
+make coverage-gate COVERAGE_THRESHOLD=100
 ```
 
 Der Standard fuer den aktuellen M3-/MVP-Stand ist:
 
 - minimale Line-Coverage unter `src/`: `100%`
 
-Das Gate ist per `XRAY_COVERAGE_THRESHOLD` konfigurierbar.
+Das Gate ist per Make-Variable `COVERAGE_THRESHOLD` konfigurierbar.
 
 ### Coverage-Ausnahmen-Gate
 
@@ -113,8 +108,7 @@ Das Runtime-Image ist fuer den aktuellen Stand gehaertet:
 Der Runtime-Smoke-Test fuer Release- und Abnahmepfade ist:
 
 ```bash
-docker build --target runtime -t cmake-xray .
-docker run --rm cmake-xray --help
+make runtime
 ```
 
 ## JSON-Reportvertrag
@@ -127,7 +121,7 @@ Der maschinenlesbare JSON-Reportvertrag ist in [docs/report-json.md](./report-js
 - **JSON-Wiring** in `xray_tests` ueber `tests/adapters/test_port_wiring.cpp`. Tests stellen sicher, dass `--format json` ueber Composition Root und CLI bis zum `JsonReportAdapter` durchverdrahtet ist und nicht in den Console-Fallback faellt.
 - **Binary-E2E-Goldens** ueber das CTest-Ziel `e2e_binary_artifacts` und `tests/e2e/run_e2e_artifacts.sh`. Die echte `cmake-xray`-Binary erzeugt JSON-Berichte fuer Compile-Database-only-, File-API-only- (Build-Dir und Reply-Dir), Mixed-Input-, Truncated- und Hotspot-Truncated-Faelle bei `analyze`, sowie fuer `compile_database_directory`-, `file_api_source_root`-, Mixed-Prioritaet- und `cli_absolute`-Faelle bei `impact`. Die Ausgaben werden byte-stabil gegen die Goldens unter `tests/e2e/testdata/m5/json-reports/` verglichen.
 
-Diese Gates sind verpflichtend und werden ueber alle in diesem Dokument aufgefuehrten Docker-Pfade sowie ueber die nativen Build-Matrizen in `.github/workflows/build.yml` und `.github/workflows/release.yml` ausgefuehrt.
+Diese Gates sind verpflichtend und werden ueber alle in diesem Dokument aufgefuehrten Make-Targets sowie ueber die nativen Build-Matrizen in `.github/workflows/build.yml` und `.github/workflows/release.yml` ausgefuehrt.
 
 ### Validator-Abhaengigkeit
 
@@ -452,14 +446,13 @@ versions` plus der Configure-Status `AP M5-1.7 toolchain check: ...`.
 
 ## Zusammenhang mit Releasing
 
-Fuer M3 und spaetere Releases sind mindestens diese Docker-Pfade massgeblich:
+Fuer M3 und spaetere Releases sind mindestens diese Make-Targets massgeblich:
 
-- `docker build --target test -t cmake-xray:test .`
+- `make docker-test`
 - `rg "GCOVR""_EXCL_" | wc -l`
-- `docker build --target coverage-check --build-arg XRAY_COVERAGE_THRESHOLD=100 -t cmake-xray:coverage-check .`
-- `docker build --target quality-check -t cmake-xray:quality-check .`
-- `docker build --target runtime -t cmake-xray .`
-- `docker run --rm cmake-xray --help`
+- `make coverage-gate COVERAGE_THRESHOLD=100`
+- `make quality-gate`
+- `make runtime`
 
 Die Release-Checkliste selbst steht in [docs/releasing.md](./releasing.md).
 
