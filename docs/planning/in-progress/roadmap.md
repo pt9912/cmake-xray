@@ -6,12 +6,28 @@
 | ---------- | -------------------------------------------------------------------------------------- |
 | Dokument   | Phasenplan `cmake-xray`                                                                |
 | Version    | `0.8`                                                                                  |
-| Stand      | `2026-04-30`                                                                           |
+| Stand      | `2026-05-02`                                                                           |
 | Status     | Entwurf                                                                                |
 | Referenzen | [Lastenheft](../../../spec/lastenheft.md), [Design](../../../spec/design.md), [Architektur](../../../spec/architecture.md) |
 
 ### 0.1 Zweck
 Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**. Der Phasenplan ist an den Anforderungen des Lastenhefts ausgerichtet und dient als Bruecke zwischen Anforderungen und konkreter Umsetzungsplanung. Er definiert die fachliche Reihenfolge und relative Groesse der Arbeitspakete, enthaelt jedoch bewusst keine kalendarischen Termine.
+
+### 0.2 Aktueller Stand
+
+| Bereich              | Status            | Detail                                                                                       |
+| -------------------- | ----------------- | -------------------------------------------------------------------------------------------- |
+| M0 - M5              | `erledigt`        | Liefer-Stand gepinnt; Plan-Dateien unter [`docs/planning/done/`](../done/).                  |
+| M6 AP 1.1            | `erledigt`        | Target-Graph-Vertraege ([`done/plan-M6-1-1.md`](../done/plan-M6-1-1.md)).                    |
+| M6 AP 1.2            | `erledigt`        | Target-Graph-Ausgaben + Hubs ([`done/plan-M6-1-2.md`](../done/plan-M6-1-2.md)).              |
+| M6 AP 1.3            | `erledigt`        | Impact-Priorisierung ueber Target-Graph ([`done/plan-M6-1-3.md`](../done/plan-M6-1-3.md)).   |
+| **M6 AP 1.4**        | **`in Arbeit`**   | Include-Sicht (Origin + Tiefe) - A.1-A.4 + A.5 step 21pre/21 erledigt, Step 22+ offen ([`in-progress/plan-M6-1-4.md`](./plan-M6-1-4.md)). |
+| M6 AP 1.5            | `offen`           | Analyseauswahl, Schwellenwerte, Impact-Budget ([`open/plan-M6-1-5.md`](../open/plan-M6-1-5.md)). |
+| M6 AP 1.6            | `offen`           | Vergleich zweier Analyse-JSON-Berichte ([`open/plan-M6-1-6.md`](../open/plan-M6-1-6.md)).    |
+| M6 AP 1.7            | `offen`           | Referenzdaten, Doku, Release ([`open/plan-M6-1-7.md`](../open/plan-M6-1-7.md)).              |
+| M6 AP 1.8            | `offen`           | Praeprozessor-Include + Konfig-Override ([`open/plan-M6-1-8.md`](../open/plan-M6-1-8.md)).   |
+
+Naechster konkreter Schritt: M6 AP 1.4 A.5 Step 22 (Markdown-Adapter v4-Output, siehe `in-progress/plan-M6-1-4.md` Zeile 1111).
 
 ## 1. Planungsgrundsaetze
 
