@@ -200,7 +200,7 @@ def check_formats(manifest: dict[str, str], examples_dir: Path,
     json_validator = repo_root / "tests" / "validate_json_schema.py"
     dot_validator = repo_root / "tests" / "validate_dot_reports.py"
     html_validator = repo_root / "tests" / "validate_html_reports.py"
-    json_schema = repo_root / "docs" / "report-json.schema.json"
+    json_schema = repo_root / "spec" / "report-json.schema.json"
 
     final_status = EXIT_OK
     for name in sorted(manifest.keys()):
