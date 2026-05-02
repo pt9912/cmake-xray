@@ -222,46 +222,47 @@ add_test(
 )
 set_tests_properties(report_json_schema_rejects_analyze_without_target_hubs PROPERTIES WILL_FAIL TRUE)
 
-# AP M6-1.3 A.5 follow-up: schema-rejection gates for the v3 prioritised
-# impact contract. Each fixture deliberately violates exactly one
-# documented invariant; WILL_FAIL inverts the schema-validator outcome
-# so the gate fails loud whenever a regression makes the schema accept
-# bytes the contract explicitly forbids.
+# AP M6-1.3 A.5 follow-up + AP M6-1.4 A.3 review fix: schema-rejection
+# gates for the v4 prioritised impact contract (renamed from v3 when
+# AP M6-1.4 A.3 bumped kReportFormatVersion). Each fixture deliberately
+# violates exactly one documented invariant; WILL_FAIL inverts the
+# schema-validator outcome so the gate fails loud whenever a regression
+# makes the schema accept bytes the contract explicitly forbids.
 add_test(
-    NAME report_json_schema_rejects_v3_with_format_version_two
+    NAME report_json_schema_rejects_format_version_two
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
             --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
-            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_v3_with_format_version_two_broken_sample.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_schema_rejects_format_version_two_broken_sample.json
 )
-set_tests_properties(report_json_schema_rejects_v3_with_format_version_two PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(report_json_schema_rejects_format_version_two PROPERTIES WILL_FAIL TRUE)
 
 add_test(
-    NAME report_json_schema_rejects_impact_v3_missing_prioritized
+    NAME report_json_schema_rejects_impact_v4_missing_prioritized
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
             --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
-            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_missing_prioritized_broken_sample.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v4_missing_prioritized_broken_sample.json
 )
-set_tests_properties(report_json_schema_rejects_impact_v3_missing_prioritized PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(report_json_schema_rejects_impact_v4_missing_prioritized PROPERTIES WILL_FAIL TRUE)
 
 add_test(
-    NAME report_json_schema_rejects_impact_v3_invalid_priority_class
+    NAME report_json_schema_rejects_impact_v4_invalid_priority_class
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
             --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
-            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_invalid_priority_class_broken_sample.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v4_invalid_priority_class_broken_sample.json
 )
-set_tests_properties(report_json_schema_rejects_impact_v3_invalid_priority_class PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(report_json_schema_rejects_impact_v4_invalid_priority_class PROPERTIES WILL_FAIL TRUE)
 
 add_test(
-    NAME report_json_schema_rejects_impact_v3_graph_distance_out_of_range
+    NAME report_json_schema_rejects_impact_v4_graph_distance_out_of_range
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
             --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
-            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_graph_distance_out_of_range_broken_sample.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v4_graph_distance_out_of_range_broken_sample.json
 )
-set_tests_properties(report_json_schema_rejects_impact_v3_graph_distance_out_of_range PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(report_json_schema_rejects_impact_v4_graph_distance_out_of_range PROPERTIES WILL_FAIL TRUE)
 
 # AP M6-1.3 Finding 3 follow-up: companion negative tests for the
 # cross-field invariants that the JSON Schema Draft 2020-12 dialect
@@ -273,7 +274,7 @@ add_test(
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
             --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
-            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_depth_effective_exceeds_requested_broken_sample.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v4_depth_effective_exceeds_requested_broken_sample.json
 )
 set_tests_properties(report_json_cross_field_rejects_depth_effective_exceeds_requested PROPERTIES WILL_FAIL TRUE)
 
@@ -282,7 +283,7 @@ add_test(
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
             --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
-            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_graph_distance_exceeds_requested_broken_sample.json
+            --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v4_graph_distance_exceeds_requested_broken_sample.json
 )
 set_tests_properties(report_json_cross_field_rejects_graph_distance_exceeds_requested PROPERTIES WILL_FAIL TRUE)
 

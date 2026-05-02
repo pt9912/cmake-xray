@@ -259,7 +259,7 @@ Reportweite Diagnostics aus `ImpactResult::diagnostics`. Leersatz `No diagnostic
 
 ## Goldens
 
-- Goldens liegen unter `tests/e2e/testdata/m5/html-reports/` und `tests/e2e/testdata/m6/html-reports/`. Beide Verzeichnisse enthalten ausschliesslich `format_version=3`-Goldens (AP M6-1.3 A.4 inhaltlich migriert); die `m5/`-/`m6/`-Trennung ist fachlich (Datensatz-Szenarien), nicht versionell, analog zur JSON- und DOT-Goldens-Aufteilung.
+- Goldens liegen unter `tests/e2e/testdata/m5/html-reports/` und `tests/e2e/testdata/m6/html-reports/`. Beide Verzeichnisse enthalten ausschliesslich `format_version=4`-Goldens (AP M6-1.4 A.3 inhaltlich migriert); die `m5/`-/`m6/`-Trennung ist fachlich (Datensatz-Szenarien), nicht versionell, analog zur JSON- und DOT-Goldens-Aufteilung.
 - Manifeste `tests/e2e/testdata/m5/html-reports/manifest.txt` und `tests/e2e/testdata/m6/html-reports/manifest.txt` listen jeden Goldenpfad einmal; Verzeichnis und Manifest werden beidseitig abgeglichen.
 - Goldens enthalten keine Host-/Workspace-spezifischen Absolutpfade. Synthetische Pfade wie `/project/...` oder `C:/project/...` bleiben erlaubt.
 - Goldens enthalten keine Zeitstempel, Hostnamen, zufaellige IDs oder Buildpfade.

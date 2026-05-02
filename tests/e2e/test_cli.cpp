@@ -1477,6 +1477,22 @@ TEST_CASE_FIXTURE(CliFixture,
 }
 
 TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-scope='project ' (trailing whitespace) is invalid value") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--include-scope=project "}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--include-scope: invalid value 'project '") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-depth='direct ' (trailing whitespace) is invalid value") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--include-depth=direct "}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--include-depth: invalid value 'direct '") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
                    "AP1.4 A.3: --include-scope project,external (comma) is invalid value") {
     const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
     CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--include-scope",

@@ -37,7 +37,7 @@ Jeder JSON-Report enthaelt diese Pflichtfelder in genau dieser Reihenfolge:
 | Feld | Typ | Pflicht | Beschreibung |
 | --- | --- | --- | --- |
 | `format` | string | ja | Maschinenlesbarer Dokumenttyp. `cmake-xray.analysis` oder `cmake-xray.impact`. |
-| `format_version` | integer | ja | Aktuell `3` (M6 AP 1.3). Erhoeht sich bei vertragsbrechenden Aenderungen. |
+| `format_version` | integer | ja | Aktuell `4` (M6 AP 1.4 A.3). Erhoeht sich bei vertragsbrechenden Aenderungen. Die strukturellen v4-Erweiterungen (`include_filter`, `origin`/`depth_kind` an Hotspots) folgen mit dem JSON-Adapter-Rollout in M6 AP 1.4 A.4. |
 | `report_type` | string | ja | `analyze` oder `impact`. Kurzer Workflow-Identifier; nicht der CLI-Wert `--format json`. |
 | `inputs` | object | ja | Eingabeprovenienz aus `ReportInputs`. Schema je Reporttyp unten. |
 | `summary` | object | ja | Aggregierte Kennzahlen je Reporttyp. |
@@ -411,7 +411,7 @@ Diagnostic-Korrespondenz:
 - `spec/report-json.schema.json` ist die formale Schema-Definition (JSON Schema Draft 2020-12).
 - Jedes Vertragsobjekt setzt `additionalProperties: false`. Unbekannte Felder werden hart abgelehnt.
 - Schema und C++-Konstante `kReportFormatVersion` werden in einem CTest-Gate gegeneinander geprueft. Ein abweichender `const`-Wert im Schema laesst den Gate-Test fehlschlagen.
-- Goldens unter `tests/e2e/testdata/m5/json-reports/` und `tests/e2e/testdata/m6/json-reports/` werden ueber `tests/validate_json_schema.py` gegen das Schema validiert. Der Validator gleicht Verzeichnisinhalt und Manifest beidseitig ab. Beide Verzeichnisse enthalten ausschliesslich `format_version=3`-Goldens (AP M6-1.3 A.4 inhaltlich migriert); die `m5/`-/`m6/`-Trennung ist fachlich (Datensatz-Szenarien), nicht versionell.
+- Goldens unter `tests/e2e/testdata/m5/json-reports/` und `tests/e2e/testdata/m6/json-reports/` werden ueber `tests/validate_json_schema.py` gegen das Schema validiert. Der Validator gleicht Verzeichnisinhalt und Manifest beidseitig ab. Beide Verzeichnisse enthalten ausschliesslich `format_version=4`-Goldens (AP M6-1.4 A.3 inhaltlich migriert); die `m5/`-/`m6/`-Trennung ist fachlich (Datensatz-Szenarien), nicht versionell.
 - Schema-Asymmetrie analyze vs. impact wird durch zwei Negativtests gepinnt: `report_json_schema_rejects_impact_with_target_hubs` und `report_json_schema_rejects_analyze_without_target_hubs`. Beide Tests laufen mit `WILL_FAIL TRUE` und scheitern absichtlich am Schema, damit ein Adapter-Bug, der die Asymmetrie verletzt, sofort sichtbar wird.
 
 ## Manifest

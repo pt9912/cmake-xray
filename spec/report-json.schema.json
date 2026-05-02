@@ -10,7 +10,8 @@
   "$defs": {
     "FormatVersion": {
       "type": "integer",
-      "const": 4
+      "const": 4,
+      "description": "M6 AP 1.4 A.3 flips the constant from 3 to 4. The structural v4 additions (include_filter block on the analysis report, origin and depth_kind on each include_hotspots item, excluded_unknown_count and excluded_mixed_count on the hotspot container) land with the JSON adapter rollout in M6 AP 1.4 A.4 -- in this in-flight window the schema is structurally identical to v3."
     },
     "TargetPriorityClass": {
       "type": "string",

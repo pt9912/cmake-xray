@@ -644,15 +644,20 @@ Reproduzierbarkeit aus.
     bei unbekanntem Wert.
   - `"--include-scope: option specified more than once"` bei Mehrfach-
     Setzen.
-  - `"--include-scope: missing value"` bei fehlendem Wert.
-  - Kommas, leere Werte und ASCII-Whitespace-getrimmte Tokens werden
-    nicht akzeptiert; CLI parst exakt einen Token.
+  - Der typed-but-empty-Fall (`--include-scope=` oder `--include-scope` ohne
+    Folgewert) wird von CLI11 schon waehrend des Parsens abgelehnt, bevor
+    der Validator dieses APs laeuft; der Exit-Code bleibt `2`, der genaue
+    Fehlertext ist CLI11s eigener und nicht Teil des AP-1.4-Vertrags. Tests
+    fuer diese Form pruefen daher nur den Exit-Code.
+  - Kommas und ASCII-Whitespace-getrimmte Tokens werden nicht akzeptiert;
+    CLI parst exakt einen Token.
   - Der Parser prueft vor der Enum-Konvertierung, dass der Rohwert exakt
     einem nichtleeren Token ohne ASCII-Whitespace am Anfang oder Ende
     entspricht. `--include-scope=project` und
     `--include-scope project` sind gleichwertig; Werte wie
-    `" project"`, `"project "`, `"project,external"` oder `""`
-    fallen unter `invalid value`.
+    `" project"`, `"project "`, `"project,external"` fallen unter
+    `invalid value`. Empty-String `""` wird von CLI11 wie oben
+    beschrieben abgefangen.
 
 ### `--include-depth <value>`
 
@@ -661,7 +666,10 @@ Reproduzierbarkeit aus.
 - **Fehlerphrasen** analog:
   - `"--include-depth: invalid value '<value>'; allowed: all, direct, indirect"`.
   - `"--include-depth: option specified more than once"`.
-  - `"--include-depth: missing value"`.
+  - Der typed-but-empty-Fall (`--include-depth=` oder `--include-depth`
+    ohne Folgewert) wird von CLI11 schon waehrend des Parsens abgelehnt
+    (siehe `--include-scope`); Exit-Code `2`, Fehlertext ist CLI11s
+    eigener.
   - Derselbe Rohwert-Check wie bei `--include-scope` gilt vor der
     Enum-Konvertierung.
 
@@ -929,8 +937,9 @@ CLI-Tests `tests/e2e/test_cli.cpp`:
   `"--include-scope: invalid value 'foo'; allowed: all, project, external, unknown"`.
 - Doppeltes `--include-scope all --include-scope project` ergibt
   Exit-Code `2`, `"--include-scope: option specified more than once"`.
-- `--include-scope` ohne Wert ergibt Exit-Code `2`,
-  `"--include-scope: missing value"`.
+- `--include-scope=` (typed-but-empty) ergibt Exit-Code `2`. Der genaue
+  Fehlertext stammt von CLI11 und ist nicht Teil des Vertrags; Tests
+  pruefen nur den Exit-Code.
 - `--include-scope=project` und `--include-scope project` werden
   akzeptiert; `--include-scope=project,external`,
   `--include-scope=" project"` und `--include-scope="project "` ergeben

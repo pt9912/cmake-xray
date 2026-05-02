@@ -82,7 +82,7 @@ Jeder DOT-Report enthaelt mindestens:
 | Attribut | Typ | Beschreibung |
 | --- | --- | --- |
 | `xray_report_type` | quoted string | `analyze` oder `impact`. |
-| `format_version` | integer | identisch mit `xray::hexagon::model::kReportFormatVersion`, ab AP M6-1.3 `3` (vorher `2` ab AP M6-1.2). |
+| `format_version` | integer | identisch mit `xray::hexagon::model::kReportFormatVersion`, ab AP M6-1.4 A.3 `4` (vorher `3` ab AP M6-1.3, `2` ab AP M6-1.2). |
 | `graph_node_limit` | integer | wirksames Node-Budget fuer diesen Report. |
 | `graph_edge_limit` | integer | wirksames Edge-Budget fuer diesen Report. |
 | `graph_truncated` | boolean | `true`, wenn ein Kandidatenknoten oder eine Kandidatenkante wegen `node_limit`, `edge_limit` oder Analyze-`context_limit` nicht im finalen Graph enthalten ist. Auch im ungekuerzten Fall verpflichtend ausgegeben (`false`). |
