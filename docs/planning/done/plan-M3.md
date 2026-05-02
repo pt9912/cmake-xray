@@ -8,7 +8,7 @@
 | Version | `0.7` |
 | Stand | `2026-04-22` |
 | Status | Abgeschlossen |
-| Referenzen | [Lastenheft](../../spec/lastenheft.md), [Design](../../spec/design.md), [Architektur](../../spec/architecture.md), [Phasenplan](./roadmap.md), [Plan M2](./plan-M2.md), [Qualitaet](../user/quality.md), [Releasing](../user/releasing.md) |
+| Referenzen | [Lastenheft](../../../spec/lastenheft.md), [Design](../../../spec/design.md), [Architektur](../../../spec/architecture.md), [Phasenplan](../in-progress/roadmap.md), [Plan M2](./plan-M2.md), [Qualitaet](../../user/quality.md), [Releasing](../../user/releasing.md) |
 
 ### 0.1 Zweck
 Dieser Plan beschreibt die konkreten Schritte fuer Milestone M3 (`v1.0.0`). Ziel ist der lieferfaehige MVP-Stand: Die in M2 eingefuehrten fachlichen Analysen sollen als stabile Markdown-Berichte exportierbar sein, ueber versionierte Referenzdaten und erwartete Ausgaben abgesichert werden und in einer dokumentierten Referenzumgebung pruefbar bleiben.

@@ -8,7 +8,7 @@
 | Version    | `0.8`                                                                                  |
 | Stand      | `2026-04-30`                                                                           |
 | Status     | Entwurf                                                                                |
-| Referenzen | [Lastenheft](../../spec/lastenheft.md), [Design](../../spec/design.md), [Architektur](../../spec/architecture.md) |
+| Referenzen | [Lastenheft](../../../spec/lastenheft.md), [Design](../../../spec/design.md), [Architektur](../../../spec/architecture.md) |
 
 ### 0.1 Zweck
 Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**. Der Phasenplan ist an den Anforderungen des Lastenhefts ausgerichtet und dient als Bruecke zwischen Anforderungen und konkreter Umsetzungsplanung. Er definiert die fachliche Reihenfolge und relative Groesse der Arbeitspakete, enthaelt jedoch bewusst keine kalendarischen Termine.

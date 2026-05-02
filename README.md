@@ -346,7 +346,7 @@ Weitere Dokumentation:
 - [docs/user/guide.md](./docs/user/guide.md)
 - [spec/design.md](./spec/design.md)
 - [spec/architecture.md](./spec/architecture.md)
-- [docs/planning/roadmap.md](./docs/planning/roadmap.md)
+- [docs/planning/in-progress/roadmap.md](./docs/planning/in-progress/roadmap.md)
 - [docs/user/releasing.md](./docs/user/releasing.md)
 - [docs/user/quality.md](./docs/user/quality.md)
 - [docs/user/performance.md](./docs/user/performance.md)

@@ -8,7 +8,7 @@
 | Version | `1.0` |
 | Stand | `2026-04-24` |
 | Status | Abgeschlossen |
-| Referenzen | [Lastenheft](../../spec/lastenheft.md), [Design](../../spec/design.md), [Architektur](../../spec/architecture.md), [Phasenplan](./roadmap.md), [Plan M3](./plan-M3.md), [Qualitaet](../user/quality.md), [Releasing](../user/releasing.md) |
+| Referenzen | [Lastenheft](../../../spec/lastenheft.md), [Design](../../../spec/design.md), [Architektur](../../../spec/architecture.md), [Phasenplan](../in-progress/roadmap.md), [Plan M3](./plan-M3.md), [Qualitaet](../../user/quality.md), [Releasing](../../user/releasing.md) |
 
 ### 0.1 Zweck
 Dieser Plan beschreibt die konkreten Schritte fuer Milestone M4 (`v1.1.0`). Ziel ist der erste Ausbau nach dem MVP: `cmake-xray` soll die CMake File API als zweite echte Eingabequelle fuer die Kernanalysen nutzen koennen, daraus Translation-Unit-Beobachtungen und Target-Zuordnungen ableiten und diese Zusatzsicht in `analyze` und `impact` fuer Konsole und Markdown nutzbar machen.
@@ -55,7 +55,7 @@ Nicht Bestandteil von M4 sind:
 - formale Plattformfreigaben fuer macOS oder Windows (`NF-08`, `NF-09`)
 - die dritte Impact-Evidenzklasse `uncertain` aus dem Design-Dokument; M4 verwendet ausschliesslich `direct` und `heuristic` als Evidenzherkunft ueber betroffene Translation Units und fuehrt `uncertain` erst ein, wenn spaetere Meilensteine Faelle erfordern, die keiner der beiden Klassen zugeordnet werden koennen
 
-Diese Abgrenzung setzt die Architekturentscheidung aus [architecture.md](../../spec/architecture.md) um: Phase 4 beginnt mit `F-05`, `F-19` und `F-24`; weitergehende Target-Graph-Auswertungen und weitere Report-Formate folgen erst danach.
+Diese Abgrenzung setzt die Architekturentscheidung aus [architecture.md](../../../spec/architecture.md) um: Phase 4 beginnt mit `F-05`, `F-19` und `F-24`; weitergehende Target-Graph-Auswertungen und weitere Report-Formate folgen erst danach.
 
 ## 1. Arbeitspakete
 

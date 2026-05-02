@@ -8,7 +8,7 @@
 | Version | `0.7` |
 | Stand | `2026-04-22` |
 | Status | Entwurf |
-| Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Phasenplan](../docs/planning/roadmap.md) |
+| Referenzen | [Lastenheft](./lastenheft.md), [Design](./design.md), [Phasenplan](../docs/planning/in-progress/roadmap.md) |
 
 ### 0.1 Zweck
 Dieses Dokument beschreibt die geplante Systemstruktur von **cmake-xray**. Es leitet aus den Anforderungen und dem Design eine technische Zerlegung in Verantwortlichkeiten, Datenfluesse und Integrationspunkte ab.

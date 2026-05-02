@@ -8,7 +8,7 @@
 | Version    | `0.6`                                                                                                                                                                  |
 | Stand      | `2026-04-22`                                                                                                                                                           |
 | Status     | Abgeschlossen                                                                                                                                                          |
-| Referenzen | [Lastenheft](../../spec/lastenheft.md), [Design](../../spec/design.md), [Architektur](../../spec/architecture.md), [Phasenplan](./roadmap.md), [Plan M0](./plan-M0.md), [Qualitaet](../user/quality.md) |
+| Referenzen | [Lastenheft](../../../spec/lastenheft.md), [Design](../../../spec/design.md), [Architektur](../../../spec/architecture.md), [Phasenplan](../in-progress/roadmap.md), [Plan M0](./plan-M0.md), [Qualitaet](../../user/quality.md) |
 
 ### 0.1 Zweck
 Dieser Plan beschreibt die konkreten Schritte fuer Milestone M1 (`v0.2.0`). Ziel ist ein nutzbares CLI-Grundgeruest, das eine `compile_commands.json` kontrolliert einliest, Fehlerfaelle verstaendlich behandelt und den spaeteren Analysekern sauber ueber Ports ansteuert.

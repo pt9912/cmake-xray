@@ -5,7 +5,7 @@ verbindlichen Required-Check-Schritte aus
 [`.github/workflows/build.yml`](../../.github/workflows/build.yml) wider, sodass
 Reviewer und Releaser die Plattformsicht ohne CI lokal reproduzieren koennen.
 
-Der Plattformstatus-Vertrag aus [plan-M5-1-7.md](../planning/plan-M5-1-7.md) bleibt
+Der Plattformstatus-Vertrag aus [plan-M5-1-7.md](../planning/done/plan-M5-1-7.md) bleibt
 unveraendert: Linux ist `supported`, macOS und Windows sind `known_limited`,
 solange Atomic-Replace- und CLI-Pflicht-Smokes nicht als Required Checks im
 nativen Job liegen. Eine erfolgreiche manuelle Checkliste begruendet keine
@@ -82,7 +82,7 @@ pwsh -File scripts/platform-smoke.ps1 -Binary build/Release/cmake-xray.exe
 ```
 
 Der Smoke faehrt alle Pflichtkommandos aus
-[plan-M5-1-7.md](../planning/plan-M5-1-7.md) "Normative CLI-Smokes" inklusive der
+[plan-M5-1-7.md](../planning/done/plan-M5-1-7.md) "Normative CLI-Smokes" inklusive der
 `--output`-Smokes aus Tranche C.1 mit nativen Windows-Pfaden ohne
 MSYS-Magie ab (`msys_path_mode=native_powershell`).
 
@@ -145,5 +145,5 @@ verlangt automatisiertes, in Branch-Protection verankertes Verfahren.
 
 - [docs/user/quality.md "Plattformstatus (AP M5-1.7)"](./quality.md)
 - [docs/user/releasing.md "Plattformartefakte macOS und Windows"](./releasing.md)
-- [docs/planning/plan-M5-1-7.md "Plattformstatus-Vertrag"](../planning/plan-M5-1-7.md)
+- [docs/planning/plan-M5-1-7.md "Plattformstatus-Vertrag"](../planning/done/plan-M5-1-7.md)
 - [tests/platform/toolchain-minimums.json](../../tests/platform/toolchain-minimums.json)

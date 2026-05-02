@@ -9,7 +9,7 @@
 | Zielrelease | `v1.3.0` |
 | Stand | `2026-04-30` |
 | Status | Entwurf |
-| Referenzen | [Lastenheft](../../spec/lastenheft.md), [Design](../../spec/design.md), [Architektur](../../spec/architecture.md), [Phasenplan](./roadmap.md), [Plan M5](./plan-M5.md), [Qualitaet](../user/quality.md), [Releasing](../user/releasing.md) |
+| Referenzen | [Lastenheft](../../../spec/lastenheft.md), [Design](../../../spec/design.md), [Architektur](../../../spec/architecture.md), [Phasenplan](./roadmap.md), [Plan M5](../done/plan-M5.md), [Qualitaet](../../user/quality.md), [Releasing](../../user/releasing.md) |
 
 ### 0.1 Zweck
 Dieser Plan beschreibt die konkreten Schritte fuer Milestone M6 (`v1.3.0`). Ziel ist der Ausbau nach M5: `cmake-xray` soll direkte Target-Abhaengigkeiten als eigene Analysegrundlage nutzen, betroffene Targets ueber den Target-Graphen priorisieren, Include-Sichten verfeinern, Analyseumfang und Schwellenwerte gezielter konfigurierbar machen und Projektanalysen zwischen zwei Zeitpunkten vergleichbar ausgeben.

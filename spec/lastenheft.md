@@ -80,7 +80,7 @@ Nachtraeglich ergaenzte Anforderungen erhalten zur Wahrung stabiler Referenzen d
 |---|---|
 | [Design](./design.md) | Fachliche und benutzerbezogene Ausgestaltung auf Basis dieses Lastenhefts |
 | [Architecture](./architecture.md) | Technische Systemstruktur und Datenfluesse |
-| [Phasenplan](../docs/planning/roadmap.md) | Inkrementelle Lieferplanung in Phasen |
+| [Phasenplan](../docs/planning/in-progress/roadmap.md) | Inkrementelle Lieferplanung in Phasen |
 
 ### 1.8 Schreibkonvention
 Dieses Dokument verwendet bewusst ASCII-Umschreibungen wie `ae`, `oe` und `ue`, damit Inhalt und Kennungen in einfachen Textumgebungen, Terminals und Build-Logs konsistent darstellbar bleiben.

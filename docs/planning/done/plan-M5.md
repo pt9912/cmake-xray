@@ -8,7 +8,7 @@
 | Version | `0.27` |
 | Stand | `2026-04-25` |
 | Status | Entwurf |
-| Referenzen | [Lastenheft](../../spec/lastenheft.md), [Design](../../spec/design.md), [Architektur](../../spec/architecture.md), [Phasenplan](./roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](../user/quality.md), [Releasing](../user/releasing.md) |
+| Referenzen | [Lastenheft](../../../spec/lastenheft.md), [Design](../../../spec/design.md), [Architektur](../../../spec/architecture.md), [Phasenplan](../in-progress/roadmap.md), [Plan M4](./plan-M4.md), [Qualitaet](../../user/quality.md), [Releasing](../../user/releasing.md) |
 
 ### 0.1 Zweck
 Dieser Plan beschreibt die konkreten Schritte fuer Milestone M5 (`v1.2.0`). Ziel ist der Ausbau nach M4: `cmake-xray` soll die vorhandenen Analyseergebnisse in weiteren Ausgabeformaten bereitstellen, maschinenlesbare Formate versionieren, einen offiziellen Release-Pfad mit Linux-Artefakt und OCI-Image absichern, erste Portabilitaetsnachweise fuer macOS und Windows liefern und die CLI um detailreiche bzw. reduzierte Ausgabemodi erweitern.

@@ -435,7 +435,7 @@ Mit Target-Sicht (File API):
 command-lokales Flag. Beide Flags sind gegenseitig exklusiv und muessen
 hinter dem Subcommand stehen; eine globale Position vor dem Subcommand
 wird abgelehnt. Der vollstaendige Vertrag steht in
-[plan-M5-1-5.md](../planning/plan-M5-1-5.md); `quality.md` listet die zugehoerigen
+[plan-M5-1-5.md](../planning/done/plan-M5-1-5.md); `quality.md` listet die zugehoerigen
 Quality-Gates.
 
 ### Anwendungsfall Quiet: knappe CI-Logs

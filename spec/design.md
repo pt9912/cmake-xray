@@ -8,7 +8,7 @@
 | Version | `0.4` |
 | Stand | `2026-04-22` |
 | Status | Entwurf |
-| Referenzen | [Lastenheft](./lastenheft.md), [Architektur](./architecture.md), [Phasenplan](../docs/planning/roadmap.md) |
+| Referenzen | [Lastenheft](./lastenheft.md), [Architektur](./architecture.md), [Phasenplan](../docs/planning/in-progress/roadmap.md) |
 
 ### 0.1 Zweck
 Dieses Dokument konkretisiert die fachliche und benutzerbezogene Ausgestaltung des Produkts auf Basis der Anforderungen im [Lastenheft](./lastenheft.md). Es beschreibt beabsichtigtes Verhalten, Ausgabemodelle und Interaktionsmuster, ohne die technische Implementierungstiefe des Architekturdokuments vorwegzunehmen.

@@ -8,7 +8,7 @@
 | Version | `0.1` |
 | Stand | `2026-04-21` |
 | Status | Abgeschlossen |
-| Referenzen | [Lastenheft](../../spec/lastenheft.md), [Architektur](../../spec/architecture.md), [Phasenplan](./roadmap.md) |
+| Referenzen | [Lastenheft](../../../spec/lastenheft.md), [Architektur](../../../spec/architecture.md), [Phasenplan](../in-progress/roadmap.md) |
 
 ### 0.1 Zweck
 Dieser Plan beschreibt die konkreten Schritte fuer Milestone M0 (`v0.1.0`). Ziel ist ein baubares, testbares Projekt mit hexagonaler Grundstruktur und den noetigsten Dokumentationsartefakten.

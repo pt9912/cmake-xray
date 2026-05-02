@@ -161,7 +161,7 @@ Der menschenlesbare HTML-Reportvertrag ist in [spec/report-html.md](../../spec/r
 
 - **HTML-Adapter-Vertrag** in `xray_tests` ueber `tests/adapters/test_html_report_adapter.cpp`. Pflichtgeruest (`<!doctype html>`, `<html lang="en">`, einziges `h1`, einziges `main`, `head`-Reihenfolge), Escape-Regeln fuer Textknoten und Attribute, Whitespace-Normalisierung (LF/CRLF/CR/Tab/Control-Bytes), CSS-Pflichtmerkmale (keine externen Ressourcen, keine Animationen, keine `@import`/`url(...)`-Referenzen, System-Fontstack, Druckpfad) und das `kReportFormatVersion`-Meta sind dort verbindlich abgesichert.
 - **HTML-Wiring** in `xray_tests` ueber `tests/adapters/test_port_wiring.cpp`. Tests stellen sicher, dass `--format html` ueber Composition Root und CLI bis zum `HtmlReportAdapter` durchverdrahtet ist und nicht in den Console-Fallback faellt.
-- **HTML-Render-Preconditions** in `xray_tests` ueber `tests/e2e/test_cli.cpp`. Die in der Impact-Negativfall-Matrix von [docs/planning/plan-M5-1-4.md](../planning/plan-M5-1-4.md) gelisteten HTML-Render-Preconditions sind ueber CLI-Tests verbindlich abgesichert: `changed_file_source=unresolved_file_api_source_root` und `changed_file=std::nullopt` produzieren je einen Textfehler auf `stderr`, einen Nicht-Null-Exit und kein HTML.
+- **HTML-Render-Preconditions** in `xray_tests` ueber `tests/e2e/test_cli.cpp`. Die in der Impact-Negativfall-Matrix von [docs/planning/plan-M5-1-4.md](../planning/done/plan-M5-1-4.md) gelisteten HTML-Render-Preconditions sind ueber CLI-Tests verbindlich abgesichert: `changed_file_source=unresolved_file_api_source_root` und `changed_file=std::nullopt` produzieren je einen Textfehler auf `stderr`, einen Nicht-Null-Exit und kein HTML.
 - **HTML-CLI-Stream-/Fehlerpfade** in `xray_tests` ueber `tests/e2e/test_cli.cpp` und `tests/e2e/test_cli_render_errors.cpp`. CLI-Tests sichern den `--format html`-stdout-Vertrag, den `--format html --output <path>`-Atomic-Writer-Vertrag, Render-Fehler-Doppelgaenger fuer Analyze und Impact (vollstaendiges Rendern vor Emission, unveraenderte Zieldatei bei Renderfehler), die Negativtests fuer `--top 0` und `impact --top` sowie die Eingabefehlerpfade (nicht vorhandene Compile-Database-/File-API-Eingaben, ungueltiges Compile-Database-JSON, ungueltige File-API-Reply-Daten, Schreibfehler).
 - **HTML-Goldens und Manifest** unter `tests/e2e/testdata/m5/html-reports/` mit `manifest.txt`. Goldens decken Compile-DB-only-, File-API-only-, Mixed-Input-, Default-Top-, Top-Untruncated-, Top-Truncated-, Hotspot-Kontext-Kuerzungs-, Same-Source-Path/Different-Directory- und Escaping-Faelle bei `analyze` sowie Compile-DB-, File-API-, Mixed-Input-, Direct-Targets-, No-Affected-Targets-, und Absolute-`--changed-file`-Faelle bei `impact` ab. Per-Plattform-Goldens (`*_windows.html`) decken host-divergente Pfadsemantik fuer `cli_absolute`-Eingaben ab.
 - **HTML-Escape-Fixture** unter `tests/e2e/testdata/m5/html-fixtures/escape_paths/compile_commands.json` betreibt das Escaping-Golden mit `<`, `>`, `&`, `"`, `'`, Backslash, Newline und `<script>`-aehnlichen Strings; die DOT-Escape-Fixture bleibt davon unberuehrt.
@@ -172,7 +172,7 @@ CTest selbst installiert keine Systempakete und greift nicht auf das Netzwerk zu
 
 ## CLI-Verbosity (`--quiet` / `--verbose`)
 
-Der command-lokale Verbosity-Vertrag ist in [docs/planning/plan-M5-1-5.md](../planning/plan-M5-1-5.md) dokumentiert. AP M5-1.5 fuehrt `--quiet` und `--verbose` in drei verbindlichen Tranchen plus optionaler Tranche D ein. Tranchen A, B und C sind abgeschlossen und sichern folgende Gates:
+Der command-lokale Verbosity-Vertrag ist in [docs/planning/plan-M5-1-5.md](../planning/done/plan-M5-1-5.md) dokumentiert. AP M5-1.5 fuehrt `--quiet` und `--verbose` in drei verbindlichen Tranchen plus optionaler Tranche D ein. Tranchen A, B und C sind abgeschlossen und sichern folgende Gates:
 
 - **CLI-Modell und Architektur-Tabu** in `xray_tests` ueber `tests/adapters/test_port_wiring.cpp`. `static_assert`-basierte Architektur-Pruefungen stellen sicher, dass `ConsoleReportAdapter`, `MarkdownReportAdapter`, `JsonReportAdapter`, `DotReportAdapter` und `HtmlReportAdapter` weiterhin default-konstruierbar sind und `GenerateReportPort::generate_analysis_report` und `generate_impact_report` ihre dokumentierten Signaturen behalten. Eine zukuenftige Erweiterung um einen `OutputVerbosity`-Parameter wuerde die `static_assert`-Sequenz brechen.
 - **Mutual-Exclusion und command-lokale Position** in `xray_tests` ueber `tests/e2e/test_cli_verbosity.cpp`. Tests pruefen, dass `--quiet` und `--verbose` an beiden Subcommands akzeptiert werden, gemeinsam zu einem Usage-Fehler fuehren, und globale Positionen vor dem Subcommand mit nonzero Exit abgelehnt werden. Mutual-Exclusion-Praezedenz: stderr enthaelt fuer den Mutual-Exclusion-Fehler keinen `verbose:`-Block.
@@ -190,7 +190,7 @@ Der command-lokale Verbosity-Vertrag ist in [docs/planning/plan-M5-1-5.md](../pl
 Zusaetzlich zu den Docker-Quality-Gates oben fuehrt der Release-Pfad in
 [`.github/workflows/release.yml`](../../.github/workflows/release.yml) verbindliche
 Gates aus, die jeden Tag-Push absichern. Sie sind in
-[docs/planning/plan-M5-1-6.md](../planning/plan-M5-1-6.md) festgeschrieben und im Dry-Run-
+[docs/planning/plan-M5-1-6.md](../planning/done/plan-M5-1-6.md) festgeschrieben und im Dry-Run-
 Orchestrator ([`scripts/release-dry-run.sh`](../../scripts/release-dry-run.sh))
 identisch verschaltet, sodass Workflow- und Dry-Run-Disposition deckungsgleich
 bleiben:
@@ -258,7 +258,7 @@ Release) entsteht.
 
 ## Plattformstatus (AP M5-1.7)
 
-Der Plattformstatus-Vertrag aus [docs/planning/plan-M5-1-7.md](../planning/plan-M5-1-7.md)
+Der Plattformstatus-Vertrag aus [docs/planning/plan-M5-1-7.md](../planning/done/plan-M5-1-7.md)
 unterscheidet drei Statusklassen: `supported` (offiziell freigegeben),
 `validated_smoke` (Build, Pflicht-Smokes und Plattformgates gruen, aber
 ohne Releasefreigabe) und `known_limited` (Pflichtgate fehlt oder ist nicht
@@ -273,7 +273,7 @@ Aktueller Stand nach Abschluss von AP 1.7 (alle Tranchen A–D ausgeliefert):
 | Windows x86_64 | `validated_smoke` | `Native (windows-x86_64)` plus PowerShell-Smoke (D.1) | `ctest` faehrt dieselben Pflicht-Suites wie macOS; zusaetzlich laeuft `scripts/platform-smoke.ps1` als konvertierungsfreier `native_powershell`-Pfad. Status seit 2026-04-30 `validated_smoke` aus denselben Bedingungen wie macOS (Required Check + Audit ueber run 25153798452) |
 
 Die Required-Check-Namen sind in
-[docs/planning/plan-M5-1-7.md](../planning/plan-M5-1-7.md) "Plattformstatus-Vertrag" verbindlich
+[docs/planning/plan-M5-1-7.md](../planning/done/plan-M5-1-7.md) "Plattformstatus-Vertrag" verbindlich
 festgelegt; Branch-Protection-Konfiguration und Workflow-Jobnamen muessen
 deckungsgleich bleiben. Die Branch-Protection ist nicht im Workflow
 versioniert; ein `gh api repos/<owner>/<repo>/branches/main/protection`-Auszug
@@ -434,7 +434,7 @@ realer Host das Minimum unterschreitet.
 Die Plan-Pflicht "Mindestens ein Matrixjob pro Hostfamilie nutzt eine
 explizit eingerichtete aktuelle CMake-/Compiler-Kombination statt nur
 implizit vorinstallierter Runner-Defaults"
-([plan-M5-1-7.md](../planning/plan-M5-1-7.md) "CMake-/Compiler-Kompatibilitaet")
+([plan-M5-1-7.md](../planning/done/plan-M5-1-7.md) "CMake-/Compiler-Kompatibilitaet")
 ist in `.github/workflows/build.yml` ueber den Step
 `Install pinned CMake` umgesetzt: `python -m pip install cmake==3.30.5`
 schiebt eine versionsgepinnte CMake-Installation aus PyPI vor den

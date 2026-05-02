@@ -8,7 +8,7 @@
 | Version    | `0.3`                                                                                                                                                                  |
 | Stand      | `2026-04-22`                                                                                                                                                           |
 | Status     | Abgeschlossen                                                                                                                                                          |
-| Referenzen | [Lastenheft](../../spec/lastenheft.md), [Design](../../spec/design.md), [Architektur](../../spec/architecture.md), [Phasenplan](./roadmap.md), [Plan M1](./plan-M1.md), [Qualitaet](../user/quality.md) |
+| Referenzen | [Lastenheft](../../../spec/lastenheft.md), [Design](../../../spec/design.md), [Architektur](../../../spec/architecture.md), [Phasenplan](../in-progress/roadmap.md), [Plan M1](./plan-M1.md), [Qualitaet](../../user/quality.md) |
 
 ### 0.1 Zweck
 Dieser Plan beschreibt die konkreten Schritte fuer Milestone M2 (`v0.3.0`). Ziel ist der erste fachlich nutzbare Analysepfad: `cmake-xray` soll auffaellige Translation Units rangfolgebasiert ausgeben, Include-Hotspots aus einer dokumentierten MVP-Heuristik ableiten und eine dateibasierte Impact-Analyse fuer Translation Units bereitstellen.

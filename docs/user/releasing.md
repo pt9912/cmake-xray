@@ -151,7 +151,7 @@ Falls kein Asset-Upload erforderlich ist, koennen die `./release-assets/*`-Argum
 ## Tag-, Versions- und `latest`-Vertrag (AP M5-1.6)
 
 Der Release-Workflow akzeptiert nur Tag-Pushes mit dem in
-[`docs/planning/plan-M5-1-6.md`](../planning/plan-M5-1-6.md) Sektion "SemVer-Tag-Muster"
+[`docs/planning/plan-M5-1-6.md`](../planning/done/plan-M5-1-6.md) Sektion "SemVer-Tag-Muster"
 fixierten Muster:
 
 - `vMAJOR.MINOR.PATCH` (`v0.0.0`, `v1.2.3`).
@@ -229,7 +229,7 @@ Required Checks (`Native (linux-x86_64)`, `Native (macos-arm64)`,
 Host-Portability`), und build.yml run 25153798452 (commit `7be4829`,
 post-protection) bildet den auditierbaren gruenen Run-Audit. Das
 Plattformstatus-Vokabular und die Required-Check-Namen sind in
-[docs/planning/plan-M5-1-7.md](../planning/plan-M5-1-7.md) verbindlich festgelegt;
+[docs/planning/plan-M5-1-7.md](../planning/done/plan-M5-1-7.md) verbindlich festgelegt;
 per-Adapter-Coverage und Atomic-Replace-Matrix in
 [docs/user/quality.md](./quality.md) "Plattformstatus (AP M5-1.7)".
 
