@@ -15,7 +15,11 @@
 #
 # Regenerate the hashes when an example is intentionally refreshed:
 #
-#   ( cd docs/examples && sha256sum * ) > docs/examples/manifest.txt.new
+#   ( cd docs/examples && sha256sum * | sort ) > docs/examples/manifest.txt.new
+#
+# The trailing `| sort` keeps the manifest in stable hash-prefix order so
+# diffs across regens stay tight; without it `sha256sum *` follows the
+# directory traversal order and the gate diff churns on every run.
 #
 043868d04678d13a270ca3613b0024bde03a006a3d7a7026480744b182e6d986  impact-target-graph.html
 16d245ca13cf535a0f5826fe46da5a0b7941c4d20800c34f1b42d35c39b4c7c1  impact-report-targets.json

@@ -1054,12 +1054,35 @@ Innerhalb von **A.3 (CLI und Schema)**:
 
 Innerhalb von **A.4 (JSON- und DOT-Adapter)**:
 
+A.4-Voraussetzungen aus A.1-A.3 (A.3-Review-Bestaetigung, Findung 8):
+`AnalyzeProjectRequest::include_scope`/`include_depth` sind bereits als
+Model-Enums getypt, `IncludeHotspot` traegt bereits `origin` und
+`depth_kind` aus A.1/A.2, `parsed_include_*` reicht durch
+`ProjectAnalyzer` an `build_include_hotspots`. A.4 ist damit reine
+Adapter-Arbeit (Serialisierung existierender Modellfelder plus neuer
+`include_filter`-Block aus `AnalysisResult`); kein Re-Touch von A.1-A.3
+Code noetig.
+
 17. JSON-Adapter implementiert v4-Output mit `include_filter`-Block
     und Hotspot-Erweiterungen.
 18. DOT-Adapter implementiert v4-Output mit neuen Knoten- und
     Graph-Attributen.
 19. `report-dot.md` auf v4.
 20. Goldens migriert/erweitert.
+20a. CLI-Form-Symmetrie ergaenzen (A.3-Review-Findung 7): test_cli.cpp
+    deckt jedes `--include-scope`/`--include-depth`-Keyword in beiden
+    Formen `--option X` (space) und `--option=X` (equals) ab. A.3
+    laesst die Coverage matrix-luecke offen (alle vier Scope- und drei
+    Depth-Keywords sind gepruft, aber nicht jedes in beiden Formen);
+    A.4 schliesst sie zusammen mit den neuen Adapter-Tests, weil dort
+    ohnehin neue CLI-Aufrufe golden-getestet werden.
+20b. Header-Aufteilung fuer Filter-Enums pruefen (A.3-Review-Findung
+    10): wenn A.4 weitere CLI-Header in `cli_adapter.cpp` zieht oder
+    `IncludeScope`/`IncludeDepthFilter` von einer dritten Stelle
+    konsumiert wird, die zwei Filter-Enums aus `include_hotspot.h`
+    nach `include_filter_options.h` (oder gleichwertig) extrahieren,
+    damit `cli_adapter.cpp` nicht den vollen Hotspot-Header braucht.
+    Sonst beilassen.
 
 Innerhalb von **A.5 (HTML-, Markdown- und Console-Adapter)**:
 
