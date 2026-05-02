@@ -18,6 +18,15 @@
     "observation_source": "exact",
     "target_metadata": "not_loaded"
   },
+  "include_filter": {
+    "include_scope": "all",
+    "include_depth": "all",
+    "include_depth_limit_requested": 32,
+    "include_depth_limit_effective": 2,
+    "include_node_budget_requested": 10000,
+    "include_node_budget_effective": 6,
+    "include_node_budget_reached": false
+  },
   "translation_unit_ranking": {
     "limit": 1,
     "total_count": 3,
@@ -51,9 +60,13 @@
     "total_count": 2,
     "returned_count": 1,
     "truncated": true,
+    "excluded_unknown_count": 0,
+    "excluded_mixed_count": 0,
     "items": [
       {
         "header_path": "include/common/config.h",
+        "origin": "project",
+        "depth_kind": "direct",
         "affected_total_count": 3,
         "affected_returned_count": 1,
         "affected_truncated": true,

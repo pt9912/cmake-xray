@@ -37,7 +37,7 @@ Jeder JSON-Report enthaelt diese Pflichtfelder in genau dieser Reihenfolge:
 | Feld | Typ | Pflicht | Beschreibung |
 | --- | --- | --- | --- |
 | `format` | string | ja | Maschinenlesbarer Dokumenttyp. `cmake-xray.analysis` oder `cmake-xray.impact`. |
-| `format_version` | integer | ja | Aktuell `4` (M6 AP 1.4 A.3). Erhoeht sich bei vertragsbrechenden Aenderungen. Die strukturellen v4-Erweiterungen (`include_filter`, `origin`/`depth_kind` an Hotspots) folgen mit dem JSON-Adapter-Rollout in M6 AP 1.4 A.4. |
+| `format_version` | integer | ja | Aktuell `4` (M6 AP 1.4). Erhoeht sich bei vertragsbrechenden Aenderungen. v4 fuegt den `include_filter`-Block sowie `origin` und `depth_kind` an jedem Hotspot-Item und `excluded_unknown_count`/`excluded_mixed_count` am Hotspot-Container ein. |
 | `report_type` | string | ja | `analyze` oder `impact`. Kurzer Workflow-Identifier; nicht der CLI-Wert `--format json`. |
 | `inputs` | object | ja | Eingabeprovenienz aus `ReportInputs`. Schema je Reporttyp unten. |
 | `summary` | object | ja | Aggregierte Kennzahlen je Reporttyp. |

@@ -58,7 +58,11 @@ using xray::hexagon::model::ImpactedTarget;
 using xray::hexagon::model::ImpactedTranslationUnit;
 using xray::hexagon::model::ImpactKind;
 using xray::hexagon::model::ImpactResult;
+using xray::hexagon::model::IncludeDepthFilter;
+using xray::hexagon::model::IncludeDepthKind;
 using xray::hexagon::model::IncludeHotspot;
+using xray::hexagon::model::IncludeOrigin;
+using xray::hexagon::model::IncludeScope;
 using xray::hexagon::model::RankedTranslationUnit;
 using xray::hexagon::model::TargetAssignment;
 using xray::hexagon::model::TargetDependency;
@@ -166,12 +170,71 @@ struct GraphHeader {
     // and the attributes start appearing in impact-DOT output.
     std::size_t impact_target_depth_requested{0};
     std::size_t impact_target_depth_effective{0};
+    // AP M6-1.4 A.4: include-filter graph attributes for analyze reports
+    // (graph_include_scope, graph_include_depth,
+    // graph_include_node_budget_reached). Impact-DOT does not carry these.
+    IncludeScope include_scope{IncludeScope::all};
+    IncludeDepthFilter include_depth{IncludeDepthFilter::all};
+    bool include_node_budget_reached{false};
 };
 
 std::string target_graph_status_text(TargetGraphStatus status) {
     if (status == TargetGraphStatus::loaded) return "loaded";
     if (status == TargetGraphStatus::partial) return "partial";
     return "not_loaded";
+}
+
+std::string include_origin_text(IncludeOrigin origin) {
+    if (origin == IncludeOrigin::project) return "project";
+    if (origin == IncludeOrigin::external) return "external";
+    return "unknown";
+}
+
+std::string include_depth_kind_text(IncludeDepthKind kind) {
+    if (kind == IncludeDepthKind::direct) return "direct";
+    if (kind == IncludeDepthKind::indirect) return "indirect";
+    return "mixed";
+}
+
+std::string include_scope_text(IncludeScope scope) {
+    if (scope == IncludeScope::project) return "project";
+    if (scope == IncludeScope::external) return "external";
+    if (scope == IncludeScope::unknown) return "unknown";
+    return "all";
+}
+
+std::string include_depth_filter_text(IncludeDepthFilter filter) {
+    if (filter == IncludeDepthFilter::direct) return "direct";
+    if (filter == IncludeDepthFilter::indirect) return "indirect";
+    return "all";
+}
+
+void emit_impact_depth_attributes(std::ostringstream& out, const GraphHeader& header) {
+    if (header.report_type != "impact") return;
+    out << "  ";
+    append_integer_attribute(out, "graph_impact_target_depth_requested",
+                              header.impact_target_depth_requested);
+    out << ";\n";
+    out << "  ";
+    append_integer_attribute(out, "graph_impact_target_depth_effective",
+                              header.impact_target_depth_effective);
+    out << ";\n";
+}
+
+void emit_analyze_include_filter_attributes(std::ostringstream& out, const GraphHeader& header) {
+    if (header.report_type != "analyze") return;
+    out << "  ";
+    append_string_attribute(out, "graph_include_scope",
+                            include_scope_text(header.include_scope));
+    out << ";\n";
+    out << "  ";
+    append_string_attribute(out, "graph_include_depth",
+                            include_depth_filter_text(header.include_depth));
+    out << ";\n";
+    out << "  ";
+    append_boolean_attribute(out, "graph_include_node_budget_reached",
+                             header.include_node_budget_reached);
+    out << ";\n";
 }
 
 void emit_graph_header(std::ostringstream& out, const GraphHeader& header) {
@@ -197,22 +260,8 @@ void emit_graph_header(std::ostringstream& out, const GraphHeader& header) {
     append_string_attribute(out, "graph_target_graph_status",
                             target_graph_status_text(header.target_graph_status));
     out << ";\n";
-    // AP M6-1.3 A.3: graph_impact_target_depth_{requested,effective} are
-    // pflicht in Impact-DOT v3 (plan-M6-1-3.md "Neue Graph-Attribute fuer
-    // Impact-DOT"). The if-constexpr is dead in A.3 (kReportFormatVersion=2)
-    // and activates in A.4. Analyze-DOT does not carry these attributes.
-    if constexpr (xray::hexagon::model::kReportFormatVersion >= 3) {
-        if (header.report_type == "impact") {
-            out << "  ";
-            append_integer_attribute(out, "graph_impact_target_depth_requested",
-                                      header.impact_target_depth_requested);
-            out << ";\n";
-            out << "  ";
-            append_integer_attribute(out, "graph_impact_target_depth_effective",
-                                      header.impact_target_depth_effective);
-            out << ";\n";
-        }
-    }
+    emit_impact_depth_attributes(out, header);
+    emit_analyze_include_filter_attributes(out, header);
 }
 
 void emit_graph_footer(std::ostringstream& out) { out << "}\n"; }
@@ -256,6 +305,8 @@ struct AnalyzeTuNode {
 struct AnalyzeHotspotNode {
     std::string id;
     std::string header_path;
+    IncludeOrigin origin{IncludeOrigin::unknown};
+    IncludeDepthKind depth_kind{IncludeDepthKind::direct};
     std::size_t context_total_count{0};
     std::size_t context_returned_count{0};
     bool context_truncated{false};
@@ -378,6 +429,8 @@ void build_analyze_nodes(AnalyzeContext& ctx,
         AnalyzeHotspotNode node{};
         node.id = "hotspot_" + std::to_string(hotspot_index++);
         node.header_path = hotspot.header_path;
+        node.origin = hotspot.origin;
+        node.depth_kind = hotspot.depth_kind;
         node.context_total_count = hotspot.affected_translation_units.size();
         ctx.hotspot_id_by_path.emplace(hotspot.header_path, node.id);
         ctx.graph.hotspot_nodes.push_back(std::move(node));
@@ -685,6 +738,10 @@ void emit_analyze_hotspot_node(std::ostringstream& out, const AnalyzeHotspotNode
     out << ", ";
     append_string_attribute(out, "path", node.header_path);
     out << ", ";
+    append_string_attribute(out, "origin", include_origin_text(node.origin));
+    out << ", ";
+    append_string_attribute(out, "depth_kind", include_depth_kind_text(node.depth_kind));
+    out << ", ";
     append_integer_attribute(out, "context_total_count", node.context_total_count);
     out << ", ";
     append_integer_attribute(out, "context_returned_count", node.context_returned_count);
@@ -746,9 +803,14 @@ void emit_target_dependency_edge(std::ostringstream& out,
 
 void emit_analyze_graph(std::ostringstream& out, const AnalyzeGraph& graph,
                         const DotBudget& budget,
-                        TargetGraphStatus target_graph_status) {
-    emit_graph_header(out, GraphHeader{"cmake_xray_analysis", "analyze", budget,
-                                       graph.truncated, target_graph_status});
+                        TargetGraphStatus target_graph_status,
+                        const AnalysisResult& result) {
+    GraphHeader header{"cmake_xray_analysis", "analyze", budget, graph.truncated,
+                       target_graph_status};
+    header.include_scope = result.include_scope_effective;
+    header.include_depth = result.include_depth_filter_effective;
+    header.include_node_budget_reached = result.include_node_budget_reached;
+    emit_graph_header(out, header);
     for (const auto& node : graph.tu_nodes) emit_analyze_tu_node(out, node);
     for (const auto& node : graph.hotspot_nodes) emit_analyze_hotspot_node(out, node);
     for (const auto& node : graph.target_nodes) emit_analyze_target_node(out, node);
@@ -789,7 +851,7 @@ std::string render_analyze(const AnalysisResult& result, std::size_t top_limit) 
     compute_hotspot_context_counts(graph);
 
     std::ostringstream out;
-    emit_analyze_graph(out, graph, budget, result.target_graph_status);
+    emit_analyze_graph(out, graph, budget, result.target_graph_status, result);
     return out.str();
 }
 

@@ -5,6 +5,9 @@ digraph cmake_xray_analysis {
   graph_edge_limit=80;
   graph_truncated=false;
   graph_target_graph_status="loaded";
+  graph_include_scope="all";
+  graph_include_depth="all";
+  graph_include_node_budget_reached=false;
   tu_1 [kind="translation_unit", rank=1, label="hub.cpp", path="src/hub.cpp", directory="build", unique_key="/project/src/hub.cpp|/project/build"];
   tu_2 [kind="translation_unit", rank=2, label="src00.cpp", path="src/src00.cpp", directory="build", unique_key="/project/src/src00.cpp|/project/build"];
   tu_3 [kind="translation_unit", rank=3, label="src01.cpp", path="src/src01.cpp", directory="build", unique_key="/project/src/src01.cpp|/project/build"];

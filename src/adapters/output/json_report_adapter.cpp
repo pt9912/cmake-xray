@@ -15,6 +15,7 @@
 #include "hexagon/model/analysis_result.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
+#include "hexagon/model/include_hotspot.h"
 #include "hexagon/model/observation_source.h"
 #include "hexagon/model/report_format_version.h"
 #include "hexagon/model/report_inputs.h"
@@ -36,7 +37,11 @@ using xray::hexagon::model::ImpactedTarget;
 using xray::hexagon::model::ImpactedTranslationUnit;
 using xray::hexagon::model::ImpactKind;
 using xray::hexagon::model::ImpactResult;
+using xray::hexagon::model::IncludeDepthFilter;
+using xray::hexagon::model::IncludeDepthKind;
 using xray::hexagon::model::IncludeHotspot;
+using xray::hexagon::model::IncludeOrigin;
+using xray::hexagon::model::IncludeScope;
 using xray::hexagon::model::ObservationSource;
 using xray::hexagon::model::RankedTranslationUnit;
 using xray::hexagon::model::ReportInputs;
@@ -95,6 +100,43 @@ std::string target_graph_status_text(TargetGraphStatus status) {
     if (status == TargetGraphStatus::loaded) return "loaded";
     if (status == TargetGraphStatus::partial) return "partial";
     return "not_loaded";
+}
+
+std::string include_origin_text(IncludeOrigin origin) {
+    if (origin == IncludeOrigin::project) return "project";
+    if (origin == IncludeOrigin::external) return "external";
+    return "unknown";
+}
+
+std::string include_depth_kind_text(IncludeDepthKind kind) {
+    if (kind == IncludeDepthKind::direct) return "direct";
+    if (kind == IncludeDepthKind::indirect) return "indirect";
+    return "mixed";
+}
+
+std::string include_scope_text(IncludeScope scope) {
+    if (scope == IncludeScope::project) return "project";
+    if (scope == IncludeScope::external) return "external";
+    if (scope == IncludeScope::unknown) return "unknown";
+    return "all";
+}
+
+std::string include_depth_filter_text(IncludeDepthFilter filter) {
+    if (filter == IncludeDepthFilter::direct) return "direct";
+    if (filter == IncludeDepthFilter::indirect) return "indirect";
+    return "all";
+}
+
+ordered_json render_include_filter(const AnalysisResult& result) {
+    return ordered_json{
+        {"include_scope", include_scope_text(result.include_scope_effective)},
+        {"include_depth", include_depth_filter_text(result.include_depth_filter_effective)},
+        {"include_depth_limit_requested", result.include_depth_limit_requested},
+        {"include_depth_limit_effective", result.include_depth_limit_effective},
+        {"include_node_budget_requested", result.include_node_budget_requested},
+        {"include_node_budget_effective", result.include_node_budget_effective},
+        {"include_node_budget_reached", result.include_node_budget_reached},
+    };
 }
 
 std::string target_dependency_kind_text(TargetDependencyKind /*kind*/) {
@@ -348,6 +390,8 @@ ordered_json render_hotspot_item(
     append_diagnostics(diagnostics_array, hotspot.diagnostics);
     return ordered_json{
         {"header_path", hotspot.header_path},
+        {"origin", include_origin_text(hotspot.origin)},
+        {"depth_kind", include_depth_kind_text(hotspot.depth_kind)},
         {"affected_total_count", affected_total},
         {"affected_returned_count", affected_returned},
         {"affected_truncated", affected_truncated},
@@ -388,6 +432,8 @@ ordered_json render_hotspot_container(const AnalysisResult& result, std::size_t 
         {"total_count", total},
         {"returned_count", returned},
         {"truncated", truncated},
+        {"excluded_unknown_count", result.include_hotspot_excluded_unknown_count},
+        {"excluded_mixed_count", result.include_hotspot_excluded_mixed_count},
         {"items", std::move(items)},
     };
 }
@@ -522,6 +568,7 @@ std::string JsonReportAdapter::write_analysis_report(
     document["report_type"] = "analyze";
     document["inputs"] = render_inputs_common(analysis_result.inputs);
     document["summary"] = render_analysis_summary(analysis_result, top_limit);
+    document["include_filter"] = render_include_filter(analysis_result);
     document["translation_unit_ranking"] =
         render_ranking_container(analysis_result, top_limit);
     document["include_hotspots"] =

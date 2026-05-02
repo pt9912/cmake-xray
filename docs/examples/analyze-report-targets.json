@@ -18,6 +18,15 @@
     "observation_source": "derived",
     "target_metadata": "loaded"
   },
+  "include_filter": {
+    "include_scope": "all",
+    "include_depth": "all",
+    "include_depth_limit_requested": 32,
+    "include_depth_limit_effective": 0,
+    "include_node_budget_requested": 10000,
+    "include_node_budget_effective": 0,
+    "include_node_budget_reached": false
+  },
   "translation_unit_ranking": {
     "limit": 10,
     "total_count": 2,
@@ -81,6 +90,8 @@
     "total_count": 0,
     "returned_count": 0,
     "truncated": false,
+    "excluded_unknown_count": 0,
+    "excluded_mixed_count": 0,
     "items": []
   },
   "target_graph_status": "loaded",

@@ -278,6 +278,25 @@ TEST_CASE("json analyze ranking sort tie-breaks rank by reference source_path") 
     CHECK(items[1]["reference"]["source_path"] == "z/last.cpp");
 }
 
+TEST_CASE("json analyze hotspot items carry origin and depth_kind (AP M6-1.4 A.4)") {
+    AnalysisResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    auto external_mixed = IncludeHotspot{
+        "include/external.h", {reference("a.cpp", "b", "a|b")}, {}};
+    external_mixed.origin = xray::hexagon::model::IncludeOrigin::external;
+    external_mixed.depth_kind = xray::hexagon::model::IncludeDepthKind::mixed;
+    result.include_hotspots = {external_mixed};
+
+    const JsonReportAdapter adapter;
+    const auto doc = parse(adapter.write_analysis_report(result, 10));
+
+    const auto& items = doc["include_hotspots"]["items"];
+    REQUIRE(items.size() == 1);
+    CHECK(items[0]["origin"] == "external");
+    CHECK(items[0]["depth_kind"] == "mixed");
+}
+
 TEST_CASE("json analyze hotspot affected list is sorted and limit-aware") {
     const JsonReportAdapter adapter;
     const auto doc = parse(

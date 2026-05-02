@@ -49,6 +49,12 @@ assert_stdout_equals_file() {
     actual_clean="$(mktemp)"
     expected_clean="$(mktemp)"
     "$@" >"$actual_file" 2>/dev/null || true
+    if [ "${XRAY_UPDATE_GOLDENS:-0}" = "1" ]; then
+        cp "$actual_file" "$expected_file"
+        echo "UPDATE: $description -> $expected_file"
+        rm -f "$actual_file" "$actual_clean" "$expected_clean"
+        return 0
+    fi
     normalize_line_endings "$actual_file" > "$actual_clean"
     normalize_line_endings "$expected_file" > "$expected_clean"
     if cmp -s "$actual_clean" "$expected_clean"; then
@@ -104,6 +110,12 @@ assert_dot_stdout_equals_file() {
     actual_clean="$(mktemp)"
     expected_clean="$(mktemp)"
     "$@" >"$actual_file" 2>/dev/null || true
+    if [ "${XRAY_UPDATE_GOLDENS:-0}" = "1" ]; then
+        normalize_dot_unique_keys "$actual_file" > "$expected_file"
+        echo "UPDATE: $description -> $expected_file"
+        rm -f "$actual_file" "$actual_clean" "$expected_clean"
+        return 0
+    fi
     normalize_dot_unique_keys "$actual_file" | tr -d '\r' > "$actual_clean"
     normalize_line_endings "$expected_file" > "$expected_clean"
     if cmp -s "$actual_clean" "$expected_clean"; then
@@ -126,6 +138,12 @@ assert_dot_file_equals_file() {
     local actual_clean expected_clean
     actual_clean="$(mktemp)"
     expected_clean="$(mktemp)"
+    if [ "${XRAY_UPDATE_GOLDENS:-0}" = "1" ]; then
+        normalize_dot_unique_keys "$actual_file" > "$expected_file"
+        echo "UPDATE: $description -> $expected_file"
+        rm -f "$actual_clean" "$expected_clean"
+        return 0
+    fi
     normalize_dot_unique_keys "$actual_file" | tr -d '\r' > "$actual_clean"
     normalize_line_endings "$expected_file" > "$expected_clean"
     if cmp -s "$actual_clean" "$expected_clean"; then
@@ -143,6 +161,12 @@ assert_file_equals() {
     local actual_clean expected_clean
     actual_clean="$(mktemp)"
     expected_clean="$(mktemp)"
+    if [ "${XRAY_UPDATE_GOLDENS:-0}" = "1" ]; then
+        cp "$actual_file" "$expected_file"
+        echo "UPDATE: $description -> $expected_file"
+        rm -f "$actual_clean" "$expected_clean"
+        return 0
+    fi
     normalize_line_endings "$actual_file" > "$actual_clean"
     normalize_line_endings "$expected_file" > "$expected_clean"
     if cmp -s "$actual_clean" "$expected_clean"; then

@@ -328,6 +328,27 @@ TEST_CASE("DOT analyze emits include_hotspot with context counts and tu_include_
     CHECK(report.find("tu_1 -> hotspot_1 [kind=\"tu_include_hotspot\"") != std::string::npos);
 }
 
+TEST_CASE("DOT analyze emits origin and depth_kind on include_hotspot nodes (AP M6-1.4 A.4)") {
+    AnalysisResult result = make_minimal_analysis_result();
+    auto tu = ranked_tu("src/app.cpp", "build", "src/app.cpp|build");
+    tu.rank = 1;
+    result.translation_units = {tu};
+    auto hotspot = IncludeHotspot{
+        "include/header.h",
+        {reference("src/app.cpp", "build", "src/app.cpp|build")},
+        {},
+    };
+    hotspot.origin = xray::hexagon::model::IncludeOrigin::external;
+    hotspot.depth_kind = xray::hexagon::model::IncludeDepthKind::mixed;
+    result.include_hotspots = {hotspot};
+
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 5);
+
+    CHECK(report.find("origin=\"external\"") != std::string::npos);
+    CHECK(report.find("depth_kind=\"mixed\"") != std::string::npos);
+}
+
 TEST_CASE("DOT analyze marks pure context translation units as context_only") {
     AnalysisResult result = make_minimal_analysis_result();
     auto primary = ranked_tu("src/app.cpp", "build", "src/app.cpp|build");

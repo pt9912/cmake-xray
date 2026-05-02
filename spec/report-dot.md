@@ -89,12 +89,17 @@ Jeder DOT-Report enthaelt mindestens:
 | `graph_target_graph_status` | quoted string | `not_loaded`, `loaded`, `partial`. Pflicht ab AP M6-1.2 fuer Analyze und Impact. Spiegelt `AnalysisResult::target_graph_status` bzw. `ImpactResult::target_graph_status`. |
 | `graph_impact_target_depth_requested` | integer | nur Impact-DOT, Pflicht ab AP M6-1.3. Validierter angeforderter Reverse-BFS-Tiefenwert, identisch mit `ImpactResult::impact_target_depth_requested`. |
 | `graph_impact_target_depth_effective` | integer | nur Impact-DOT, Pflicht ab AP M6-1.3. Tatsaechlich erreichte Tiefe, identisch mit `ImpactResult::impact_target_depth_effective`. Bei `graph_target_graph_status="not_loaded"` immer `0`. |
+| `graph_include_scope` | quoted string | nur Analyze-DOT, Pflicht ab AP M6-1.4. `all`, `project`, `external` oder `unknown`. Spiegelt `AnalysisResult::include_scope_effective`. |
+| `graph_include_depth` | quoted string | nur Analyze-DOT, Pflicht ab AP M6-1.4. `all`, `direct` oder `indirect`. Spiegelt `AnalysisResult::include_depth_filter_effective`. |
+| `graph_include_node_budget_reached` | boolean | nur Analyze-DOT, Pflicht ab AP M6-1.4. Spiegelt `AnalysisResult::include_node_budget_reached`. |
 
 `graph_truncated` bezieht sich auf den finalen Graphzustand nach Entfernen reiner, unverbundener Kontextknoten.
 
 Die `graph_impact_target_depth_*`-Attribute erscheinen ausschliesslich in
 Impact-DOT, unabhaengig vom `graph_target_graph_status`. Analyze-DOT
-gibt sie nicht aus.
+gibt sie nicht aus. Umgekehrt gibt nur Analyze-DOT die `graph_include_*`-
+Attribute aus; Impact-DOT traegt sie nicht, weil der Include-Filter
+Vertrag analyze-only ist.
 
 ## Analyze-Vertrag
 
@@ -127,6 +132,8 @@ Pflichtattribute fuer Include-Hotspot-Knoten:
 - `kind="include_hotspot"`.
 - `label`: gekuerztes oder ungekuerztes Leselabel.
 - `path`: vollstaendiger Anzeige-Pfad aus `IncludeHotspot::header_path`.
+- `origin` (Pflicht ab AP M6-1.4): quoted string `project`, `external` oder `unknown`. Spiegelt `IncludeHotspot::origin`. Erscheint zwischen `path` und `context_total_count`.
+- `depth_kind` (Pflicht ab AP M6-1.4): quoted string `direct`, `indirect` oder `mixed`. Spiegelt `IncludeHotspot::depth_kind`. Erscheint direkt nach `origin`.
 - `context_total_count`: Integer.
 - `context_returned_count`: Integer.
 - `context_truncated`: Boolean.
