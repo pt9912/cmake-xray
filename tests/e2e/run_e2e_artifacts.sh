@@ -10,7 +10,7 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 . "$script_dir/run_e2e_lib.sh"
 
 # M5 JSON goldens (analyze) — byte-stable diff against golden AND schema
-# validation of the actually produced bytes per docs/plan-M5-1-2.md:367.
+# validation of the actually produced bytes per docs/planning/plan-M5-1-2.md:367.
 assert_exit "M5 json analyze compile-db-only exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format json
 assert_stdout_equals_file "M5 json analyze compile-db-only matches golden" tests/e2e/testdata/m5/json-reports/analyze_compile_db_only.json \
     "$BINARY" analyze --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --format json
@@ -88,7 +88,7 @@ assert_json_stdout_validates "M5 json impact absolute changed-file validates aga
     "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file "$impact_absolute_arg" --format json
 
 # M5 DOT goldens (analyze) — byte-stable diff against golden AND syntax
-# validation of the produced bytes per docs/plan-M5-1-3.md.
+# validation of the produced bytes per docs/planning/plan-M5-1-3.md.
 assert_exit "M5 dot analyze compile-db-only exits 0" 0 "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --format dot --top 2
 assert_stdout_equals_file "M5 dot analyze compile-db-only matches golden" tests/e2e/testdata/m5/dot-reports/analyze_compile_db_only.dot \
     "$BINARY" analyze --compile-commands tests/e2e/testdata/m5/dot-fixtures/multi_tu_compile_db/compile_commands.json --format dot --top 2
@@ -239,7 +239,7 @@ assert_dot_stdout_validates "M5 dot impact absolute changed-file validates again
     "$BINARY" impact --compile-commands tests/e2e/testdata/m2/basic_project/compile_commands.json --changed-file "$dot_impact_absolute_arg" --format dot
 
 # M5 HTML goldens (analyze) — byte-stable diff against golden per
-# docs/plan-M5-1-4.md Tranche C.1. AP M5-1.4 ships no separate HTML structure
+# docs/planning/plan-M5-1-4.md Tranche C.1. AP M5-1.4 ships no separate HTML structure
 # validator script (the contract is locked in via tests/adapters/test_html_report_adapter.cpp
 # and the byte-stable goldens here); a future Tranche D may add an optional
 # tests/validate_html_reports.py if a structure smoke is needed beyond pure
@@ -290,7 +290,7 @@ assert_stdout_equals_file "M5 html analyze directory contexts matches golden" te
 
 # m5/html-fixtures/escape_paths is HTML-specific; it embeds <, >, &, ", ',
 # backslash, newline and <script>-style strings so the golden locks in the
-# documented escape rules from docs/report-html.md. Backslash-as-path-separator
+# documented escape rules from spec/report-html.md. Backslash-as-path-separator
 # behaviour is platform-dependent: on POSIX, a literal backslash is part of
 # the source filename and renders as `back\slash.cpp`; on Windows the path
 # resolver normalises \ -> / before reaching the HTML adapter, so the rendered

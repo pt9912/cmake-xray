@@ -222,7 +222,7 @@ void append_target_section(std::ostringstream& out, std::string_view title,
 
 std::string target_graph_status_text(TargetGraphStatus status) {
     // Caller filters not_loaded before reaching here; the not_loaded path
-    // omits the entire section per docs/plan-M6-1-2.md "Console- und
+    // omits the entire section per docs/planning/plan-M6-1-2.md "Console- und
     // Markdown-Vertragsregeln". Mapping the remaining two enum values via
     // a ternary keeps the helper byte-stable without an unreachable third
     // branch that would otherwise miss coverage.
@@ -232,7 +232,7 @@ std::string target_graph_status_text(TargetGraphStatus status) {
 std::vector<std::string> render_from_column_with_suffix(
     const std::vector<TargetDependency>& edges) {
     // From-column has no [external] marker; use the shared display helper
-    // verbatim per docs/plan-M6-1-2.md "Adapter-Implementierungs-Hinweise".
+    // verbatim per docs/planning/plan-M6-1-2.md "Adapter-Implementierungs-Hinweise".
     std::vector<TargetDisplayEntry> entries;
     entries.reserve(edges.size());
     for (const auto& edge : edges) {
@@ -244,7 +244,7 @@ std::vector<std::string> render_from_column_with_suffix(
 std::vector<std::string> render_to_column_with_suffixes(
     const std::vector<TargetDependency>& edges) {
     // Console-specific to-column: the suffix order is documented in
-    // docs/plan-M6-1-2.md "Reihenfolge der Suffixe bei kombiniertem
+    // docs/planning/plan-M6-1-2.md "Reihenfolge der Suffixe bei kombiniertem
     // Mischfall: <to_display_name> [external] [key: <to_unique_key>]". The
     // shared disambiguation helper does not own the [external] suffix
     // because it knows nothing about edge resolution; assemble suffixes
@@ -298,7 +298,7 @@ void append_target_graph_reference_section(std::ostringstream& out,
 }
 
 // AP M6-1.3 A.4: Impact-Console "Prioritised Affected Targets" section.
-// Format per docs/plan-M6-1-3.md "Console":
+// Format per docs/planning/plan-M6-1-3.md "Console":
 //   `[<priority_class>, distance=<n>, evidence=<strength>] <display_name>`
 // One line per target; metadata-only header line for not_loaded.
 void append_prioritised_affected_targets_section(std::ostringstream& out,

@@ -33,7 +33,7 @@ if(NOT CMAKE_MINIMUM_REQUIRED_VERSION VERSION_EQUAL "${_xray_required_cmake_vers
         "disagrees with toolchain-minimums.json cmake.minimum_version="
         "${_xray_required_cmake_version}. Update both together so the "
         "documented minimum stays aligned across CMakeLists.txt, README.md, "
-        "docs/guide.md and the JSON contract.")
+        "docs/user/guide.md and the JSON contract.")
 endif()
 
 if(CMAKE_VERSION VERSION_LESS "${_xray_required_cmake_version}")

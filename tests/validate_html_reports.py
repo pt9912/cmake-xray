@@ -2,7 +2,7 @@
 """HTML structure validator for cmake-xray reports (AP M5-1.4 Tranche D).
 
 This is a stdlib-only structural smoke for the HTML report contract from
-docs/report-html.md. It does not parse HTML in the strict spec sense;
+spec/report-html.md. It does not parse HTML in the strict spec sense;
 instead it walks the document with a small forward parser and checks the
 contract-level invariants the goldens are expected to keep:
 
@@ -47,7 +47,7 @@ EXIT_ENVIRONMENT_ERROR = 2
 
 # Tags whose mere presence violates the HTML report contract because they
 # either pull in code, embed remote resources, or expand the attack surface
-# beyond the static report scope locked down in docs/report-html.md.
+# beyond the static report scope locked down in spec/report-html.md.
 FORBIDDEN_TAG_PATTERNS = (
     re.compile(r"<\s*script\b", re.IGNORECASE),
     re.compile(r"</\s*script\s*>", re.IGNORECASE),

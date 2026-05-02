@@ -15,8 +15,8 @@ struct TargetDisplayEntry {
 };
 
 // Disambiguate target display strings against name collisions inside a single
-// rendered list, per docs/plan-M6-1-2.md "Adapter-Implementierungs-Hinweise"
-// and docs/report-html.md "Disambiguierung kollidierender Target-Display-
+// rendered list, per docs/planning/plan-M6-1-2.md "Adapter-Implementierungs-Hinweise"
+// and spec/report-html.md "Disambiguierung kollidierender Target-Display-
 // Namen". Operates on pairs so the same helper covers File-API targets,
 // "<external>::*" edge targets and mixed collisions where an internal target
 // `foo` and an external target with raw_id `foo` share the same display_text

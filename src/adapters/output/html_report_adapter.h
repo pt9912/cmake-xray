@@ -13,19 +13,19 @@ namespace xray::adapters::output {
 // instantiating the adapter or rendering full reports. Tranche B fills in
 // the actual analyze/impact rendering.
 
-// HTML-escape a text-node value per docs/report-html.md "Escaping": minimum
+// HTML-escape a text-node value per spec/report-html.md "Escaping": minimum
 // escapes for &, <, >. Caller-side helper; Tranche B composes whitespace
 // normalization and escaping via render_text below before emitting business
 // values.
 std::string html_escape_text(std::string_view value);
 
-// HTML-escape an attribute value per docs/report-html.md "Escaping":
+// HTML-escape an attribute value per spec/report-html.md "Escaping":
 // minimum escapes for &, <, >, ", '. Caller-side helper; Tranche B composes
 // whitespace normalization and escaping via render_attribute below.
 std::string html_escape_attribute(std::string_view value);
 
 // Normalize whitespace inside a business value before HTML escaping per
-// docs/report-html.md "Escaping": \r\n and \r → " / ", each \n → " / ",
+// spec/report-html.md "Escaping": \r\n and \r → " / ", each \n → " / ",
 // each \t → " ", every other ASCII control byte below 0x20 → " ".
 std::string normalize_html_whitespace(std::string_view value);
 
@@ -41,7 +41,7 @@ std::string render_text(std::string_view value);
 std::string render_attribute(std::string_view value);
 
 // The static, byte-stable CSS string emitted in <style> for every HTML
-// report, per docs/report-html.md "CSS-Vertrag". Identical for analyze and
+// report, per spec/report-html.md "CSS-Vertrag". Identical for analyze and
 // impact, free of @import / url(...) / external resources / animations.
 std::string_view html_report_css();
 

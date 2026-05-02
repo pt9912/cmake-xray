@@ -9,7 +9,7 @@
 #   2. recomputes the SHA-256 of each example and verifies it matches the
 #      manifest hash byte-for-byte,
 #   3. runs the per-format validator (JSON via tests/validate_json_schema.py
-#      against docs/report-json.schema.json, DOT via
+#      against spec/report-json.schema.json, DOT via
 #      tests/validate_dot_reports.py, HTML via tests/validate_html_reports.py)
 #      where applicable.
 #

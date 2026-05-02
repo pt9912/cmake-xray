@@ -232,7 +232,7 @@ assert_dot_stdout_validates() {
     rm -f "$captured"
 }
 
-# Validate a JSON file against docs/report-json.schema.json. Skips silently
+# Validate a JSON file against spec/report-json.schema.json. Skips silently
 # if the validator script or python3 is unavailable so the bash smoke does
 # not fail on minimal hosts; CTest itself already enforces the schema gate
 # via the report_json_schema_validation entry.
@@ -240,7 +240,7 @@ assert_dot_stdout_validates() {
 # Paths go through native_path so MSYS Bash's POSIX-style /d/a/... is
 # converted to D:\a\... before being handed to a non-MSYS Python on Windows.
 validator_script="$(native_path "$REPO_ROOT/tests/validate_json_schema.py")"
-schema_path="$(native_path "$REPO_ROOT/docs/report-json.schema.json")"
+schema_path="$(native_path "$REPO_ROOT/spec/report-json.schema.json")"
 assert_schema_validates() {
     local description="$1" json_file="$2"
     if ! command -v python3 >/dev/null 2>&1; then
@@ -248,7 +248,7 @@ assert_schema_validates() {
         return
     fi
     if ! [ -f "$REPO_ROOT/tests/validate_json_schema.py" ] || \
-       ! [ -f "$REPO_ROOT/docs/report-json.schema.json" ]; then
+       ! [ -f "$REPO_ROOT/spec/report-json.schema.json" ]; then
         echo "SKIP: $description (validator or schema missing)"
         return
     fi

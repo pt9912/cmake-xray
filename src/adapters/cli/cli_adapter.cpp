@@ -294,7 +294,7 @@ std::string_view depth_error_phrase(DepthParseOutcome::Status status) {
 }
 
 // AP M6-1.3 A.2: parse and validate --impact-target-depth per
-// docs/plan-M6-1-3.md "CLI-Vertrag". Captures the parsed depth in
+// docs/planning/plan-M6-1-3.md "CLI-Vertrag". Captures the parsed depth in
 // options.parsed_impact_target_depth on success; emits one of the four
 // documented error phrases on failure.
 std::optional<int> validate_impact_target_depth(CliOptions& options, std::ostream& err) {

@@ -195,7 +195,7 @@ cmd_latest() {
     # version and skips this code path. Fall-4-style detection (latest
     # stuck on a digest unrelated to any release) is now an external
     # inspection concern, with the manual recovery path in
-    # docs/releasing.md unchanged for those cases. The post-push verify
+    # docs/user/releasing.md unchanged for those cases. The post-push verify
     # on lines below is the correctness guarantee for the normal flow.
     local existing_latest_digest
     existing_latest_digest="$(read_remote_digest "$latest_tag" || true)"

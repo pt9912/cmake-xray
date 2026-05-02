@@ -278,7 +278,7 @@ TEST_CASE("console report adapter preserves inline diagnostics and handles empty
 
 // ---- M6 AP 1.2 Tranche A.3: Direct Target Dependencies / Target Hubs /
 // Target Graph Reference console sections. Status matrix per
-// docs/plan-M6-1-2.md "Console-Adapter (Status-Matrix Reporttyp x Status)"
+// docs/planning/plan-M6-1-2.md "Console-Adapter (Status-Matrix Reporttyp x Status)"
 // plus disambiguation and external-suffix order regressions.
 
 namespace m6_console {

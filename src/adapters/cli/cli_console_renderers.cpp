@@ -120,7 +120,7 @@ std::string render_console_quiet_impact(const ImpactResult& result) {
 // own section heading line plus indented body lines and ends with a blank
 // line separator; the top-level renderer terminates the document by trimming
 // the trailing blank line so stdout ends with exactly one newline (single-
-// newline contract from docs/plan-M5-1-5.md).
+// newline contract from docs/planning/plan-M5-1-5.md).
 
 namespace verbose_helpers {
 
@@ -531,7 +531,7 @@ std::string render_console_verbose_analyze(const AnalysisResult& result, std::si
     emit_diagnostics_section(out, result.diagnostics);
     auto text = out.str();
     // Each section ends with "\n\n"; trim one to leave exactly one trailing
-    // newline for the document, per docs/plan-M5-1-5.md single-newline rule.
+    // newline for the document, per docs/planning/plan-M5-1-5.md single-newline rule.
     if (!text.empty() && text.back() == '\n' && text.size() >= 2 &&
         text[text.size() - 2] == '\n') {
         text.pop_back();

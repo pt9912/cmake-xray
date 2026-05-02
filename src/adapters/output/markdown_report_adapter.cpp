@@ -354,7 +354,7 @@ void append_target_section(std::ostringstream& out, std::string_view title,
 
 std::string target_graph_status_text(TargetGraphStatus status) {
     // Caller filters not_loaded before reaching here; the not_loaded path
-    // omits the entire section per docs/plan-M6-1-2.md "Console- und
+    // omits the entire section per docs/planning/plan-M6-1-2.md "Console- und
     // Markdown-Vertragsregeln". Mapping the remaining two enum values via
     // a ternary keeps the helper byte-stable without an unreachable third
     // branch that would otherwise miss coverage.
@@ -366,7 +366,7 @@ std::string target_dependency_resolution_text(TargetDependencyResolution res) {
 }
 
 std::string normalize_table_cell_whitespace(std::string_view value) {
-    // Mirrors docs/report-html.md "Escaping" whitespace contract so M6
+    // Mirrors spec/report-html.md "Escaping" whitespace contract so M6
     // table cells stay byte-stable across HTML and Markdown for the same
     // inputs. \r\n and \r → " / ", each \n → " / ", \t → one space, other
     // ASCII control bytes < 0x20 → one space.
@@ -398,7 +398,7 @@ std::string normalize_table_cell_whitespace(std::string_view value) {
 }
 
 void append_table_cell_plain(std::ostringstream& out, std::string_view value) {
-    // Plain-text cell: whitespace-normalize per docs/plan-M6-1-2.md
+    // Plain-text cell: whitespace-normalize per docs/planning/plan-M6-1-2.md
     // "Markdown-Tabellen-Escaping". No backtick wrapping. Callers supply
     // adapter-controlled fixed strings (Resolution values "resolved" /
     // "external", direction labels, hub leersaetze) that cannot contain
@@ -410,7 +410,7 @@ void append_table_cell_plain(std::ostringstream& out, std::string_view value) {
 
 void append_table_cell_target(std::ostringstream& out, std::string_view value) {
     // Inline-code wrapped cell for target display names and raw_ids per
-    // docs/plan-M6-1-2.md "Markdown-Tabellen-Escaping". Whitespace-normalize
+    // docs/planning/plan-M6-1-2.md "Markdown-Tabellen-Escaping". Whitespace-normalize
     // first; if the value carries a backtick, wrap with double backticks
     // and an inner space on each side so the inline-code span survives.
     // `|` is escaped to `\|` even inside the code span so renderers without
@@ -473,7 +473,7 @@ void append_target_graph_table(std::ostringstream& out,
 
 void append_target_graph_section(std::ostringstream& out, const AnalysisResult& result) {
     // Caller guarantees status != not_loaded; the not_loaded branch omits the
-    // entire section per docs/plan-M6-1-2.md "Console- und
+    // entire section per docs/planning/plan-M6-1-2.md "Console- und
     // Markdown-Vertragsregeln".
     out << "## Direct Target Dependencies\n\n";
     out << "Status: `" << target_graph_status_text(result.target_graph_status) << "`.\n\n";
@@ -533,7 +533,7 @@ void append_target_graph_reference_section(std::ostringstream& out,
 }
 
 // AP M6-1.3 A.4: Impact-Markdown "Prioritised Affected Targets" section
-// per docs/plan-M6-1-3.md "Markdown". Always present in v3 impact
+// per docs/planning/plan-M6-1-3.md "Markdown". Always present in v3 impact
 // output; body shape varies by target_graph_status.
 void append_prioritised_affected_targets_section(std::ostringstream& out,
                                                   const ImpactResult& result) {

@@ -3,7 +3,7 @@
 # Each non-comment, non-blank line names exactly one golden file in this
 # directory. tests/validate_json_schema.py checks that the manifest and the
 # directory contents agree, and validates each listed golden against
-# docs/report-json.schema.json (format_version=2).
+# spec/report-json.schema.json (format_version=2).
 #
 # Coverage per plan-M6-1-2.md "E2E-/Golden-Tests":
 #   analyze-compile-db-only.json  -> not_loaded, empty graph, empty hubs

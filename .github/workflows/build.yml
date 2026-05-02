@@ -108,7 +108,7 @@ jobs:
         # implizit vorinstallierter Runner-Defaults". The pip-installed
         # CMake from PyPI shadows the runner-default cmake on PATH (the
         # actions/setup-python venv prepends to PATH). The pinned version
-        # is documented in docs/quality.md "Plattformstatus (AP M5-1.7)";
+        # is documented in docs/user/quality.md "Plattformstatus (AP M5-1.7)";
         # bumps go through the same review path as cmake/compiler
         # minimum bumps.
         shell: bash

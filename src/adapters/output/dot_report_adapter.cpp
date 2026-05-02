@@ -28,7 +28,7 @@
 namespace xray::adapters::output {
 
 DotBudget compute_analyze_budget(std::size_t top_limit) {
-    // docs/report-dot.md: context_limit = min(top_limit, 5);
+    // spec/report-dot.md: context_limit = min(top_limit, 5);
     //                    node_limit = max(25, 4 * top_limit + 10);
     //                    edge_limit = max(40, 6 * top_limit + 20).
     constexpr std::size_t kTopLimitClamp = 100'000;
@@ -43,7 +43,7 @@ DotBudget compute_analyze_budget(std::size_t top_limit) {
 }
 
 DotBudget compute_impact_budget() {
-    // docs/report-dot.md: fixed M5 budgets, node_limit = 100, edge_limit = 200.
+    // spec/report-dot.md: fixed M5 budgets, node_limit = 100, edge_limit = 200.
     DotBudget budget{};
     budget.context_limit = 0;
     budget.node_limit = 100;
@@ -712,7 +712,7 @@ void emit_external_target_node(std::ostringstream& out,
     out << "  " << node.id << " [";
     append_string_attribute(out, "kind", "external_target");
     out << ", ";
-    // label gets middle-truncation per docs/plan-M6-1-2.md DOT-Vertragsregeln;
+    // label gets middle-truncation per docs/planning/plan-M6-1-2.md DOT-Vertragsregeln;
     // append_string_attribute then escapes the truncated value as a DOT string.
     append_string_attribute(out, "label", truncate_label(node.raw_id));
     out << ", ";
@@ -808,7 +808,7 @@ struct ImpactTargetNode {
     // True when the node carries an impact classification (from
     // ImpactResult::affected_targets). False for nodes that exist only
     // because target_graph.nodes propagated them; those are reference data
-    // and must not advertise an impact attribute per docs/report-dot.md
+    // and must not advertise an impact attribute per spec/report-dot.md
     // (impact is optional on target nodes).
     bool has_impact_attribute{true};
     // AP M6-1.3 A.3: v3 priority attributes carried alongside the M5

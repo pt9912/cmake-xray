@@ -117,7 +117,7 @@ std::string normalize_html_whitespace(std::string_view value) {
 }
 
 std::string_view html_report_css() {
-    // Static, byte-stable CSS per docs/report-html.md "CSS-Vertrag".
+    // Static, byte-stable CSS per spec/report-html.md "CSS-Vertrag".
     // Identical for analyze and impact. No @import / url(...) / external
     // fonts / animations / random values. System fontstacks only.
     // Layout: leading newline puts <style> on its own line, one CSS rule
@@ -664,7 +664,7 @@ void emit_target_graph_reference_section(std::ostringstream& out,
 }
 
 // AP M6-1.3 A.4: Impact-HTML "Prioritised Affected Targets" section
-// per docs/plan-M6-1-3.md "HTML". Always present in v3 impact output;
+// per docs/planning/plan-M6-1-3.md "HTML". Always present in v3 impact output;
 // the body shape varies by target_graph_status.
 void emit_prioritised_affected_targets_section(std::ostringstream& out,
                                                  const ImpactResult& result) {

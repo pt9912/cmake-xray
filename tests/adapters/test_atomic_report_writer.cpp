@@ -136,7 +136,7 @@ TEST_CASE("atomic temp path uses report when target has no filename") {
 // `\\server\share\...` noch `\\?\C:\...` als zusammengesetzten Pfad — der
 // Backslash ist auf POSIX kein Pfadtrenner. Der Plan-Pflicht-Skip
 // "dokumentierter Windows-API-Skip mit known_limited-Folge" ist in
-// docs/quality.md unter Plattformstatus dokumentiert; die Tests selbst
+// docs/user/quality.md unter Plattformstatus dokumentiert; die Tests selbst
 // laufen nur auf Windows-Hosts und decken dort den Pfad-Splitting-Vertrag
 // (parent_path + filename) fuer UNC und Extended-Length ab.
 #ifdef _WIN32

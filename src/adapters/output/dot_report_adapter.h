@@ -6,7 +6,7 @@
 
 namespace xray::adapters::output {
 
-// Graph budgets per docs/report-dot.md "Budgets" sections. Pure values,
+// Graph budgets per spec/report-dot.md "Budgets" sections. Pure values,
 // computed from the effective --top limit (analyze) or fixed M5 constants
 // (impact). Exposed publicly so unit tests can pin the formulas without
 // needing to instantiate the adapter or parse the rendered DOT.

@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- README.md and docs/guide.md now explicitly document the
+- README.md and docs/user/guide.md now explicitly document the
   `cmake -B build`-aus-Source path as the supported user-facing
   installation path on macOS arm64 and Windows x86_64 (where no
   release artefact is shipped), with platform-specific output paths
@@ -21,9 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   platforms it is the supported user path.
 - macOS arm64 and Windows x86_64 platform status promoted from
   `known_limited` to `validated_smoke` in `README.md`,
-  `docs/guide.md`, `docs/releasing.md`, `docs/quality.md` and
-  `docs/plan-M5-1-7.md`. Both external preconditions from
-  `docs/plan-M5-1-7.md` "Plattformstatus-Vertrag" are now met:
+  `docs/user/guide.md`, `docs/user/releasing.md`, `docs/user/quality.md` and
+  `docs/planning/plan-M5-1-7.md`. Both external preconditions from
+  `docs/planning/plan-M5-1-7.md` "Plattformstatus-Vertrag" are now met:
   Branch-Protection on `main` anchors the five Required Checks
   (`Native (linux-x86_64)`, `Native (macos-arm64)`,
   `Native (windows-x86_64)`, `Docker Runtime Build`, `docs/examples
@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   first regular release, because `:latest` legitimately carries the
   previous stable release's digest at that moment. The post-push
   digest-verify on `:latest` is unchanged and remains the correctness
-  guarantee for the normal flow; Fall 4 of `docs/releasing.md`
+  guarantee for the normal flow; Fall 4 of `docs/user/releasing.md`
   Recovery-Runbook stays the manual path for stuck-`latest`
   inspections.
 - `read_remote_digest` in `scripts/oci-image-publish.sh` now extracts
@@ -72,14 +72,14 @@ existing console/markdown goldens stay byte-stable in normal mode.
 
 - HTML report format (`--format html`) — self-contained HTML5 document
   with inline CSS, no external resources or JavaScript; contract pinned
-  in `docs/report-html.md` and validated via
+  in `spec/report-html.md` and validated via
   `tests/validate_html_reports.py`.
 - JSON report format (`--format json`) with versioned schema
-  (`docs/report-json.schema.json`, Draft 2020-12, `format_version: 1`)
+  (`spec/report-json.schema.json`, Draft 2020-12, `format_version: 1`)
   and a per-report manifest under `tests/e2e/testdata/m5/json-reports/`.
 - Graphviz DOT report format (`--format dot`) for visualising
   top-rankings, hotspots and impact relationships; contract pinned in
-  `docs/report-dot.md`, validated via `tests/validate_dot_reports.py`
+  `spec/report-dot.md`, validated via `tests/validate_dot_reports.py`
   plus optional `dot -Tsvg`/`-Tplain`/`-Tjson` gates when Graphviz is
   installed.
 - Atomic file output via `--output <path>` for `markdown`, `json`,
@@ -88,7 +88,7 @@ existing console/markdown goldens stay byte-stable in normal mode.
   `ReplaceFileW`/`MoveFileExW` with `MOVEFILE_WRITE_THROUGH`.
 - Command-local `--quiet` and `--verbose` flags on `analyze` and
   `impact` (mutually exclusive); contract pinned in
-  `docs/plan-M5-1-5.md` and validated via
+  `docs/planning/plan-M5-1-5.md` and validated via
   `tests/validate_verbosity_reports.py`.
 - Top-level `--version` flag that prints the resolved app version
   without subcommand initialisation.
@@ -119,8 +119,8 @@ existing console/markdown goldens stay byte-stable in normal mode.
   (`toolchain_minimums_accepts_current_gnu` and two `WILL_FAIL`
   negatives).
 - Plattformstatus classification (`supported` / `validated_smoke` /
-  `known_limited`) consistently in README, `docs/quality.md`,
-  `docs/releasing.md` and `docs/guide.md`. Linux x86_64 is
+  `known_limited`) consistently in README, `docs/user/quality.md`,
+  `docs/user/releasing.md` and `docs/user/guide.md`. Linux x86_64 is
   `supported`; macOS arm64 and Windows x86_64 are `known_limited`
   pending external Branch-Protection and a green CI audit.
 - Synthetic UNC and Extended-Length path tests across DOT, HTML, JSON
@@ -141,14 +141,14 @@ existing console/markdown goldens stay byte-stable in normal mode.
   `.github/workflows/build.yml`) that runs the drift gate under a
   divergent bind-mount prefix so host-path leakage in the binary
   output is caught before the native matrix runs.
-- File-API performance baseline in `docs/performance.md` plus
+- File-API performance baseline in `docs/user/performance.md` plus
   versioned reply fixtures under
   `tests/reference/scale_*/build/.cmake/api/v1/reply/`. Regenerate
   via `tests/reference/generate_file_api_fixtures.sh`; the manifest
   `tests/reference/file-api-performance-manifest.json` documents
   CMake version, generator and reply paths.
 - Manual platform smoke checklist
-  ([`docs/platform-smoke-checklist.md`](docs/platform-smoke-checklist.md))
+  ([`docs/user/platform-smoke-checklist.md`](docs/user/platform-smoke-checklist.md))
   mirroring the Required-Check sequence for local platform
   verification.
 
@@ -161,9 +161,9 @@ existing console/markdown goldens stay byte-stable in normal mode.
 - Console and markdown reporters keep their byte-stable v1.1.0 output
   in normal mode; AP M5-1.1 input-provenance fields surface only in
   JSON, DOT and HTML.
-- README, `docs/guide.md` and `docs/releasing.md` describe user
+- README, `docs/user/guide.md` and `docs/user/releasing.md` describe user
   invocations via released artefacts and the OCI image; internal
-  build paths (`./build/cmake-xray`) are reserved for `docs/performance.md`
+  build paths (`./build/cmake-xray`) are reserved for `docs/user/performance.md`
   measurement commands.
 
 ### Fixed
@@ -173,8 +173,8 @@ existing console/markdown goldens stay byte-stable in normal mode.
   do. Previously the JSON path produced a report on stdout (or at
   the target path) and exited `0`, contradicting the JSON v1
   "Textfehler ohne JSON-Report" contract pinned in
-  `docs/report-json.md`.
-- `docs/guide.md` OCI tag references aligned with the AP M5-1.6
+  `spec/report-json.md`.
+- `docs/user/guide.md` OCI tag references aligned with the AP M5-1.6
   release contract: container pulls use `X.Y.Z` (no leading `v`),
   consistent with `README.md`, `scripts/oci-image-publish.sh` and
   the `release.yml` push step.
@@ -188,7 +188,7 @@ existing console/markdown goldens stay byte-stable in normal mode.
 | Windows x86_64 | `known_limited` |
 
 `known_limited` rests on two external preconditions per
-[`docs/quality.md`](docs/quality.md) "Plattformstatus (AP M5-1.7)":
+[`docs/user/quality.md`](docs/user/quality.md) "Plattformstatus (AP M5-1.7)":
 the Branch-Protection of the repository must pin the
 `Native (...)`-Required-Checks for the affected platforms, and the
 green CI run on those platforms must be auditable. Both conditions
@@ -235,7 +235,7 @@ are external to this repository and not gated by AP 1.8.
 - CLI report selection via `--format console|markdown` and atomic markdown file output via `--output <path>`
 - versioned M3 report fixtures, markdown golden files, example reports under `docs/examples/`, and E2E byte-compare coverage for console and markdown
 - versioned reference projects under `tests/reference/scale_250`, `scale_500`, and `scale_1000` plus a checked-in generator for reproducible performance baselines
-- `docs/performance.md` with measured baseline artifacts and explicit NF-04/NF-05 evaluation for the MVP path
+- `docs/user/performance.md` with measured baseline artifacts and explicit NF-04/NF-05 evaluation for the MVP path
 
 ### Changed
 

@@ -1,6 +1,6 @@
 # cmake-xray
 
-`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Es liest `compile_commands.json` und optional CMake-File-API-Reply-Daten, rankt auffaellige Translation Units, leitet heuristische Include-Hotspots ab, analysiert Datei-Impact und zeigt betroffene Targets an. Ergebnisse werden als Konsolen-, Markdown-, JSON-, Graphviz-DOT- oder eigenstaendiger HTML-Report ausgegeben; JSON, DOT und HTML folgen den versionierten Vertraegen in [docs/report-json.md](./docs/report-json.md), [docs/report-dot.md](./docs/report-dot.md) und [docs/report-html.md](./docs/report-html.md). Die ausgegebene App-Version ist via `cmake-xray --version` einzusehen; der historische Funktionsverlauf je Releaselinie steht in [CHANGELOG.md](./CHANGELOG.md).
+`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Es liest `compile_commands.json` und optional CMake-File-API-Reply-Daten, rankt auffaellige Translation Units, leitet heuristische Include-Hotspots ab, analysiert Datei-Impact und zeigt betroffene Targets an. Ergebnisse werden als Konsolen-, Markdown-, JSON-, Graphviz-DOT- oder eigenstaendiger HTML-Report ausgegeben; JSON, DOT und HTML folgen den versionierten Vertraegen in [spec/report-json.md](./spec/report-json.md), [spec/report-dot.md](./spec/report-dot.md) und [spec/report-html.md](./spec/report-html.md). Die ausgegebene App-Version ist via `cmake-xray --version` einzusehen; der historische Funktionsverlauf je Releaselinie steht in [CHANGELOG.md](./CHANGELOG.md).
 
 ## Status
 
@@ -42,7 +42,7 @@ Mindestversionen sind in [tests/platform/toolchain-minimums.json](./tests/platfo
 versioniert; CMake (3.20), GCC (10), Clang (12), AppleClang (13) und MSVC
 (19.29) werden beim Configure jeder Plattform fail-fast geprueft. Anhebungen
 laufen synchron ueber JSON, `cmake_minimum_required`, README und
-[docs/guide.md](./docs/guide.md).
+[docs/user/guide.md](./docs/user/guide.md).
 
 Als reproduzierbare Referenzumgebung steht das Multi-Stage-[Dockerfile](./Dockerfile) zur Verfuegung.
 
@@ -73,8 +73,8 @@ die Atomic-Replace- und CLI-Pflicht-Smokes (Tranchen B und C.1), die
 UNC/Extended-Length-Adaptertests (C.2) und auf Windows zusaetzlich den
 PowerShell-Pflicht-Smoke (D.1). Detaillierte Gate-Erklaerungen,
 Required-Check-Namen und die Atomic-Replace-Matrix stehen in
-[docs/quality.md](./docs/quality.md) "Plattformstatus (AP M5-1.7)";
-Release- und Preview-Grenzen in [docs/releasing.md](./docs/releasing.md)
+[docs/user/quality.md](./docs/user/quality.md) "Plattformstatus (AP M5-1.7)";
+Release- und Preview-Grenzen in [docs/user/releasing.md](./docs/user/releasing.md)
 "Plattformartefakte macOS und Windows".
 
 ## Installation und Ausfuehrung
@@ -108,7 +108,7 @@ docker run --rm ghcr.io/pt9912/cmake-xray:X.Y.Z --version
 Dabei bezeichnet `X.Y.Z` die Release-Version ohne fuehrendes `v`; der OCI-Tag
 spiegelt die App-Version, der Git-Tag den Release-Anker (`vX.Y.Z`). Beide Werte
 sind ueber `validate-release-tag.sh` gegen das gleiche SemVer-Muster gepinnt
-(siehe [docs/releasing.md](./docs/releasing.md)).
+(siehe [docs/user/releasing.md](./docs/user/releasing.md)).
 
 Fuer regulaere Releases (kein Prerelease-Suffix) wird zusaetzlich der Tag
 `:latest` aktualisiert, sobald der versionierte Tag erfolgreich gepusht und der
@@ -333,7 +333,7 @@ make quality-report
 <summary><b>Performance-Baseline</b></summary>
 
 
-Die versionierten Referenzprojekte liegen unter [tests/reference](./tests/reference). Die dokumentierte Baseline fuer `scale_250`, `scale_500` und `scale_1000` sowie die Impact-Stichprobe steht in [docs/performance.md](./docs/performance.md). Die zugehoerigen Messartefakte werden unter `build/reports/performance/` erzeugt.
+Die versionierten Referenzprojekte liegen unter [tests/reference](./tests/reference). Die dokumentierte Baseline fuer `scale_250`, `scale_500` und `scale_1000` sowie die Impact-Stichprobe steht in [docs/user/performance.md](./docs/user/performance.md). Die zugehoerigen Messartefakte werden unter `build/reports/performance/` erzeugt.
 
 </details>
 
@@ -342,14 +342,14 @@ Die versionierten Referenzprojekte liegen unter [tests/reference](./tests/refere
 
 Weitere Dokumentation:
 
-- [docs/lastenheft.md](./docs/lastenheft.md)
-- [docs/guide.md](./docs/guide.md)
-- [docs/design.md](./docs/design.md)
-- [docs/architecture.md](./docs/architecture.md)
-- [docs/roadmap.md](./docs/roadmap.md)
-- [docs/releasing.md](./docs/releasing.md)
-- [docs/quality.md](./docs/quality.md)
-- [docs/performance.md](./docs/performance.md)
+- [spec/lastenheft.md](./spec/lastenheft.md)
+- [docs/user/guide.md](./docs/user/guide.md)
+- [spec/design.md](./spec/design.md)
+- [spec/architecture.md](./spec/architecture.md)
+- [docs/planning/roadmap.md](./docs/planning/roadmap.md)
+- [docs/user/releasing.md](./docs/user/releasing.md)
+- [docs/user/quality.md](./docs/user/quality.md)
+- [docs/user/performance.md](./docs/user/performance.md)
 </details>
 
 

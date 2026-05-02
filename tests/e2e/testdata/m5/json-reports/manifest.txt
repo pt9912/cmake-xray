@@ -3,7 +3,7 @@
 # Each non-comment, non-blank line names exactly one golden file in this
 # directory. tests/validate_json_schema.py checks that the manifest and the
 # directory contents agree, and validates each listed golden against
-# docs/report-json.schema.json.
+# spec/report-json.schema.json.
 #
 # Tranche A creates this manifest empty; Tranche C adds the analyze and
 # impact goldens that lock the JSON contract in place.

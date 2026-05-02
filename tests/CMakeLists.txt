@@ -36,7 +36,7 @@ target_link_libraries(
 # property below.
 target_compile_definitions(
     xray_tests PRIVATE
-    XRAY_REPORT_JSON_SCHEMA_PATH="${PROJECT_SOURCE_DIR}/docs/report-json.schema.json"
+    XRAY_REPORT_JSON_SCHEMA_PATH="${PROJECT_SOURCE_DIR}/spec/report-json.schema.json"
 )
 
 if(MSVC)
@@ -185,7 +185,7 @@ add_test(
     NAME report_json_schema_validation
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
-            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
             --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/json-reports
             --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m5/json-reports/manifest.txt
 )
@@ -196,7 +196,7 @@ add_test(
     NAME report_json_schema_validation_m6
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
-            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
             --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/json-reports
             --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/json-reports/manifest.txt
 )
@@ -208,7 +208,7 @@ add_test(
     NAME report_json_schema_rejects_impact_with_target_hubs
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
-            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
             --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_with_target_hubs_broken_sample.json
 )
 set_tests_properties(report_json_schema_rejects_impact_with_target_hubs PROPERTIES WILL_FAIL TRUE)
@@ -217,7 +217,7 @@ add_test(
     NAME report_json_schema_rejects_analyze_without_target_hubs
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
-            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
             --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_analyze_without_target_hubs_broken_sample.json
 )
 set_tests_properties(report_json_schema_rejects_analyze_without_target_hubs PROPERTIES WILL_FAIL TRUE)
@@ -231,7 +231,7 @@ add_test(
     NAME report_json_schema_rejects_v3_with_format_version_two
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
-            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
             --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_v3_with_format_version_two_broken_sample.json
 )
 set_tests_properties(report_json_schema_rejects_v3_with_format_version_two PROPERTIES WILL_FAIL TRUE)
@@ -240,7 +240,7 @@ add_test(
     NAME report_json_schema_rejects_impact_v3_missing_prioritized
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
-            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
             --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_missing_prioritized_broken_sample.json
 )
 set_tests_properties(report_json_schema_rejects_impact_v3_missing_prioritized PROPERTIES WILL_FAIL TRUE)
@@ -249,7 +249,7 @@ add_test(
     NAME report_json_schema_rejects_impact_v3_invalid_priority_class
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
-            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
             --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_invalid_priority_class_broken_sample.json
 )
 set_tests_properties(report_json_schema_rejects_impact_v3_invalid_priority_class PROPERTIES WILL_FAIL TRUE)
@@ -258,7 +258,7 @@ add_test(
     NAME report_json_schema_rejects_impact_v3_graph_distance_out_of_range
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
-            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
             --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_graph_distance_out_of_range_broken_sample.json
 )
 set_tests_properties(report_json_schema_rejects_impact_v3_graph_distance_out_of_range PROPERTIES WILL_FAIL TRUE)
@@ -272,7 +272,7 @@ add_test(
     NAME report_json_cross_field_rejects_depth_effective_exceeds_requested
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
-            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
             --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_depth_effective_exceeds_requested_broken_sample.json
 )
 set_tests_properties(report_json_cross_field_rejects_depth_effective_exceeds_requested PROPERTIES WILL_FAIL TRUE)
@@ -281,7 +281,7 @@ add_test(
     NAME report_json_cross_field_rejects_graph_distance_exceeds_requested
     COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
-            --schema ${PROJECT_SOURCE_DIR}/docs/report-json.schema.json
+            --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
             --validate-file ${PROJECT_SOURCE_DIR}/tests/adapters/fixtures/json_impact_v3_graph_distance_exceeds_requested_broken_sample.json
 )
 set_tests_properties(report_json_cross_field_rejects_graph_distance_exceeds_requested PROPERTIES WILL_FAIL TRUE)
@@ -395,7 +395,7 @@ endif()
 
 # AP M5-1.4 Tranche D: optional HTML structure smoke. Pure-stdlib Python
 # validator that mirrors the DOT manifest+content gate and locks the static
-# HTML contract from docs/report-html.md (single h1/main, no script, no
+# HTML contract from spec/report-html.md (single h1/main, no script, no
 # external resources, no inline event handlers, no HTML comments). Runs in
 # every environment with python3 on PATH; no pip dependency.
 add_test(
@@ -431,7 +431,7 @@ set_tests_properties(html_structure_validation_rejects_broken_html PROPERTIES WI
 # AP M6-1.2 Tranche A.3: manifest/directory parity gates for the M6
 # Markdown and Console reference goldens. There is no dedicated structure
 # validator for these formats (markdown/console are line-based text without
-# a formal contract beyond docs/plan-M6-1-2.md); the parity check stops a
+# a formal contract beyond docs/planning/plan-M6-1-2.md); the parity check stops a
 # stray file or an out-of-date manifest from passing review unnoticed.
 add_test(
     NAME markdown_manifest_validation_m6
@@ -502,6 +502,6 @@ add_test(
 #
 # Locally the dev still runs the portability script directly via
 # `bash scripts/verify-doc-examples-portability.sh`; the
-# docs/platform-smoke-checklist.md "docs/examples Host-
+# docs/user/platform-smoke-checklist.md "docs/examples Host-
 # Portabilitaet" section documents this as the explicit step before
 # claiming "lokal gruen".

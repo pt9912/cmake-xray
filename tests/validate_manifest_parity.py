@@ -7,7 +7,7 @@ tests/validate_html_reports.py without imposing format-specific structure
 checks. Used by the M6 markdown-reports/ and console-reports/ goldens
 directories, which carry committed reference samples but have no
 dedicated structure validator (markdown and console are line-based text
-without a formal contract beyond docs/plan-M6-1-2.md).
+without a formal contract beyond docs/planning/plan-M6-1-2.md).
 
 The check guarantees:
   - every non-comment, non-blank line in the manifest names a file that

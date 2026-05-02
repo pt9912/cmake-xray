@@ -385,7 +385,7 @@ TEST_CASE("markdown report adapter preserves marker-dependent indentation for tw
 }
 
 // ---- M6 AP 1.2 Tranche A.3: Target Graph / Target Hubs / Target Graph
-// Reference Markdown sections. Status matrix per docs/plan-M6-1-2.md
+// Reference Markdown sections. Status matrix per docs/planning/plan-M6-1-2.md
 // "Markdown-Adapter (Status-Matrix Reporttyp x Status, identisch zu Console)"
 // plus disambiguation, table-cell escaping and Compile-DB-only byte-stability
 // regressions.

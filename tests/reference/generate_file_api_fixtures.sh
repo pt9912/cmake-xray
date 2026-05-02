@@ -3,7 +3,7 @@
 # for tests/reference/scale_*.
 #
 # The fixtures back the M5 File-API performance baseline in
-# docs/performance.md. Configure-only -- the reply directory is the only
+# docs/user/performance.md. Configure-only -- the reply directory is the only
 # artefact we keep, so regen is fast and the build/CMakeCache.txt etc.
 # stay out of source control.
 #

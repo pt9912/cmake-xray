@@ -356,7 +356,7 @@ TEST_CASE("report format version is three") {
 }
 
 TEST_CASE("report-json schema format_version const matches kReportFormatVersion") {
-    // AP 1.2 Tranche A gate: docs/report-json.schema.json must declare a
+    // AP 1.2 Tranche A gate: spec/report-json.schema.json must declare a
     // const value for FormatVersion that matches the C++ constant. Mismatches
     // are a hard fail because the schema, the adapter, and any downstream
     // tooling have to agree on a single version source.

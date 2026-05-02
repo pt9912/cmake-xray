@@ -90,7 +90,7 @@ TEST_CASE("html_escape_text escapes the three text-node specials") {
 }
 
 TEST_CASE("html_escape_text leaves quote and apostrophe untouched") {
-    // Per docs/report-html.md, text nodes do not need to escape " or '.
+    // Per spec/report-html.md, text nodes do not need to escape " or '.
     // Only attribute values do.
     CHECK(html_escape_text("a \"b\" c") == "a \"b\" c");
     CHECK(html_escape_text("it's fine") == "it's fine");
@@ -182,7 +182,7 @@ TEST_CASE("render_attribute normalizes whitespace before attribute escaping") {
 TEST_CASE("html_report_css is non-empty and free of forbidden external resources") {
     const auto css = std::string{html_report_css()};
     REQUIRE(!css.empty());
-    // No external resources or animations per docs/report-html.md.
+    // No external resources or animations per spec/report-html.md.
     CHECK(css.find("@import") == std::string::npos);
     CHECK(css.find("url(") == std::string::npos);
     CHECK(css.find("@keyframes") == std::string::npos);
@@ -244,7 +244,7 @@ TEST_CASE("HTML impact report emits the documented document scaffold") {
     CHECK(report.find("<h1>cmake-xray impact report</h1>") != std::string::npos);
 }
 
-TEST_CASE("HTML head order follows docs/report-html.md") {
+TEST_CASE("HTML head order follows spec/report-html.md") {
     const HtmlReportAdapter adapter;
     const auto report = adapter.write_analysis_report(make_minimal_analysis_result(), 3);
     const auto pos_charset = report.find("meta charset");
@@ -1044,7 +1044,7 @@ TEST_CASE("HTML impact report renders both direct and heuristic sections in fixe
 }
 
 // ---- M6 AP 1.2 Tranche A.3: Target Graph / Target Hubs / Target Graph
-// Reference sections. Status matrix per docs/plan-M6-1-2.md "HTML-Adapter
+// Reference sections. Status matrix per docs/planning/plan-M6-1-2.md "HTML-Adapter
 // (Status-Matrix Reporttyp x Status)" plus disambiguation regressions.
 
 namespace m6_html {

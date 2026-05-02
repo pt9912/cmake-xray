@@ -817,7 +817,7 @@ TEST_CASE("AP1.3 A.3: evidence_strength_text_v3 maps the three TargetEvidenceStr
 TEST_CASE("AP1.3 A.4: kReportFormatVersion is 3 once all five adapters render the v3 fields") {
     // AP M6-1.3 A.4 flips the production format-version constant. The
     // schema-side FormatVersion.const must follow in
-    // docs/report-json.schema.json; report_json_schema_validation
+    // spec/report-json.schema.json; report_json_schema_validation
     // verifies the pair stays in sync.
     static_assert(xray::hexagon::model::kReportFormatVersion == 3);
     CHECK(xray::hexagon::model::kReportFormatVersion == 3);

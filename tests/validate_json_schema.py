@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """JSON schema validator for cmake-xray reports (AP M5-1.2 Tranche A).
 
-Validates docs/report-json.schema.json against the JSON Schema Draft 2020-12
+Validates spec/report-json.schema.json against the JSON Schema Draft 2020-12
 meta-schema, then validates every JSON report golden listed in the manifest
 against the schema. The manifest and the report directory must agree.
 
@@ -10,12 +10,12 @@ yield a clear stderr message and a nonzero exit, never a silent skip.
 
 Usage:
     python3 tests/validate_json_schema.py \
-        --schema docs/report-json.schema.json \
+        --schema spec/report-json.schema.json \
         --reports-dir tests/e2e/testdata/m5/json-reports \
         --manifest tests/e2e/testdata/m5/json-reports/manifest.txt
 
     python3 tests/validate_json_schema.py \
-        --schema docs/report-json.schema.json \
+        --schema spec/report-json.schema.json \
         --syntax-only
 
 Exit codes:
@@ -187,7 +187,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate cmake-xray JSON report goldens against the schema.")
     parser.add_argument("--schema", required=True, type=Path,
-                        help="Path to docs/report-json.schema.json.")
+                        help="Path to spec/report-json.schema.json.")
     parser.add_argument("--reports-dir", type=Path,
                         help="Directory of JSON report goldens.")
     parser.add_argument("--manifest", type=Path,
