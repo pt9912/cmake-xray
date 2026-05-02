@@ -143,7 +143,7 @@ dafuer ein Feld `include_resolution_mode` mit genau diesen Werten ein:
   Source-Parsing-Resolver und ignoriert den Praeprozessor-Adapter.
 - `auto`: Nutzt den praeprozessorgenauen Adapter, wenn alle
   Voraussetzungen erfuellt sind; sonst Fallback auf
-  `heuristic_source_parser` mit Diagnostic. `auto` ist nur aktiv, wenn
+  `heuristic` mit Diagnostic. `auto` ist nur aktiv, wenn
   CLI oder Konfigurationsdatei es explizit setzen.
 - `preprocessor`: erzwingt den praeprozessorgenauen Adapter. Wenn die
   Voraussetzungen nicht erfuellt sind, ist das ein CLI-/Eingabefehler
@@ -203,6 +203,13 @@ Konfigurations-Overrides werden danach angewendet und koennen diesen
 vorlaeufigen Wert ersetzen. Die urspruengliche Adapter-Provenienz
 bleibt als Provenienzfeld oder Diagnostic erhalten.
 
+Overrides werden immer nach der Resolver-Auswahl und nach der
+Hotspot-Aggregation angewendet, unabhaengig davon, ob der wirksame
+Resolver `heuristic` oder `preprocessor` ist. Dadurch korrigiert
+dieselbe Konfigurationsdatei sowohl heuristisch unklare Pfade als auch
+praeprozessorgenaue Provenienz, ohne dass Nutzer den Resolver-Modus
+wechseln muessen.
+
 Budgetgrenzen sind in AP 1.8 exakt:
 
 - `preprocessor_include_depth_limit`: maximale transitive Include-Tiefe,
@@ -219,6 +226,24 @@ ein Diagnostic mit Budgetname, Limit und erreichter Zaehlerzahl
 ausgegeben. Laufzeitlimits und Dateigroessenlimits sind nicht Teil des
 AP-1.8-Budgetvertrags.
 
+Die BFS-Reihenfolge ist Teil des Vertrags:
+
+- Startdateien sortieren nach `(normalized_source_path,
+  normalized_build_context_key)`.
+- Include-Kanten pro Parent sortieren nach
+  `(normalized_including_path, normalized_included_path,
+  include_kind, raw_spelling, preliminary_include_origin)`.
+- Neue Include-Knoten werden ueber den normalisierten Include-Pfad
+  dedupliziert; der erste Besuch in dieser sortierten BFS-Reihenfolge
+  gewinnt.
+- `preprocessor_include_node_budget` und
+  `preprocessor_include_edge_budget` werden in genau dieser
+  Entdeckungsreihenfolge verbraucht.
+
+Adapter-Lieferreihenfolge, Dateisystem-Reihenfolge,
+Hash-Container-Reihenfolge oder Praeprozessor-Callback-Reihenfolge
+duerfen das gekappte Ergebnis nicht beeinflussen.
+
 ## Konfigurationsdatei
 
 AP 1.8 fuehrt eine projektlokale Konfigurationsdatei fuer
@@ -227,8 +252,13 @@ Include-Origin-Overrides ein. Vorgeschlagener Dateiname:
 
 Discovery-Vertrag:
 
-- Default-Suche erfolgt ausschliesslich in der normalisierten
-  Projekt- oder Source-Root, die auch fuer Report-Pfade verwendet wird.
+- AP 1.8 verwendet eine einzige `include_config_root`.
+  Praezedenz: explizite Source-Root aus CMake-File-API, sonst
+  normalisierte Projektwurzel, sonst CLI-CWD nur fuer
+  Compile-Database-only-Laeufe ohne belastbare Projektwurzel.
+- Default-Suche erfolgt ausschliesslich in dieser
+  `include_config_root`, die auch fuer Report-Pfade und Pattern-
+  Matching verwendet wird.
 - Die aktuelle Working Directory ist kein Suchanker, ausser sie ist
   identisch mit dieser Root.
 - Es wird keine rekursive Suche in Eltern- oder Unterverzeichnissen
@@ -244,12 +274,12 @@ Discovery-Vertrag:
   Datei ist kein Fehler.
 - Symlinks werden fuer Discovery nicht realpath-kanonisiert. Der
   Default-Pfad entsteht aus der lexikalisch normalisierten
-  Projekt-/Source-Root plus `cmake-xray.toml`; wenn dieser Pfad durch
+  `include_config_root` plus `cmake-xray.toml`; wenn dieser Pfad durch
   einen Symlink erreichbar ist und die Datei lesbar ist, gilt sie als
   vorhanden. Der Report gibt den lexikalisch normalisierten
   Config-Pfad aus, nicht zwingend den physischen Realpath.
 - Pattern-Matching verwendet die gleichen lexikalisch normalisierten
-  Projekt-/Source-Root-relativen Pfade wie die Reports. Es erfolgt
+  `include_config_root`-relativen Pfade wie die Reports. Es erfolgt
   keine Symlink-Aufloesung und kein Plattform-Case-Folding; Windows-
   Laufwerksbuchstaben werden nur fuer die Root-Normalisierung
   lowercase behandelt, nicht fuer relative Match-Schluessel.
@@ -274,8 +304,15 @@ Regeln:
 - Jeder vorhandene Schluessel muss eine Liste von Strings enthalten.
   `include_origin = {}` ist gleichwertig zu einem leeren
   `[include_origin]`-Block.
-- Pfadmuster werden relativ zur normalisierten Projekt- oder
-  Source-Root ausgewertet.
+- Inhaltlich ungueltige Konfigurationsdateien sind hart
+  fehlgeschlagene CLI-/Konfigurationsfehler: unbekannte Top-Level-
+  Schluessel, unbekannte `[include_origin]`-Schluessel, falsche Typen,
+  ungueltige Muster, mehrdeutige gleich spezifische Ziel-Origins,
+  Absolutpfade oder nicht normalisierbare Pfade enden nonzero, ohne
+  stdout-Report und ohne Zieldatei. Es gibt keinen partiellen Lauf mit
+  Default- oder Teilkonfiguration.
+- Pfadmuster werden relativ zur normalisierten `include_config_root`
+  ausgewertet.
 - Backslashes werden vor dem Matching zu `/` normalisiert.
 - Matching ist case-sensitiv; plattformspezifisches Case-Folding ist
   Folgeumfang.
@@ -285,7 +322,11 @@ Regeln:
 - `..`-Segmente nach Normalisierung sind unzulaessig.
 - Ein Pfad darf nach Prioritaetsaufloesung genau eine finale
   `IncludeOrigin` erhalten.
-- Spezifischere Muster gewinnen vor allgemeineren Mustern. Bei
+- Spezifischere Muster gewinnen vor allgemeineren Mustern. Die
+  Spezifitaet eines Musters ist das Tupel
+  `(literal_path_segment_count, literal_character_count,
+  -wildcard_token_count, -double_star_count)`, absteigend sortiert.
+  Ein Segment ist literal, wenn es keine Glob-Zeichen enthaelt. Bei
   gleicher Spezifitaet und unterschiedlicher Ziel-Origin ist das ein
   Konfigurationsfehler.
 - Bei gleicher Spezifitaet und gleicher Ziel-Origin werden doppelte
@@ -305,7 +346,7 @@ Information `config_loaded=false`.
 AP 1.8 muss in Analyze-Reports sichtbar machen:
 
 - welche Include-Aufloesungsquelle aktiv war:
-  `heuristic_source_parser` oder `preprocessor`;
+  `heuristic` oder `preprocessor`;
 - welcher `include_resolution_mode` angefordert wurde und welcher
   Resolver effektiv verwendet wurde;
 - ob eine Konfigurationsdatei geladen wurde;
@@ -404,11 +445,13 @@ AP 1.8 ist abgeschlossen, wenn:
 
 - eine optionale Konfigurationsdatei Include-Origin-Overrides
   deterministisch anwenden kann;
+- dieselben Overrides in den wirksamen Modi `heuristic`, `auto` und
+  `preprocessor` nach der Hotspot-Aggregation angewendet werden;
 - fehlende Default-Konfiguration ohne Diagnostic-Flaeche fuer Nutzer
   beim M6-kompatiblen Default bleibt und nur `config_loaded=false`
   reportet;
-- ungueltige, mehrdeutige oder nicht normalisierbare Override-Regeln
-  klare Fehler oder Diagnostics erzeugen;
+- ungueltige, mehrdeutige oder nicht normalisierbare
+  Konfigurationsdateien nonzero enden und keinen Report schreiben;
 - der bestehende heuristische Include-Resolver ohne
   Konfigurationsdatei unveraendert nutzbar bleibt;
 - `include_resolution_mode=heuristic` der Default ist und bestehende
@@ -427,6 +470,8 @@ AP 1.8 ist abgeschlossen, wenn:
   `preprocessor_include_node_budget` oder
   `preprocessor_include_edge_budget` sichtbar sind und keine stillen
   Datenqualitaetsverluste verursachen;
+- Budget-Kappung bei gleicher Eingabe unabhaengig von Adapter-,
+  Dateisystem- und Container-Reihenfolge byte-stabil bleibt;
 - `--include-scope` und `--include-depth` auf den finalen
   klassifizierten Hotspot-Daten arbeiten;
 - JSON, Console, Markdown, HTML und DOT die aktive Include-Datenquelle
