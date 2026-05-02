@@ -8,6 +8,12 @@
 
 namespace xray::hexagon::model {
 
+// AP M6-1.4 A.5 step 21pre: classification-side enums (origin, depth-kind)
+// stay together with the IncludeHotspot they annotate. The filter-side
+// enums (IncludeScope, IncludeDepthFilter) live in
+// include_filter_options.h so request-side consumers (CLI adapter,
+// port model) do not need this full hotspot header.
+
 enum class IncludeOrigin {
     project,
     external,
@@ -18,19 +24,6 @@ enum class IncludeDepthKind {
     direct,
     indirect,
     mixed,
-};
-
-enum class IncludeScope {
-    all,
-    project,
-    external,
-    unknown,
-};
-
-enum class IncludeDepthFilter {
-    all,
-    direct,
-    indirect,
 };
 
 struct IncludeHotspot {

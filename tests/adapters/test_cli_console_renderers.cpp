@@ -10,7 +10,7 @@
 #include "hexagon/model/compile_database_result.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
-#include "hexagon/model/include_hotspot.h"
+#include "hexagon/model/include_classification.h"
 #include "hexagon/model/observation_source.h"
 #include "hexagon/model/report_inputs.h"
 #include "hexagon/model/target_info.h"

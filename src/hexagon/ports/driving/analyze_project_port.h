@@ -4,7 +4,7 @@
 #include <optional>
 
 #include "hexagon/model/analysis_result.h"
-#include "hexagon/model/include_hotspot.h"
+#include "hexagon/model/include_filter_options.h"
 
 namespace xray::hexagon::ports::driving {
 

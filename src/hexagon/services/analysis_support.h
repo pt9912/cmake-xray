@@ -8,7 +8,8 @@
 
 #include "hexagon/model/build_model_result.h"
 #include "hexagon/model/compile_entry.h"
-#include "hexagon/model/include_hotspot.h"
+#include "hexagon/model/include_classification.h"
+#include "hexagon/model/include_filter_options.h"
 #include "hexagon/model/include_resolution.h"
 #include "hexagon/model/translation_unit.h"
 

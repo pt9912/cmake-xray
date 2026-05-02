@@ -8,7 +8,7 @@
 
 #include "adapters/input/source_parsing_include_adapter.h"
 #include "hexagon/model/compile_entry.h"
-#include "hexagon/model/include_hotspot.h"
+#include "hexagon/model/include_classification.h"
 #include "hexagon/model/include_resolution.h"
 #include "hexagon/services/analysis_support.h"
 

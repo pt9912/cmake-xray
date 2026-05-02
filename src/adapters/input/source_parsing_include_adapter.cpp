@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "hexagon/model/diagnostic.h"
-#include "hexagon/model/include_hotspot.h"
+#include "hexagon/model/include_classification.h"
 #include "hexagon/model/include_resolution.h"
 #include "hexagon/model/translation_unit.h"
 #include "hexagon/services/analysis_support.h"

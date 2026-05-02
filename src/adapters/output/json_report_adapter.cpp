@@ -15,7 +15,7 @@
 #include "hexagon/model/analysis_result.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
-#include "hexagon/model/include_hotspot.h"
+#include "hexagon/model/include_classification.h"
 #include "hexagon/model/observation_source.h"
 #include "hexagon/model/report_format_version.h"
 #include "hexagon/model/report_inputs.h"

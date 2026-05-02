@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "diagnostic.h"
-#include "include_hotspot.h"
+#include "include_classification.h"
 
 namespace xray::hexagon::model {
 

@@ -9,7 +9,7 @@
 #include "hexagon/model/application_info.h"
 #include "hexagon/model/compile_database_result.h"
 #include "hexagon/model/impact_result.h"
-#include "hexagon/model/include_hotspot.h"
+#include "hexagon/model/include_classification.h"
 #include "hexagon/model/translation_unit.h"
 
 namespace {

@@ -13,7 +13,7 @@
 #include "adapters/cli/output_verbosity.h"
 #include "hexagon/model/application_info.h"
 #include "hexagon/model/compile_database_result.h"
-#include "hexagon/model/include_hotspot.h"
+#include "hexagon/model/include_filter_options.h"
 #include "hexagon/model/report_inputs.h"
 
 namespace xray::adapters::cli {
