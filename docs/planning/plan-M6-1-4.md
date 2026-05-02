@@ -1177,11 +1177,60 @@ Innerhalb von **A.5 (HTML-, Markdown- und Console-Adapter)**:
     bekommt (BFS-Limits-Effective != 0); falls nicht, bleibt der
     Plan-konforme `0`-Pfad gepinnt und der `>0`-Pfad wartet auf eine
     spaetere Fixture-Erweiterung.
+25c. **CSS-Badge-Naming-Rename (A.5 step 21 Review-Findung 1)**:
+    Step 21 hat sechs neue BEM-Klassen `badge--{project,external,
+    unknown,direct,indirect,mixed}` eingefuehrt, waehrend die M5-
+    Impact-Klassen `badge-direct` und `badge-heuristic` (Single-Dash)
+    weiter bestehen. Ein HTML-Bericht mit gemischtem M5- und v4-
+    Inhalt rendert dasselbe Wort "direct" in zwei verschiedenen
+    Paletten je nach Kontext (Impact-Evidenz vs. Hotspot-Tiefe). Plan
+    line 813-814 macht die BEM-Doppeldash-Variante zum Vertrag, also
+    ist ein Folge-Rename die saubere Loesung:
+    - `badge-direct` -> `badge--evidence-direct` (Impact-Evidenz-
+      Achse).
+    - `badge-heuristic` -> `badge--evidence-heuristic`.
+    Das Rename betrifft den Inline-CSS-Block im HTML-Adapter und die
+    `class="badge badge-direct"`/`badge-heuristic"`-Stellen in den
+    Impact-Spalten plus die zugehoerigen Adapter-Tests und Goldens.
+    Soll als SEPARATER Refactor-Commit landen, NICHT in Step 21,
+    22, 23 oder 24, damit das Adapter-Diff klein bleibt; idealerweise
+    zwischen Step 25 (alle Goldens v4) und A.6 (Audit), weil dann
+    der vollstaendige v4-Stand vorliegt und keine widersprueche zu
+    halb-fertigen Adapter-Outputs entstehen.
 
 Innerhalb von **A.6 (Audit-Pass)**:
 
 26. CLI-E2E-Tests vollstaendig durchlaufen lassen.
 27. Docker-Gates ausfuehren.
+27a. **CHANGELOG-Eintrag (A.5 step 21 Review-Findung 8)**:
+    Bisher ist `CHANGELOG.md` `[Unreleased] / Added` leer, obwohl
+    AP 1.4 mehrere benutzerseitig sichtbare Aenderungen mitbringt.
+    A.6 fuegt einen konsolidierten Eintrag hinzu, der mindestens
+    abdeckt:
+    - Neue Analyze-CLI-Optionen `--include-scope` und
+      `--include-depth` mit Default `all` (A.3).
+    - JSON-, DOT-, HTML-, Markdown- und Console-Reports tragen pro
+      Hotspot die neuen Felder `origin` und `depth_kind` und am
+      Hotspot-Container `excluded_unknown_count` /
+      `excluded_mixed_count` (A.4/A.5).
+    - Analyze-JSON enthaelt einen neuen `include_filter`-Block (A.4).
+    - Analyze-DOT traegt `graph_include_scope`,
+      `graph_include_depth` und `graph_include_node_budget_reached`
+      (A.4).
+    - HTML/Markdown/Console-Reports zeigen eine `Filter`-Zeile mit
+      Origin/Depth-Werten und die `Note: include analysis stopped at
+      <effective> nodes (budget reached).`-Zeile bei
+      `include_node_budget_reached=true` (A.5).
+    - `kReportFormatVersion` von 3 auf 4 (A.3 als Versionssprung,
+      A.4 als strukturelle Migration).
+    - Zwei neue HTML-CSS-Klassen `badge--<X>` plus, wenn 25c
+      ausgefuehrt wurde, das `badge-direct`/`-heuristic`-Rename auf
+      `badge--evidence-direct`/`-heuristic`.
+    Wording-Style folgt der bestehenden CHANGELOG-Konvention (Keep a
+    Changelog mit Added/Changed/Fixed-Sektionen, Eintrags-Subjects in
+    Praesens). Der Eintrag wird vor 28 (Liefer-Stand pinnen) gemacht,
+    damit der CHANGELOG-Diff im selben Audit-Lauf gegen die Docker-
+    Gates aus 27 abgesichert ist.
 28. Liefer-Stand-Block aktualisieren.
 
 ## Tranchen-Schnitt
