@@ -1408,3 +1408,142 @@ TEST_CASE_FIXTURE(CliFixture,
     CHECK(err.str().find("--require-target-graph: target graph data is required "
                           "but not available") != std::string::npos);
 }
+
+// ---- AP M6-1.4 A.3: --include-scope + --include-depth ----
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-scope unknown-token returns exit 2 with 'invalid value'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--include-scope",
+               "bogus"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--include-scope: invalid value 'bogus'; allowed: all, project, "
+                          "external, unknown") != std::string::npos);
+    CHECK(out.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-scope specified twice returns exit 2 with 'option specified more than once'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--include-scope",
+               "all", "--include-scope", "project"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--include-scope: option specified more than once") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-scope= (empty value) is rejected with cli_usage_error") {
+    // CLI11 catches a typed-but-empty value at parse time before our
+    // validator runs, so the exit code is asserted but the exact phrase
+    // (CLI11's default text) is not part of the AP 1.4 contract.
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--include-scope="}) == ExitCode::cli_usage_error);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-scope all is accepted (explicit default)") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--include-scope",
+               "all"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-scope project is accepted") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--include-scope",
+               "project"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-scope=external is accepted") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--include-scope=external"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-scope=unknown is accepted") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--include-scope=unknown"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-scope=' project' (leading whitespace) is invalid value") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--include-scope= project"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--include-scope: invalid value ' project'") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-scope project,external (comma) is invalid value") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--include-scope",
+               "project,external"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--include-scope: invalid value 'project,external'") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-depth unknown-token returns exit 2 with 'invalid value'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--include-depth",
+               "deep"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--include-depth: invalid value 'deep'; allowed: all, direct, "
+                          "indirect") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-depth specified twice returns exit 2 with 'option specified more than once'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--include-depth",
+               "all", "--include-depth", "direct"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--include-depth: option specified more than once") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-depth= (empty value) is rejected with cli_usage_error") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--include-depth="}) == ExitCode::cli_usage_error);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-depth all is accepted (explicit default)") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--include-depth",
+               "all"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-depth direct is accepted") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--include-depth",
+               "direct"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-depth=indirect is accepted") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--include-depth=indirect"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-scope and --include-depth compose into the analyze run") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--include-scope",
+               "project", "--include-depth", "direct"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.4 A.3: --include-scope and --include-depth are not exposed on impact") {
+    // Plan-M6-1-4: only analyze accepts the new filters; impact rejects them
+    // with CLI11's standard "unrecognised option" parse error (exit 2).
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--include-scope", "project"}) ==
+          ExitCode::cli_usage_error);
+}

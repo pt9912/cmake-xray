@@ -10,7 +10,7 @@
   "$defs": {
     "FormatVersion": {
       "type": "integer",
-      "const": 3
+      "const": 4
     },
     "TargetPriorityClass": {
       "type": "string",

@@ -814,11 +814,13 @@ TEST_CASE("AP1.3 A.3: evidence_strength_text_v3 maps the three TargetEvidenceStr
           "uncertain");
 }
 
-TEST_CASE("AP1.3 A.4: kReportFormatVersion is 3 once all five adapters render the v3 fields") {
-    // AP M6-1.3 A.4 flips the production format-version constant. The
-    // schema-side FormatVersion.const must follow in
+TEST_CASE("AP1.4 A.3: kReportFormatVersion is 4 alongside the new --include-scope/--include-depth options") {
+    // AP M6-1.4 A.3 flips the production format-version constant from 3 to 4.
+    // The schema-side FormatVersion.const must follow in
     // spec/report-json.schema.json; report_json_schema_validation
-    // verifies the pair stays in sync.
-    static_assert(xray::hexagon::model::kReportFormatVersion == 3);
-    CHECK(xray::hexagon::model::kReportFormatVersion == 3);
+    // verifies the pair stays in sync. The structural v4 additions
+    // (include_filter / origin / depth_kind) ship with the JSON adapter
+    // rollout in A.4.
+    static_assert(xray::hexagon::model::kReportFormatVersion == 4);
+    CHECK(xray::hexagon::model::kReportFormatVersion == 4);
 }

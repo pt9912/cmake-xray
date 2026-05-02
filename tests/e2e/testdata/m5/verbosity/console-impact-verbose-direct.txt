@@ -1,6 +1,6 @@
 verbose impact summary
   report_type: impact
-  format_version: 3
+  format_version: 4
   changed_file: src/main.cpp
   affected_translation_units: 1
   classification: direct

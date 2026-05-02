@@ -13,6 +13,7 @@
 #include "adapters/cli/output_verbosity.h"
 #include "hexagon/model/application_info.h"
 #include "hexagon/model/compile_database_result.h"
+#include "hexagon/model/include_hotspot.h"
 #include "hexagon/model/report_inputs.h"
 
 namespace xray::adapters::cli {
@@ -60,6 +61,20 @@ struct CliOptions {
     // target graph is loaded, impact ends with exit 1 + the documented
     // error message (CLI maps the service code target_graph_required).
     bool require_target_graph_flag{false};
+    // AP M6-1.4 A.3: --include-scope and --include-depth analyze options.
+    // Both are single-value enums with default `all`; manual parsing in
+    // validate_include_scope/_depth produces the three documented error
+    // phrases each (invalid value / option specified more than once /
+    // missing value). Empty text means the user did not supply the option,
+    // and the parsed enum stays at the default `all`.
+    std::string include_scope_text;
+    CLI::Option* include_scope_option{nullptr};
+    xray::hexagon::model::IncludeScope parsed_include_scope{
+        xray::hexagon::model::IncludeScope::all};
+    std::string include_depth_text;
+    CLI::Option* include_depth_option{nullptr};
+    xray::hexagon::model::IncludeDepthFilter parsed_include_depth{
+        xray::hexagon::model::IncludeDepthFilter::all};
 };
 
 OutputVerbosity resolve_verbosity(const CliOptions& options) {
@@ -193,6 +208,19 @@ void configure_analyze_command(CLI::App& app, CliOptions& options, CLI::App*& an
                      "Limit ranking and hotspot output to the top N")
         ->default_val(options.top_limit)
         ->check(CLI::PositiveNumber);
+    // AP M6-1.4 A.3: --include-scope and --include-depth analyze filters.
+    // Captured as raw strings so validate_include_scope/_depth can emit the
+    // three documented error phrases each. take_last() lets CLI11 accept
+    // duplicates silently so the validator owns the
+    // "option specified more than once" phrasing via Option::count().
+    options.include_scope_option = analyze_cmd->add_option(
+        "--include-scope", options.include_scope_text,
+        "Include hotspot origin filter: all (default), project, external, or unknown");
+    options.include_scope_option->take_last();
+    options.include_depth_option = analyze_cmd->add_option(
+        "--include-depth", options.include_depth_text,
+        "Include hotspot depth filter: all (default), direct, or indirect");
+    options.include_depth_option->take_last();
     configure_report_options(*analyze_cmd, options);
     configure_verbosity_options(*analyze_cmd, options);
 }
@@ -313,6 +341,67 @@ std::optional<int> validate_impact_target_depth(CliOptions& options, std::ostrea
     }
     err << "error: --impact-target-depth: " << depth_error_phrase(outcome.status)
         << "\n";
+    return ExitCode::cli_usage_error;
+}
+
+// AP M6-1.4 A.3: --include-scope and --include-depth validators.
+// Each option produces two documented error phrases at this layer:
+//   --include-<X>: invalid value '<value>'; allowed: <list>
+//   --include-<X>: option specified more than once
+// CLI11 itself rejects the typed-but-empty value form
+// (e.g. `--include-scope=`) at parse time before this validator runs;
+// the user-facing exit code is the same (cli_usage_error) but the exact
+// phrase is CLI11's own. An option not passed at all leaves the parsed
+// enum at its default `all` -- silently accepted.
+std::optional<int> validate_include_scope(CliOptions& options, std::ostream& err) {
+    if (options.include_scope_option == nullptr) return std::nullopt;
+    if (options.include_scope_option->count() > 1) {
+        err << "error: --include-scope: option specified more than once\n";
+        return ExitCode::cli_usage_error;
+    }
+    if (options.include_scope_option->count() == 0) return std::nullopt;
+    if (options.include_scope_text == "all") {
+        options.parsed_include_scope = xray::hexagon::model::IncludeScope::all;
+        return std::nullopt;
+    }
+    if (options.include_scope_text == "project") {
+        options.parsed_include_scope = xray::hexagon::model::IncludeScope::project;
+        return std::nullopt;
+    }
+    if (options.include_scope_text == "external") {
+        options.parsed_include_scope = xray::hexagon::model::IncludeScope::external;
+        return std::nullopt;
+    }
+    if (options.include_scope_text == "unknown") {
+        options.parsed_include_scope = xray::hexagon::model::IncludeScope::unknown;
+        return std::nullopt;
+    }
+    err << "error: --include-scope: invalid value '" << options.include_scope_text
+        << "'; allowed: all, project, external, unknown\n";
+    return ExitCode::cli_usage_error;
+}
+
+std::optional<int> validate_include_depth(CliOptions& options, std::ostream& err) {
+    if (options.include_depth_option == nullptr) return std::nullopt;
+    if (options.include_depth_option->count() > 1) {
+        err << "error: --include-depth: option specified more than once\n";
+        return ExitCode::cli_usage_error;
+    }
+    if (options.include_depth_option->count() == 0) return std::nullopt;
+    if (options.include_depth_text == "all") {
+        options.parsed_include_depth = xray::hexagon::model::IncludeDepthFilter::all;
+        return std::nullopt;
+    }
+    if (options.include_depth_text == "direct") {
+        options.parsed_include_depth = xray::hexagon::model::IncludeDepthFilter::direct;
+        return std::nullopt;
+    }
+    if (options.include_depth_text == "indirect") {
+        options.parsed_include_depth = xray::hexagon::model::IncludeDepthFilter::indirect;
+        return std::nullopt;
+    }
+    err << "error: --include-depth: invalid value '" << options.include_depth_text
+        << "'; allowed: all, direct, indirect\n";
     return ExitCode::cli_usage_error;
 }
 
@@ -723,7 +812,9 @@ xray::hexagon::ports::driving::AnalyzeProjectRequest build_project_request(
     // Aggregate return avoids a gcov NRVO artifact on the closing brace.
     return {optional_input_path(options.compile_commands_path, report_display_base),
             optional_input_path(options.cmake_file_api_path, report_display_base),
-            report_display_base};
+            report_display_base,
+            options.parsed_include_scope,
+            options.parsed_include_depth};
 }
 
 xray::hexagon::ports::driving::AnalyzeImpactRequest build_impact_request(
@@ -744,6 +835,9 @@ std::optional<int> validate_subcommand_options(CliOptions& options, bool is_impa
     if (is_impact) {
         if (const auto e = validate_changed_file_required(options, err); e.has_value()) return e;
         if (const auto e = validate_impact_target_depth(options, err); e.has_value()) return e;
+    } else {
+        if (const auto e = validate_include_scope(options, err); e.has_value()) return e;
+        if (const auto e = validate_include_depth(options, err); e.has_value()) return e;
     }
     return validate_input_options(options, err);
 }

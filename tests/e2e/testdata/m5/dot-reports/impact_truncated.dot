@@ -1,6 +1,6 @@
 digraph cmake_xray_impact {
   xray_report_type="impact";
-  format_version=3;
+  format_version=4;
   graph_node_limit=100;
   graph_edge_limit=200;
   graph_truncated=true;

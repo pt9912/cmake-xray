@@ -1,6 +1,6 @@
 verbose impact summary
   report_type: impact
-  format_version: 3
+  format_version: 4
   changed_file: include/common/shared.h
   affected_translation_units: 3
   classification: heuristic
