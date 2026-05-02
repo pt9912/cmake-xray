@@ -18,7 +18,7 @@ DOCKER_BINARY ?= /tmp/cmake-xray
 
 .DEFAULT_GOAL := help
 
-.PHONY: help dev configure build test smoke lint docker-test docker-build docker-binary docker-gates docker-coverage coverage-gate quality-gate coverage-report quality-report runtime docs-refs docs-portability release-dry-run clean
+.PHONY: help dev configure build test smoke lint docker-test docker-build docker-binary docker-gates docker-coverage coverage-gate quality-gate coverage-report quality-report runtime docs-check docs-portability release-dry-run clean
 
 help:
 	@printf '%s\n' \
@@ -33,7 +33,7 @@ help:
 		'  make docker-gates       Run Docker test, coverage and quality gates' \
 		'  make docker-binary      Build the Docker binary stage and extract /workspace/build/cmake-xray to DOCKER_BINARY (default /tmp/cmake-xray)' \
 		'  make runtime            Build and smoke-test the runtime image' \
-		'  make docs-refs          Validate local documentation links' \
+		'  make docs-check         Validate local documentation links' \
 		'  make docs-portability   Validate documentation example portability' \
 		'  make release-dry-run    Run the release dry-run script' \
 		'  make docker-coverage    Build and print the Docker coverage report' \
@@ -106,7 +106,7 @@ runtime:
 	$(DOCKER) build --target runtime -t $(IMAGE) .
 	$(DOCKER) run --rm $(IMAGE) --help
 
-docs-refs:
+docs-check:
 	bash scripts/verify-doc-refs.sh
 
 docs-portability:
