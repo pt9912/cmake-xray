@@ -608,11 +608,11 @@ IncludeHotspotsBuildResult build_include_hotspots(
                        affected.end());
         if (affected.size() < 2) continue;
         all_hotspots.push_back(model::IncludeHotspot{
-            make_display_path(header_key, base_directory),
-            std::move(affected),
-            {},
-            classify_include_origin(header_key, observations, source_root),
-            aggregate_depth_kind(acc.has_direct, acc.has_indirect),
+            .header_path = make_display_path(header_key, base_directory),
+            .affected_translation_units = std::move(affected),
+            .diagnostics = {},
+            .origin = classify_include_origin(header_key, observations, source_root),
+            .depth_kind = aggregate_depth_kind(acc.has_direct, acc.has_indirect),
         });
     }
 

@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <regex>
@@ -154,7 +153,9 @@ void gather_edges_from_node(const FrontierNode& node,
                             TranslationUnitState& tu_state, GlobalBudgetState& global,
                             std::vector<PendingEdge>& edges) {
     if (node.depth >= kIncludeDepthLimit) {
-        global.include_depth_limit_was_hit = true;
+        if (can_read_file(node.path) && !parse_include_directives(node.path).empty()) {
+            global.include_depth_limit_was_hit = true;
+        }
         return;
     }
     if (!can_read_file(node.path)) {
@@ -300,7 +301,8 @@ IncludeResolutionResult SourceParsingIncludeAdapter::resolve_includes(
     if (global.include_depth_limit_was_hit) {
         result.diagnostics.push_back(
             {DiagnosticSeverity::note,
-             "include analysis stopped at depth " + std::to_string(kIncludeDepthLimit) +
+             "include analysis stopped at depth " +
+                 std::to_string(global.include_depth_limit_effective) +
                  " (depth limit reached); deeper transitive includes may be missing"});
     }
 

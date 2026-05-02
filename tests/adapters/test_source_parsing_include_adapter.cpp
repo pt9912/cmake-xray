@@ -364,6 +364,36 @@ TEST_CASE("source parsing include adapter caps include analysis at depth limit a
     CHECK(has_depth_diag);
 }
 
+TEST_CASE("source parsing include adapter does not emit depth diagnostic when leaf at limit has no includes") {
+    TempDir temp_dir{"cmake-xray-source-parsing-depth-limit-empty-leaf"};
+    write_file(temp_dir.path() / "src/main.cpp", "#include \"chain/h0.h\"\n");
+    // Build a chain whose deepest member sits exactly at depth 32 and has no
+    // #include directives -- the depth-limit diagnostic must stay silent
+    // because nothing transitive would have been missed.
+    constexpr int kChainLength = 32;
+    for (int i = 0; i < kChainLength - 1; ++i) {
+        write_file(temp_dir.path() / ("include/chain/h" + std::to_string(i) + ".h"),
+                   "#include \"chain/h" + std::to_string(i + 1) + ".h\"\n");
+    }
+    write_file(temp_dir.path() / ("include/chain/h" + std::to_string(kChainLength - 1) + ".h"),
+               "#pragma once\n");
+
+    const auto observations = build_single_observation(
+        temp_dir.path(),
+        CompileEntry::from_arguments("../src/main.cpp", "build",
+                                     {"clang++", "-I../include", "-c", "../src/main.cpp"}));
+
+    const SourceParsingIncludeAdapter adapter;
+    const auto result = adapter.resolve_includes(observations);
+
+    REQUIRE(result.translation_units.size() == 1);
+    CHECK(result.translation_units[0].headers.size() == 32);
+    const auto has_depth_diag = std::any_of(
+        result.diagnostics.begin(), result.diagnostics.end(),
+        [](const auto& d) { return d.message.find("depth limit reached") != std::string::npos; });
+    CHECK_FALSE(has_depth_diag);
+}
+
 TEST_CASE("source parsing include adapter caps include analysis at node budget and emits budget diagnostic") {
     TempDir temp_dir{"cmake-xray-source-parsing-budget-cap"};
     constexpr int kHeaderCount = 10005;  // > kIncludeNodeBudget (10000)

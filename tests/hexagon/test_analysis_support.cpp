@@ -549,6 +549,42 @@ TEST_CASE("build_include_hotspots scope and depth filters compose as intersectio
     CHECK(build.excluded_mixed_count == 0);
 }
 
+TEST_CASE("build_include_hotspots: project+mixed hotspot rejected by scope=unknown does not count under any exclusion bucket") {
+    const auto observations = xray::hexagon::services::build_translation_unit_observations(
+        {
+            CompileEntry::from_arguments("/project/src/a.cpp", "/project/build/a",
+                                         {"clang++", "-c", "/project/src/a.cpp"}),
+            CompileEntry::from_arguments("/project/src/b.cpp", "/project/build/b",
+                                         {"clang++", "-c", "/project/src/b.cpp"}),
+        },
+        std::filesystem::path{"/tmp"});
+
+    IncludeResolutionResult resolution;
+    resolution.translation_units = {
+        ResolvedTranslationUnitIncludes{
+            observations[0].reference.unique_key,
+            {IncludeEntry{"/project/include/m.h", IncludeDepthKind::direct}},
+            {},
+        },
+        ResolvedTranslationUnitIncludes{
+            observations[1].reference.unique_key,
+            {IncludeEntry{"/project/include/m.h", IncludeDepthKind::indirect}},
+            {},
+        },
+    };
+
+    const auto build = xray::hexagon::services::build_include_hotspots(
+        observations, resolution, std::filesystem::path{"/tmp"}, std::filesystem::path{"/project"},
+        xray::hexagon::services::IncludeHotspotFilters{
+            xray::hexagon::model::IncludeScope::unknown,
+            xray::hexagon::model::IncludeDepthFilter::direct});
+
+    CHECK(build.total_count == 1);
+    CHECK(build.hotspots.empty());
+    CHECK(build.excluded_unknown_count == 0);
+    CHECK(build.excluded_mixed_count == 0);
+}
+
 TEST_CASE("analysis support normalizes relative paths via absolute resolution") {
     const auto result = xray::hexagon::services::normalize_path("relative/path.cpp");
 

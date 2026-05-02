@@ -322,6 +322,10 @@ model::AnalysisResult ProjectAnalyzer::analyze_project(AnalyzeProjectRequest req
     result.application = model::application_info();
     populate_initial_inputs(request, result.inputs);
     set_legacy_compile_database_path(result);
+    result.include_scope_requested = request.include_scope;
+    result.include_scope_effective = request.include_scope;
+    result.include_depth_filter_requested = request.include_depth;
+    result.include_depth_filter_effective = request.include_depth;
 
     const ProjectLoadContext ctx{compile_db_port_, file_api_port_, request,
                                   path_for_io_string(request.compile_commands_path),
