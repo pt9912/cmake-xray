@@ -14,6 +14,7 @@
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
 #include "hexagon/model/include_classification.h"
+#include "hexagon/model/include_filter_options.h"
 #include "hexagon/model/observation_source.h"
 #include "hexagon/model/report_format_version.h"
 #include "hexagon/model/report_inputs.h"
@@ -140,6 +141,12 @@ std::string_view html_report_css() {
         "border-radius:0.25rem;background:#f0f0f0;color:#1a1a1a;font-size:0.875rem;}\n"
         ".badge-direct{background:#1a1a1a;color:#ffffff;}\n"
         ".badge-heuristic{background:#ffffff;color:#1a1a1a;}\n"
+        ".badge--project{background:#e8f1ff;color:#0b3a8c;border-color:#0b3a8c;}\n"
+        ".badge--external{background:#fff4e0;color:#7a4a00;border-color:#7a4a00;}\n"
+        ".badge--unknown{background:#f0f0f0;color:#404040;}\n"
+        ".badge--direct{background:#e8ffe8;color:#0b6b0b;border-color:#0b6b0b;}\n"
+        ".badge--indirect{background:#fff0f4;color:#8c0b3a;border-color:#8c0b3a;}\n"
+        ".badge--mixed{background:#fffbe0;color:#7a6a00;border-color:#7a6a00;}\n"
         ".empty{color:#404040;font-style:italic;}\n"
         "code,pre{font-family:ui-monospace,\"SFMono-Regular\",\"Menlo\",\"Consolas\",monospace;}\n"
         "@page{margin:1.5cm;}\n"
@@ -161,7 +168,11 @@ using xray::hexagon::model::ImpactedTarget;
 using xray::hexagon::model::ImpactedTranslationUnit;
 using xray::hexagon::model::ImpactKind;
 using xray::hexagon::model::ImpactResult;
+using xray::hexagon::model::IncludeDepthFilter;
+using xray::hexagon::model::IncludeDepthKind;
 using xray::hexagon::model::IncludeHotspot;
+using xray::hexagon::model::IncludeOrigin;
+using xray::hexagon::model::IncludeScope;
 using xray::hexagon::model::ObservationSource;
 using xray::hexagon::model::RankedTranslationUnit;
 using xray::hexagon::model::ReportInputs;
@@ -215,6 +226,31 @@ std::string target_graph_status_text(TargetGraphStatus status) {
     // paragraph without a Status banner); the helper therefore needs to
     // map only the two reachable enum values.
     return status == TargetGraphStatus::loaded ? "loaded" : "partial";
+}
+
+std::string include_origin_text(IncludeOrigin origin) {
+    if (origin == IncludeOrigin::project) return "project";
+    if (origin == IncludeOrigin::external) return "external";
+    return "unknown";
+}
+
+std::string include_depth_kind_text(IncludeDepthKind kind) {
+    if (kind == IncludeDepthKind::direct) return "direct";
+    if (kind == IncludeDepthKind::indirect) return "indirect";
+    return "mixed";
+}
+
+std::string include_scope_text(IncludeScope scope) {
+    if (scope == IncludeScope::project) return "project";
+    if (scope == IncludeScope::external) return "external";
+    if (scope == IncludeScope::unknown) return "unknown";
+    return "all";
+}
+
+std::string include_depth_filter_text(IncludeDepthFilter filter) {
+    if (filter == IncludeDepthFilter::direct) return "direct";
+    if (filter == IncludeDepthFilter::indirect) return "indirect";
+    return "all";
 }
 
 std::string target_graph_status_badge_class(TargetGraphStatus status) {
@@ -463,8 +499,31 @@ struct HotspotContext {
     const std::map<std::string, const std::vector<TargetInfo>*>& targets_by_key;
 };
 
+void emit_hotspots_filter_line(std::ostringstream& out, const AnalysisResult& result) {
+    // AP M6-1.4 A.5: Filter-Zeile vor der Tabelle. Spiegelt die wirksame
+    // include-scope/include-depth-Konfiguration plus die zwei
+    // exkludierungs-Zaehler (excluded_unknown_count und _mixed_count
+    // aus AnalysisResult) gemaess plan-M6-1-4.md "HTML".
+    out << "<p class=\"include-filter\">Filter: scope="
+        << "<span class=\"badge badge--"
+        << render_text(include_scope_text(result.include_scope_effective)) << "\">"
+        << render_text(include_scope_text(result.include_scope_effective)) << "</span>"
+        << ", depth=<span class=\"badge badge--"
+        << render_text(include_depth_filter_text(result.include_depth_filter_effective)) << "\">"
+        << render_text(include_depth_filter_text(result.include_depth_filter_effective))
+        << "</span>. Excluded: "
+        << result.include_hotspot_excluded_unknown_count << " unknown, "
+        << result.include_hotspot_excluded_mixed_count << " mixed.</p>\n";
+    if (result.include_node_budget_reached) {
+        out << "<p class=\"include-budget-note\">Note: include analysis stopped at "
+            << result.include_node_budget_effective
+            << " nodes (budget reached).</p>\n";
+    }
+}
+
 void emit_hotspots_section(std::ostringstream& out, const HotspotContext& ctx) {
     out << "<section class=\"hotspots\"><h2>Include Hotspots</h2>\n";
+    emit_hotspots_filter_line(out, ctx.result);
     if (ctx.result.include_hotspots.empty()) {
         out << "<p class=\"empty\">No include hotspots to report.</p></section>";
         return;
@@ -476,13 +535,21 @@ void emit_hotspots_section(std::ostringstream& out, const HotspotContext& ctx) {
     out << "<div class=\"table-wrap\"><table>\n"
         << "<thead><tr>"
         << "<th scope=\"col\">Header</th>"
+        << "<th scope=\"col\">Origin</th>"
+        << "<th scope=\"col\">Depth</th>"
         << "<th scope=\"col\">Affected translation units</th>"
         << "<th scope=\"col\">Translation unit context</th>"
         << "</tr></thead>\n<tbody>\n";
     for (std::size_t index = 0; index < ctx.hotspot_count; ++index) {
         const auto& hotspot = ctx.result.include_hotspots[index];
+        const auto origin_text = include_origin_text(hotspot.origin);
+        const auto depth_text = include_depth_kind_text(hotspot.depth_kind);
         out << "<tr>"
             << "<td>" << render_text(hotspot.header_path) << "</td>"
+            << "<td><span class=\"badge badge--" << render_text(origin_text)
+            << "\">" << render_text(origin_text) << "</span></td>"
+            << "<td><span class=\"badge badge--" << render_text(depth_text)
+            << "\">" << render_text(depth_text) << "</span></td>"
             << "<td>" << hotspot.affected_translation_units.size() << "</td>";
         emit_hotspot_context_cell(out, hotspot, ctx.top_limit, ctx.targets_by_key);
         out << "</tr>\n";

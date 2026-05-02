@@ -19,6 +19,12 @@ th{background:#f3f3f3;font-weight:600;}
 .badge{display:inline-block;padding:0.1rem 0.5rem;border:1px solid #1a1a1a;border-radius:0.25rem;background:#f0f0f0;color:#1a1a1a;font-size:0.875rem;}
 .badge-direct{background:#1a1a1a;color:#ffffff;}
 .badge-heuristic{background:#ffffff;color:#1a1a1a;}
+.badge--project{background:#e8f1ff;color:#0b3a8c;border-color:#0b3a8c;}
+.badge--external{background:#fff4e0;color:#7a4a00;border-color:#7a4a00;}
+.badge--unknown{background:#f0f0f0;color:#404040;}
+.badge--direct{background:#e8ffe8;color:#0b6b0b;border-color:#0b6b0b;}
+.badge--indirect{background:#fff0f4;color:#8c0b3a;border-color:#8c0b3a;}
+.badge--mixed{background:#fffbe0;color:#7a6a00;border-color:#7a6a00;}
 .empty{color:#404040;font-style:italic;}
 code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;}
 @page{margin:1.5cm;}
@@ -56,11 +62,12 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 </tbody>
 </table></div></section>
 <section class="hotspots"><h2>Include Hotspots</h2>
+<p class="include-filter">Filter: scope=<span class="badge badge--all">all</span>, depth=<span class="badge badge--all">all</span>. Excluded: 0 unknown, 0 mixed.</p>
 <div class="table-wrap"><table>
-<thead><tr><th scope="col">Header</th><th scope="col">Affected translation units</th><th scope="col">Translation unit context</th></tr></thead>
+<thead><tr><th scope="col">Header</th><th scope="col">Origin</th><th scope="col">Depth</th><th scope="col">Affected translation units</th><th scope="col">Translation unit context</th></tr></thead>
 <tbody>
-<tr><td>include/common/config.h</td><td>3</td><td><p>Showing 2 of 3 translation units.</p><ul><li>src/app/main.cpp <span class="badge">build/app</span> <span class="badge">app</span></li><li>src/lib/core.cpp <span class="badge">build/lib</span> <span class="badge">core</span></li></ul></td></tr>
-<tr><td>include/common/shared.h</td><td>3</td><td><p>Showing 2 of 3 translation units.</p><ul><li>src/app/main.cpp <span class="badge">build/app</span> <span class="badge">app</span></li><li>src/lib/core.cpp <span class="badge">build/lib</span> <span class="badge">core</span></li></ul></td></tr>
+<tr><td>include/common/config.h</td><td><span class="badge badge--project">project</span></td><td><span class="badge badge--direct">direct</span></td><td>3</td><td><p>Showing 2 of 3 translation units.</p><ul><li>src/app/main.cpp <span class="badge">build/app</span> <span class="badge">app</span></li><li>src/lib/core.cpp <span class="badge">build/lib</span> <span class="badge">core</span></li></ul></td></tr>
+<tr><td>include/common/shared.h</td><td><span class="badge badge--project">project</span></td><td><span class="badge badge--indirect">indirect</span></td><td>3</td><td><p>Showing 2 of 3 translation units.</p><ul><li>src/app/main.cpp <span class="badge">build/app</span> <span class="badge">app</span></li><li>src/lib/core.cpp <span class="badge">build/lib</span> <span class="badge">core</span></li></ul></td></tr>
 </tbody>
 </table></div></section>
 <section class="target-metadata"><h2>Target Metadata</h2>

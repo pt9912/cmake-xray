@@ -1404,3 +1404,51 @@ TEST_CASE("HTML impact v3: section ordering pins Prioritised Affected Targets be
     CHECK(pos_graph_ref < pos_prioritised);
     CHECK(pos_prioritised < pos_diags);
 }
+
+TEST_CASE("HTML analyze v4: include filter line carries scope, depth and excluded counts (AP M6-1.4 A.5)") {
+    auto result = make_minimal_analysis_result();
+    result.include_hotspot_excluded_unknown_count = 5;
+    result.include_hotspot_excluded_mixed_count = 3;
+
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+
+    CHECK(report.find("class=\"include-filter\"") != std::string::npos);
+    CHECK(report.find("badge--all") != std::string::npos);
+    CHECK(report.find("Excluded: 5 unknown, 3 mixed.") != std::string::npos);
+}
+
+TEST_CASE("HTML analyze v4: budget-reached note appears when include_node_budget_reached is true (AP M6-1.4 A.5)") {
+    auto result = make_minimal_analysis_result();
+    result.include_node_budget_reached = true;
+    result.include_node_budget_effective = 8420;
+
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+
+    CHECK(report.find("class=\"include-budget-note\"") != std::string::npos);
+    CHECK(report.find("include analysis stopped at 8420 nodes (budget reached)") !=
+          std::string::npos);
+}
+
+TEST_CASE("HTML analyze v4: hotspot rows carry origin and depth_kind columns with badge classes (AP M6-1.4 A.5)") {
+    auto result = make_minimal_analysis_result();
+    auto external_mixed = IncludeHotspot{
+        "include/external.h",
+        {xray::hexagon::model::TranslationUnitReference{"src/a.cpp", "build", "src/a.cpp",
+                                                         "src/a.cpp|build"},
+         xray::hexagon::model::TranslationUnitReference{"src/b.cpp", "build", "src/b.cpp",
+                                                         "src/b.cpp|build"}},
+        {}};
+    external_mixed.origin = xray::hexagon::model::IncludeOrigin::external;
+    external_mixed.depth_kind = xray::hexagon::model::IncludeDepthKind::mixed;
+    result.include_hotspots = {external_mixed};
+
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+
+    CHECK(report.find("<th scope=\"col\">Origin</th>") != std::string::npos);
+    CHECK(report.find("<th scope=\"col\">Depth</th>") != std::string::npos);
+    CHECK(report.find("class=\"badge badge--external\">external") != std::string::npos);
+    CHECK(report.find("class=\"badge badge--mixed\">mixed") != std::string::npos);
+}
