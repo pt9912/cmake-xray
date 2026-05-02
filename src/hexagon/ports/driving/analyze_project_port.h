@@ -4,6 +4,7 @@
 #include <optional>
 
 #include "hexagon/model/analysis_result.h"
+#include "hexagon/model/include_hotspot.h"
 
 namespace xray::hexagon::ports::driving {
 
@@ -17,6 +18,8 @@ struct AnalyzeProjectRequest {
     std::optional<InputPathArgument> compile_commands_path;
     std::optional<InputPathArgument> cmake_file_api_path;
     std::filesystem::path report_display_base;
+    model::IncludeScope include_scope{model::IncludeScope::all};
+    model::IncludeDepthFilter include_depth{model::IncludeDepthFilter::all};
 };
 
 class AnalyzeProjectPort {

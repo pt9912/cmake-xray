@@ -52,10 +52,29 @@ std::vector<model::RankedTranslationUnit> build_ranked_translation_units(
     const std::vector<model::TranslationUnitObservation>& observations,
     const model::IncludeResolutionResult& include_resolution);
 
-std::vector<model::IncludeHotspot> build_include_hotspots(
+struct IncludeHotspotsBuildResult {
+    std::vector<model::IncludeHotspot> hotspots;
+    std::size_t total_count{0};
+    std::size_t excluded_unknown_count{0};
+    std::size_t excluded_mixed_count{0};
+};
+
+struct IncludeHotspotFilters {
+    model::IncludeScope scope{model::IncludeScope::all};
+    model::IncludeDepthFilter depth_filter{model::IncludeDepthFilter::all};
+};
+
+model::IncludeOrigin classify_include_origin(
+    const std::string& header_path,
+    const std::vector<model::TranslationUnitObservation>& observations,
+    const std::filesystem::path& source_root);
+
+IncludeHotspotsBuildResult build_include_hotspots(
     const std::vector<model::TranslationUnitObservation>& observations,
     const model::IncludeResolutionResult& include_resolution,
-    const std::filesystem::path& base_directory);
+    const std::filesystem::path& base_directory,
+    const std::filesystem::path& source_root,
+    IncludeHotspotFilters filters);
 
 std::string resolve_changed_file_key(const std::filesystem::path& base_directory,
                                      const std::filesystem::path& changed_path);

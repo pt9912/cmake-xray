@@ -20,6 +20,19 @@ enum class IncludeDepthKind {
     mixed,
 };
 
+enum class IncludeScope {
+    all,
+    project,
+    external,
+    unknown,
+};
+
+enum class IncludeDepthFilter {
+    all,
+    direct,
+    indirect,
+};
+
 struct IncludeHotspot {
     std::string header_path;
     std::vector<TranslationUnitReference> affected_translation_units;

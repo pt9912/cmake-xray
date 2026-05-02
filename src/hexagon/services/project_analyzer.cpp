@@ -25,6 +25,7 @@ using ports::driving::InputPathArgument;
 
 struct LoadedInputs {
     std::filesystem::path base_directory;
+    std::filesystem::path source_root;
     bool success{false};
 };
 
@@ -105,7 +106,7 @@ LoadedInputs load_compile_commands_input(const ports::driven::BuildModelPort& po
     const auto model = port.load_build_model(path);
     result.compile_database = model.compile_database;
     result.observation_source = model::ObservationSource::exact;
-    return {compile_commands_base_directory(path, fallback_base), model.is_success()};
+    return {compile_commands_base_directory(path, fallback_base), {}, model.is_success()};
 }
 
 LoadedInputs load_file_api_only_input(const ports::driven::BuildModelPort& port,
@@ -122,7 +123,8 @@ LoadedInputs load_file_api_only_input(const ports::driven::BuildModelPort& port,
     if (model.is_success()) {
         append_unique_diagnostics(result.diagnostics, model.diagnostics);
     }
-    return {std::filesystem::path{model.source_root}, model.is_success()};
+    const auto source_root_path = std::filesystem::path{model.source_root};
+    return {source_root_path, source_root_path, model.is_success()};
 }
 
 bool try_load_file_api(const ports::driven::BuildModelPort& port,
@@ -251,13 +253,34 @@ bool load_project_inputs(const ProjectLoadContext& ctx, ProjectLoadState& state,
         state.loaded = load_compile_commands_input(ctx.compile_db_port, ctx.compile_path,
                                                    ctx.request.report_display_base, result);
         if (!state.loaded.success) return false;
-        return ctx.file_api_path.empty() ||
-               try_load_file_api(ctx.file_api_port, ctx.file_api_path, ctx.request,
-                                 state.file_api_model, result);
+        if (ctx.file_api_path.empty()) return true;
+        if (!try_load_file_api(ctx.file_api_port, ctx.file_api_path, ctx.request,
+                               state.file_api_model, result)) return false;
+        state.loaded.source_root = std::filesystem::path{state.file_api_model.source_root};
+        return true;
     }
     state.loaded = load_file_api_only_input(ctx.file_api_port, ctx.file_api_path, ctx.request,
                                              result);
     return state.loaded.success;
+}
+
+void populate_include_filter_telemetry(
+    const model::IncludeResolutionResult& include_resolution,
+    const services::IncludeHotspotsBuildResult& hotspots_build,
+    const ports::driving::AnalyzeProjectRequest& request, model::AnalysisResult& result) {
+    result.include_scope_requested = request.include_scope;
+    result.include_scope_effective = request.include_scope;
+    result.include_depth_filter_requested = request.include_depth;
+    result.include_depth_filter_effective = request.include_depth;
+    result.include_hotspot_total_count = hotspots_build.total_count;
+    result.include_hotspot_returned_count = hotspots_build.hotspots.size();
+    result.include_hotspot_excluded_unknown_count = hotspots_build.excluded_unknown_count;
+    result.include_hotspot_excluded_mixed_count = hotspots_build.excluded_mixed_count;
+    result.include_depth_limit_requested = include_resolution.include_depth_limit_requested;
+    result.include_depth_limit_effective = include_resolution.include_depth_limit_effective;
+    result.include_node_budget_requested = include_resolution.include_node_budget_requested;
+    result.include_node_budget_effective = include_resolution.include_node_budget_effective;
+    result.include_node_budget_reached = include_resolution.include_node_budget_reached;
 }
 
 void finalize_analysis(const ProjectLoadContext& ctx, const ProjectLoadState& state,
@@ -274,8 +297,11 @@ void finalize_analysis(const ProjectLoadContext& ctx, const ProjectLoadState& st
     result.include_analysis_heuristic = include_resolution.heuristic;
     result.translation_units = build_ranked_translation_units(observations, include_resolution);
     attach_targets_to_ranked_units(result.translation_units, result.target_assignments);
-    result.include_hotspots =
-        build_include_hotspots(observations, include_resolution, state.loaded.base_directory);
+    auto hotspots_build = build_include_hotspots(
+        observations, include_resolution, state.loaded.base_directory, state.loaded.source_root,
+        services::IncludeHotspotFilters{ctx.request.include_scope, ctx.request.include_depth});
+    populate_include_filter_telemetry(include_resolution, hotspots_build, ctx.request, result);
+    result.include_hotspots = std::move(hotspots_build.hotspots);
     append_unique_diagnostics(result.diagnostics, include_resolution.diagnostics);
     append_target_coverage_diagnostic(result.translation_units, result.target_assignments,
                                       result.diagnostics);

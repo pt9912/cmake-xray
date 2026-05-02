@@ -130,7 +130,10 @@ TEST_CASE("analysis support sorts equally sized hotspots by header path") {
     };
 
     const auto hotspots = xray::hexagon::services::build_include_hotspots(
-        observations, include_resolution, std::filesystem::path{"/tmp"});
+                              observations, include_resolution, std::filesystem::path{"/tmp"},
+                              std::filesystem::path{},
+                              xray::hexagon::services::IncludeHotspotFilters{})
+                              .hotspots;
 
     REQUIRE(hotspots.size() == 2);
     CHECK(hotspots[0].header_path == "/project/include/a.h");
@@ -171,11 +174,379 @@ TEST_CASE("analysis support sorts larger hotspots ahead of smaller ones") {
     };
 
     const auto hotspots = xray::hexagon::services::build_include_hotspots(
-        observations, include_resolution, std::filesystem::path{"/tmp"});
+                              observations, include_resolution, std::filesystem::path{"/tmp"},
+                              std::filesystem::path{},
+                              xray::hexagon::services::IncludeHotspotFilters{})
+                              .hotspots;
 
     REQUIRE(hotspots.size() == 2);
     CHECK(hotspots[0].header_path == "/project/include/larger.h");
     CHECK(hotspots[1].header_path == "/project/include/smaller.h");
+}
+
+namespace {
+
+xray::hexagon::model::TranslationUnitObservation make_observation_with_paths(
+    std::string source_path, std::vector<std::string> quote_includes,
+    std::vector<std::string> includes, std::vector<std::string> system_includes) {
+    xray::hexagon::model::TranslationUnitObservation obs;
+    obs.reference.source_path = source_path;
+    obs.reference.unique_key = source_path + "|context";
+    obs.reference.source_path_key = source_path;
+    obs.resolved_source_path = source_path;
+    obs.quote_include_paths = std::move(quote_includes);
+    obs.include_paths = std::move(includes);
+    obs.system_include_paths = std::move(system_includes);
+    return obs;
+}
+
+}  // namespace
+
+TEST_CASE("classify_include_origin returns project for headers under source_root") {
+    const auto obs = make_observation_with_paths("/project/src/main.cpp", {}, {}, {});
+    const auto origin = xray::hexagon::services::classify_include_origin(
+        "/project/include/foo.h", {obs}, std::filesystem::path{"/project"});
+    CHECK(origin == xray::hexagon::model::IncludeOrigin::project);
+}
+
+TEST_CASE("classify_include_origin returns external for headers under system_include_paths") {
+    const auto obs =
+        make_observation_with_paths("/project/src/main.cpp", {}, {}, {"/usr/include"});
+    const auto origin = xray::hexagon::services::classify_include_origin(
+        "/usr/include/iostream", {obs}, std::filesystem::path{"/project"});
+    CHECK(origin == xray::hexagon::model::IncludeOrigin::external);
+}
+
+TEST_CASE("classify_include_origin returns project for quote_include_paths outside source_root") {
+    const auto obs = make_observation_with_paths("/project/src/main.cpp", {"/sibling/quoted"}, {},
+                                                 {});
+    const auto origin = xray::hexagon::services::classify_include_origin(
+        "/sibling/quoted/foo.h", {obs}, std::filesystem::path{"/project"});
+    CHECK(origin == xray::hexagon::model::IncludeOrigin::project);
+}
+
+TEST_CASE("classify_include_origin returns project for include_paths outside source_root") {
+    const auto obs =
+        make_observation_with_paths("/project/src/main.cpp", {}, {"/sibling/include"}, {});
+    const auto origin = xray::hexagon::services::classify_include_origin(
+        "/sibling/include/foo.h", {obs}, std::filesystem::path{"/project"});
+    CHECK(origin == xray::hexagon::model::IncludeOrigin::project);
+}
+
+TEST_CASE("classify_include_origin returns unknown for headers not in any path") {
+    const auto obs = make_observation_with_paths("/project/src/main.cpp", {}, {}, {});
+    const auto origin = xray::hexagon::services::classify_include_origin(
+        "/nowhere/foo.h", {obs}, std::filesystem::path{"/project"});
+    CHECK(origin == xray::hexagon::model::IncludeOrigin::unknown);
+}
+
+TEST_CASE("classify_include_origin tolerates empty source_root and falls through to other tests") {
+    const auto obs =
+        make_observation_with_paths("/project/src/main.cpp", {}, {"/repo/include"}, {});
+    const auto origin = xray::hexagon::services::classify_include_origin(
+        "/repo/include/foo.h", {obs}, std::filesystem::path{});
+    CHECK(origin == xray::hexagon::model::IncludeOrigin::project);
+}
+
+TEST_CASE("classify_include_origin uses segment matching, not string prefix") {
+    const auto obs = make_observation_with_paths("/repo2/src/main.cpp", {}, {}, {});
+    const auto origin = xray::hexagon::services::classify_include_origin(
+        "/repo2/include/foo.h", {obs}, std::filesystem::path{"/repo"});
+    CHECK(origin == xray::hexagon::model::IncludeOrigin::unknown);
+}
+
+TEST_CASE("classify_include_origin: system wins over quote include path") {
+    const auto obs = make_observation_with_paths("/project/src/main.cpp", {"/sysroot"}, {},
+                                                 {"/sysroot"});
+    const auto origin = xray::hexagon::services::classify_include_origin(
+        "/sysroot/foo.h", {obs}, std::filesystem::path{"/project"});
+    CHECK(origin == xray::hexagon::model::IncludeOrigin::external);
+}
+
+TEST_CASE("classify_include_origin: source_root wins over system_include_paths") {
+    const auto obs =
+        make_observation_with_paths("/project/src/main.cpp", {}, {}, {"/project/include"});
+    const auto origin = xray::hexagon::services::classify_include_origin(
+        "/project/include/foo.h", {obs}, std::filesystem::path{"/project"});
+    CHECK(origin == xray::hexagon::model::IncludeOrigin::project);
+}
+
+TEST_CASE("build_include_hotspots aggregates depth_kind direct/indirect/mixed correctly") {
+    const auto observations = xray::hexagon::services::build_translation_unit_observations(
+        {
+            CompileEntry::from_arguments("/project/src/a.cpp", "/project/build/a",
+                                         {"clang++", "-c", "/project/src/a.cpp"}),
+            CompileEntry::from_arguments("/project/src/b.cpp", "/project/build/b",
+                                         {"clang++", "-c", "/project/src/b.cpp"}),
+        },
+        std::filesystem::path{"/tmp"});
+
+    IncludeResolutionResult resolution;
+    resolution.translation_units = {
+        ResolvedTranslationUnitIncludes{
+            observations[0].reference.unique_key,
+            {IncludeEntry{"/project/include/only-direct.h", IncludeDepthKind::direct},
+             IncludeEntry{"/project/include/only-indirect.h", IncludeDepthKind::indirect},
+             IncludeEntry{"/project/include/mixed.h", IncludeDepthKind::direct}},
+            {},
+        },
+        ResolvedTranslationUnitIncludes{
+            observations[1].reference.unique_key,
+            {IncludeEntry{"/project/include/only-direct.h", IncludeDepthKind::direct},
+             IncludeEntry{"/project/include/only-indirect.h", IncludeDepthKind::indirect},
+             IncludeEntry{"/project/include/mixed.h", IncludeDepthKind::indirect}},
+            {},
+        },
+    };
+
+    const auto build = xray::hexagon::services::build_include_hotspots(
+        observations, resolution, std::filesystem::path{"/tmp"}, std::filesystem::path{},
+        xray::hexagon::services::IncludeHotspotFilters{});
+
+    REQUIRE(build.hotspots.size() == 3);
+    const auto find_kind = [&](std::string_view name) {
+        for (const auto& h : build.hotspots) {
+            if (h.header_path.find(name) != std::string::npos) return h.depth_kind;
+        }
+        return xray::hexagon::model::IncludeDepthKind::direct;
+    };
+    CHECK(find_kind("only-direct") == xray::hexagon::model::IncludeDepthKind::direct);
+    CHECK(find_kind("only-indirect") == xray::hexagon::model::IncludeDepthKind::indirect);
+    CHECK(find_kind("mixed") == xray::hexagon::model::IncludeDepthKind::mixed);
+}
+
+TEST_CASE("build_include_hotspots scope=project filters out external+unknown and counts unknown exclusions") {
+    auto observations = xray::hexagon::services::build_translation_unit_observations(
+        {
+            CompileEntry::from_arguments("/project/src/a.cpp", "/project/build/a",
+                                         {"clang++", "-c", "/project/src/a.cpp"}),
+            CompileEntry::from_arguments("/project/src/b.cpp", "/project/build/b",
+                                         {"clang++", "-c", "/project/src/b.cpp"}),
+        },
+        std::filesystem::path{"/tmp"});
+    observations[0].system_include_paths.push_back("/usr/include");
+    observations[1].system_include_paths.push_back("/usr/include");
+
+    IncludeResolutionResult resolution;
+    resolution.translation_units = {
+        ResolvedTranslationUnitIncludes{
+            observations[0].reference.unique_key,
+            {IncludeEntry{"/project/include/proj.h", IncludeDepthKind::direct},
+             IncludeEntry{"/usr/include/iostream", IncludeDepthKind::direct},
+             IncludeEntry{"/nowhere/orphan.h", IncludeDepthKind::direct}},
+            {},
+        },
+        ResolvedTranslationUnitIncludes{
+            observations[1].reference.unique_key,
+            {IncludeEntry{"/project/include/proj.h", IncludeDepthKind::direct},
+             IncludeEntry{"/usr/include/iostream", IncludeDepthKind::direct},
+             IncludeEntry{"/nowhere/orphan.h", IncludeDepthKind::direct}},
+            {},
+        },
+    };
+
+    const auto build = xray::hexagon::services::build_include_hotspots(
+        observations, resolution, std::filesystem::path{"/tmp"},
+        std::filesystem::path{"/project"},
+        xray::hexagon::services::IncludeHotspotFilters{
+            xray::hexagon::model::IncludeScope::project,
+            xray::hexagon::model::IncludeDepthFilter::all});
+
+    CHECK(build.total_count == 3);
+    REQUIRE(build.hotspots.size() == 1);
+    CHECK(build.hotspots[0].origin == xray::hexagon::model::IncludeOrigin::project);
+    CHECK(build.excluded_unknown_count == 1);
+    CHECK(build.excluded_mixed_count == 0);
+}
+
+TEST_CASE("build_include_hotspots depth=direct filters out indirect+mixed and counts mixed exclusions") {
+    const auto observations = xray::hexagon::services::build_translation_unit_observations(
+        {
+            CompileEntry::from_arguments("/project/src/a.cpp", "/project/build/a",
+                                         {"clang++", "-c", "/project/src/a.cpp"}),
+            CompileEntry::from_arguments("/project/src/b.cpp", "/project/build/b",
+                                         {"clang++", "-c", "/project/src/b.cpp"}),
+        },
+        std::filesystem::path{"/tmp"});
+
+    IncludeResolutionResult resolution;
+    resolution.translation_units = {
+        ResolvedTranslationUnitIncludes{
+            observations[0].reference.unique_key,
+            {IncludeEntry{"/project/include/d.h", IncludeDepthKind::direct},
+             IncludeEntry{"/project/include/i.h", IncludeDepthKind::indirect},
+             IncludeEntry{"/project/include/m.h", IncludeDepthKind::direct}},
+            {},
+        },
+        ResolvedTranslationUnitIncludes{
+            observations[1].reference.unique_key,
+            {IncludeEntry{"/project/include/d.h", IncludeDepthKind::direct},
+             IncludeEntry{"/project/include/i.h", IncludeDepthKind::indirect},
+             IncludeEntry{"/project/include/m.h", IncludeDepthKind::indirect}},
+            {},
+        },
+    };
+
+    const auto build = xray::hexagon::services::build_include_hotspots(
+        observations, resolution, std::filesystem::path{"/tmp"}, std::filesystem::path{},
+        xray::hexagon::services::IncludeHotspotFilters{
+            xray::hexagon::model::IncludeScope::all,
+            xray::hexagon::model::IncludeDepthFilter::direct});
+
+    CHECK(build.total_count == 3);
+    REQUIRE(build.hotspots.size() == 1);
+    CHECK(build.hotspots[0].header_path == "/project/include/d.h");
+    CHECK(build.excluded_mixed_count == 1);
+    CHECK(build.excluded_unknown_count == 0);
+}
+
+TEST_CASE("build_include_hotspots scope=external returns only external hotspots") {
+    auto observations = xray::hexagon::services::build_translation_unit_observations(
+        {
+            CompileEntry::from_arguments("/project/src/a.cpp", "/project/build/a",
+                                         {"clang++", "-c", "/project/src/a.cpp"}),
+            CompileEntry::from_arguments("/project/src/b.cpp", "/project/build/b",
+                                         {"clang++", "-c", "/project/src/b.cpp"}),
+        },
+        std::filesystem::path{"/tmp"});
+    observations[0].system_include_paths.push_back("/usr/include");
+    observations[1].system_include_paths.push_back("/usr/include");
+
+    IncludeResolutionResult resolution;
+    resolution.translation_units = {
+        ResolvedTranslationUnitIncludes{
+            observations[0].reference.unique_key,
+            {IncludeEntry{"/project/include/proj.h", IncludeDepthKind::direct},
+             IncludeEntry{"/usr/include/iostream", IncludeDepthKind::direct}},
+            {},
+        },
+        ResolvedTranslationUnitIncludes{
+            observations[1].reference.unique_key,
+            {IncludeEntry{"/project/include/proj.h", IncludeDepthKind::direct},
+             IncludeEntry{"/usr/include/iostream", IncludeDepthKind::direct}},
+            {},
+        },
+    };
+
+    const auto build = xray::hexagon::services::build_include_hotspots(
+        observations, resolution, std::filesystem::path{"/tmp"},
+        std::filesystem::path{"/project"},
+        xray::hexagon::services::IncludeHotspotFilters{
+            xray::hexagon::model::IncludeScope::external,
+            xray::hexagon::model::IncludeDepthFilter::all});
+
+    REQUIRE(build.hotspots.size() == 1);
+    CHECK(build.hotspots[0].origin == xray::hexagon::model::IncludeOrigin::external);
+}
+
+TEST_CASE("build_include_hotspots scope=unknown returns only unknown-origin hotspots") {
+    const auto observations = xray::hexagon::services::build_translation_unit_observations(
+        {
+            CompileEntry::from_arguments("/project/src/a.cpp", "/project/build/a",
+                                         {"clang++", "-c", "/project/src/a.cpp"}),
+            CompileEntry::from_arguments("/project/src/b.cpp", "/project/build/b",
+                                         {"clang++", "-c", "/project/src/b.cpp"}),
+        },
+        std::filesystem::path{"/tmp"});
+
+    IncludeResolutionResult resolution;
+    resolution.translation_units = {
+        ResolvedTranslationUnitIncludes{
+            observations[0].reference.unique_key,
+            {IncludeEntry{"/project/include/proj.h", IncludeDepthKind::direct},
+             IncludeEntry{"/nowhere/orphan.h", IncludeDepthKind::direct}},
+            {},
+        },
+        ResolvedTranslationUnitIncludes{
+            observations[1].reference.unique_key,
+            {IncludeEntry{"/project/include/proj.h", IncludeDepthKind::direct},
+             IncludeEntry{"/nowhere/orphan.h", IncludeDepthKind::direct}},
+            {},
+        },
+    };
+
+    const auto build = xray::hexagon::services::build_include_hotspots(
+        observations, resolution, std::filesystem::path{"/tmp"},
+        std::filesystem::path{"/project"},
+        xray::hexagon::services::IncludeHotspotFilters{
+            xray::hexagon::model::IncludeScope::unknown,
+            xray::hexagon::model::IncludeDepthFilter::all});
+
+    REQUIRE(build.hotspots.size() == 1);
+    CHECK(build.hotspots[0].origin == xray::hexagon::model::IncludeOrigin::unknown);
+}
+
+TEST_CASE("build_include_hotspots depth=indirect returns only indirect hotspots") {
+    const auto observations = xray::hexagon::services::build_translation_unit_observations(
+        {
+            CompileEntry::from_arguments("/project/src/a.cpp", "/project/build/a",
+                                         {"clang++", "-c", "/project/src/a.cpp"}),
+            CompileEntry::from_arguments("/project/src/b.cpp", "/project/build/b",
+                                         {"clang++", "-c", "/project/src/b.cpp"}),
+        },
+        std::filesystem::path{"/tmp"});
+
+    IncludeResolutionResult resolution;
+    resolution.translation_units = {
+        ResolvedTranslationUnitIncludes{
+            observations[0].reference.unique_key,
+            {IncludeEntry{"/project/include/d.h", IncludeDepthKind::direct},
+             IncludeEntry{"/project/include/i.h", IncludeDepthKind::indirect}},
+            {},
+        },
+        ResolvedTranslationUnitIncludes{
+            observations[1].reference.unique_key,
+            {IncludeEntry{"/project/include/d.h", IncludeDepthKind::direct},
+             IncludeEntry{"/project/include/i.h", IncludeDepthKind::indirect}},
+            {},
+        },
+    };
+
+    const auto build = xray::hexagon::services::build_include_hotspots(
+        observations, resolution, std::filesystem::path{"/tmp"}, std::filesystem::path{},
+        xray::hexagon::services::IncludeHotspotFilters{
+            xray::hexagon::model::IncludeScope::all,
+            xray::hexagon::model::IncludeDepthFilter::indirect});
+
+    REQUIRE(build.hotspots.size() == 1);
+    CHECK(build.hotspots[0].header_path == "/project/include/i.h");
+    CHECK(build.hotspots[0].depth_kind == xray::hexagon::model::IncludeDepthKind::indirect);
+}
+
+TEST_CASE("build_include_hotspots scope and depth filters compose as intersection without double-counting unknown+mixed") {
+    auto observations = xray::hexagon::services::build_translation_unit_observations(
+        {
+            CompileEntry::from_arguments("/project/src/a.cpp", "/project/build/a",
+                                         {"clang++", "-c", "/project/src/a.cpp"}),
+            CompileEntry::from_arguments("/project/src/b.cpp", "/project/build/b",
+                                         {"clang++", "-c", "/project/src/b.cpp"}),
+        },
+        std::filesystem::path{"/tmp"});
+
+    IncludeResolutionResult resolution;
+    resolution.translation_units = {
+        ResolvedTranslationUnitIncludes{
+            observations[0].reference.unique_key,
+            {IncludeEntry{"/nowhere/orphan.h", IncludeDepthKind::direct}},
+            {},
+        },
+        ResolvedTranslationUnitIncludes{
+            observations[1].reference.unique_key,
+            {IncludeEntry{"/nowhere/orphan.h", IncludeDepthKind::indirect}},
+            {},
+        },
+    };
+
+    const auto build = xray::hexagon::services::build_include_hotspots(
+        observations, resolution, std::filesystem::path{"/tmp"}, std::filesystem::path{"/project"},
+        xray::hexagon::services::IncludeHotspotFilters{
+            xray::hexagon::model::IncludeScope::project,
+            xray::hexagon::model::IncludeDepthFilter::direct});
+
+    CHECK(build.total_count == 1);
+    CHECK(build.hotspots.empty());
+    CHECK(build.excluded_unknown_count == 1);
+    CHECK(build.excluded_mixed_count == 0);
 }
 
 TEST_CASE("analysis support normalizes relative paths via absolute resolution") {

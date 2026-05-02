@@ -15,7 +15,11 @@ using xray::hexagon::model::CompileCommandSource;
 using xray::hexagon::model::CompileEntry;
 using xray::hexagon::model::Diagnostic;
 using xray::hexagon::model::DiagnosticSeverity;
+using xray::hexagon::model::IncludeDepthFilter;
+using xray::hexagon::model::IncludeDepthKind;
+using xray::hexagon::model::IncludeOrigin;
 using xray::hexagon::model::IncludeResolutionResult;
+using xray::hexagon::model::IncludeScope;
 using xray::hexagon::model::RankedTranslationUnit;
 using xray::hexagon::model::TranslationUnitObservation;
 using xray::hexagon::model::TranslationUnitReference;
@@ -474,53 +478,165 @@ std::vector<RankedTranslationUnit> build_ranked_translation_units(
     return ranked;
 }
 
-std::vector<model::IncludeHotspot> build_include_hotspots(
+namespace {
+
+bool is_path_under(const std::filesystem::path& candidate, const std::filesystem::path& base) {
+    const auto cand_norm = candidate.lexically_normal();
+    const auto base_norm = base.lexically_normal();
+    auto cand_it = cand_norm.begin();
+    const auto cand_end = cand_norm.end();
+    auto base_it = base_norm.begin();
+    const auto base_end = base_norm.end();
+
+    const auto skip_separators = [](auto& it, auto end) {
+        while (it != end) {
+            const auto piece = it->generic_string();
+            if (!piece.empty() && piece != "/") return;
+            ++it;
+        }
+    };
+
+    skip_separators(base_it, base_end);
+    if (base_it == base_end) return false;
+    while (base_it != base_end) {
+        skip_separators(cand_it, cand_end);
+        if (cand_it == cand_end) return false;
+        if (cand_it->generic_string() != base_it->generic_string()) return false;
+        ++cand_it;
+        ++base_it;
+        skip_separators(base_it, base_end);
+    }
+    return true;
+}
+
+bool any_observation_path_under(
     const std::vector<TranslationUnitObservation>& observations,
-    const IncludeResolutionResult& include_resolution,
-    const std::filesystem::path& base_directory) {
+    const std::filesystem::path& header,
+    const std::vector<std::string> TranslationUnitObservation::*member) {
+    for (const auto& obs : observations) {
+        for (const auto& entry : obs.*member) {
+            if (is_path_under(header, std::filesystem::path{entry})) return true;
+        }
+    }
+    return false;
+}
+
+bool scope_matches(IncludeOrigin origin, IncludeScope scope) {
+    if (scope == IncludeScope::all) return true;
+    if (scope == IncludeScope::project) return origin == IncludeOrigin::project;
+    if (scope == IncludeScope::external) return origin == IncludeOrigin::external;
+    return origin == IncludeOrigin::unknown;
+}
+
+bool depth_matches(IncludeDepthKind kind, IncludeDepthFilter filter) {
+    if (filter == IncludeDepthFilter::all) return true;
+    if (filter == IncludeDepthFilter::direct) return kind == IncludeDepthKind::direct;
+    return kind == IncludeDepthKind::indirect;
+}
+
+IncludeDepthKind aggregate_depth_kind(bool has_direct, bool has_indirect) {
+    if (has_direct && has_indirect) return IncludeDepthKind::mixed;
+    if (has_indirect) return IncludeDepthKind::indirect;
+    return IncludeDepthKind::direct;
+}
+
+struct HotspotAccumulator {
+    std::vector<TranslationUnitReference> affected_translation_units;
+    bool has_direct{false};
+    bool has_indirect{false};
+};
+
+std::map<std::string, HotspotAccumulator> accumulate_hotspot_entries(
+    const std::vector<TranslationUnitObservation>& observations,
+    const IncludeResolutionResult& include_resolution) {
     std::unordered_map<std::string, TranslationUnitReference> references_by_key;
     references_by_key.reserve(observations.size());
     for (const auto& observation : observations) {
         references_by_key.emplace(observation.reference.unique_key, observation.reference);
     }
-
-    std::map<std::string, std::vector<TranslationUnitReference>> hotspots_by_header;
-
+    std::map<std::string, HotspotAccumulator> by_header;
     for (const auto& resolved : include_resolution.translation_units) {
         const auto reference_it = references_by_key.find(resolved.translation_unit_key);
         if (reference_it == references_by_key.end()) continue;
-
         for (const auto& entry : resolved.headers) {
-            hotspots_by_header[entry.header_path].push_back(reference_it->second);
+            auto& acc = by_header[entry.header_path];
+            acc.affected_translation_units.push_back(reference_it->second);
+            if (entry.depth_kind == IncludeDepthKind::direct) acc.has_direct = true;
+            if (entry.depth_kind == IncludeDepthKind::indirect) acc.has_indirect = true;
         }
     }
+    return by_header;
+}
 
-    std::vector<model::IncludeHotspot> hotspots;
-    for (auto& [header_key, affected] : hotspots_by_header) {
+}  // namespace
+
+IncludeOrigin classify_include_origin(const std::string& header_path,
+                                      const std::vector<TranslationUnitObservation>& observations,
+                                      const std::filesystem::path& source_root) {
+    const auto header = std::filesystem::path{header_path};
+    if (!source_root.empty() && is_path_under(header, source_root)) {
+        return IncludeOrigin::project;
+    }
+    if (any_observation_path_under(observations, header,
+                                   &TranslationUnitObservation::system_include_paths)) {
+        return IncludeOrigin::external;
+    }
+    if (any_observation_path_under(observations, header,
+                                   &TranslationUnitObservation::quote_include_paths) ||
+        any_observation_path_under(observations, header,
+                                   &TranslationUnitObservation::include_paths)) {
+        return IncludeOrigin::project;
+    }
+    return IncludeOrigin::unknown;
+}
+
+IncludeHotspotsBuildResult build_include_hotspots(
+    const std::vector<TranslationUnitObservation>& observations,
+    const IncludeResolutionResult& include_resolution,
+    const std::filesystem::path& base_directory, const std::filesystem::path& source_root,
+    IncludeHotspotFilters filters) {
+    auto by_header = accumulate_hotspot_entries(observations, include_resolution);
+
+    std::vector<model::IncludeHotspot> all_hotspots;
+    for (auto& [header_key, acc] : by_header) {
+        auto& affected = acc.affected_translation_units;
         std::sort(affected.begin(), affected.end(), translation_unit_reference_less);
         affected.erase(std::unique(affected.begin(), affected.end(),
                                    [](const auto& lhs, const auto& rhs) {
                                        return lhs.unique_key == rhs.unique_key;
                                    }),
                        affected.end());
-
         if (affected.size() < 2) continue;
-
-        hotspots.push_back({
-            .header_path = make_display_path(header_key, base_directory),
-            .affected_translation_units = std::move(affected),
-            .diagnostics = {},
+        all_hotspots.push_back(model::IncludeHotspot{
+            make_display_path(header_key, base_directory),
+            std::move(affected),
+            {},
+            classify_include_origin(header_key, observations, source_root),
+            aggregate_depth_kind(acc.has_direct, acc.has_indirect),
         });
     }
 
-    std::sort(hotspots.begin(), hotspots.end(), [](const auto& lhs, const auto& rhs) {
+    std::sort(all_hotspots.begin(), all_hotspots.end(), [](const auto& lhs, const auto& rhs) {
         if (lhs.affected_translation_units.size() != rhs.affected_translation_units.size()) {
             return lhs.affected_translation_units.size() > rhs.affected_translation_units.size();
         }
         return lhs.header_path < rhs.header_path;
     });
 
-    return hotspots;
+    IncludeHotspotsBuildResult out;
+    out.total_count = all_hotspots.size();
+    for (auto& hotspot : all_hotspots) {
+        if (!scope_matches(hotspot.origin, filters.scope)) {
+            if (hotspot.origin == IncludeOrigin::unknown) ++out.excluded_unknown_count;
+            continue;
+        }
+        if (!depth_matches(hotspot.depth_kind, filters.depth_filter)) {
+            if (hotspot.depth_kind == IncludeDepthKind::mixed) ++out.excluded_mixed_count;
+            continue;
+        }
+        out.hotspots.push_back(std::move(hotspot));
+    }
+    return out;
 }
 
 std::string resolve_changed_file_key(const std::filesystem::path& base_directory,
