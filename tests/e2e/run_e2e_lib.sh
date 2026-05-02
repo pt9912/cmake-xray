@@ -25,7 +25,38 @@ native_path() {
 BINARY="$1"
 TESTDATA="$2"
 failures=0
+golden_updates=0
 REPO_ROOT="$(cd "$TESTDATA/../../.." && pwd)"
+
+# AP M6-1.4 A.4 review-fix (item 4): make XRAY_UPDATE_GOLDENS=1 announce
+# itself loudly so a developer cannot leave it set in their shell and
+# silently overwrite goldens during normal `ctest` iteration. Pair the
+# loud banner with golden_updates accounting and a non-zero exit at the
+# end of the run unless XRAY_UPDATE_GOLDENS_CONFIRM=YES is also set, so
+# CI runs without the confirm flag still flag the unexpected refresh.
+if [ "${XRAY_UPDATE_GOLDENS:-0}" = "1" ]; then
+    echo "================================================================" >&2
+    echo " WARNING: XRAY_UPDATE_GOLDENS=1 is set." >&2
+    echo " Goldens will be OVERWRITTEN with the captured actual bytes." >&2
+    echo " The script exits non-zero unless XRAY_UPDATE_GOLDENS_CONFIRM=YES" >&2
+    echo " is also set, so accidental shell exports do not silently churn" >&2
+    echo " the goldens. Unset the var or pass --confirm to proceed." >&2
+    echo "================================================================" >&2
+fi
+
+xray_e2e_trap_on_exit() {
+    if [ "$golden_updates" -gt 0 ]; then
+        echo "" >&2
+        echo "$golden_updates golden(s) UPDATED via XRAY_UPDATE_GOLDENS=1." >&2
+        if [ "${XRAY_UPDATE_GOLDENS_CONFIRM:-}" != "YES" ]; then
+            echo "Refusing to exit cleanly without XRAY_UPDATE_GOLDENS_CONFIRM=YES." >&2
+            echo "Set XRAY_UPDATE_GOLDENS_CONFIRM=YES alongside XRAY_UPDATE_GOLDENS=1" >&2
+            echo "to confirm a deliberate golden refresh." >&2
+            exit 2
+        fi
+    fi
+}
+trap xray_e2e_trap_on_exit EXIT
 
 normalize_line_endings() {
     tr -d '\r' < "$1"
@@ -52,6 +83,7 @@ assert_stdout_equals_file() {
     if [ "${XRAY_UPDATE_GOLDENS:-0}" = "1" ]; then
         cp "$actual_file" "$expected_file"
         echo "UPDATE: $description -> $expected_file"
+        golden_updates=$((golden_updates + 1))
         rm -f "$actual_file" "$actual_clean" "$expected_clean"
         return 0
     fi
@@ -113,6 +145,7 @@ assert_dot_stdout_equals_file() {
     if [ "${XRAY_UPDATE_GOLDENS:-0}" = "1" ]; then
         normalize_dot_unique_keys "$actual_file" > "$expected_file"
         echo "UPDATE: $description -> $expected_file"
+        golden_updates=$((golden_updates + 1))
         rm -f "$actual_file" "$actual_clean" "$expected_clean"
         return 0
     fi
@@ -141,6 +174,7 @@ assert_dot_file_equals_file() {
     if [ "${XRAY_UPDATE_GOLDENS:-0}" = "1" ]; then
         normalize_dot_unique_keys "$actual_file" > "$expected_file"
         echo "UPDATE: $description -> $expected_file"
+        golden_updates=$((golden_updates + 1))
         rm -f "$actual_clean" "$expected_clean"
         return 0
     fi
@@ -164,6 +198,7 @@ assert_file_equals() {
     if [ "${XRAY_UPDATE_GOLDENS:-0}" = "1" ]; then
         cp "$actual_file" "$expected_file"
         echo "UPDATE: $description -> $expected_file"
+        golden_updates=$((golden_updates + 1))
         rm -f "$actual_clean" "$expected_clean"
         return 0
     fi

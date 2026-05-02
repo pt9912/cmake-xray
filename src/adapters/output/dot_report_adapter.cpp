@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -163,11 +164,12 @@ struct GraphHeader {
     DotBudget budget;
     bool truncated;
     TargetGraphStatus target_graph_status{TargetGraphStatus::not_loaded};
-    // AP M6-1.3 A.3: v3 graph-level depth attributes for impact reports.
-    // emit_graph_header consults kReportFormatVersion via if constexpr;
-    // in A.3 with kReportFormatVersion=2 the branch is statically
-    // discarded so v2 reports stay byte-stable. A.4 flips the constant
-    // and the attributes start appearing in impact-DOT output.
+    // AP M6-1.3 A.4 introduced graph-level depth attributes for impact
+    // reports as v3 fields. With kReportFormatVersion=4 today they are
+    // permanently emitted by emit_impact_depth_attributes; the
+    // `if constexpr (kReportFormatVersion >= 3)` guard around the call
+    // is kept as a structural marker that documents the v3 origin and
+    // future-proofs the call site for a hypothetical v5 split.
     std::size_t impact_target_depth_requested{0};
     std::size_t impact_target_depth_effective{0};
     // AP M6-1.4 A.4: include-filter graph attributes for analyze reports
@@ -238,6 +240,12 @@ void emit_analyze_include_filter_attributes(std::ostringstream& out, const Graph
 }
 
 void emit_graph_header(std::ostringstream& out, const GraphHeader& header) {
+    // emit_impact_depth_attributes and emit_analyze_include_filter_attributes
+    // dispatch on header.report_type via string-equality fallback. A future
+    // call site that forgets to set report_type would silently no-op both
+    // helpers and drop the v4-pflicht graph attributes. Catch it loud here.
+    assert((header.report_type == "analyze" || header.report_type == "impact") &&
+           "GraphHeader::report_type must be either \"analyze\" or \"impact\"");
     out << "digraph " << header.graph_name << " {\n";
     out << "  ";
     append_string_attribute(out, "xray_report_type", header.report_type);

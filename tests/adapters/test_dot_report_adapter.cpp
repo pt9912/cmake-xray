@@ -349,6 +349,40 @@ TEST_CASE("DOT analyze emits origin and depth_kind on include_hotspot nodes (AP 
     CHECK(report.find("depth_kind=\"mixed\"") != std::string::npos);
 }
 
+TEST_CASE("DOT analyze emits graph_include_* attributes (AP M6-1.4 A.4)") {
+    AnalysisResult result = make_minimal_analysis_result();
+
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 5);
+
+    CHECK(report.find("graph_include_scope=\"all\"") != std::string::npos);
+    CHECK(report.find("graph_include_depth=\"all\"") != std::string::npos);
+    CHECK(report.find("graph_include_node_budget_reached=false") != std::string::npos);
+}
+
+TEST_CASE("DOT impact does NOT emit graph_include_* attributes (AP M6-1.4 A.4 analyze-only contract)") {
+    ImpactResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_impact_report(result);
+
+    CHECK(report.find("graph_include_scope") == std::string::npos);
+    CHECK(report.find("graph_include_depth") == std::string::npos);
+    CHECK(report.find("graph_include_node_budget_reached") == std::string::npos);
+}
+
+TEST_CASE("DOT analyze does NOT emit graph_impact_target_depth_* attributes (AP M6-1.4 A.4 impact-only contract)") {
+    AnalysisResult result = make_minimal_analysis_result();
+
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 5);
+
+    CHECK(report.find("graph_impact_target_depth_requested") == std::string::npos);
+    CHECK(report.find("graph_impact_target_depth_effective") == std::string::npos);
+}
+
 TEST_CASE("DOT analyze marks pure context translation units as context_only") {
     AnalysisResult result = make_minimal_analysis_result();
     auto primary = ranked_tu("src/app.cpp", "build", "src/app.cpp|build");

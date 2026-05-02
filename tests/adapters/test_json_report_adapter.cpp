@@ -297,6 +297,42 @@ TEST_CASE("json analyze hotspot items carry origin and depth_kind (AP M6-1.4 A.4
     CHECK(items[0]["depth_kind"] == "mixed");
 }
 
+TEST_CASE("json analyze report carries include_filter block (AP M6-1.4 A.4)") {
+    AnalysisResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+
+    const JsonReportAdapter adapter;
+    const auto doc = parse(adapter.write_analysis_report(result, 10));
+
+    REQUIRE(doc.contains("include_filter"));
+    const auto& filter = doc["include_filter"];
+    CHECK(filter.contains("include_scope"));
+    CHECK(filter.contains("include_depth"));
+    CHECK(filter.contains("include_depth_limit_requested"));
+    CHECK(filter.contains("include_depth_limit_effective"));
+    CHECK(filter.contains("include_node_budget_requested"));
+    CHECK(filter.contains("include_node_budget_effective"));
+    CHECK(filter.contains("include_node_budget_reached"));
+}
+
+TEST_CASE("json analyze hotspot container carries excluded_*_count (AP M6-1.4 A.4)") {
+    AnalysisResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.include_hotspot_excluded_unknown_count = 7;
+    result.include_hotspot_excluded_mixed_count = 3;
+
+    const JsonReportAdapter adapter;
+    const auto doc = parse(adapter.write_analysis_report(result, 10));
+
+    const auto& container = doc["include_hotspots"];
+    REQUIRE(container.contains("excluded_unknown_count"));
+    REQUIRE(container.contains("excluded_mixed_count"));
+    CHECK(container["excluded_unknown_count"].get<int>() == 7);
+    CHECK(container["excluded_mixed_count"].get<int>() == 3);
+}
+
 TEST_CASE("json analyze hotspot affected list is sorted and limit-aware") {
     const JsonReportAdapter adapter;
     const auto doc = parse(
