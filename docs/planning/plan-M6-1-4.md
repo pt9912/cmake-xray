@@ -1086,12 +1086,48 @@ Code noetig.
 
 Innerhalb von **A.5 (HTML-, Markdown- und Console-Adapter)**:
 
+21pre. **Auftakt-Commit (A.4-Review-Findung 8)**: `include_hotspot.h`
+    aufteilen, bevor die drei neuen Adapter aus A.5 die vollen
+    Hotspot-Strukturen importieren obwohl sie nur die vier Filter-Enums
+    brauchen. Vorgesehene Aufteilung:
+    - `src/hexagon/model/include_classification.h`: `IncludeOrigin`,
+      `IncludeDepthKind`, `IncludeHotspot`-Struct mit den Klassifikations-
+      Feldern.
+    - `src/hexagon/model/include_filter_options.h`: `IncludeScope`,
+      `IncludeDepthFilter` (die beiden Request-/Effective-Enums, die
+      heute mitten in der Hotspot-Datei wohnen).
+    `cli_adapter.cpp` zieht dann nur den Filter-Options-Header,
+    Adapter zieht beide. Soll als ERSTER A.5-Commit landen, damit alle
+    nachfolgenden Adapter-Imports vom Anfang an die richtigen Header
+    referenzieren.
 21. HTML-Adapter implementiert v4-Output mit Filter-Zeile und neuen
     Tabellenspalten.
 22. Markdown-Adapter implementiert v4-Output.
 23. Console-Adapter implementiert v4-Output.
 24. `report-html.md` auf v4.
 25. Goldens fuer alle drei Formate.
+25a. **Fixture mit external/mixed/excluded-Coverage (A.4-Review-Findung 2)**:
+    A.4 hat alle realen Fixtures durchregeneriert, aber keine Datei
+    erzeugt `origin="external"`, `depth_kind="mixed"` oder
+    `excluded_*_count > 0`. Plan-pflicht-Test "Aggregation `mixed`
+    fuer Hotspot mit gemischten TU-Eintraegen" (~881-882) ist nur
+    synthetisch in den Adapter-Unit-Tests gepruft. A.5 ergaenzt eine
+    neue Fixture unter `tests/e2e/testdata/m6/`, deren Compile-DB
+    mindestens (a) eine TU mit System-Include `<vector>` (System-Pfad
+    -> external) enthaelt und (b) zwei Wege auf denselben Header
+    erzeugt (einmal direct, einmal indirect -> mixed). Goldens
+    fuer alle fuenf Reportformate werden aus dieser Fixture neu
+    gebacken; sie pinnen die `external`-, `mixed`- und ggf.
+    `excluded_*_count`-Pfade end-to-end.
+25b. **Tracking-Note (A.4-Review-Findung 7)**: File-API-Fixtures
+    erzeugen heute `include_depth_limit_effective=0` und
+    `include_node_budget_effective=0`, weil keine On-Disk-Sources die
+    Replies stuetzen und der Include-Resolver nie laeuft. Plan-konform
+    (Plan ~302), aber Coverage-Luecke. A.5 entscheidet bewusst, ob
+    die neue Fixture aus 25a auch eine echte Source-Layout-Variante
+    bekommt (BFS-Limits-Effective != 0); falls nicht, bleibt der
+    Plan-konforme `0`-Pfad gepinnt und der `>0`-Pfad wartet auf eine
+    spaetere Fixture-Erweiterung.
 
 Innerhalb von **A.6 (Audit-Pass)**:
 
