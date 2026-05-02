@@ -55,6 +55,9 @@ Nicht umsetzen:
   Build-System-Mutation.
 - Vollstaendige semantische C++-Analyse jenseits der fuer Include-
   Kanten noetigen Praeprozessorinformationen.
+- Stille Aenderung des Standardverhaltens bestehender Analyze-Aufrufe:
+  Ohne CLI-Option und ohne Konfigurationsdatei bleibt der heuristische
+  Source-Parsing-Resolver aktiv.
 - Projektweite Policy-Engine fuer alle Analyseoptionen. Die
   Konfigurationsdatei steuert in AP 1.8 ausschliesslich
   Include-Origin-Overrides und die Praeprozessor-Include-Aufloesung.
@@ -71,6 +74,8 @@ AP 1.8 baut auf folgenden M6-Vertraegen auf:
 - `IncludeDepthKind` mit den Werten `direct`, `indirect`, `mixed`.
 - `--include-scope <all|project|external|unknown>`.
 - `--include-depth <all|direct|indirect>`.
+- Bestehender M6-Default: Ohne explizite Resolver-Auswahl nutzt
+  `analyze` den heuristischen Source-Parsing-Resolver.
 - Strukturierte Include-Filter- und Include-Hotspot-Felder in den
   Analyze-Reportformaten.
 - Konsolidierte M6-Dokumentation und Beispiele aus AP 1.7.
@@ -134,11 +139,12 @@ Hotspots. Die Hotspot-Aggregation bleibt im Hexagon.
 Die Resolver-Auswahl ist Teil des Analyze-Requests. AP 1.8 fuehrt
 dafuer ein Feld `include_resolution_mode` mit genau diesen Werten ein:
 
-- `auto`: Default. Nutzt den praeprozessorgenauen Adapter, wenn alle
+- `heuristic`: Default. Erzwingt den bestehenden
+  Source-Parsing-Resolver und ignoriert den Praeprozessor-Adapter.
+- `auto`: Nutzt den praeprozessorgenauen Adapter, wenn alle
   Voraussetzungen erfuellt sind; sonst Fallback auf
-  `heuristic_source_parser` mit Diagnostic.
-- `heuristic`: erzwingt den bestehenden Source-Parsing-Resolver und
-  ignoriert den Praeprozessor-Adapter.
+  `heuristic_source_parser` mit Diagnostic. `auto` ist nur aktiv, wenn
+  CLI oder Konfigurationsdatei es explizit setzen.
 - `preprocessor`: erzwingt den praeprozessorgenauen Adapter. Wenn die
   Voraussetzungen nicht erfuellt sind, ist das ein CLI-/Eingabefehler
   ohne stdout-Report und ohne Zieldatei.
@@ -146,7 +152,8 @@ dafuer ein Feld `include_resolution_mode` mit genau diesen Werten ein:
 CLI und Konfigurationsdatei duerfen dieses Feld setzen. Wenn beide es
 setzen und die Werte abweichen, ist das ein CLI-/Konfigurationsfehler.
 Wenn nur die Konfigurationsdatei es setzt, gilt dieser Wert. Wenn nur
-die CLI es setzt, gilt die CLI. Ohne explizite Setzung gilt `auto`.
+die CLI es setzt, gilt die CLI. Ohne explizite Setzung gilt
+`heuristic`.
 Der konkrete CLI-Name wird in A.4 festgelegt; bis dahin ist
 `--include-resolver <auto|heuristic|preprocessor>` der Arbeitsname und
 in Tests sowie Doku konsistent zu verwenden.
@@ -180,6 +187,21 @@ Wichtig:
   Nur `include_resolution_mode=preprocessor` ist der harte
   Praeprozessor-Pfad und darf fehlende Praeprozessorvoraussetzungen zum
   Abbruch machen.
+
+Die Praeprozessor-Provenienz wird vor Overrides deterministisch auf
+`IncludeOrigin` abgebildet:
+
+| Praeprozessor-Provenienz | Vorlaeufige `IncludeOrigin` |
+|---|---|
+| `project` | `project` |
+| `system` | `external` |
+| `external` | `external` |
+| `unknown` | `unknown` |
+| adapter-spezifisch, nicht dokumentiert | `unknown` plus Diagnostic |
+
+Konfigurations-Overrides werden danach angewendet und koennen diesen
+vorlaeufigen Wert ersetzen. Die urspruengliche Adapter-Provenienz
+bleibt als Provenienzfeld oder Diagnostic erhalten.
 
 Budgetgrenzen sind in AP 1.8 exakt:
 
@@ -220,19 +242,38 @@ Discovery-Vertrag:
 - Ein explizit gesetzter, nicht lesbarer oder ungueltiger Config-Pfad
   ist ein CLI-/Konfigurationsfehler. Eine nicht vorhandene Default-
   Datei ist kein Fehler.
+- Symlinks werden fuer Discovery nicht realpath-kanonisiert. Der
+  Default-Pfad entsteht aus der lexikalisch normalisierten
+  Projekt-/Source-Root plus `cmake-xray.toml`; wenn dieser Pfad durch
+  einen Symlink erreichbar ist und die Datei lesbar ist, gilt sie als
+  vorhanden. Der Report gibt den lexikalisch normalisierten
+  Config-Pfad aus, nicht zwingend den physischen Realpath.
+- Pattern-Matching verwendet die gleichen lexikalisch normalisierten
+  Projekt-/Source-Root-relativen Pfade wie die Reports. Es erfolgt
+  keine Symlink-Aufloesung und kein Plattform-Case-Folding; Windows-
+  Laufwerksbuchstaben werden nur fuer die Root-Normalisierung
+  lowercase behandelt, nicht fuer relative Match-Schluessel.
 
 Minimaler Vertragsumfang:
 
 ```toml
+include_resolution_mode = "heuristic"
+
 [include_origin]
 project = ["src/**", "include/**"]
 external = ["third_party/**", "vendor/**"]
 unknown = []
-include_resolution_mode = "auto"
 ```
 
 Regeln:
 
+- `[include_origin]` darf fehlen oder leer sein. Dann werden keine
+  Origin-Overrides angewendet.
+- Die Schluessel `project`, `external` und `unknown` sind optional;
+  fehlende Schluessel entsprechen einer leeren Liste.
+- Jeder vorhandene Schluessel muss eine Liste von Strings enthalten.
+  `include_origin = {}` ist gleichwertig zu einem leeren
+  `[include_origin]`-Block.
 - Pfadmuster werden relativ zur normalisierten Projekt- oder
   Source-Root ausgewertet.
 - Backslashes werden vor dem Matching zu `/` normalisiert.
@@ -255,7 +296,9 @@ Regeln:
   Include-Tiefe und nicht die Praeprozessor-Kanten.
 
 Die Konfigurationsdatei ist optional. Ohne Datei bleibt das Verhalten
-identisch zum M6-Default.
+identisch zum M6-Default: `include_resolution_mode=heuristic`, keine
+Origin-Overrides, keine Config-Diagnostics ausser der reportbaren
+Information `config_loaded=false`.
 
 ## Report- und Formatvertrag
 
@@ -361,10 +404,16 @@ AP 1.8 ist abgeschlossen, wenn:
 
 - eine optionale Konfigurationsdatei Include-Origin-Overrides
   deterministisch anwenden kann;
+- fehlende Default-Konfiguration ohne Diagnostic-Flaeche fuer Nutzer
+  beim M6-kompatiblen Default bleibt und nur `config_loaded=false`
+  reportet;
 - ungueltige, mehrdeutige oder nicht normalisierbare Override-Regeln
   klare Fehler oder Diagnostics erzeugen;
 - der bestehende heuristische Include-Resolver ohne
   Konfigurationsdatei unveraendert nutzbar bleibt;
+- `include_resolution_mode=heuristic` der Default ist und bestehende
+  Aufrufe ohne Config/CLI-Auswahl keine praeprozessorgenauen Ergebnisse
+  aktivieren;
 - `include_resolution_mode=auto` bei fehlendem Praeprozessor
   deterministisch auf den heuristischen Resolver zurueckfaellt und ein
   Diagnostic erzeugt;
