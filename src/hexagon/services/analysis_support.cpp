@@ -490,8 +490,8 @@ std::vector<model::IncludeHotspot> build_include_hotspots(
         const auto reference_it = references_by_key.find(resolved.translation_unit_key);
         if (reference_it == references_by_key.end()) continue;
 
-        for (const auto& header : resolved.headers) {
-            hotspots_by_header[header].push_back(reference_it->second);
+        for (const auto& entry : resolved.headers) {
+            hotspots_by_header[entry.header_path].push_back(reference_it->second);
         }
     }
 

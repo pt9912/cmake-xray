@@ -27,6 +27,8 @@ using xray::hexagon::model::ChangedFileSource;
 using xray::hexagon::model::CompileDatabaseError;
 using xray::hexagon::model::CompileDatabaseResult;
 using xray::hexagon::model::CompileEntry;
+using xray::hexagon::model::IncludeDepthKind;
+using xray::hexagon::model::IncludeEntry;
 using xray::hexagon::model::IncludeResolutionResult;
 using xray::hexagon::model::ObservationSource;
 using xray::hexagon::model::ReportInputSource;
@@ -133,18 +135,21 @@ public:
                 {
                     ResolvedTranslationUnitIncludes{
                         translation_units[0].reference.unique_key,
-                        {"/project/include/common/config.h", "/project/include/common/shared.h"},
+                        {IncludeEntry{"/project/include/common/config.h", IncludeDepthKind::direct},
+                         IncludeEntry{"/project/include/common/shared.h", IncludeDepthKind::direct}},
                         {{xray::hexagon::model::DiagnosticSeverity::warning,
                           "could not resolve include \"generated/version.h\" from /project/src/main.cpp"}},
                     },
                     ResolvedTranslationUnitIncludes{
                         translation_units[1].reference.unique_key,
-                        {"/project/include/common/config.h", "/project/include/common/shared.h"},
+                        {IncludeEntry{"/project/include/common/config.h", IncludeDepthKind::direct},
+                         IncludeEntry{"/project/include/common/shared.h", IncludeDepthKind::direct}},
                         {},
                     },
                     ResolvedTranslationUnitIncludes{
                         translation_units[2].reference.unique_key,
-                        {"/project/include/common/config.h", "/project/include/common/shared.h"},
+                        {IncludeEntry{"/project/include/common/config.h", IncludeDepthKind::direct},
+                         IncludeEntry{"/project/include/common/shared.h", IncludeDepthKind::direct}},
                         {},
                     },
                 },

@@ -266,8 +266,9 @@ bool collect_heuristic_impacts(
     std::map<std::string, ImpactedTranslationUnit>& impacted_by_key) {
     bool heuristic_match_found = false;
     for (const auto& resolved : include_resolution.translation_units) {
-        const auto header_match =
-            std::find(resolved.headers.begin(), resolved.headers.end(), changed_file_key);
+        const auto header_match = std::find_if(
+            resolved.headers.begin(), resolved.headers.end(),
+            [&](const model::IncludeEntry& entry) { return entry.header_path == changed_file_key; });
         if (header_match == resolved.headers.end()) continue;
         heuristic_match_found = true;
         const auto observation_it = observations_by_key.find(resolved.translation_unit_key);

@@ -18,6 +18,8 @@
 namespace {
 
 using xray::hexagon::model::CompileEntry;
+using xray::hexagon::model::IncludeDepthKind;
+using xray::hexagon::model::IncludeEntry;
 using xray::hexagon::model::IncludeResolutionResult;
 using xray::hexagon::model::ResolvedTranslationUnitIncludes;
 
@@ -115,12 +117,14 @@ TEST_CASE("analysis support sorts equally sized hotspots by header path") {
     include_resolution.translation_units = {
         ResolvedTranslationUnitIncludes{
             observations[0].reference.unique_key,
-            {"/project/include/b.h", "/project/include/a.h"},
+            {IncludeEntry{"/project/include/b.h", IncludeDepthKind::direct},
+             IncludeEntry{"/project/include/a.h", IncludeDepthKind::direct}},
             {},
         },
         ResolvedTranslationUnitIncludes{
             observations[1].reference.unique_key,
-            {"/project/include/b.h", "/project/include/a.h"},
+            {IncludeEntry{"/project/include/b.h", IncludeDepthKind::direct},
+             IncludeEntry{"/project/include/a.h", IncludeDepthKind::direct}},
             {},
         },
     };
@@ -149,17 +153,19 @@ TEST_CASE("analysis support sorts larger hotspots ahead of smaller ones") {
     include_resolution.translation_units = {
         ResolvedTranslationUnitIncludes{
             observations[0].reference.unique_key,
-            {"/project/include/smaller.h", "/project/include/larger.h"},
+            {IncludeEntry{"/project/include/smaller.h", IncludeDepthKind::direct},
+             IncludeEntry{"/project/include/larger.h", IncludeDepthKind::direct}},
             {},
         },
         ResolvedTranslationUnitIncludes{
             observations[1].reference.unique_key,
-            {"/project/include/smaller.h", "/project/include/larger.h"},
+            {IncludeEntry{"/project/include/smaller.h", IncludeDepthKind::direct},
+             IncludeEntry{"/project/include/larger.h", IncludeDepthKind::direct}},
             {},
         },
         ResolvedTranslationUnitIncludes{
             observations[2].reference.unique_key,
-            {"/project/include/larger.h"},
+            {IncludeEntry{"/project/include/larger.h", IncludeDepthKind::direct}},
             {},
         },
     };

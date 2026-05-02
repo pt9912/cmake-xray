@@ -23,6 +23,8 @@ using xray::hexagon::model::CompileDatabaseError;
 using xray::hexagon::model::CompileDatabaseResult;
 using xray::hexagon::model::CompileEntry;
 using xray::hexagon::model::ImpactKind;
+using xray::hexagon::model::IncludeDepthKind;
+using xray::hexagon::model::IncludeEntry;
 using xray::hexagon::model::IncludeResolutionResult;
 using xray::hexagon::model::ObservationSource;
 using xray::hexagon::model::ReportInputSource;
@@ -111,21 +113,24 @@ public:
                 {
                     ResolvedTranslationUnitIncludes{
                         translation_units[0].reference.unique_key,
-                        {"/project/include/common/config.h",
-                         "/project/include/common/shared.h"},
+                        {IncludeEntry{"/project/include/common/config.h", IncludeDepthKind::direct},
+                         IncludeEntry{"/project/include/common/shared.h",
+                                      IncludeDepthKind::direct}},
                         {{xray::hexagon::model::DiagnosticSeverity::warning,
                           "could not resolve include \"generated/version.h\" from /project/src/main.cpp"}},
                     },
                     ResolvedTranslationUnitIncludes{
                         translation_units[1].reference.unique_key,
-                        {"/project/include/common/config.h",
-                         "/project/include/common/shared.h"},
+                        {IncludeEntry{"/project/include/common/config.h", IncludeDepthKind::direct},
+                         IncludeEntry{"/project/include/common/shared.h",
+                                      IncludeDepthKind::direct}},
                         {},
                     },
                     ResolvedTranslationUnitIncludes{
                         translation_units[2].reference.unique_key,
-                        {"/project/include/common/config.h",
-                         "/project/include/common/shared.h"},
+                        {IncludeEntry{"/project/include/common/config.h", IncludeDepthKind::direct},
+                         IncludeEntry{"/project/include/common/shared.h",
+                                      IncludeDepthKind::direct}},
                         {},
                     },
                 },
@@ -243,7 +248,8 @@ TEST_CASE("impact analyzer only keeps diagnostics for impacted translation units
                     {
                         ResolvedTranslationUnitIncludes{
                             translation_units[0].reference.unique_key,
-                            {"/project/include/common/partial.h"},
+                            {IncludeEntry{"/project/include/common/partial.h",
+                                          IncludeDepthKind::direct}},
                             {{xray::hexagon::model::DiagnosticSeverity::warning,
                               "could not resolve include \"generated/partial.h\" from /project/src/main.cpp"}},
                         },
@@ -294,7 +300,8 @@ TEST_CASE("impact analyzer sorts report-wide diagnostics deterministically") {
                     {
                         ResolvedTranslationUnitIncludes{
                             translation_units[0].reference.unique_key,
-                            {"/project/include/common/config.h"},
+                            {IncludeEntry{"/project/include/common/config.h",
+                                          IncludeDepthKind::direct}},
                             {{xray::hexagon::model::DiagnosticSeverity::warning, "middle warning"}},
                         },
                         ResolvedTranslationUnitIncludes{
@@ -375,12 +382,14 @@ TEST_CASE("impact analyzer computes affected targets from file api data") {
                     {
                         ResolvedTranslationUnitIncludes{
                             translation_units[0].reference.unique_key,
-                            {"/project/include/common/config.h"},
+                            {IncludeEntry{"/project/include/common/config.h",
+                                          IncludeDepthKind::direct}},
                             {},
                         },
                         ResolvedTranslationUnitIncludes{
                             translation_units[1].reference.unique_key,
-                            {"/project/include/common/config.h"},
+                            {IncludeEntry{"/project/include/common/config.h",
+                                          IncludeDepthKind::direct}},
                             {},
                         },
                     },
@@ -469,7 +478,7 @@ TEST_CASE("impact analyzer promotes heuristic target to direct when later observ
                     {
                         ResolvedTranslationUnitIncludes{
                             translation_units[0].reference.unique_key,
-                            {"/project/src/z_main.cpp"},
+                            {IncludeEntry{"/project/src/z_main.cpp", IncludeDepthKind::direct}},
                             {},
                         },
                         ResolvedTranslationUnitIncludes{
