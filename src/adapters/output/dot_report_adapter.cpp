@@ -21,6 +21,7 @@
 #include "hexagon/model/analysis_result.h"
 #include "hexagon/model/impact_result.h"
 #include "hexagon/model/include_classification.h"
+#include "hexagon/model/include_filter_options.h"
 #include "hexagon/model/report_format_version.h"
 #include "hexagon/model/target_graph.h"
 #include "hexagon/model/target_info.h"

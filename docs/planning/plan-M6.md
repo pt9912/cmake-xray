@@ -222,7 +222,7 @@ Wichtig:
 
 Vorgesehene Artefakte:
 
-- Erweiterung von `src/hexagon/model/include_hotspot.*` oder gleichwertigen Include-Modellen
+- Erweiterung von `src/hexagon/model/include_classification.*`, `src/hexagon/model/include_filter_options.*` oder gleichwertigen Include-Modellen (urspruenglich `include_hotspot.h`, in AP M6-1.4 A.5 step 21pre aufgeteilt)
 - Anpassung von `src/hexagon/ports/driven/include_resolver_port.h`
 - Anpassung von `src/adapters/input/source_parsing_include_adapter.*`
 - Anpassung von `src/hexagon/services/project_analyzer.*`

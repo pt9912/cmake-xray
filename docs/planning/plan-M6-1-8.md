@@ -93,8 +93,10 @@ Voraussichtlich zu aendern:
 
 - `src/hexagon/ports/driven/include_resolver_port.h`
 - `src/adapters/input/source_parsing_include_adapter.*`
-- `src/hexagon/model/include_hotspot.*` oder gleichwertige
-  Include-Modelle
+- `src/hexagon/model/include_classification.*` und
+  `src/hexagon/model/include_filter_options.*` oder gleichwertige
+  Include-Modelle (urspruenglich `include_hotspot.h`, in M6 AP 1.4
+  A.5 step 21pre aufgeteilt)
 - `src/hexagon/model/analysis_request.*` oder gleichwertige
   Analyze-Request-Modelle
 - `src/hexagon/services/project_analyzer.*`

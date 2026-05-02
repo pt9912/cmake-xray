@@ -36,7 +36,10 @@ AP 1.4 hebt `kReportFormatVersion` von `3` (eingefuehrt in AP 1.3) auf
 Umsetzen:
 
 - Neue Modelle `IncludeOrigin` und `IncludeDepthKind` in
-  `src/hexagon/model/include_hotspot.h`.
+  `src/hexagon/model/include_classification.h` (urspruenglich
+  `include_hotspot.h`, in step 21pre umbenannt; die zugehoerigen
+  Filter-Enums `IncludeScope` und `IncludeDepthFilter` leben seit
+  step 21pre in `include_filter_options.h`).
 - Erweiterung von `IncludeHotspot` um `origin` und `depth_kind`.
 - Erweiterung von `IncludeResolutionResult`/`ResolvedTranslationUnitIncludes`
   um pro-Header-Tiefenmarkierung und Budget-Telemetrie
@@ -112,7 +115,10 @@ sind.
 
 Voraussichtlich zu aendern:
 
-- `src/hexagon/model/include_hotspot.h`
+- `src/hexagon/model/include_classification.h` (in step 21pre
+  umbenannt aus `include_hotspot.h`)
+- `src/hexagon/model/include_filter_options.h` (in step 21pre neu
+  angelegt fuer `IncludeScope`/`IncludeDepthFilter`)
 - `src/hexagon/model/include_resolution.h`
 - `src/hexagon/model/analysis_result.h`
 - `src/hexagon/model/report_format_version.h`
