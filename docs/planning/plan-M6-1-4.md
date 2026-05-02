@@ -1110,7 +1110,50 @@ Innerhalb von **A.5 (HTML-, Markdown- und Console-Adapter)**:
     Tabellenspalten.
 22. Markdown-Adapter implementiert v4-Output.
 23. Console-Adapter implementiert v4-Output.
-24. `report-html.md` auf v4.
+24. `spec/report-html.md` auf v4 heben. Die Prosa-Spezifikation
+    spiegelt den HTML-Vertrag, der in Step 21 im Adapter umgesetzt
+    wurde, sowie die Console- und Markdown-Pendants aus Step 22/23.
+    Konkret zu ergaenzen:
+    - Neue Pflicht-Filter-Zeile in der `Include Hotspots`-Section:
+      `<p class="include-filter">Filter: scope=<span class="badge badge--<scope>">…</span>, depth=<span class="badge badge--<depth>">…</span>. Excluded: <unknown> unknown, <mixed> mixed.</p>`
+      Wording, Position (zwischen `<h2>` und Tabelle / Empty-Marker)
+      und die Tatsache, dass die Zeile auch im Empty-Hotspot-Fall
+      ausgegeben wird (siehe naechster Punkt) muessen pinnt sein.
+    - Empty-Hotspot-Verhalten ausdruecklich dokumentieren: die
+      Filter-Zeile spiegelt Analyse-Konfiguration, nicht Ergebnis;
+      sie erscheint deshalb auch dann, wenn `include_hotspots` leer
+      ist. Schliesst A.5-step-21-Review-Findung 6 ("Plan does not
+      specify whether the filter line should appear when there are no
+      hotspots") als Vertrag, nicht nur als Implementierungsdetail.
+    - Optionale `<p class="include-budget-note">Note: include
+      analysis stopped at <effective> nodes (budget reached).</p>`
+      Zeile dokumentieren: Erscheint genau dann, wenn
+      `include_node_budget_reached=true`. Wording exakt fixen.
+    - Neue Pflicht-Spalten `Origin` und `Depth` in der Hotspot-
+      Tabelle pinnen, mit der vom Plan vorgegebenen
+      Spaltenreihenfolge (`Header`, `Origin`, `Depth`,
+      `Affected translation units`, `Translation unit context`).
+    - Neue CSS-Badge-Klassen `badge--project`, `badge--external`,
+      `badge--unknown`, `badge--direct`, `badge--indirect`,
+      `badge--mixed` als Vertragsbestandteil festhalten. Die
+      Koexistenz mit den bestehenden M5-Klassen `badge-direct` und
+      `badge-heuristic` (impact-Evidenz, single-dash) ist eine
+      bekannte Naming-Asymmetrie aus A.5-step-21-Review-Findung 1;
+      ein optionaler Folge-Rename (z.B.
+      `badge-direct` -> `badge--evidence-direct`) gehoert nicht in
+      Step 24, sondern in einen separaten Refactor-Commit.
+    - `format_version=4` als HTML-Pflichtfeld markieren (steht heute
+      in der `<dt>format_version</dt><dd>4</dd>`-Definition-List;
+      mit der A.4-Aktualisierung von `:262` auf `format_version=4`-
+      Goldens schon teils da, in Step 24 aber zusammenhaengend
+      konsolidieren).
+    - Liste der Goldens-Pflichtszenarien auf den A.5-Stand bringen,
+      sobald Step 25/25a die Mixed-/External-/Excluded-Coverage
+      ergaenzt haben.
+    Step 24 wird typischerweise NACH Step 23 (Console-Adapter)
+    gemacht, damit die Doku den vollstaendigen v4-Stand aller drei
+    A.5-Adapter zusammenhaengend dokumentiert; ein frueherer Commit
+    waere nur halb-vollstaendig.
 25. Goldens fuer alle drei Formate.
 25a. **Fixture mit external/mixed/excluded-Coverage (A.4-Review-Findung 2)**:
     A.4 hat alle realen Fixtures durchregeneriert, aber keine Datei
