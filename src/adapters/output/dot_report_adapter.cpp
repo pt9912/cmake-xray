@@ -1,6 +1,7 @@
 #include "adapters/output/dot_report_adapter.h"
 
 #include "adapters/output/impact_priority_text.h"
+#include "adapters/output/include_text_helpers.h"
 
 #include <algorithm>
 #include <array>
@@ -185,31 +186,6 @@ std::string target_graph_status_text(TargetGraphStatus status) {
     if (status == TargetGraphStatus::loaded) return "loaded";
     if (status == TargetGraphStatus::partial) return "partial";
     return "not_loaded";
-}
-
-std::string include_origin_text(IncludeOrigin origin) {
-    if (origin == IncludeOrigin::project) return "project";
-    if (origin == IncludeOrigin::external) return "external";
-    return "unknown";
-}
-
-std::string include_depth_kind_text(IncludeDepthKind kind) {
-    if (kind == IncludeDepthKind::direct) return "direct";
-    if (kind == IncludeDepthKind::indirect) return "indirect";
-    return "mixed";
-}
-
-std::string include_scope_text(IncludeScope scope) {
-    if (scope == IncludeScope::project) return "project";
-    if (scope == IncludeScope::external) return "external";
-    if (scope == IncludeScope::unknown) return "unknown";
-    return "all";
-}
-
-std::string include_depth_filter_text(IncludeDepthFilter filter) {
-    if (filter == IncludeDepthFilter::direct) return "direct";
-    if (filter == IncludeDepthFilter::indirect) return "indirect";
-    return "all";
 }
 
 void emit_impact_depth_attributes(std::ostringstream& out, const GraphHeader& header) {

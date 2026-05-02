@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "adapters/output/impact_priority_text.h"
+#include "adapters/output/include_text_helpers.h"
 #include "adapters/output/target_display_support.h"
 #include "hexagon/model/analysis_result.h"
 #include "hexagon/model/diagnostic.h"
@@ -226,31 +227,6 @@ std::string target_graph_status_text(TargetGraphStatus status) {
     // paragraph without a Status banner); the helper therefore needs to
     // map only the two reachable enum values.
     return status == TargetGraphStatus::loaded ? "loaded" : "partial";
-}
-
-std::string include_origin_text(IncludeOrigin origin) {
-    if (origin == IncludeOrigin::project) return "project";
-    if (origin == IncludeOrigin::external) return "external";
-    return "unknown";
-}
-
-std::string include_depth_kind_text(IncludeDepthKind kind) {
-    if (kind == IncludeDepthKind::direct) return "direct";
-    if (kind == IncludeDepthKind::indirect) return "indirect";
-    return "mixed";
-}
-
-std::string include_scope_text(IncludeScope scope) {
-    if (scope == IncludeScope::project) return "project";
-    if (scope == IncludeScope::external) return "external";
-    if (scope == IncludeScope::unknown) return "unknown";
-    return "all";
-}
-
-std::string include_depth_filter_text(IncludeDepthFilter filter) {
-    if (filter == IncludeDepthFilter::direct) return "direct";
-    if (filter == IncludeDepthFilter::indirect) return "indirect";
-    return "all";
 }
 
 std::string target_graph_status_badge_class(TargetGraphStatus status) {
@@ -504,13 +480,13 @@ void emit_hotspots_filter_line(std::ostringstream& out, const AnalysisResult& re
     // include-scope/include-depth-Konfiguration plus die zwei
     // exkludierungs-Zaehler (excluded_unknown_count und _mixed_count
     // aus AnalysisResult) gemaess plan-M6-1-4.md "HTML".
+    const auto scope_value = include_scope_text(result.include_scope_effective);
+    const auto depth_value = include_depth_filter_text(result.include_depth_filter_effective);
     out << "<p class=\"include-filter\">Filter: scope="
-        << "<span class=\"badge badge--"
-        << render_text(include_scope_text(result.include_scope_effective)) << "\">"
-        << render_text(include_scope_text(result.include_scope_effective)) << "</span>"
-        << ", depth=<span class=\"badge badge--"
-        << render_text(include_depth_filter_text(result.include_depth_filter_effective)) << "\">"
-        << render_text(include_depth_filter_text(result.include_depth_filter_effective))
+        << "<span class=\"badge badge--" << render_attribute(scope_value) << "\">"
+        << render_text(scope_value) << "</span>"
+        << ", depth=<span class=\"badge badge--" << render_attribute(depth_value) << "\">"
+        << render_text(depth_value)
         << "</span>. Excluded: "
         << result.include_hotspot_excluded_unknown_count << " unknown, "
         << result.include_hotspot_excluded_mixed_count << " mixed.</p>\n";
@@ -546,9 +522,9 @@ void emit_hotspots_section(std::ostringstream& out, const HotspotContext& ctx) {
         const auto depth_text = include_depth_kind_text(hotspot.depth_kind);
         out << "<tr>"
             << "<td>" << render_text(hotspot.header_path) << "</td>"
-            << "<td><span class=\"badge badge--" << render_text(origin_text)
+            << "<td><span class=\"badge badge--" << render_attribute(origin_text)
             << "\">" << render_text(origin_text) << "</span></td>"
-            << "<td><span class=\"badge badge--" << render_text(depth_text)
+            << "<td><span class=\"badge badge--" << render_attribute(depth_text)
             << "\">" << render_text(depth_text) << "</span></td>"
             << "<td>" << hotspot.affected_translation_units.size() << "</td>";
         emit_hotspot_context_cell(out, hotspot, ctx.top_limit, ctx.targets_by_key);
