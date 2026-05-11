@@ -954,14 +954,48 @@ parallel zu AP 1.4 entwickelbar.
   `059f85d` (Threshold-Anwendung in analysis_support), `cfd1604`
   (AnalysisConfiguration + Section-States), `018f61e` (Service-
   Tests), `535428c` (Coverage-Tidy-Up NRVO + Brace-Init).
-- A.3 (Schema und Format-Vertrag): **in Arbeit**, Step 10-11
-  geliefert in `570820d` (kReportFormatVersion=5,
-  TargetGraphStatus::disabled). Step 12 (Schema v5) und Step 13
-  (`spec/report-json.md` v5) noch offen. Zwischen `570820d` und dem
-  A.4-Abschluss ist die `docker-test`-Gate erwartungsgemaess rot,
-  weil das Binary `format_version=5` ausgibt waehrend die committed
-  Goldens noch `4` halten.
-- A.4 (JSON- und DOT-Adapter): noch nicht ausgeliefert.
+- A.3 (Schema und Format-Vertrag): **erledigt im Code**. Lokal
+  ausgeliefert in `570820d` (Step 10-11 model bump), `c5d30c9`
+  (Step 12 Schema v5) und `0e7045c` (Step 13 report-json.md v5).
+- A.4 (JSON- und DOT-Adapter): **in Arbeit**. Lokal ausgeliefert
+  in `53b6e48` (Step 14 JSON adapter v5), `995bfc6` (Step 15 DOT
+  adapter v5), `8a242fb` (TargetGraphStatus::disabled-Mapping in
+  Console/Markdown/HTML als A.4/A.5-Folgearbeit zu Step 11) und
+  `b470b53` (kReportFormatVersion-Pin in zwei Adapter-/Service-
+  Tests von 4 auf 5). Schwerpunkt fuer die naechste Sitzung:
+  * Step 16 `spec/report-dot.md` v5.
+  * Step 17 Goldens regen fuer 60+ JSON+DOT-Files (siehe
+    Sub-Punkt unten).
+  * Adapter-Tests in `tests/adapters/test_json_report_adapter.cpp`
+    und `tests/adapters/test_dot_report_adapter.cpp` um neue v5-
+    Felder erweitern.
+  * Coverage- und Quality-Tidy-Up (Multi-Line-Ketten, NRVO,
+    Brace-Init-Maps), Pattern wie bei A.1/A.2.
+  * Empty-Section-Suppression fuer `disabled`/`not_loaded` in JSON
+    und DOT pro plan §572-594.
+
+  Zwischen `570820d` und dem Schritt-17-Abschluss bleibt die
+  `docker-test`-Gate erwartungsgemaess rot, weil das Binary jetzt
+  `format_version: 5` ausgibt waehrend die committed Goldens noch
+  `4` halten. Lokal nicht-gepushte Commits seit dem A.2-Endstand:
+
+  ```
+  b470b53 fix(M6 AP 1.5): A.4 update test format_version pins from 4 to 5
+  8a242fb feat(M6 AP 1.5): A.4/A.5 step 11 follow-up route TargetGraphStatus::disabled in Console/Markdown/HTML
+  995bfc6 feat(M6 AP 1.5): A.4 step 15 DOT adapter v5
+  53b6e48 feat(M6 AP 1.5): A.4 step 14 JSON adapter v5
+  0e7045c docs(spec): M6 AP 1.5 A.3 step 13 raise report-json.md to v5
+  c5d30c9 docs(spec): M6 AP 1.5 A.3 step 12 raise report-json.schema.json to v5
+  d052039 docs(M6 AP 1.5): pin Liefer-Stand for A.1 + A.2 and add Wiederaufnahme-Plan
+  570820d feat(M6 AP 1.5): A.3 step 10-11 raise kReportFormatVersion to 5 + TargetGraphStatus::disabled
+  ```
+
+  Goldens-Regen-Quellen (Step 17): tests/e2e/run_e2e_artifacts.sh
+  fuer m5/m6 JSON+DOT (jeweils ~16 `assert_*_equals_file`-Eintraege),
+  plus docs/examples/{analyze,impact}-report{,-targets,-target-graph}
+  .{json,dot} mit Manifest-Hash-Update. Das Binary unter /tmp/cmake-xray
+  (Build `b36oip9rm`) ist bereits v5-faehig und kann fuer die Regen
+  benutzt werden.
 - A.5 (HTML-, Markdown- und Console-Adapter): noch nicht ausgeliefert.
 - A.6 (Audit-Pass): noch nicht ausgeliefert.
 
