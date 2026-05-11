@@ -1,0 +1,7 @@
+[
+  {
+    "directory": "build",
+    "command": "clang++ -I../include -c ../src/main.cpp -o main.o",
+    "file": "../src/main.cpp"
+  }
+]
