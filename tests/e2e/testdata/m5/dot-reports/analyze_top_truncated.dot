@@ -15,7 +15,7 @@ digraph cmake_xray_analysis {
   graph_tu_threshold_arg_count=0;
   graph_tu_threshold_include_path_count=0;
   graph_tu_threshold_define_count=0;
-  tu_1 [kind="translation_unit", rank=1, label="file_00.cpp", path="src/file_00.cpp", directory="build", unique_key="/Development/cmake-xray/tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/src/file_00.cpp|/Development/cmake-xray/tests/e2e/testdata/m5/dot-fixtures/truncating_compile_db/build"];
+  tu_1 [kind="translation_unit", rank=1, label="file_00.cpp", path="src/file_00.cpp", directory="build", unique_key="HOSTPATH"];
   hotspot_1 [kind="include_hotspot", label="h0.h", path="include/h0.h", origin="project", depth_kind="direct", context_total_count=6, context_returned_count=1, context_truncated=true];
   tu_1 -> hotspot_1 [kind="tu_include_hotspot"];
 }

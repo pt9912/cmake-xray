@@ -15,8 +15,8 @@ digraph cmake_xray_analysis {
   graph_tu_threshold_arg_count=0;
   graph_tu_threshold_include_path_count=0;
   graph_tu_threshold_define_count=0;
-  tu_1 [kind="translation_unit", rank=1, label="main.cpp", path="src/main.cpp", directory="build", unique_key="/project/src/main.cpp|/project/build"];
-  tu_2 [kind="translation_unit", rank=2, label="core.cpp", path="src/core.cpp", directory="build", unique_key="/project/src/core.cpp|/project/build"];
+  tu_1 [kind="translation_unit", rank=1, label="main.cpp", path="src/main.cpp", directory="build", unique_key="HOSTPATH"];
+  tu_2 [kind="translation_unit", rank=2, label="core.cpp", path="src/core.cpp", directory="build", unique_key="HOSTPATH"];
   target_1 [kind="target", label="app", name="app", type="EXECUTABLE", unique_key="app::EXECUTABLE"];
   target_2 [kind="target", label="core", name="core", type="STATIC_LIBRARY", unique_key="core::STATIC_LIBRARY"];
   tu_1 -> target_1 [kind="tu_target"];
