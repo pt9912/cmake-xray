@@ -37,7 +37,7 @@ Jeder JSON-Report enthaelt diese Pflichtfelder in genau dieser Reihenfolge:
 | Feld | Typ | Pflicht | Beschreibung |
 | --- | --- | --- | --- |
 | `format` | string | ja | Maschinenlesbarer Dokumenttyp. `cmake-xray.analysis` oder `cmake-xray.impact`. |
-| `format_version` | integer | ja | Aktuell `4` (M6 AP 1.4). Erhoeht sich bei vertragsbrechenden Aenderungen. v4 fuegt den `include_filter`-Block sowie `origin` und `depth_kind` an jedem Hotspot-Item und `excluded_unknown_count`/`excluded_mixed_count` am Hotspot-Container ein. |
+| `format_version` | integer | ja | Aktuell `5` (M6 AP 1.5). Erhoeht sich bei vertragsbrechenden Aenderungen. v5 fuegt zwei neue Top-Level-Pflichtfelder `analysis_configuration` und `analysis_section_states` ein, drei neue Summary-Counter (`tu_ranking_total_count_after_thresholds`, `tu_ranking_excluded_by_thresholds_count`, `include_hotspot_excluded_by_min_tus_count`) und erweitert `target_graph_status` um den Wert `"disabled"`. v4 fuegt den `include_filter`-Block sowie `origin` und `depth_kind` an jedem Hotspot-Item und `excluded_unknown_count`/`excluded_mixed_count` am Hotspot-Container ein. |
 | `report_type` | string | ja | `analyze` oder `impact`. Kurzer Workflow-Identifier; nicht der CLI-Wert `--format json`. |
 | `inputs` | object | ja | Eingabeprovenienz aus `ReportInputs`. Schema je Reporttyp unten. |
 | `summary` | object | ja | Aggregierte Kennzahlen je Reporttyp. |
@@ -104,12 +104,15 @@ Format-Identifier und Reporttyp:
 3. `report_type`
 4. `inputs`
 5. `summary`
-6. `translation_unit_ranking`
-7. `include_hotspots`
-8. `target_graph_status`
-9. `target_graph`
-10. `target_hubs`
-11. `diagnostics`
+6. `analysis_configuration` *(neu in v5)*
+7. `analysis_section_states` *(neu in v5)*
+8. `include_filter` *(neu in v4)*
+9. `translation_unit_ranking`
+10. `include_hotspots`
+11. `target_graph_status`
+12. `target_graph`
+13. `target_hubs`
+14. `diagnostics`
 
 ### `inputs` (analyze)
 
@@ -126,6 +129,42 @@ Enthaelt die fuenf Felder aus dem gemeinsamen `inputs`-Anteil. `changed_file` un
 | `include_analysis_heuristic` | boolean | ja | `true`, wenn Include-Aufloesung heuristisch lief; sonst `false`. |
 | `observation_source` | string | ja | `exact` oder `derived`. |
 | `target_metadata` | string | ja | `not_loaded`, `loaded` oder `partial`. |
+| `tu_ranking_total_count_after_thresholds` | integer | ja | (v5) Anzahl TUs nach `--tu-threshold`-Filter, vor `--top`. |
+| `tu_ranking_excluded_by_thresholds_count` | integer | ja | (v5) Anzahl TUs, durch `--tu-threshold`-Filter ausgeschlossen. |
+| `include_hotspot_excluded_by_min_tus_count` | integer | ja | (v5) Anzahl Hotspots, durch `--min-hotspot-tus`-Filter ausgeschlossen. |
+
+### `analysis_configuration` (analyze, v5)
+
+Spiegelt die durch CLI validierte Analyseauswahl plus die wirksamen Schwellenwerte:
+
+| Feld | Typ | Pflicht | Werte |
+| --- | --- | --- | --- |
+| `analysis_sections` | array | ja | Kanonisch sortierte Liste der `effective_sections` (`tu-ranking`, `include-hotspots`, `target-graph`, `target-hubs`). Bei `--analysis all` enthaelt es alle vier Werte. |
+| `tu_thresholds` | object | ja | Objekt mit exakt drei Pflicht-Schluesseln `arg_count`, `include_path_count`, `define_count` (jeweils integer, `0` = keine Filterung). |
+| `min_hotspot_tus` | integer | ja | Wirksamer `--min-hotspot-tus`-Wert; Default `2`. |
+| `target_hub_in_threshold` | integer | ja | Wirksamer `--target-hub-in-threshold`-Wert; Default `10`. |
+| `target_hub_out_threshold` | integer | ja | Wirksamer `--target-hub-out-threshold`-Wert; Default `10`. |
+
+`tu_thresholds` traegt immer alle drei Metriken, damit das Schema mit `additionalProperties: false` geschlossen bleibt. Fehlende CLI-Werte werden als `0` serialisiert.
+
+### `analysis_section_states` (analyze, v5)
+
+Objekt mit allen vier Sections als Pflicht-Schluessel:
+
+| Feld | Typ | Pflicht | Werte |
+| --- | --- | --- | --- |
+| `tu-ranking` | string | ja | `active`, `disabled` oder `not_loaded`. |
+| `include-hotspots` | string | ja | `active`, `disabled` oder `not_loaded`. |
+| `target-graph` | string | ja | `active`, `disabled` oder `not_loaded`. |
+| `target-hubs` | string | ja | `active`, `disabled` oder `not_loaded`. |
+
+Regeln:
+
+- `disabled`: Section nicht in `analysis_configuration.analysis_sections`.
+- `not_loaded`: Section angefordert, aber Daten nicht verfuegbar (z. B. Target-Graph ohne File-API).
+- `active`: Section angefordert und Daten verfuegbar.
+- `target_graph_status` traegt zusaetzlich `"disabled"`, wenn die `target-graph`-Section nicht angefordert wurde; semantisch unterschiedlich von `not_loaded`.
+- `disabled`/`not_loaded`-Sections werden weiterhin im JSON mit deterministischen Empty-Strukturen ausgegeben (`translation_unit_ranking.items=[]`, `include_hotspots.items=[]`, `target_graph.nodes=[]`/`.edges=[]`, `target_hubs.inbound=[]`/`.outbound=[]`).
 
 ### `translation_unit_ranking`
 
