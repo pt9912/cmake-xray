@@ -1312,12 +1312,42 @@ werden.
 Wird nach dem Schnitt der A-Tranchen mit Commit-Hashes befuellt. Bis
 dahin ist AP 1.4 nicht abnahmefaehig.
 
-- A.1 (Modelle und BFS-Umstellung): noch nicht ausgeliefert.
-- A.2 (Service-Klassifikation und Filter): noch nicht ausgeliefert.
-- A.3 (CLI und Schema): noch nicht ausgeliefert.
-- A.4 (JSON- und DOT-Adapter): noch nicht ausgeliefert.
-- A.5 (HTML-, Markdown- und Console-Adapter): noch nicht ausgeliefert.
-- A.6 (Audit-Pass): noch nicht ausgeliefert.
+- A.1 (Modelle und BFS-Umstellung): `dbd51e0` (feat A.1 BFS adapter)
+  + `7881ffa` (A.1/A.2 review findings, joint mit A.2).
+- A.2 (Service-Klassifikation und Filter): `e770238` (feat A.2 origin
+  classifier + depth-kind aggregation + intersection filter)
+  + `7881ffa` (A.1/A.2 review findings, joint mit A.1).
+- A.3 (CLI und Schema): `e5e668e` (feat A.3 CLI-Optionen + v4 Schema-
+  Bump), `041aaf4` (review-fixes 1-6), `c5896e2` (review-fixes 7-10).
+- A.4 (JSON- und DOT-Adapter): `c48e45c` (feat A.4 JSON+DOT v4),
+  `248c863` (Plan-Pin der A.4-Review-Items 2/7/8 als A.5),
+  `6db5a9f` (review-fixes 1/3/4/5/6/9/10).
+- A.5 (HTML-, Markdown- und Console-Adapter):
+  - Step 21pre: `16f5b2a` (split include_hotspot.h), `f7afa6e`
+    (review-fixes 1-4).
+  - Step 21 (HTML v4): `94d4267` (feat HTML adapter v4),
+    `953190e` + `90bcdd2` (Plan-Expansionen Step 24 / 25c / 27a),
+    `aa29322` (shared include text helpers + attribute escaping).
+  - Step 22 (Markdown v4): `7a7314c` (Plan-Expansion + Filter-
+    Backtick-Vereinheitlichung), `be4c314` (feat Markdown adapter
+    v4), `36bb1ab` (Goldens-Regen), `c6a4fa2` (dead append_reference
+    entfernen).
+  - Step 23 (Console v4): `8998a3f` (Plan-Expansion), `3b92a8a`
+    (feat Console adapter v4), `bbeee3e` (Console-Goldens-Regen),
+    `900ac64` (verbleibende v4-Test-Assertions), `9364070` (dead
+    append_translation_unit_reference entfernen), `f727d38`
+    (Coverage-Restore für die multi-line `out <<`-Chains).
+  - Step 24 (spec/report-html.md v4): `a7defad`.
+  - Step 25 / 25a (include_origin_mix-Fixture + 10 Goldens):
+    `0ad4c64` (Fixture), `d70ceb7` (Goldens + Manifeste).
+  - Step 25b (Tracking-Note erledigt durch 25a): `e035e62`.
+  - Step 25c (BEM-Rename `badge-direct`/`badge-heuristic` →
+    `badge--evidence-*`): `2f83d7e`.
+- A.6 (Audit-Pass): aktueller Commit (CHANGELOG-Eintrag fuer Step
+  27a, Liefer-Stand-Block fuer Step 28). Steps 26 und 27 (CLI-E2E-
+  und Docker-Gates) sind durch die wiederholten gruenen Docker-
+  Gate-Laeufe waehrend A.5 (zuletzt nach `2f83d7e`: 41/41 Tests
+  gruen, Coverage 100%, Quality-Gate gruen) implizit erledigt.
 
 ## Abnahmekriterien
 

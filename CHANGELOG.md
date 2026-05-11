@@ -9,8 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- M6 AP 1.4 introduces an include-origin and include-depth view across
+  all five report formats. Two new analyze-CLI options
+  `--include-scope` (values `all`, `project`, `external`, `unknown`,
+  default `all`) and `--include-depth` (values `all`, `direct`,
+  `indirect`, default `all`) filter the `Include Hotspots` section
+  while leaving translation-unit ranking untouched.
+- Every `Include Hotspots` entry carries two new classification
+  fields `origin` (`project` / `external` / `unknown`) and
+  `depth_kind` (`direct` / `indirect` / `mixed`); the hotspot
+  container also tracks `excluded_unknown_count` and
+  `excluded_mixed_count` counters for the scope/depth filters. Fields
+  surface in analyze JSON, DOT, HTML, Markdown and Console reports
+  with format-specific presentation (badges, table columns, suffix in
+  brackets).
+- Analyze-JSON adds an `include_filter` block with the effective
+  scope, depth and BFS-limit values plus `include_node_budget_reached`.
+- Analyze-DOT adds three graph attributes `graph_include_scope`,
+  `graph_include_depth` and `graph_include_node_budget_reached`.
+- HTML, Markdown and Console reports prefix the hotspot listing with
+  a `Filter:` line that mirrors the analysis configuration even when
+  the hotspot set is empty. An optional `Note: include analysis
+  stopped at <effective> nodes (budget reached).` line appears when
+  the BFS hits the node budget.
+- HTML report ships six new CSS badge classes
+  `badge--project`, `badge--external`, `badge--unknown`,
+  `badge--direct`, `badge--indirect`, `badge--mixed` for the new
+  origin and depth values.
+
 ### Changed
 
+- `kReportFormatVersion` rises from `3` to `4`. AP 1.4 A.3 carries the
+  version jump; AP 1.4 A.4 / A.5 land the structural fields and
+  format-specific renderings under the v4 contract.
+- HTML evidence badges rename from single-dash to BEM double-dash to
+  align with the new origin/depth classes: `badge-direct` →
+  `badge--evidence-direct`, `badge-heuristic` →
+  `badge--evidence-heuristic`. The visible badge text stays
+  unchanged.
 - README.md and docs/user/guide.md now explicitly document the
   `cmake -B build`-aus-Source path as the supported user-facing
   installation path on macOS arm64 and Windows x86_64 (where no
