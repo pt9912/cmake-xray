@@ -157,14 +157,6 @@ void append_target_suffix(std::ostringstream& out, const std::vector<TargetInfo>
     out << ']';
 }
 
-void append_reference(
-    std::ostringstream& out, const TranslationUnitReference& reference,
-    const std::map<std::string, const std::vector<TargetInfo>*>& targets_by_key) {
-    append_reference(out, reference);
-    const auto it = targets_by_key.find(reference.unique_key);
-    if (it != targets_by_key.end()) append_target_suffix(out, *it->second);
-}
-
 void append_diagnostic_list(std::ostringstream& out, const std::vector<Diagnostic>& diagnostics,
                             std::string_view indent) {
     for (const auto& diagnostic : diagnostics) {
