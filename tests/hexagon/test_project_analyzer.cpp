@@ -342,6 +342,158 @@ TEST_CASE("project analyzer keeps best effort metrics for unmatched command quot
           std::string::npos);
 }
 
+// ---- AP M6-1.5 A.2: analysis_configuration + analysis_section_states ----
+
+TEST_CASE("AP1.5 A.2: project analyzer mirrors request fields into analysis_configuration") {
+    using xray::hexagon::model::AnalysisSection;
+    using xray::hexagon::model::TuRankingMetric;
+    const StubBuildModelPort build_model_port;
+    const UnusedBuildModelPort unused_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port, include_resolver_port,
+                                                            unused_port};
+
+    auto request = make_project_request("/tmp/compile_commands.json", "");
+    request.analysis_sections = {AnalysisSection::tu_ranking, AnalysisSection::include_hotspots};
+    request.tu_thresholds[TuRankingMetric::arg_count] = 6;
+    request.min_hotspot_tus = 3;
+    request.target_hub_in_threshold = 7;
+    request.target_hub_out_threshold = 9;
+
+    const auto result = analyzer.analyze_project(std::move(request));
+
+    REQUIRE(result.analysis_configuration.effective_sections.size() == 2);
+    CHECK(result.analysis_configuration.effective_sections[0] == AnalysisSection::tu_ranking);
+    CHECK(result.analysis_configuration.effective_sections[1] ==
+          AnalysisSection::include_hotspots);
+    CHECK(result.analysis_configuration.min_hotspot_tus == 3);
+    CHECK(result.analysis_configuration.target_hub_in_threshold == 7);
+    CHECK(result.analysis_configuration.target_hub_out_threshold == 9);
+    REQUIRE(result.analysis_configuration.tu_thresholds.count(TuRankingMetric::arg_count) == 1);
+    CHECK(result.analysis_configuration.tu_thresholds.at(TuRankingMetric::arg_count) == 6);
+}
+
+TEST_CASE("AP1.5 A.2: project analyzer populates all four section states with disabled / not_loaded rules") {
+    using xray::hexagon::model::AnalysisSection;
+    using xray::hexagon::model::AnalysisSectionState;
+    const StubBuildModelPort build_model_port;
+    const UnusedBuildModelPort unused_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port, include_resolver_port,
+                                                            unused_port};
+
+    // Compile-DB-only run with all four sections requested: tu-ranking and
+    // include-hotspots are always data-available (-> active); target-graph
+    // and target-hubs depend on a loaded target_graph_status, which the
+    // compile-DB-only path never reaches (-> not_loaded).
+    auto request = make_project_request("/tmp/compile_commands.json", "");
+    request.analysis_sections = {AnalysisSection::tu_ranking, AnalysisSection::include_hotspots,
+                                 AnalysisSection::target_graph,
+                                 AnalysisSection::target_hubs};
+
+    const auto result = analyzer.analyze_project(std::move(request));
+
+    REQUIRE(result.analysis_section_states.size() == 4);
+    CHECK(result.analysis_section_states.at(AnalysisSection::tu_ranking) ==
+          AnalysisSectionState::active);
+    CHECK(result.analysis_section_states.at(AnalysisSection::include_hotspots) ==
+          AnalysisSectionState::active);
+    CHECK(result.analysis_section_states.at(AnalysisSection::target_graph) ==
+          AnalysisSectionState::not_loaded);
+    CHECK(result.analysis_section_states.at(AnalysisSection::target_hubs) ==
+          AnalysisSectionState::not_loaded);
+}
+
+TEST_CASE("AP1.5 A.2: project analyzer marks omitted sections as disabled") {
+    using xray::hexagon::model::AnalysisSection;
+    using xray::hexagon::model::AnalysisSectionState;
+    const StubBuildModelPort build_model_port;
+    const UnusedBuildModelPort unused_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port, include_resolver_port,
+                                                            unused_port};
+
+    auto request = make_project_request("/tmp/compile_commands.json", "");
+    request.analysis_sections = {AnalysisSection::tu_ranking};
+
+    const auto result = analyzer.analyze_project(std::move(request));
+
+    CHECK(result.analysis_section_states.at(AnalysisSection::tu_ranking) ==
+          AnalysisSectionState::active);
+    CHECK(result.analysis_section_states.at(AnalysisSection::include_hotspots) ==
+          AnalysisSectionState::disabled);
+    CHECK(result.analysis_section_states.at(AnalysisSection::target_graph) ==
+          AnalysisSectionState::disabled);
+    CHECK(result.analysis_section_states.at(AnalysisSection::target_hubs) ==
+          AnalysisSectionState::disabled);
+}
+
+TEST_CASE("AP1.5 A.2: project analyzer applies tu_thresholds before ranking and counts excluded") {
+    using xray::hexagon::model::TuRankingMetric;
+    const StubBuildModelPort build_model_port;
+    const UnusedBuildModelPort unused_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port, include_resolver_port,
+                                                            unused_port};
+
+    // The stub fixture has arg_count = 8 / 4 / 7 for main.cpp / core.cpp /
+    // tool.cpp. Filtering on arg_count >= 7 leaves main.cpp + tool.cpp.
+    auto request = make_project_request("/tmp/compile_commands.json", "");
+    request.tu_thresholds[TuRankingMetric::arg_count] = 7;
+
+    const auto result = analyzer.analyze_project(std::move(request));
+
+    CHECK(result.tu_ranking_excluded_by_thresholds_count == 1);
+    CHECK(result.tu_ranking_total_count_after_thresholds == 2);
+    REQUIRE(result.translation_units.size() == 2);
+    // Surviving TUs keep consecutive ranks 1..2.
+    CHECK(result.translation_units[0].rank == 1);
+    CHECK(result.translation_units[1].rank == 2);
+}
+
+TEST_CASE("AP1.5 A.2: project analyzer applies tu_thresholds across all three metrics") {
+    // Covers the three branches inside translation_unit_passes_thresholds
+    // (arg_count, include_path_count, define_count) by setting all three
+    // thresholds at values the stub fixture satisfies for at least one TU.
+    using xray::hexagon::model::TuRankingMetric;
+    const StubBuildModelPort build_model_port;
+    const UnusedBuildModelPort unused_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port, include_resolver_port,
+                                                            unused_port};
+
+    auto request = make_project_request("/tmp/compile_commands.json", "");
+    request.tu_thresholds[TuRankingMetric::arg_count] = 1;
+    request.tu_thresholds[TuRankingMetric::include_path_count] = 1;
+    request.tu_thresholds[TuRankingMetric::define_count] = 1;
+
+    const auto result = analyzer.analyze_project(std::move(request));
+
+    // Stub fixture defines (arg_count, include_path_count, define_count) =
+    // (8, 2, 1) for main.cpp, (6, 1, 0) for core.cpp and (7, 1, 1) for
+    // tool.cpp; only core.cpp has define_count < 1 and is dropped.
+    CHECK(result.tu_ranking_excluded_by_thresholds_count == 1);
+    CHECK(result.tu_ranking_total_count_after_thresholds == 2);
+}
+
+TEST_CASE("AP1.5 A.2: project analyzer enforces configurable min_hotspot_tus and counts excluded") {
+    const StubBuildModelPort build_model_port;
+    const UnusedBuildModelPort unused_port;
+    const StubIncludeResolverPort include_resolver_port;
+    const xray::hexagon::services::ProjectAnalyzer analyzer{build_model_port, include_resolver_port,
+                                                            unused_port};
+
+    // The stub fixture has two hotspots each with three affected TUs, so
+    // bumping min_hotspot_tus to 4 drops them both.
+    auto request = make_project_request("/tmp/compile_commands.json", "");
+    request.min_hotspot_tus = 4;
+
+    const auto result = analyzer.analyze_project(std::move(request));
+
+    CHECK(result.include_hotspots.empty());
+    CHECK(result.include_hotspot_excluded_by_min_tus_count == 2);
+}
+
 TEST_CASE("report generator delegates rendering to the report writer port") {
     const StubReportWriterPort report_writer_port;
     const xray::hexagon::services::ReportGenerator generator{report_writer_port};
