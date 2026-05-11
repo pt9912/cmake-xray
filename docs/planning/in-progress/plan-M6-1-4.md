@@ -863,7 +863,7 @@ Section:
 ```markdown
 ## Include Hotspots
 
-Filter: `scope=all`, `depth=all`. Excluded: 0 unknown, 0 mixed.
+Filter: `scope=all`, `depth=all`. Excluded: `0` unknown, `0` mixed.
 
 | Header | Origin | Depth | Affected TUs | Context |
 |---|---|---|---|---|
@@ -1108,7 +1108,29 @@ Innerhalb von **A.5 (HTML-, Markdown- und Console-Adapter)**:
     referenzieren.
 21. HTML-Adapter implementiert v4-Output mit Filter-Zeile und neuen
     Tabellenspalten.
-22. Markdown-Adapter implementiert v4-Output.
+22. Markdown-Adapter implementiert v4-Output mit neuer `Include Hotspots`-Section und dokumentiertem
+    Top-Kontingenz-Verhalten.
+    1. Pflicht-Section-Struktur in exakter Reihenfolge:
+       `## Include Hotspots` (mit Leerzeile),
+       `Filter: \`scope=<X>\`, \`depth=<Y>\`. Excluded: \`<N>\` unknown, \`<M>\` mixed.`,
+       optional `Note: include analysis stopped at <effective> nodes (budget reached).` bei
+       `include_node_budget_reached=true`,
+       optional `Showing <returned> of <total> include hotspots.` bei Top-Limit-Drosselung,
+       danach `No include hotspots found.` ODER Tabelle.
+    2. Empty-Hotspot-Vertrag wie HTML: Filter-Zeile (und optional Budget/Top-Limit-Zeile) erscheinen auch bei leerem
+       `include_hotspots`; der Empty-Marker steht unterhalb davon.
+    3. Tabellen-Vertrag bei Nicht-Empty:
+       Header exakt `| Header | Origin | Depth | Affected TUs | Context |`
+       und Trennzeile `|---|---|---|---|---|`.
+       `Header`-Zelle mit `append_table_cell_target`, dabei Backtick + Pipe-Escape.
+       `Origin` und `Depth` ebenfalls über `append_table_cell_target` mit Enum-Text
+       (Backticks wie im Plan-Referenzsatz bei Zeile 870 analog), numerisch als Zahl ohne Backtick in `Affected TUs`
+       (`hotspot.affected_translation_units.size()`).
+    4. X (Context-Inhalt): A (flach: `src/main.cpp [directory: build/debug] / src/lib.cpp [directory: build/lib]`,
+       konsistent mit `normalize_table_cell_whitespace`-Separator).
+    5. Y (Hotspot-Diagnostics): β (fallen in Markdown weg, konsistent mit HTML v4).
+    6. Z (Target-Suffix in Context): ja, bei vorhandenem Target weiterhin im Context als
+       `[targets: <name>]` mit `disambiguate_target_display_names`.
 23. Console-Adapter implementiert v4-Output.
 24. `spec/report-html.md` auf v4 heben. Die Prosa-Spezifikation
     spiegelt den HTML-Vertrag, der in Step 21 im Adapter umgesetzt
