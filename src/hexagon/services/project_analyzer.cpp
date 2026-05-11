@@ -309,15 +309,19 @@ void populate_analysis_section_states(model::AnalysisResult& result) {
     };
     const bool graph_available = result.target_graph_status == TargetGraphStatus::loaded ||
                                  result.target_graph_status == TargetGraphStatus::partial;
-    result.analysis_section_states = {
-        {AnalysisSection::tu_ranking, state_for(AnalysisSection::tu_ranking, true)},
-        {AnalysisSection::include_hotspots,
-         state_for(AnalysisSection::include_hotspots, true)},
-        {AnalysisSection::target_graph,
-         state_for(AnalysisSection::target_graph, graph_available)},
-        {AnalysisSection::target_hubs,
-         state_for(AnalysisSection::target_hubs, graph_available)},
-    };
+    // Sequential emplace beats a multi-line brace-init under gcov; the
+    // four pairs of constant-keyed inserts each register as their own
+    // covered line.
+    auto& states = result.analysis_section_states;
+    states.clear();
+    states.emplace(AnalysisSection::tu_ranking,
+                   state_for(AnalysisSection::tu_ranking, true));
+    states.emplace(AnalysisSection::include_hotspots,
+                   state_for(AnalysisSection::include_hotspots, true));
+    states.emplace(AnalysisSection::target_graph,
+                   state_for(AnalysisSection::target_graph, graph_available));
+    states.emplace(AnalysisSection::target_hubs,
+                   state_for(AnalysisSection::target_hubs, graph_available));
 }
 
 void populate_include_filter_telemetry(

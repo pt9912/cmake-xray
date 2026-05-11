@@ -503,7 +503,9 @@ RankedTranslationUnitsBuildResult build_ranked_translation_units(
         out.translation_units[index].rank = index + 1;
     }
     out.total_count_after_thresholds = out.translation_units.size();
-    return out;
+    // NRVO-defeating return mirrors normalize_table_cell_whitespace so the
+    // closing brace counts as a covered line under gcov.
+    return RankedTranslationUnitsBuildResult(std::move(out));
 }
 
 namespace {
