@@ -1,5 +1,8 @@
 #pragma once
 
+#include <map>
+
+#include "analysis_configuration.h"
 #include "application_info.h"
 #include "compile_database_result.h"
 #include "diagnostic.h"
@@ -42,6 +45,8 @@ struct AnalysisResult {
     std::size_t include_node_budget_requested{10000};
     std::size_t include_node_budget_effective{0};
     bool include_node_budget_reached{false};
+    AnalysisConfiguration analysis_configuration;
+    std::map<AnalysisSection, AnalysisSectionState> analysis_section_states;
 };
 
 }  // namespace xray::hexagon::model
