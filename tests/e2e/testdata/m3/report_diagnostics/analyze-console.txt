@@ -9,14 +9,7 @@ top 3 of 3 translation units
 3. src/lib/core.cpp [directory: build/lib]
    arg_count=6 include_path_count=1 define_count=0
 
-include hotspots [heuristic]
-top 2 of 2 include hotspots
-- include/common/config.h (affected translation units: 3)
-  src/app/main.cpp [directory: build/app]
-  src/lib/core.cpp [directory: build/lib]
-  src/tools/tool.cpp [directory: build/tools]
-- include/common/shared.h (affected translation units: 3)
-  src/app/main.cpp [directory: build/app]
-  src/lib/core.cpp [directory: build/lib]
-  src/tools/tool.cpp [directory: build/tools]
+Include Hotspots (scope=all, depth=all; excluded: 0 unknown, 0 mixed):
+  include/common/config.h [project, direct] (3 translation units)
+  include/common/shared.h [project, indirect] (3 translation units)
 note: include-based results are heuristic; conditional or generated includes may be missing

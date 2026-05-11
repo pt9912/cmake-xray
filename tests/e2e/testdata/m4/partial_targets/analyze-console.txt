@@ -8,8 +8,8 @@ top 1 of 1 translation units
    arg_count=5 include_path_count=1 define_count=0
    warning: cannot read source file for include analysis: /project/src/main.cpp
 
-include hotspots [heuristic]
-no include hotspots found
+Include Hotspots (scope=all, depth=all; excluded: 0 unknown, 0 mixed):
+  No include hotspots found.
 
 Direct Target Dependencies (target_graph_status: loaded):
   No direct target dependencies.

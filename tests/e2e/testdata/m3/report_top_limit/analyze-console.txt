@@ -5,10 +5,7 @@ top 1 of 3 translation units
    arg_count=8 include_path_count=2 define_count=1
    warning: could not resolve include "generated/version.h" from src/app/main.cpp
 
-include hotspots [heuristic]
-top 1 of 2 include hotspots
-- include/common/config.h (affected translation units: 3)
-  src/app/main.cpp [directory: build/app]
-  src/lib/core.cpp [directory: build/lib]
-  src/tools/tool.cpp [directory: build/tools]
+Include Hotspots (scope=all, depth=all; excluded: 0 unknown, 0 mixed):
+  Showing 1 of 2 include hotspots.
+  include/common/config.h [project, direct] (3 translation units)
 note: include-based results are heuristic; conditional or generated includes may be missing

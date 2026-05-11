@@ -35,8 +35,8 @@ top 10 of 11 translation units
    arg_count=3 include_path_count=0 define_count=0
    warning: cannot read source file for include analysis: src/src08.cpp
 
-include hotspots [heuristic]
-no include hotspots found
+Include Hotspots (scope=all, depth=all; excluded: 0 unknown, 0 mixed):
+  No include hotspots found.
 
 Direct Target Dependencies (target_graph_status: loaded):
   src00 -> hub
