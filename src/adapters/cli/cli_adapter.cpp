@@ -101,6 +101,20 @@ struct CliOptions {
     // one entry per metric).
     std::vector<std::string> tu_threshold_texts;
     std::map<xray::hexagon::model::TuRankingMetric, std::size_t> parsed_tu_thresholds;
+    // AP M6-1.5 A.1: three single-value size_t options share the same
+    // validator (validate_size_option) and the same three error phrases
+    // (not an integer / negative value / option specified more than once).
+    // Defaults mirror the pre-AP-1.5 hardcoded constants: min_hotspot_tus
+    // 2 (analysis_support.cpp), target_hub_*_threshold 10 (AP 1.1).
+    std::string min_hotspot_tus_text;
+    CLI::Option* min_hotspot_tus_option{nullptr};
+    std::size_t parsed_min_hotspot_tus{2};
+    std::string target_hub_in_threshold_text;
+    CLI::Option* target_hub_in_threshold_option{nullptr};
+    std::size_t parsed_target_hub_in_threshold{10};
+    std::string target_hub_out_threshold_text;
+    CLI::Option* target_hub_out_threshold_option{nullptr};
+    std::size_t parsed_target_hub_out_threshold{10};
 };
 
 OutputVerbosity resolve_verbosity(const CliOptions& options) {
@@ -265,6 +279,24 @@ void configure_analyze_command(CLI::App& app, CliOptions& options, CLI::App*& an
         "TU-ranking metric threshold as <metric>=<n>; metric is one of "
         "arg_count, include_path_count, define_count. May be set once per "
         "metric");
+    // AP M6-1.5 A.1: three single-value size_t options; each uses
+    // ->take_last() so validate_size_option owns the
+    // "option specified more than once" error phrase via Option::count().
+    options.min_hotspot_tus_option = analyze_cmd->add_option(
+        "--min-hotspot-tus", options.min_hotspot_tus_text,
+        "Minimum number of affected translation units to register an include "
+        "hotspot (default 2)");
+    options.min_hotspot_tus_option->take_last();
+    options.target_hub_in_threshold_option = analyze_cmd->add_option(
+        "--target-hub-in-threshold", options.target_hub_in_threshold_text,
+        "Minimum number of incoming target dependencies to classify a target "
+        "as an inbound hub (default 10)");
+    options.target_hub_in_threshold_option->take_last();
+    options.target_hub_out_threshold_option = analyze_cmd->add_option(
+        "--target-hub-out-threshold", options.target_hub_out_threshold_text,
+        "Minimum number of outgoing target dependencies to classify a target "
+        "as an outbound hub (default 10)");
+    options.target_hub_out_threshold_option->take_last();
     configure_report_options(*analyze_cmd, options);
     configure_verbosity_options(*analyze_cmd, options);
 }
@@ -607,6 +639,39 @@ std::optional<int> validate_tu_thresholds(CliOptions& options, std::ostream& err
     }
 
     options.parsed_tu_thresholds = std::move(parsed);
+    return std::nullopt;
+}
+
+std::optional<int> validate_size_option(CLI::Option* option, std::string_view option_name,
+                                        const std::string& raw_text, std::size_t& parsed_value,
+                                        std::ostream& err) {
+    // AP M6-1.5 A.1: shared validator for the three single-value size_t
+    // CLI options --min-hotspot-tus, --target-hub-in-threshold and
+    // --target-hub-out-threshold. Emits the three plan-pinned error
+    // phrases prefixed with the option_name argument so each call site
+    // re-uses the helper without copy-pasting the parse logic.
+    if (option == nullptr) return std::nullopt;
+    if (option->count() > 1) {
+        err << "error: " << option_name << ": option specified more than once\n";
+        return ExitCode::cli_usage_error;
+    }
+    if (option->count() == 0) return std::nullopt;
+    if (!raw_text.empty() && raw_text.front() == '-') {
+        err << "error: " << option_name << ": negative value\n";
+        return ExitCode::cli_usage_error;
+    }
+    if (raw_text.empty() ||
+        !std::all_of(raw_text.begin(), raw_text.end(),
+                     [](unsigned char ch) { return std::isdigit(ch) != 0; })) {
+        err << "error: " << option_name << ": not an integer\n";
+        return ExitCode::cli_usage_error;
+    }
+    std::size_t numeric_value = 0;
+    for (const char ch : raw_text) {
+        numeric_value = numeric_value * 10 +
+                        static_cast<std::size_t>(static_cast<unsigned char>(ch) - '0');
+    }
+    parsed_value = numeric_value;
     return std::nullopt;
 }
 
@@ -1046,9 +1111,9 @@ xray::hexagon::ports::driving::AnalyzeProjectRequest build_project_request(
             options.parsed_include_depth,
             options.parsed_analysis_sections,
             options.parsed_tu_thresholds,
-            /*min_hotspot_tus=*/2,
-            /*target_hub_in_threshold=*/10,
-            /*target_hub_out_threshold=*/10};
+            options.parsed_min_hotspot_tus,
+            options.parsed_target_hub_in_threshold,
+            options.parsed_target_hub_out_threshold};
 }
 
 xray::hexagon::ports::driving::AnalyzeImpactRequest build_impact_request(
@@ -1074,6 +1139,27 @@ std::optional<int> validate_subcommand_options(CliOptions& options, bool is_impa
         if (const auto e = validate_include_depth(options, err); e.has_value()) return e;
         if (const auto e = validate_analysis(options, err); e.has_value()) return e;
         if (const auto e = validate_tu_thresholds(options, err); e.has_value()) return e;
+        if (const auto e = validate_size_option(options.min_hotspot_tus_option,
+                                                "--min-hotspot-tus",
+                                                options.min_hotspot_tus_text,
+                                                options.parsed_min_hotspot_tus, err);
+            e.has_value()) {
+            return e;
+        }
+        if (const auto e = validate_size_option(options.target_hub_in_threshold_option,
+                                                "--target-hub-in-threshold",
+                                                options.target_hub_in_threshold_text,
+                                                options.parsed_target_hub_in_threshold, err);
+            e.has_value()) {
+            return e;
+        }
+        if (const auto e = validate_size_option(options.target_hub_out_threshold_option,
+                                                "--target-hub-out-threshold",
+                                                options.target_hub_out_threshold_text,
+                                                options.parsed_target_hub_out_threshold, err);
+            e.has_value()) {
+            return e;
+        }
     }
     return validate_input_options(options, err);
 }

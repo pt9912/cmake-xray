@@ -1751,3 +1751,132 @@ TEST_CASE_FIXTURE(CliFixture, "AP1.5 A.1: --tu-threshold is not exposed on impac
                "src/app/main.cpp", "--tu-threshold", "arg_count=5"}) ==
           ExitCode::cli_usage_error);
 }
+
+// ---- AP M6-1.5 A.1: --min-hotspot-tus / --target-hub-in-threshold /
+//                     --target-hub-out-threshold ----
+//
+// All three single-value size_t options share validate_size_option and
+// therefore the same three error phrases. The matrix below exercises
+// every option name in turn for each phrase so a regression in the
+// shared helper or a wiring slip surfaces in the failing test name.
+
+TEST_CASE_FIXTURE(CliFixture, "AP1.5 A.1: --min-hotspot-tus 5 is accepted") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--min-hotspot-tus",
+               "5"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "AP1.5 A.1: --min-hotspot-tus 0 is accepted (no filter)") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--min-hotspot-tus",
+               "0"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --min-hotspot-tus with non-numeric value returns exit 2 with 'not an integer'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--min-hotspot-tus",
+               "abc"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--min-hotspot-tus: not an integer") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "AP1.5 A.1: --min-hotspot-tus with negative value is rejected") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--min-hotspot-tus",
+               "-1"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--min-hotspot-tus: negative value") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --min-hotspot-tus specified twice returns exit 2 with 'option specified more than once'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--min-hotspot-tus",
+               "2", "--min-hotspot-tus", "3"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--min-hotspot-tus: option specified more than once") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "AP1.5 A.1: --target-hub-in-threshold 20 is accepted") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--target-hub-in-threshold", "20"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --target-hub-in-threshold with negative value returns exit 2 with 'negative value'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--target-hub-in-threshold", "-5"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--target-hub-in-threshold: negative value") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --target-hub-in-threshold with non-numeric value returns exit 2 with 'not an integer'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--target-hub-in-threshold", "xyz"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--target-hub-in-threshold: not an integer") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --target-hub-in-threshold specified twice is rejected") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--target-hub-in-threshold", "10", "--target-hub-in-threshold", "20"}) ==
+          ExitCode::cli_usage_error);
+    CHECK(err.str().find("--target-hub-in-threshold: option specified more than once") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "AP1.5 A.1: --target-hub-out-threshold 30 is accepted") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--target-hub-out-threshold", "30"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --target-hub-out-threshold with negative value returns exit 2 with 'negative value'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--target-hub-out-threshold", "-7"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--target-hub-out-threshold: negative value") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --target-hub-out-threshold with non-numeric value returns exit 2 with 'not an integer'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--target-hub-out-threshold", "x"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--target-hub-out-threshold: not an integer") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --target-hub-out-threshold specified twice is rejected") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(),
+               "--target-hub-out-threshold", "10", "--target-hub-out-threshold", "20"}) ==
+          ExitCode::cli_usage_error);
+    CHECK(err.str().find("--target-hub-out-threshold: option specified more than once") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.5 A.1: the three single-value size_t options are not exposed on impact") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--min-hotspot-tus", "2"}) == ExitCode::cli_usage_error);
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--target-hub-in-threshold", "10"}) ==
+          ExitCode::cli_usage_error);
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--target-hub-out-threshold", "10"}) ==
+          ExitCode::cli_usage_error);
+}
