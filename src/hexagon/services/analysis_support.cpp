@@ -17,6 +17,7 @@ using xray::hexagon::model::Diagnostic;
 using xray::hexagon::model::DiagnosticSeverity;
 using xray::hexagon::model::IncludeDepthFilter;
 using xray::hexagon::model::IncludeDepthKind;
+using xray::hexagon::model::IncludeHotspot;
 using xray::hexagon::model::IncludeOrigin;
 using xray::hexagon::model::IncludeResolutionResult;
 using xray::hexagon::model::IncludeScope;
