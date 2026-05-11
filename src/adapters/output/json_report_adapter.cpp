@@ -133,18 +133,21 @@ ordered_json render_analysis_configuration(const AnalysisResult& result) {
     for (const auto& section : cfg.effective_sections) {
         sections.push_back(analysis_section_text(section));
     }
-    return ordered_json{
-        {"analysis_sections", std::move(sections)},
-        {"tu_thresholds",
-         ordered_json{
-             {"arg_count", tu_threshold_value(cfg, TuRankingMetric::arg_count)},
-             {"include_path_count", tu_threshold_value(cfg, TuRankingMetric::include_path_count)},
-             {"define_count", tu_threshold_value(cfg, TuRankingMetric::define_count)},
-         }},
-        {"min_hotspot_tus", cfg.min_hotspot_tus},
-        {"target_hub_in_threshold", cfg.target_hub_in_threshold},
-        {"target_hub_out_threshold", cfg.target_hub_out_threshold},
-    };
+    // Sequential field assignment (instead of brace-init-list) keeps
+    // every line covered under gcov; multi-line ordered_json{...}
+    // initializers leave the inner key/value lines uncovered.
+    ordered_json tu_thresholds;
+    tu_thresholds["arg_count"] = tu_threshold_value(cfg, TuRankingMetric::arg_count);
+    tu_thresholds["include_path_count"] =
+        tu_threshold_value(cfg, TuRankingMetric::include_path_count);
+    tu_thresholds["define_count"] = tu_threshold_value(cfg, TuRankingMetric::define_count);
+    ordered_json out;
+    out["analysis_sections"] = std::move(sections);
+    out["tu_thresholds"] = std::move(tu_thresholds);
+    out["min_hotspot_tus"] = cfg.min_hotspot_tus;
+    out["target_hub_in_threshold"] = cfg.target_hub_in_threshold;
+    out["target_hub_out_threshold"] = cfg.target_hub_out_threshold;
+    return out;
 }
 
 ordered_json render_analysis_section_states(const AnalysisResult& result) {
