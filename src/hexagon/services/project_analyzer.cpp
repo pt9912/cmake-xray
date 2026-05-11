@@ -270,6 +270,56 @@ bool load_project_inputs(const ProjectLoadContext& ctx, ProjectLoadState& state,
     return state.loaded.success;
 }
 
+void populate_analysis_configuration(const AnalyzeProjectRequest& request,
+                                     model::AnalysisResult& result) {
+    // AP M6-1.5 A.2: analysis_configuration mirrors the validated request
+    // surface. requested_sections and effective_sections are identical in
+    // AP 1.5 per plan §269-273; later APs may diverge them via auto-
+    // augmentation or degradation. The four numeric fields and the
+    // tu_thresholds map flow straight from the request defaults
+    // (min_hotspot_tus=2, hub thresholds=10) when the user does not pass
+    // the new flags.
+    auto& cfg = result.analysis_configuration;
+    cfg.requested_sections = request.analysis_sections;
+    cfg.effective_sections = request.analysis_sections;
+    cfg.tu_thresholds = request.tu_thresholds;
+    cfg.min_hotspot_tus = request.min_hotspot_tus;
+    cfg.target_hub_in_threshold = request.target_hub_in_threshold;
+    cfg.target_hub_out_threshold = request.target_hub_out_threshold;
+}
+
+bool analysis_section_in(const std::vector<model::AnalysisSection>& sections,
+                          model::AnalysisSection section) {
+    return std::find(sections.begin(), sections.end(), section) != sections.end();
+}
+
+void populate_analysis_section_states(model::AnalysisResult& result) {
+    // AP M6-1.5 A.2 plan §415-431: per-section state is disabled when the
+    // section is not in effective_sections, not_loaded when requested but
+    // the underlying data is missing, and active otherwise. tu-ranking
+    // and include-hotspots are always data-available; target-graph and
+    // target-hubs share availability and depend on target_graph_status.
+    using model::AnalysisSection;
+    using model::AnalysisSectionState;
+    using model::TargetGraphStatus;
+    const auto& effective = result.analysis_configuration.effective_sections;
+    const auto state_for = [&effective](AnalysisSection section, bool data_available) {
+        if (!analysis_section_in(effective, section)) return AnalysisSectionState::disabled;
+        return data_available ? AnalysisSectionState::active : AnalysisSectionState::not_loaded;
+    };
+    const bool graph_available = result.target_graph_status == TargetGraphStatus::loaded ||
+                                 result.target_graph_status == TargetGraphStatus::partial;
+    result.analysis_section_states = {
+        {AnalysisSection::tu_ranking, state_for(AnalysisSection::tu_ranking, true)},
+        {AnalysisSection::include_hotspots,
+         state_for(AnalysisSection::include_hotspots, true)},
+        {AnalysisSection::target_graph,
+         state_for(AnalysisSection::target_graph, graph_available)},
+        {AnalysisSection::target_hubs,
+         state_for(AnalysisSection::target_hubs, graph_available)},
+    };
+}
+
 void populate_include_filter_telemetry(
     const model::IncludeResolutionResult& include_resolution,
     const services::IncludeHotspotsBuildResult& hotspots_build,
@@ -340,13 +390,16 @@ model::AnalysisResult ProjectAnalyzer::analyze_project(AnalyzeProjectRequest req
     result.include_scope_effective = request.include_scope;
     result.include_depth_filter_requested = request.include_depth;
     result.include_depth_filter_effective = request.include_depth;
+    populate_analysis_configuration(request, result);
 
     const ProjectLoadContext ctx{compile_db_port_, file_api_port_, request,
                                   path_for_io_string(request.compile_commands_path),
                                   path_for_io_string(request.cmake_file_api_path)};
     ProjectLoadState state;
-    if (!load_project_inputs(ctx, state, result)) return result;
-    finalize_analysis(ctx, state, include_resolver_port_, result);
+    if (load_project_inputs(ctx, state, result)) {
+        finalize_analysis(ctx, state, include_resolver_port_, result);
+    }
+    populate_analysis_section_states(result);
     return result;
 }
 
