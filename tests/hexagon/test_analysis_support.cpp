@@ -140,6 +140,80 @@ TEST_CASE("analysis support sorts equally sized hotspots by header path") {
     CHECK(hotspots[1].header_path == "/project/include/b.h");
 }
 
+TEST_CASE("compare_hotspots_for_sort honours the four-element Sortier-Tupel from plan §697-698") {
+    // The by_header dedup in build_include_hotspots makes the origin and
+    // depth_kind tie-breakers unreachable through the public entry point.
+    // The plan still pins them, so this test calls compare_hotspots_for_sort
+    // directly with synthetic IncludeHotspot pairs that share the higher-
+    // priority keys, ensuring every comparator branch stays covered.
+    using xray::hexagon::model::IncludeDepthKind;
+    using xray::hexagon::model::IncludeHotspot;
+    using xray::hexagon::model::IncludeOrigin;
+    using xray::hexagon::model::TranslationUnitReference;
+    using xray::hexagon::services::compare_hotspots_for_sort;
+
+    const TranslationUnitReference tu_a{"src/a.cpp", "build/a", "src/a.cpp|build/a",
+                                         "src/a.cpp|build/a"};
+    const TranslationUnitReference tu_b{"src/b.cpp", "build/b", "src/b.cpp|build/b",
+                                         "src/b.cpp|build/b"};
+
+    const auto make_hotspot = [&](std::string header, std::size_t tu_count,
+                                  IncludeOrigin origin, IncludeDepthKind depth_kind) {
+        IncludeHotspot h;
+        h.header_path = std::move(header);
+        for (std::size_t i = 0; i < tu_count; ++i) {
+            h.affected_translation_units.push_back(i == 0 ? tu_a : tu_b);
+        }
+        h.origin = origin;
+        h.depth_kind = depth_kind;
+        return h;
+    };
+
+    // 1. Affected-TU-count breaks first (desc).
+    const auto big = make_hotspot("h.h", 3, IncludeOrigin::project,
+                                  IncludeDepthKind::direct);
+    const auto small = make_hotspot("h.h", 2, IncludeOrigin::project,
+                                    IncludeDepthKind::direct);
+    CHECK(compare_hotspots_for_sort(big, small));
+    CHECK_FALSE(compare_hotspots_for_sort(small, big));
+
+    // 2. Same count, header_path breaks (asc).
+    const auto h_a = make_hotspot("a.h", 2, IncludeOrigin::project,
+                                  IncludeDepthKind::direct);
+    const auto h_b = make_hotspot("b.h", 2, IncludeOrigin::project,
+                                  IncludeDepthKind::direct);
+    CHECK(compare_hotspots_for_sort(h_a, h_b));
+    CHECK_FALSE(compare_hotspots_for_sort(h_b, h_a));
+
+    // 3. Same count + same header_path, origin breaks
+    // (project < external < unknown per include_classification.h).
+    const auto h_project = make_hotspot("h.h", 2, IncludeOrigin::project,
+                                        IncludeDepthKind::direct);
+    const auto h_external = make_hotspot("h.h", 2, IncludeOrigin::external,
+                                          IncludeDepthKind::direct);
+    const auto h_unknown = make_hotspot("h.h", 2, IncludeOrigin::unknown,
+                                         IncludeDepthKind::direct);
+    CHECK(compare_hotspots_for_sort(h_project, h_external));
+    CHECK(compare_hotspots_for_sort(h_external, h_unknown));
+    CHECK_FALSE(compare_hotspots_for_sort(h_external, h_project));
+
+    // 4. Same count + same header_path + same origin, depth_kind breaks
+    // (direct < indirect < mixed per include_classification.h).
+    const auto h_direct = make_hotspot("h.h", 2, IncludeOrigin::project,
+                                       IncludeDepthKind::direct);
+    const auto h_indirect = make_hotspot("h.h", 2, IncludeOrigin::project,
+                                          IncludeDepthKind::indirect);
+    const auto h_mixed = make_hotspot("h.h", 2, IncludeOrigin::project,
+                                       IncludeDepthKind::mixed);
+    CHECK(compare_hotspots_for_sort(h_direct, h_indirect));
+    CHECK(compare_hotspots_for_sort(h_indirect, h_mixed));
+    CHECK_FALSE(compare_hotspots_for_sort(h_indirect, h_direct));
+
+    // 5. Identical hotspots: strict weak ordering requires false on
+    // equivalent inputs.
+    CHECK_FALSE(compare_hotspots_for_sort(h_direct, h_direct));
+}
+
 TEST_CASE("analysis support sorts larger hotspots ahead of smaller ones") {
     const auto observations = xray::hexagon::services::build_translation_unit_observations(
         {

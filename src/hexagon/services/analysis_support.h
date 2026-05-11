@@ -70,6 +70,15 @@ model::IncludeOrigin classify_include_origin(
     const std::vector<model::TranslationUnitObservation>& observations,
     const std::filesystem::path& source_root);
 
+// Lexicographic Sortier-Tupel per docs/planning/done/plan-M6-1-4.md §697-698
+// (affected_tu_count desc, normalized_header_display_path asc,
+//  include_origin asc, include_depth_kind asc). Exposed so the tie-breaker
+// branches stay covered by a focused unit test even though they are
+// unreachable through the public build_include_hotspots entry (the by_header
+// map dedups on header_path before the sort runs).
+bool compare_hotspots_for_sort(const model::IncludeHotspot& lhs,
+                                const model::IncludeHotspot& rhs);
+
 IncludeHotspotsBuildResult build_include_hotspots(
     const std::vector<model::TranslationUnitObservation>& observations,
     const model::IncludeResolutionResult& include_resolution,

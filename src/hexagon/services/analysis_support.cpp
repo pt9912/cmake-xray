@@ -570,6 +570,30 @@ std::map<std::string, HotspotAccumulator> accumulate_hotspot_entries(
 
 }  // namespace
 
+bool compare_hotspots_for_sort(const IncludeHotspot& lhs, const IncludeHotspot& rhs) {
+    // Plan-M6-1-4.md §697-698 Sortier-Tupel:
+    //   (affected_tu_count desc, normalized_header_display_path asc,
+    //    include_origin asc, include_depth_kind asc).
+    // The origin/depth_kind tie-breakers are unreachable through
+    // build_include_hotspots because by_header dedups on header_path
+    // before the sort runs; the plan still pins them so the comparator
+    // matches the contract verbatim, and they are covered by the
+    // dedicated unit test that calls this function with synthetic
+    // same-header inputs. The enum-cast comparison relies on
+    // include_classification.h declaration order
+    // (project < external < unknown, direct < indirect < mixed).
+    if (lhs.affected_translation_units.size() != rhs.affected_translation_units.size()) {
+        return lhs.affected_translation_units.size() > rhs.affected_translation_units.size();
+    }
+    if (lhs.header_path != rhs.header_path) {
+        return lhs.header_path < rhs.header_path;
+    }
+    if (lhs.origin != rhs.origin) {
+        return static_cast<int>(lhs.origin) < static_cast<int>(rhs.origin);
+    }
+    return static_cast<int>(lhs.depth_kind) < static_cast<int>(rhs.depth_kind);
+}
+
 IncludeOrigin classify_include_origin(const std::string& header_path,
                                       const std::vector<TranslationUnitObservation>& observations,
                                       const std::filesystem::path& source_root) {
@@ -616,12 +640,7 @@ IncludeHotspotsBuildResult build_include_hotspots(
         });
     }
 
-    std::sort(all_hotspots.begin(), all_hotspots.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.affected_translation_units.size() != rhs.affected_translation_units.size()) {
-            return lhs.affected_translation_units.size() > rhs.affected_translation_units.size();
-        }
-        return lhs.header_path < rhs.header_path;
-    });
+    std::sort(all_hotspots.begin(), all_hotspots.end(), compare_hotspots_for_sort);
 
     IncludeHotspotsBuildResult out;
     out.total_count = all_hotspots.size();
