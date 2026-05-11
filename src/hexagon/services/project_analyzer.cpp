@@ -85,16 +85,21 @@ void update_inputs_from_file_api_load(const model::BuildModelResult& model,
 }
 
 void apply_target_graph_view(const model::BuildModelResult& build_model,
+                             const AnalyzeProjectRequest& request,
                              model::AnalysisResult& result) {
     result.target_graph = build_model.target_graph;
     result.target_graph_status = build_model.target_graph_status;
     // Defense-in-depth: BuildModelPort contract does not bind every adapter
     // to pre-sorted output; sort here so AnalysisResult goldens are stable.
     sort_target_graph(result.target_graph);
+    // AP M6-1.5 A.2: hub thresholds come from the validated request fields
+    // (CLI defaults 10/10 mirror the pre-AP-1.5 kDefaultTargetHub*Threshold
+    // constants, which remain as fallback for unit tests that bypass the
+    // request path).
     auto [in_hubs, out_hubs] = compute_target_hubs(
         result.target_graph,
-        TargetHubThresholds{kDefaultTargetHubInThreshold,
-                            kDefaultTargetHubOutThreshold});
+        TargetHubThresholds{request.target_hub_in_threshold,
+                            request.target_hub_out_threshold});
     result.target_hubs_in = std::move(in_hubs);
     result.target_hubs_out = std::move(out_hubs);
 }
@@ -119,7 +124,7 @@ LoadedInputs load_file_api_only_input(const ports::driven::BuildModelPort& port,
     result.observation_source = model::ObservationSource::derived;
     result.target_metadata = model.target_metadata;
     result.target_assignments = model.target_assignments;
-    apply_target_graph_view(model, result);
+    apply_target_graph_view(model, request, result);
     if (model.is_success()) {
         append_unique_diagnostics(result.diagnostics, model.diagnostics);
     }
@@ -145,6 +150,7 @@ bool try_load_file_api(const ports::driven::BuildModelPort& port,
 void apply_target_enrichment(
     const std::vector<model::TranslationUnitObservation>& observations,
     const model::BuildModelResult& file_api_model,
+    const AnalyzeProjectRequest& request,
     model::AnalysisResult& result) {
     const auto& all_assignments = file_api_model.target_assignments;
 
@@ -165,7 +171,7 @@ void apply_target_enrichment(
 
     result.target_metadata = file_api_model.target_metadata;
     result.target_assignments = std::move(matched);
-    apply_target_graph_view(file_api_model, result);
+    apply_target_graph_view(file_api_model, request, result);
 
     if (result.target_assignments.empty() && !all_assignments.empty()) {
         append_unique_diagnostic(
@@ -291,7 +297,7 @@ void finalize_analysis(const ProjectLoadContext& ctx, const ProjectLoadState& st
     const auto include_resolution = include_resolver.resolve_includes(observations);
 
     if (!ctx.compile_path.empty() && !ctx.file_api_path.empty()) {
-        apply_target_enrichment(observations, state.file_api_model, result);
+        apply_target_enrichment(observations, state.file_api_model, ctx.request, result);
     }
 
     result.include_analysis_heuristic = include_resolution.heuristic;
