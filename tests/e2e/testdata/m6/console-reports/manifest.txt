@@ -15,9 +15,14 @@
 # AP M6-1.4 A.5 step 25a (origin/depth coverage):
 #   analyze-include-origin-mix.txt                -> all four origin/depth_kind values
 #   analyze-include-origin-mix-scope-project.txt  -> include_hotspot_excluded_unknown_count > 0
+#
+# AP M6-1.4 A.6 step 27 follow-up (budget-reached coverage):
+#   analyze-include-budget-reached.txt            -> "Note: include analysis stopped at
+#                                                    10000 nodes (budget reached)." line rendered.
 analyze-compile-db-only.txt
 analyze-file-api-loaded.txt
 analyze-file-api-partial.txt
+analyze-include-budget-reached.txt
 analyze-include-origin-mix-scope-project.txt
 analyze-include-origin-mix.txt
 impact-compile-db-only.txt

@@ -16,9 +16,16 @@
 # AP M6-1.4 A.5 step 25a (origin/depth coverage):
 #   analyze-include-origin-mix.json                -> all four origin/depth_kind values
 #   analyze-include-origin-mix-scope-project.json  -> include_hotspot_excluded_unknown_count > 0
+#
+# AP M6-1.4 A.6 step 27 follow-up (budget-reached coverage):
+#   analyze-include-budget-reached.json            -> include_node_budget_reached=true,
+#                                                     include_node_budget_effective=10000;
+#                                                     fixture under m6/include_budget_reached/
+#                                                     regen via that fixture's gen.py.
 analyze-compile-db-only.json
 analyze-file-api-loaded.json
 analyze-file-api-partial.json
+analyze-include-budget-reached.json
 analyze-include-origin-mix-scope-project.json
 analyze-include-origin-mix.json
 impact-compile-db-only.json

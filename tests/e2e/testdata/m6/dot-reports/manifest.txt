@@ -17,10 +17,14 @@
 # AP M6-1.4 A.5 step 25a (origin/depth coverage):
 #   analyze-include-origin-mix.dot                -> all four origin/depth_kind values
 #   analyze-include-origin-mix-scope-project.dot  -> include_hotspot_excluded_unknown_count > 0
+#
+# AP M6-1.4 A.6 step 27 follow-up (budget-reached coverage):
+#   analyze-include-budget-reached.dot            -> graph_include_node_budget_reached=true.
 analyze-compile-db-only.dot
 analyze-dot-raw-id-special-chars.dot
 analyze-file-api-loaded.dot
 analyze-file-api-partial.dot
+analyze-include-budget-reached.dot
 analyze-include-origin-mix-scope-project.dot
 analyze-include-origin-mix.dot
 impact-compile-db-only.dot

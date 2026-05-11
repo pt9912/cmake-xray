@@ -1,0 +1,11 @@
+translation unit ranking
+based on metrics: arg_count + include_path_count + define_count
+top 1 of 1 translation units
+1. src/main.cpp [directory: build]
+   arg_count=6 include_path_count=1 define_count=0
+
+Include Hotspots (scope=all, depth=all; excluded: 0 unknown, 0 mixed):
+  Note: include analysis stopped at 10000 nodes (budget reached).
+  No include hotspots found.
+note: include analysis stopped at 10000 nodes (budget reached); some indirect includes may be missing
+note: include-based results are heuristic; conditional or generated includes may be missing

@@ -1,0 +1,12 @@
+digraph cmake_xray_analysis {
+  xray_report_type="analyze";
+  format_version=4;
+  graph_node_limit=50;
+  graph_edge_limit=80;
+  graph_truncated=false;
+  graph_target_graph_status="not_loaded";
+  graph_include_scope="all";
+  graph_include_depth="all";
+  graph_include_node_budget_reached=true;
+  tu_1 [kind="translation_unit", rank=1, label="main.cpp", path="src/main.cpp", directory="build", unique_key="/Development/cmake-xray/tests/e2e/testdata/m6/include_budget_reached/src/main.cpp|/Development/cmake-xray/tests/e2e/testdata/m6/include_budget_reached/build"];
+}

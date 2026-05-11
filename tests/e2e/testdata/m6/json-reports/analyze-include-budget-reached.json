@@ -1,0 +1,85 @@
+{
+  "format": "cmake-xray.analysis",
+  "format_version": 4,
+  "report_type": "analyze",
+  "inputs": {
+    "compile_database_path": "tests/e2e/testdata/m6/include_budget_reached/compile_commands.json",
+    "compile_database_source": "cli",
+    "cmake_file_api_path": null,
+    "cmake_file_api_resolved_path": null,
+    "cmake_file_api_source": null
+  },
+  "summary": {
+    "translation_unit_count": 1,
+    "ranking_total_count": 1,
+    "hotspot_total_count": 0,
+    "top_limit": 10,
+    "include_analysis_heuristic": true,
+    "observation_source": "exact",
+    "target_metadata": "not_loaded"
+  },
+  "include_filter": {
+    "include_scope": "all",
+    "include_depth": "all",
+    "include_depth_limit_requested": 32,
+    "include_depth_limit_effective": 1,
+    "include_node_budget_requested": 10000,
+    "include_node_budget_effective": 10000,
+    "include_node_budget_reached": true
+  },
+  "translation_unit_ranking": {
+    "limit": 10,
+    "total_count": 1,
+    "returned_count": 1,
+    "truncated": false,
+    "items": [
+      {
+        "rank": 1,
+        "reference": {
+          "source_path": "src/main.cpp",
+          "directory": "build"
+        },
+        "metrics": {
+          "arg_count": 6,
+          "include_path_count": 1,
+          "define_count": 0,
+          "score": 7
+        },
+        "targets": [],
+        "diagnostics": []
+      }
+    ]
+  },
+  "include_hotspots": {
+    "limit": 10,
+    "total_count": 0,
+    "returned_count": 0,
+    "truncated": false,
+    "excluded_unknown_count": 0,
+    "excluded_mixed_count": 0,
+    "items": []
+  },
+  "target_graph_status": "not_loaded",
+  "target_graph": {
+    "nodes": [],
+    "edges": []
+  },
+  "target_hubs": {
+    "inbound": [],
+    "outbound": [],
+    "thresholds": {
+      "in_threshold": 10,
+      "out_threshold": 10
+    }
+  },
+  "diagnostics": [
+    {
+      "severity": "note",
+      "message": "include analysis stopped at 10000 nodes (budget reached); some indirect includes may be missing"
+    },
+    {
+      "severity": "note",
+      "message": "include-based results are heuristic; conditional or generated includes may be missing"
+    }
+  ]
+}
