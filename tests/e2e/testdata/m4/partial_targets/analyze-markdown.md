@@ -18,6 +18,9 @@
     - warning: cannot read source file for include analysis: /project/src/main.cpp
 
 ## Include Hotspots
+
+Filter: `scope=all`, `depth=all`. Excluded: `0` unknown, `0` mixed.
+
 No include hotspots found.
 
 ## Direct Target Dependencies

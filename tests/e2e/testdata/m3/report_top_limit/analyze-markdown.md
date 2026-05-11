@@ -15,12 +15,14 @@
     - warning: could not resolve include "generated/version.h" from src/app/main.cpp
 
 ## Include Hotspots
-1. Header: include/common/config.h
-    Affected translation units: 3
-    Translation units:
-    - src/app/main.cpp [directory: build/app]
-    - src/lib/core.cpp [directory: build/lib]
-    - src/tools/tool.cpp [directory: build/tools]
+
+Filter: `scope=all`, `depth=all`. Excluded: `0` unknown, `0` mixed.
+
+Showing 1 of 2 include hotspots.
+
+| Header | Origin | Depth | Affected TUs | Context |
+|---|---|---|---|---|
+| `include/common/config.h` | `project` | `direct` | 3 | src/app/main.cpp [directory: build/app] / src/lib/core.cpp [directory: build/lib] / src/tools/tool.cpp [directory: build/tools] |
 
 ## Diagnostics
 - note: include-based results are heuristic; conditional or generated includes may be missing

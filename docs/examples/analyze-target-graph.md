@@ -54,6 +54,9 @@
      - warning: cannot read source file for include analysis: src/src08.cpp
 
 ## Include Hotspots
+
+Filter: `scope=all`, `depth=all`. Excluded: `0` unknown, `0` mixed.
+
 No include hotspots found.
 
 ## Direct Target Dependencies
