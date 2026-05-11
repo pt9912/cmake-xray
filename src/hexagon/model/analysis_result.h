@@ -47,6 +47,18 @@ struct AnalysisResult {
     bool include_node_budget_reached{false};
     AnalysisConfiguration analysis_configuration;
     std::map<AnalysisSection, AnalysisSectionState> analysis_section_states;
+    // AP M6-1.5 A.2: threshold-filter statistics. Plan §488-498 introduces
+    // three counters that adapters surface alongside the existing AP-1.4
+    // include filter statistics:
+    //  - tu_ranking_total_count_after_thresholds: TUs that survive
+    //    --tu-threshold filtering, before --top limits.
+    //  - tu_ranking_excluded_by_thresholds_count: TUs dropped by
+    //    --tu-threshold filters.
+    //  - include_hotspot_excluded_by_min_tus_count: hotspots dropped
+    //    because affected_translation_units.size() < min_hotspot_tus.
+    std::size_t tu_ranking_total_count_after_thresholds{0};
+    std::size_t tu_ranking_excluded_by_thresholds_count{0};
+    std::size_t include_hotspot_excluded_by_min_tus_count{0};
 };
 
 }  // namespace xray::hexagon::model
