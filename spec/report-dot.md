@@ -82,24 +82,44 @@ Jeder DOT-Report enthaelt mindestens:
 | Attribut | Typ | Beschreibung |
 | --- | --- | --- |
 | `xray_report_type` | quoted string | `analyze` oder `impact`. |
-| `format_version` | integer | identisch mit `xray::hexagon::model::kReportFormatVersion`, ab AP M6-1.4 A.3 `4` (vorher `3` ab AP M6-1.3, `2` ab AP M6-1.2). |
+| `format_version` | integer | identisch mit `xray::hexagon::model::kReportFormatVersion`, ab AP M6-1.5 A.3 `5` (vorher `4` ab AP M6-1.4 A.3, `3` ab AP M6-1.3, `2` ab AP M6-1.2). |
 | `graph_node_limit` | integer | wirksames Node-Budget fuer diesen Report. |
 | `graph_edge_limit` | integer | wirksames Edge-Budget fuer diesen Report. |
 | `graph_truncated` | boolean | `true`, wenn ein Kandidatenknoten oder eine Kandidatenkante wegen `node_limit`, `edge_limit` oder Analyze-`context_limit` nicht im finalen Graph enthalten ist. Auch im ungekuerzten Fall verpflichtend ausgegeben (`false`). |
-| `graph_target_graph_status` | quoted string | `not_loaded`, `loaded`, `partial`. Pflicht ab AP M6-1.2 fuer Analyze und Impact. Spiegelt `AnalysisResult::target_graph_status` bzw. `ImpactResult::target_graph_status`. |
+| `graph_target_graph_status` | quoted string | `not_loaded`, `loaded`, `partial`, `disabled` (v5). Pflicht ab AP M6-1.2 fuer Analyze und Impact. Spiegelt `AnalysisResult::target_graph_status` bzw. `ImpactResult::target_graph_status`. `disabled` (v5) bedeutet, dass die Target-Graph-Section nicht ueber `--analysis` angefordert wurde; semantisch unterschiedlich von `not_loaded` (angefordert, aber Daten nicht verfuegbar). |
 | `graph_impact_target_depth_requested` | integer | nur Impact-DOT, Pflicht ab AP M6-1.3. Validierter angeforderter Reverse-BFS-Tiefenwert, identisch mit `ImpactResult::impact_target_depth_requested`. |
 | `graph_impact_target_depth_effective` | integer | nur Impact-DOT, Pflicht ab AP M6-1.3. Tatsaechlich erreichte Tiefe, identisch mit `ImpactResult::impact_target_depth_effective`. Bei `graph_target_graph_status="not_loaded"` immer `0`. |
 | `graph_include_scope` | quoted string | nur Analyze-DOT, Pflicht ab AP M6-1.4. `all`, `project`, `external` oder `unknown`. Spiegelt `AnalysisResult::include_scope_effective`. |
 | `graph_include_depth` | quoted string | nur Analyze-DOT, Pflicht ab AP M6-1.4. `all`, `direct` oder `indirect`. Spiegelt `AnalysisResult::include_depth_filter_effective`. |
 | `graph_include_node_budget_reached` | boolean | nur Analyze-DOT, Pflicht ab AP M6-1.4. Spiegelt `AnalysisResult::include_node_budget_reached`. |
+| `graph_analysis_sections` | quoted string | nur Analyze-DOT, Pflicht ab AP M6-1.5. Kommagetrennte Liste der `effective_sections` aus `AnalysisResult::analysis_configuration`. Z. B. `"tu-ranking,include-hotspots,target-graph,target-hubs"` fuer `--analysis all`. |
+| `graph_min_hotspot_tus` | integer | nur Analyze-DOT, Pflicht ab AP M6-1.5. Wirksamer `--min-hotspot-tus`-Wert; Default `2`. |
+| `graph_target_hub_in_threshold` | integer | nur Analyze-DOT, Pflicht ab AP M6-1.5. Wirksamer `--target-hub-in-threshold`-Wert; Default `10`. |
+| `graph_target_hub_out_threshold` | integer | nur Analyze-DOT, Pflicht ab AP M6-1.5. Wirksamer `--target-hub-out-threshold`-Wert; Default `10`. |
+| `graph_tu_threshold_arg_count` | integer | nur Analyze-DOT, Pflicht ab AP M6-1.5. `--tu-threshold arg_count`-Wert; `0` = keine Filterung. |
+| `graph_tu_threshold_include_path_count` | integer | nur Analyze-DOT, Pflicht ab AP M6-1.5. `--tu-threshold include_path_count`-Wert; `0` = keine Filterung. |
+| `graph_tu_threshold_define_count` | integer | nur Analyze-DOT, Pflicht ab AP M6-1.5. `--tu-threshold define_count`-Wert; `0` = keine Filterung. |
 
 `graph_truncated` bezieht sich auf den finalen Graphzustand nach Entfernen reiner, unverbundener Kontextknoten.
 
 Die `graph_impact_target_depth_*`-Attribute erscheinen ausschliesslich in
 Impact-DOT, unabhaengig vom `graph_target_graph_status`. Analyze-DOT
 gibt sie nicht aus. Umgekehrt gibt nur Analyze-DOT die `graph_include_*`-
-Attribute aus; Impact-DOT traegt sie nicht, weil der Include-Filter
-Vertrag analyze-only ist.
+und die `graph_analysis_sections`/`graph_min_hotspot_tus`/
+`graph_target_hub_*_threshold`/`graph_tu_threshold_*`-Attribute aus;
+Impact-DOT traegt sie nicht, weil sowohl der Include-Filter- als auch der
+Analyse-Konfigurations-Vertrag analyze-only sind.
+
+DOT serialisiert bewusst NICHT den vollstaendigen
+`analysis_section_states`-Block aus dem JSON-Vertrag. Per
+[plan-M6-1-5.md](../docs/planning/in-progress/plan-M6-1-5.md) §663-669
+enthaelt der DOT-Vertrag nur konfigurationsrelevante Werte und die
+angeforderte, validierte `effective_sections`-Liste. Vollstaendige
+Section-States sind in JSON, HTML, Console und Markdown sichtbar; DOT
+bleibt auf Graph-Metadaten und Graph-Inhalte beschraenkt. Wenn eine
+Section `disabled` oder `not_loaded` ist, werden ihre Knoten und Kanten
+nicht ausgegeben; die `graph_*`-Konfigurations-Attribute bleiben
+trotzdem vorhanden.
 
 ## Analyze-Vertrag
 
