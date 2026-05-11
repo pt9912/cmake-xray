@@ -10,7 +10,56 @@
   "$defs": {
     "FormatVersion": {
       "type": "integer",
-      "const": 4
+      "const": 5
+    },
+    "AnalysisSection": {
+      "type": "string",
+      "enum": ["tu-ranking", "include-hotspots", "target-graph", "target-hubs"]
+    },
+    "AnalysisSectionState": {
+      "type": "string",
+      "enum": ["active", "disabled", "not_loaded"]
+    },
+    "AnalysisConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analysis_sections",
+        "tu_thresholds",
+        "min_hotspot_tus",
+        "target_hub_in_threshold",
+        "target_hub_out_threshold"
+      ],
+      "properties": {
+        "analysis_sections": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/AnalysisSection"}
+        },
+        "tu_thresholds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["arg_count", "include_path_count", "define_count"],
+          "properties": {
+            "arg_count": {"type": "integer", "minimum": 0},
+            "include_path_count": {"type": "integer", "minimum": 0},
+            "define_count": {"type": "integer", "minimum": 0}
+          }
+        },
+        "min_hotspot_tus": {"type": "integer", "minimum": 0},
+        "target_hub_in_threshold": {"type": "integer", "minimum": 0},
+        "target_hub_out_threshold": {"type": "integer", "minimum": 0}
+      }
+    },
+    "AnalysisSectionStates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tu-ranking", "include-hotspots", "target-graph", "target-hubs"],
+      "properties": {
+        "tu-ranking": {"$ref": "#/$defs/AnalysisSectionState"},
+        "include-hotspots": {"$ref": "#/$defs/AnalysisSectionState"},
+        "target-graph": {"$ref": "#/$defs/AnalysisSectionState"},
+        "target-hubs": {"$ref": "#/$defs/AnalysisSectionState"}
+      }
     },
     "IncludeOrigin": {
       "type": "string",
@@ -240,7 +289,7 @@
     },
     "TargetGraphStatus": {
       "type": "string",
-      "enum": ["not_loaded", "loaded", "partial"]
+      "enum": ["not_loaded", "loaded", "partial", "disabled"]
     },
     "TargetDependencyKind": {
       "type": "string",
@@ -370,7 +419,10 @@
         "top_limit",
         "include_analysis_heuristic",
         "observation_source",
-        "target_metadata"
+        "target_metadata",
+        "tu_ranking_total_count_after_thresholds",
+        "tu_ranking_excluded_by_thresholds_count",
+        "include_hotspot_excluded_by_min_tus_count"
       ],
       "properties": {
         "translation_unit_count": {"type": "integer", "minimum": 0},
@@ -379,7 +431,10 @@
         "top_limit": {"type": "integer", "minimum": 0},
         "include_analysis_heuristic": {"type": "boolean"},
         "observation_source": {"$ref": "#/$defs/ObservationSource"},
-        "target_metadata": {"$ref": "#/$defs/TargetMetadataStatus"}
+        "target_metadata": {"$ref": "#/$defs/TargetMetadataStatus"},
+        "tu_ranking_total_count_after_thresholds": {"type": "integer", "minimum": 0},
+        "tu_ranking_excluded_by_thresholds_count": {"type": "integer", "minimum": 0},
+        "include_hotspot_excluded_by_min_tus_count": {"type": "integer", "minimum": 0}
       }
     },
     "ImpactSummary": {
@@ -417,6 +472,8 @@
         "report_type",
         "inputs",
         "summary",
+        "analysis_configuration",
+        "analysis_section_states",
         "include_filter",
         "translation_unit_ranking",
         "include_hotspots",
@@ -431,6 +488,8 @@
         "report_type": {"type": "string", "const": "analyze"},
         "inputs": {"$ref": "#/$defs/AnalysisInputs"},
         "summary": {"$ref": "#/$defs/AnalysisSummary"},
+        "analysis_configuration": {"$ref": "#/$defs/AnalysisConfiguration"},
+        "analysis_section_states": {"$ref": "#/$defs/AnalysisSectionStates"},
         "include_filter": {"$ref": "#/$defs/IncludeFilter"},
         "translation_unit_ranking": {"$ref": "#/$defs/RankingContainer"},
         "include_hotspots": {"$ref": "#/$defs/HotspotContainer"},
