@@ -31,8 +31,12 @@ namespace xray::adapters::output {
 namespace {
 
 using nlohmann::ordered_json;
+using xray::hexagon::model::AnalysisConfiguration;
 using xray::hexagon::model::AnalysisResult;
+using xray::hexagon::model::AnalysisSection;
+using xray::hexagon::model::AnalysisSectionState;
 using xray::hexagon::model::ChangedFileSource;
+using xray::hexagon::model::TuRankingMetric;
 using xray::hexagon::model::Diagnostic;
 using xray::hexagon::model::DiagnosticSeverity;
 using xray::hexagon::model::ImpactedTarget;
@@ -101,7 +105,61 @@ std::string target_metadata_text(TargetMetadataStatus status) {
 std::string target_graph_status_text(TargetGraphStatus status) {
     if (status == TargetGraphStatus::loaded) return "loaded";
     if (status == TargetGraphStatus::partial) return "partial";
+    if (status == TargetGraphStatus::disabled) return "disabled";
     return "not_loaded";
+}
+
+std::string analysis_section_text(AnalysisSection section) {
+    if (section == AnalysisSection::tu_ranking) return "tu-ranking";
+    if (section == AnalysisSection::include_hotspots) return "include-hotspots";
+    if (section == AnalysisSection::target_graph) return "target-graph";
+    return "target-hubs";
+}
+
+std::string analysis_section_state_text(AnalysisSectionState state) {
+    if (state == AnalysisSectionState::active) return "active";
+    if (state == AnalysisSectionState::disabled) return "disabled";
+    return "not_loaded";
+}
+
+std::size_t tu_threshold_value(const AnalysisConfiguration& cfg, TuRankingMetric metric) {
+    const auto it = cfg.tu_thresholds.find(metric);
+    return it == cfg.tu_thresholds.end() ? 0 : it->second;
+}
+
+ordered_json render_analysis_configuration(const AnalysisResult& result) {
+    const auto& cfg = result.analysis_configuration;
+    auto sections = ordered_json::array();
+    for (const auto& section : cfg.effective_sections) {
+        sections.push_back(analysis_section_text(section));
+    }
+    return ordered_json{
+        {"analysis_sections", std::move(sections)},
+        {"tu_thresholds",
+         ordered_json{
+             {"arg_count", tu_threshold_value(cfg, TuRankingMetric::arg_count)},
+             {"include_path_count", tu_threshold_value(cfg, TuRankingMetric::include_path_count)},
+             {"define_count", tu_threshold_value(cfg, TuRankingMetric::define_count)},
+         }},
+        {"min_hotspot_tus", cfg.min_hotspot_tus},
+        {"target_hub_in_threshold", cfg.target_hub_in_threshold},
+        {"target_hub_out_threshold", cfg.target_hub_out_threshold},
+    };
+}
+
+ordered_json render_analysis_section_states(const AnalysisResult& result) {
+    const auto state_text = [&](AnalysisSection section) {
+        const auto it = result.analysis_section_states.find(section);
+        return it == result.analysis_section_states.end()
+                   ? std::string{"disabled"}
+                   : analysis_section_state_text(it->second);
+    };
+    return ordered_json{
+        {"tu-ranking", state_text(AnalysisSection::tu_ranking)},
+        {"include-hotspots", state_text(AnalysisSection::include_hotspots)},
+        {"target-graph", state_text(AnalysisSection::target_graph)},
+        {"target-hubs", state_text(AnalysisSection::target_hubs)},
+    };
 }
 
 ordered_json render_include_filter(const AnalysisResult& result) {
@@ -428,6 +486,12 @@ ordered_json render_analysis_summary(const AnalysisResult& result, std::size_t t
         {"include_analysis_heuristic", result.include_analysis_heuristic},
         {"observation_source", observation_source},
         {"target_metadata", target_metadata},
+        {"tu_ranking_total_count_after_thresholds",
+         result.tu_ranking_total_count_after_thresholds},
+        {"tu_ranking_excluded_by_thresholds_count",
+         result.tu_ranking_excluded_by_thresholds_count},
+        {"include_hotspot_excluded_by_min_tus_count",
+         result.include_hotspot_excluded_by_min_tus_count},
     };
 }
 
@@ -545,6 +609,8 @@ std::string JsonReportAdapter::write_analysis_report(
     document["report_type"] = "analyze";
     document["inputs"] = render_inputs_common(analysis_result.inputs);
     document["summary"] = render_analysis_summary(analysis_result, top_limit);
+    document["analysis_configuration"] = render_analysis_configuration(analysis_result);
+    document["analysis_section_states"] = render_analysis_section_states(analysis_result);
     document["include_filter"] = render_include_filter(analysis_result);
     document["translation_unit_ranking"] =
         render_ranking_container(analysis_result, top_limit);
