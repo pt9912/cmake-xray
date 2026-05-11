@@ -5,6 +5,8 @@
 > **M6 AP 1.2 Tranche A.3:** `format_version` steigt auf `2`. Analyze-HTML traegt zwei zusaetzliche Pflichtsections `Target Graph` und `Target Hubs` zwischen `Target Metadata` und `Diagnostics`. Impact-HTML traegt eine zusaetzliche Pflichtsection `Target Graph Reference` zwischen `Heuristically Affected Targets` und `Diagnostics`. Beide Reporttypen behalten die neuen Sections auch bei `target_graph_status="not_loaded"` mit `h2` und sichtbarem Leersatz, analog zu `Target Metadata` aus M5.
 >
 > **M6 AP 1.3 Tranche A.4:** `format_version` steigt auf `3`. Impact-HTML traegt eine zusaetzliche Pflichtsection `Prioritised Affected Targets` zwischen `Target Graph Reference` und `Diagnostics`; sie zeigt die Reverse-BFS-priorisierte Sicht ueber den Target-Graphen mit Tiefen-Metadaten. Analyze-HTML aendert sich nicht (Reverse-BFS gilt nur fuer Impact). Die Section bleibt bei `target_graph_status="not_loaded"` mit `h2` plus Tiefen-Header und Fallback-Absatz erhalten.
+>
+> **M6 AP 1.4 Tranche A.5:** `format_version` steigt auf `4`. Analyze-HTML erweitert die `Include Hotspots`-Section um eine Pflicht-Filter-Zeile (`<p class="include-filter">`) zwischen `<h2>` und Tabelle/Empty-Marker, eine optionale Budget-Note (`<p class="include-budget-note">`) bei `include_node_budget_reached=true`, und zwei neue Pflichtspalten `Origin` und `Depth` in der Hotspot-Tabelle. Sechs neue CSS-Badge-Klassen (`badge--project`, `badge--external`, `badge--unknown`, `badge--direct`, `badge--indirect`, `badge--mixed`) landen im inline-CSS-Block. Die Filter-Zeile spiegelt Analyse-Konfiguration, nicht Ergebnis, und erscheint auch im Empty-Hotspot-Fall. Impact-HTML aendert sich strukturell nicht; die `format_version`-Anhebung dokumentiert nur die Analyze-Erweiterung. Konsole- und Markdown-Pendants leben in `docs/planning/in-progress/plan-M6-1-4.md` (Steps 22/23) und tragen denselben Filter-/Origin-/Depth-Datenstrom auf format-spezifischer Praesentation.
 
 ## Zweck
 
@@ -39,12 +41,12 @@ Das Geruest ist fuer Analyze und Impact identisch:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="xray-report-format-version" content="3">
+  <meta name="xray-report-format-version" content="4">
   <title>cmake-xray analyze report</title>
   <style>...</style>
 </head>
 <body>
-  <main class="report" data-report-type="analyze" data-format-version="3">
+  <main class="report" data-report-type="analyze" data-format-version="4">
     ...
   </main>
 </body>
@@ -68,6 +70,7 @@ Regeln:
 - System-Fontstack erlaubt: `system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif` fuer Body, `ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace` fuer Codeartiges.
 - Hintergrundfarbe Body `#ffffff`, Vordergrundfarbe `#1a1a1a`. Kontrastverhaeltnis &ge; 4.5:1 (WCAG AA fuer Fliesstext).
 - Status-Badges nutzen Hintergrund + Text in Kombination, nie nur Farbe; sichtbarer Text wie `direct`, `heuristic`, `loaded`, `partial`, `not_loaded`, `warning`, `note` bleibt erhalten.
+- M6 AP 1.4 ergaenzt sechs CSS-Klassen `badge--project`, `badge--external`, `badge--unknown`, `badge--direct`, `badge--indirect`, `badge--mixed` als Vertragsbestandteil. Sie tragen die Origin- und Depth-Werte der `Include Hotspots`-Tabelle sowie die Filter-Zeilen-Badges (`scope=<span class="badge badge--<scope>">…`, `depth=<span class="badge badge--<depth>">…`) ein. Die BEM-Doppeldash-Notation (`badge--<X>`) koexistiert mit den M5-Klassen `badge-direct` und `badge-heuristic` (Single-Dash, Impact-Evidenz-Achse) als bekannte Naming-Asymmetrie; ein optionaler Folge-Rename auf `badge--evidence-direct`/`badge--evidence-heuristic` ist in `docs/planning/in-progress/plan-M6-1-4.md` als A.5 Step 25c geplant und bleibt eine eigenstaendige Refactor-Commit, nicht Teil von AP 1.4 A.5 Step 21-24.
 - Tabellen sind auf dem Bildschirm horizontal scrollbar (`overflow-x: auto`), ohne dass das Seitenlayout bricht. Im Drucklayout setzt der Adapter `.table-wrap { overflow-x: visible }`, damit gedruckte Tabellen nicht abgeschnitten werden.
 - Drucklayout (`@media print`) entfernt Hintergrundfarben und reduziert Schriftfarbkontrast nicht unter Lesbarkeit.
 - Eine `@page { margin: 1.5cm }`-Regel setzt deterministische Druckraender; weitere Druckregeln sind ausschliesslich im Adapter-CSS hinterlegt und enthalten keine zufaelligen oder dynamischen Werte.
@@ -176,7 +179,20 @@ Hoechstens `top_limit` Zeilen. Bei `translation_units.size() > top_limit` zusaet
 
 ### Include Hotspots
 
-Spalten: `Header`, `Affected translation units`, `Translation unit context`. Hoechstens `top_limit` Zeilen. Pro Hotspot hoechstens `top_limit` Kontext-TUs; bei Kuerzung sichtbarer Hinweis `Showing N of M translation units.`. Leersatz `No include hotspots to report.`.
+Section-Struktur in fester Reihenfolge:
+
+1. `<h2>Include Hotspots</h2>`.
+2. **Pflicht-Filter-Zeile** als `<p class="include-filter">`: `Filter: scope=<span class="badge badge--<scope>">…</span>, depth=<span class="badge badge--<depth>">…</span>. Excluded: <unknown> unknown, <mixed> mixed.`. `<scope>` ist einer von `all`, `project`, `external`, `unknown`; `<depth>` ist einer von `all`, `direct`, `indirect`. `<unknown>` und `<mixed>` sind die Zaehler `include_hotspot_excluded_unknown_count` bzw. `include_hotspot_excluded_mixed_count` aus dem `AnalysisResult`. Die Zeile spiegelt Analyse-Konfiguration, nicht Ergebnis, und erscheint deshalb auch im Empty-Hotspot-Fall direkt unter dem `<h2>`.
+3. **Optionale Budget-Note** als `<p class="include-budget-note">Note: include analysis stopped at <effective> nodes (budget reached).</p>`. Erscheint genau dann, wenn `include_node_budget_reached=true`. `<effective>` ist der Wert von `include_node_budget_effective`. Wording ist Vertragsbestandteil.
+4. **Optionale Top-Limit-Hinweiszeile** `<p>Showing N of M entries.</p>` bei `include_hotspots.size() > top_limit`. Wording ist identisch zu Translation Unit Ranking.
+5. Empty-Marker `<p class="empty">No include hotspots to report.</p>` ODER Hotspot-Tabelle.
+
+Hotspot-Tabelle: Spalten `Header`, `Origin`, `Depth`, `Affected translation units`, `Translation unit context` in genau dieser Reihenfolge. Hoechstens `top_limit` Zeilen.
+
+- `Origin`-Zelle: `<span class="badge badge--<origin>">…</span>` mit `<origin>` einer von `project`, `external`, `unknown`.
+- `Depth`-Zelle: `<span class="badge badge--<depth_kind>">…</span>` mit `<depth_kind>` einer von `direct`, `indirect`, `mixed`.
+- `Affected translation units`-Zelle: Anzahl der zugeordneten TUs als Klartextzahl.
+- `Translation unit context`-Zelle: `<ul>` der ersten `top_limit` TUs; bei Kuerzung sichtbarer Hinweis `<p>Showing N of M translation units.</p>` ueber der Liste; bei leerem Kontext `<span class="empty">no translation units</span>`.
 
 ### Target Metadata
 
