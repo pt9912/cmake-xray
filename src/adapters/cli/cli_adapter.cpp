@@ -565,33 +565,14 @@ std::optional<int> reject_target_hubs_without_target_graph(
     return std::nullopt;
 }
 
-std::optional<int> validate_analysis(CliOptions& options, std::ostream& err) {
+std::optional<int> finalize_analysis_sections(AnalysisTokenClassification classification,
+                                               CliOptions& options, std::ostream& err) {
     using xray::hexagon::model::AnalysisSection;
-    if (options.analysis_option == nullptr) return std::nullopt;
-    if (options.analysis_option->count() > 1) {
-        err << "error: --analysis: option specified more than once\n";
-        return ExitCode::cli_usage_error;
-    }
-    if (options.analysis_option->count() == 0) return std::nullopt;
-
-    std::vector<std::string_view> tokens;
-    if (const auto e = split_analysis_tokens(options.analysis_text, tokens, err);
-        e.has_value()) {
-        return e;
-    }
-    AnalysisTokenClassification classification;
-    if (const auto e = classify_analysis_tokens(tokens, classification, err); e.has_value()) {
-        return e;
-    }
-    if (const auto e = reject_duplicate_analysis_tokens(classification.canonical, err);
-        e.has_value()) {
-        return e;
-    }
-    if (classification.saw_all && classification.canonical.size() > 1) {
-        err << "error: --analysis: 'all' must not be combined with other analysis values\n";
-        return ExitCode::cli_usage_error;
-    }
     if (classification.saw_all) {
+        if (classification.canonical.size() > 1) {
+            err << "error: --analysis: 'all' must not be combined with other analysis values\n";
+            return ExitCode::cli_usage_error;
+        }
         options.parsed_analysis_sections = {
             AnalysisSection::tu_ranking,
             AnalysisSection::include_hotspots,
@@ -611,6 +592,29 @@ std::optional<int> validate_analysis(CliOptions& options, std::ostream& err) {
     return std::nullopt;
 }
 
+std::optional<int> validate_analysis(CliOptions& options, std::ostream& err) {
+    if (options.analysis_option == nullptr) return std::nullopt;
+    if (options.analysis_option->count() > 1) {
+        err << "error: --analysis: option specified more than once\n";
+        return ExitCode::cli_usage_error;
+    }
+    if (options.analysis_option->count() == 0) return std::nullopt;
+    std::vector<std::string_view> tokens;
+    if (const auto e = split_analysis_tokens(options.analysis_text, tokens, err);
+        e.has_value()) {
+        return e;
+    }
+    AnalysisTokenClassification classification;
+    if (const auto e = classify_analysis_tokens(tokens, classification, err); e.has_value()) {
+        return e;
+    }
+    if (const auto e = reject_duplicate_analysis_tokens(classification.canonical, err);
+        e.has_value()) {
+        return e;
+    }
+    return finalize_analysis_sections(std::move(classification), options, err);
+}
+
 std::optional<xray::hexagon::model::TuRankingMetric> tu_metric_token_to_enum(
     std::string_view token) {
     using xray::hexagon::model::TuRankingMetric;
@@ -624,9 +628,11 @@ std::optional<xray::hexagon::model::TuRankingMetric> tu_metric_token_to_enum(
 // --tu-threshold and (in spirit) the three single-value size_t options.
 // It mirrors validate_size_option's "negative value" / "not an integer"
 // branches so the per-row parser of validate_tu_thresholds can stay
-// linear.
+// linear. option_name uses const char* (not std::string_view) so the two
+// parameters do not trip clang-tidy's adjacent-string_view warning; all
+// call sites pass option literals like "--min-hotspot-tus" anyway.
 std::optional<std::size_t> parse_non_negative_decimal(std::string_view value_text,
-                                                       std::string_view option_name,
+                                                       const char* option_name,
                                                        std::ostream& err) {
     if (!value_text.empty() && value_text.front() == '-') {
         err << "error: " << option_name << ": negative value\n";
@@ -683,7 +689,7 @@ std::optional<int> validate_tu_thresholds(CliOptions& options, std::ostream& err
     return std::nullopt;
 }
 
-std::optional<int> validate_size_option(CLI::Option* option, std::string_view option_name,
+std::optional<int> validate_size_option(CLI::Option* option, const char* option_name,
                                         const std::string& raw_text, std::size_t& parsed_value,
                                         std::ostream& err) {
     // AP M6-1.5 A.1: shared validator for the three single-value size_t
