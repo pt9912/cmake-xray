@@ -1205,15 +1205,20 @@ Innerhalb von **A.5 (HTML-, Markdown- und Console-Adapter)**:
     fuer alle fuenf Reportformate werden aus dieser Fixture neu
     gebacken; sie pinnen die `external`-, `mixed`- und ggf.
     `excluded_*_count`-Pfade end-to-end.
-25b. **Tracking-Note (A.4-Review-Findung 7)**: File-API-Fixtures
-    erzeugen heute `include_depth_limit_effective=0` und
+25b. **Tracking-Note (A.4-Review-Findung 7) — erledigt durch 25a**:
+    File-API-Fixtures erzeugen weiterhin
+    `include_depth_limit_effective=0` und
     `include_node_budget_effective=0`, weil keine On-Disk-Sources die
-    Replies stuetzen und der Include-Resolver nie laeuft. Plan-konform
-    (Plan ~302), aber Coverage-Luecke. A.5 entscheidet bewusst, ob
-    die neue Fixture aus 25a auch eine echte Source-Layout-Variante
-    bekommt (BFS-Limits-Effective != 0); falls nicht, bleibt der
-    Plan-konforme `0`-Pfad gepinnt und der `>0`-Pfad wartet auf eine
-    spaetere Fixture-Erweiterung.
+    Replies stuetzen und der Include-Resolver nie laeuft. Die in 25a
+    eingefuehrte Compile-DB-Fixture `m6/include_origin_mix` hat
+    On-Disk-Sources unter `src/` mit Headern unter `include/` und
+    `system/`, der Include-Resolver durchlaeuft die BFS, und der
+    Default-Goldensatz pinnt `include_depth_limit_effective=2` plus
+    `include_node_budget_effective=8` (zwei TUs mal vier Header-
+    Traversal-Knoten). Damit ist der `>0`-Pfad jetzt end-to-end durch
+    25a abgedeckt; ein gesonderter Source-Layout-Build des
+    File-API-Fixtures bleibt unnoetig.
+
 25c. **CSS-Badge-Naming-Rename (A.5 step 21 Review-Findung 1)**:
     Step 21 hat sechs neue BEM-Klassen `badge--{project,external,
     unknown,direct,indirect,mixed}` eingefuehrt, waehrend die M5-
