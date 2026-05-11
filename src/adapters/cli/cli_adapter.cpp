@@ -1,8 +1,10 @@
 #include "adapters/cli/cli_adapter.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <filesystem>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -92,6 +94,13 @@ struct CliOptions {
         xray::hexagon::model::AnalysisSection::target_graph,
         xray::hexagon::model::AnalysisSection::target_hubs,
     };
+    // AP M6-1.5 A.1: --tu-threshold <metric>=<n> is multi-instance; CLI11
+    // accumulates each occurrence into tu_threshold_texts so the validator
+    // can emit the five plan-pinned error phrases by walking the raw inputs
+    // in source order. parsed_tu_thresholds holds the validated map (at most
+    // one entry per metric).
+    std::vector<std::string> tu_threshold_texts;
+    std::map<xray::hexagon::model::TuRankingMetric, std::size_t> parsed_tu_thresholds;
 };
 
 OutputVerbosity resolve_verbosity(const CliOptions& options) {
@@ -247,6 +256,15 @@ void configure_analyze_command(CLI::App& app, CliOptions& options, CLI::App*& an
         "include-hotspots, target-graph, target-hubs. target-hubs requires "
         "target-graph in the same list");
     options.analysis_option->take_last();
+    // AP M6-1.5 A.1: --tu-threshold <metric>=<n> is multi-instance. CLI11
+    // accumulates each occurrence into the raw-text vector so the
+    // validator can re-emit the source-order spelling in the five
+    // documented error phrases.
+    analyze_cmd->add_option(
+        "--tu-threshold", options.tu_threshold_texts,
+        "TU-ranking metric threshold as <metric>=<n>; metric is one of "
+        "arg_count, include_path_count, define_count. May be set once per "
+        "metric");
     configure_report_options(*analyze_cmd, options);
     configure_verbosity_options(*analyze_cmd, options);
 }
@@ -527,6 +545,68 @@ std::optional<int> validate_analysis(CliOptions& options, std::ostream& err) {
     // include_hotspots=1, target_graph=2, target_hubs=3).
     std::sort(sections.begin(), sections.end());
     options.parsed_analysis_sections = std::move(sections);
+    return std::nullopt;
+}
+
+std::optional<xray::hexagon::model::TuRankingMetric> tu_metric_token_to_enum(
+    std::string_view token) {
+    using xray::hexagon::model::TuRankingMetric;
+    if (token == "arg_count") return TuRankingMetric::arg_count;
+    if (token == "include_path_count") return TuRankingMetric::include_path_count;
+    if (token == "define_count") return TuRankingMetric::define_count;
+    return std::nullopt;
+}
+
+std::optional<int> validate_tu_thresholds(CliOptions& options, std::ostream& err) {
+    using xray::hexagon::model::TuRankingMetric;
+    if (options.tu_threshold_texts.empty()) return std::nullopt;
+
+    std::map<TuRankingMetric, std::size_t> parsed;
+    for (const auto& raw : options.tu_threshold_texts) {
+        const auto eq = raw.find('=');
+        if (eq == std::string::npos) {
+            err << "error: --tu-threshold: invalid syntax '" << raw
+                << "'; expected <metric>=<n>\n";
+            return ExitCode::cli_usage_error;
+        }
+        const std::string_view metric_text{raw.data(), eq};
+        const std::string_view value_text{raw.data() + eq + 1, raw.size() - eq - 1};
+
+        const auto metric = tu_metric_token_to_enum(metric_text);
+        if (!metric.has_value()) {
+            err << "error: --tu-threshold: unknown metric '" << metric_text
+                << "'; allowed: arg_count, include_path_count, define_count\n";
+            return ExitCode::cli_usage_error;
+        }
+
+        // Reject leading sign and any non-digit character. A leading '-'
+        // shortcut to the "negative value" branch keeps the error phrase
+        // closer to user intent than the generic "not an integer" phrase.
+        if (!value_text.empty() && value_text.front() == '-') {
+            err << "error: --tu-threshold: negative value\n";
+            return ExitCode::cli_usage_error;
+        }
+        if (value_text.empty() ||
+            !std::all_of(value_text.begin(), value_text.end(),
+                         [](unsigned char ch) { return std::isdigit(ch) != 0; })) {
+            err << "error: --tu-threshold: not an integer\n";
+            return ExitCode::cli_usage_error;
+        }
+
+        if (parsed.find(*metric) != parsed.end()) {
+            err << "error: --tu-threshold: duplicate metric '" << metric_text << "'\n";
+            return ExitCode::cli_usage_error;
+        }
+
+        std::size_t numeric_value = 0;
+        for (const char ch : value_text) {
+            numeric_value = numeric_value * 10 +
+                            static_cast<std::size_t>(static_cast<unsigned char>(ch) - '0');
+        }
+        parsed.emplace(*metric, numeric_value);
+    }
+
+    options.parsed_tu_thresholds = std::move(parsed);
     return std::nullopt;
 }
 
@@ -965,7 +1045,7 @@ xray::hexagon::ports::driving::AnalyzeProjectRequest build_project_request(
             options.parsed_include_scope,
             options.parsed_include_depth,
             options.parsed_analysis_sections,
-            /*tu_thresholds=*/{},
+            options.parsed_tu_thresholds,
             /*min_hotspot_tus=*/2,
             /*target_hub_in_threshold=*/10,
             /*target_hub_out_threshold=*/10};
@@ -993,6 +1073,7 @@ std::optional<int> validate_subcommand_options(CliOptions& options, bool is_impa
         if (const auto e = validate_include_scope(options, err); e.has_value()) return e;
         if (const auto e = validate_include_depth(options, err); e.has_value()) return e;
         if (const auto e = validate_analysis(options, err); e.has_value()) return e;
+        if (const auto e = validate_tu_thresholds(options, err); e.has_value()) return e;
     }
     return validate_input_options(options, err);
 }

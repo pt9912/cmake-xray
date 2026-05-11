@@ -1671,3 +1671,83 @@ TEST_CASE_FIXTURE(CliFixture, "AP1.5 A.1: --analysis is not exposed on impact") 
     CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
                "src/app/main.cpp", "--analysis", "tu-ranking"}) == ExitCode::cli_usage_error);
 }
+
+// ---- AP M6-1.5 A.1: --tu-threshold ----
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.5 A.1: --tu-threshold arg_count=5 is accepted") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--tu-threshold",
+               "arg_count=5"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.5 A.1: --tu-threshold accepts multiple metrics, one per option") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--tu-threshold",
+               "arg_count=5", "--tu-threshold", "include_path_count=2", "--tu-threshold",
+               "define_count=1"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "AP1.5 A.1: --tu-threshold arg_count=0 is accepted") {
+    // Plan §359-361: a threshold of 0 is semantically "no filter" and
+    // must still be accepted so scripts can pass through values
+    // unconditionally.
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--tu-threshold",
+               "arg_count=0"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --tu-threshold without '=' returns exit 2 with 'invalid syntax' phrase") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--tu-threshold",
+               "arg_count5"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--tu-threshold: invalid syntax 'arg_count5'; expected <metric>=<n>") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --tu-threshold with unknown metric returns exit 2 with 'unknown metric' phrase") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--tu-threshold",
+               "bogus=5"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--tu-threshold: unknown metric 'bogus'; allowed: arg_count, "
+                          "include_path_count, define_count") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --tu-threshold with non-numeric value returns exit 2 with 'not an integer' phrase") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--tu-threshold",
+               "arg_count=abc"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--tu-threshold: not an integer") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.5 A.1: --tu-threshold with negative value is rejected") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--tu-threshold",
+               "arg_count=-1"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--tu-threshold: negative value") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --tu-threshold with a duplicate metric returns exit 2 with 'duplicate metric' phrase") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--tu-threshold",
+               "arg_count=5", "--tu-threshold", "arg_count=7"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--tu-threshold: duplicate metric 'arg_count'") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "AP1.5 A.1: --tu-threshold is not exposed on impact") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--tu-threshold", "arg_count=5"}) ==
+          ExitCode::cli_usage_error);
+}
