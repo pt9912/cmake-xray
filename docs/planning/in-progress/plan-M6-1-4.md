@@ -843,17 +843,19 @@ folgt der M5-DOT-Konvention.
 Neue Filter-Zeile vor dem `Include Hotspots`-Abschnitt:
 
 ```
-Include Hotspots (filter: scope=all, depth=all; excluded: 0 unknown, 0 mixed):
+Include Hotspots (scope=all, depth=all; excluded: 0 unknown, 0 mixed):
+  Note: include analysis stopped at 123 nodes (budget reached).
+  Showing 2 of 3 include hotspots.
   src/include/foo.h [project, direct] (5 translation units)
   src/include/bar.h [project, mixed] (4 translation units)
   /usr/include/iostream [external, indirect] (12 translation units)
 ```
 
-- Filter-Werte werden im Section-Kopf sichtbar.
-- Pro Hotspot wird ein Suffix `[<origin>, <depth_kind>]` zwischen
-  Pfad und TU-Anzahl eingefuegt.
-- Wenn `include_node_budget_reached=true`: zusaetzliche Zeile
-  `  Note: include analysis stopped at <effective> nodes (budget reached).`.
+- Pro Hotspot wird die v4-Zeile ` <header> [<origin>, <depth_kind>] (<n> translation units)` verwendet.
+- TU-Auflistung und Hotspot-Diagnostics entfallen im `Include Hotspots`-Abschnitt (β).
+- `[heuristic]` entfällt im Heading (M3-`include hotspots [heuristic]` bleibt in M3 unberührt).
+- Optional `No include hotspots found.` bei leerer Section; die `Include Hotspots`-Filterzeile erscheint auch dann.
+- `Showing <returned> of <total> include hotspots.` ist optional nur bei Top-Limit-Drosselung.
 
 ### Markdown
 
@@ -1131,7 +1133,20 @@ Innerhalb von **A.5 (HTML-, Markdown- und Console-Adapter)**:
     5. Y (Hotspot-Diagnostics): β (fallen in Markdown weg, konsistent mit HTML v4).
     6. Z (Target-Suffix in Context): ja, bei vorhandenem Target weiterhin im Context als
        `[targets: <name>]` mit `disambiguate_target_display_names`.
-23. Console-Adapter implementiert v4-Output.
+23. Console-Adapter implementiert v4-Output mit `Include Hotspots`-Vertrag analog zu HTML/Markdown.
+    1. Pflicht-Section-Struktur in exakter Reihenfolge:
+       `Include Hotspots (scope=<X>, depth=<Y>; excluded: <N> unknown, <M> mixed):`,
+       optional `Note: include analysis stopped at <effective> nodes (budget reached).`,
+       optional `Showing <returned> of <total> include hotspots.`,
+       danach `No include hotspots found.` ODER Hotspot-Zeilen.
+    2. `[heuristic]` wird im `Include Hotspots`-Heading bewusst entfernt.
+    3. Per-Hotspot-Zeile:
+       `<header> [<origin>, <depth_kind>] (<n> translation units)` mit zwei Leerzeichen-Indent;
+       keine TU-Liste, keine Hotspot-Diagnostics (β, konsistent mit HTML/Markdown).
+    4. Empty-Hotspot-Vertrag wie Markdown/HTML: Filter-/Budget-/Top-Limit-Zeile erscheint auch bei leerem `include_hotspots`,
+       Empty-Marker lautet genau `No include hotspots found.`.
+    5. TU-Suffix/`[targets: ...]` im `Include Hotspots`-Block entfällt (TU-Liste bleibt in
+       `## Translation Unit Ranking` unveraendert).
 24. `spec/report-html.md` auf v4 heben. Die Prosa-Spezifikation
     spiegelt den HTML-Vertrag, der in Step 21 im Adapter umgesetzt
     wurde, sowie die Console- und Markdown-Pendants aus Step 22/23.
