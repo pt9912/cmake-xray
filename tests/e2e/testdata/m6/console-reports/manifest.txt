@@ -11,9 +11,15 @@
 #   impact-compile-db-only.txt   -> not_loaded, no Target Graph Reference section
 #   impact-file-api-loaded.txt   -> loaded, populated Target Graph Reference lines
 #   impact-file-api-partial.txt  -> partial, at least one external edge
+#
+# AP M6-1.4 A.5 step 25a (origin/depth coverage):
+#   analyze-include-origin-mix.txt                -> all four origin/depth_kind values
+#   analyze-include-origin-mix-scope-project.txt  -> include_hotspot_excluded_unknown_count > 0
 analyze-compile-db-only.txt
 analyze-file-api-loaded.txt
 analyze-file-api-partial.txt
+analyze-include-origin-mix-scope-project.txt
+analyze-include-origin-mix.txt
 impact-compile-db-only.txt
 impact-file-api-loaded.txt
 impact-file-api-partial.txt

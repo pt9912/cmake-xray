@@ -12,9 +12,15 @@
 #   impact-compile-db-only.json   -> not_loaded, empty graph (impact has no hubs)
 #   impact-file-api-loaded.json   -> loaded, multiple edges
 #   impact-file-api-partial.json  -> partial, one external edge
+#
+# AP M6-1.4 A.5 step 25a (origin/depth coverage):
+#   analyze-include-origin-mix.json                -> all four origin/depth_kind values
+#   analyze-include-origin-mix-scope-project.json  -> include_hotspot_excluded_unknown_count > 0
 analyze-compile-db-only.json
 analyze-file-api-loaded.json
 analyze-file-api-partial.json
+analyze-include-origin-mix-scope-project.json
+analyze-include-origin-mix.json
 impact-compile-db-only.json
 impact-file-api-loaded.json
 impact-file-api-partial.json

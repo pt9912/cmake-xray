@@ -1,0 +1,197 @@
+{
+  "format": "cmake-xray.analysis",
+  "format_version": 4,
+  "report_type": "analyze",
+  "inputs": {
+    "compile_database_path": "tests/e2e/testdata/m6/include_origin_mix/compile_commands.json",
+    "compile_database_source": "cli",
+    "cmake_file_api_path": null,
+    "cmake_file_api_resolved_path": null,
+    "cmake_file_api_source": null
+  },
+  "summary": {
+    "translation_unit_count": 2,
+    "ranking_total_count": 2,
+    "hotspot_total_count": 4,
+    "top_limit": 10,
+    "include_analysis_heuristic": true,
+    "observation_source": "exact",
+    "target_metadata": "not_loaded"
+  },
+  "include_filter": {
+    "include_scope": "all",
+    "include_depth": "all",
+    "include_depth_limit_requested": 32,
+    "include_depth_limit_effective": 2,
+    "include_node_budget_requested": 10000,
+    "include_node_budget_effective": 8,
+    "include_node_budget_reached": false
+  },
+  "translation_unit_ranking": {
+    "limit": 10,
+    "total_count": 2,
+    "returned_count": 2,
+    "truncated": false,
+    "items": [
+      {
+        "rank": 1,
+        "reference": {
+          "source_path": "src/a.cpp",
+          "directory": "build/a"
+        },
+        "metrics": {
+          "arg_count": 8,
+          "include_path_count": 2,
+          "define_count": 0,
+          "score": 10
+        },
+        "targets": [],
+        "diagnostics": []
+      },
+      {
+        "rank": 2,
+        "reference": {
+          "source_path": "src/b.cpp",
+          "directory": "build/b"
+        },
+        "metrics": {
+          "arg_count": 8,
+          "include_path_count": 2,
+          "define_count": 0,
+          "score": 10
+        },
+        "targets": [],
+        "diagnostics": []
+      }
+    ]
+  },
+  "include_hotspots": {
+    "limit": 10,
+    "total_count": 4,
+    "returned_count": 4,
+    "truncated": false,
+    "excluded_unknown_count": 0,
+    "excluded_mixed_count": 0,
+    "items": [
+      {
+        "header_path": "include/config.h",
+        "origin": "project",
+        "depth_kind": "mixed",
+        "affected_total_count": 2,
+        "affected_returned_count": 2,
+        "affected_truncated": false,
+        "affected_translation_units": [
+          {
+            "reference": {
+              "source_path": "src/a.cpp",
+              "directory": "build/a"
+            },
+            "targets": []
+          },
+          {
+            "reference": {
+              "source_path": "src/b.cpp",
+              "directory": "build/b"
+            },
+            "targets": []
+          }
+        ],
+        "diagnostics": []
+      },
+      {
+        "header_path": "include/wrapper.h",
+        "origin": "project",
+        "depth_kind": "direct",
+        "affected_total_count": 2,
+        "affected_returned_count": 2,
+        "affected_truncated": false,
+        "affected_translation_units": [
+          {
+            "reference": {
+              "source_path": "src/a.cpp",
+              "directory": "build/a"
+            },
+            "targets": []
+          },
+          {
+            "reference": {
+              "source_path": "src/b.cpp",
+              "directory": "build/b"
+            },
+            "targets": []
+          }
+        ],
+        "diagnostics": []
+      },
+      {
+        "header_path": "neighbor.h",
+        "origin": "unknown",
+        "depth_kind": "direct",
+        "affected_total_count": 2,
+        "affected_returned_count": 2,
+        "affected_truncated": false,
+        "affected_translation_units": [
+          {
+            "reference": {
+              "source_path": "src/a.cpp",
+              "directory": "build/a"
+            },
+            "targets": []
+          },
+          {
+            "reference": {
+              "source_path": "src/b.cpp",
+              "directory": "build/b"
+            },
+            "targets": []
+          }
+        ],
+        "diagnostics": []
+      },
+      {
+        "header_path": "system/vector",
+        "origin": "external",
+        "depth_kind": "direct",
+        "affected_total_count": 2,
+        "affected_returned_count": 2,
+        "affected_truncated": false,
+        "affected_translation_units": [
+          {
+            "reference": {
+              "source_path": "src/a.cpp",
+              "directory": "build/a"
+            },
+            "targets": []
+          },
+          {
+            "reference": {
+              "source_path": "src/b.cpp",
+              "directory": "build/b"
+            },
+            "targets": []
+          }
+        ],
+        "diagnostics": []
+      }
+    ]
+  },
+  "target_graph_status": "not_loaded",
+  "target_graph": {
+    "nodes": [],
+    "edges": []
+  },
+  "target_hubs": {
+    "inbound": [],
+    "outbound": [],
+    "thresholds": {
+      "in_threshold": 10,
+      "out_threshold": 10
+    }
+  },
+  "diagnostics": [
+    {
+      "severity": "note",
+      "message": "include-based results are heuristic; conditional or generated includes may be missing"
+    }
+  ]
+}

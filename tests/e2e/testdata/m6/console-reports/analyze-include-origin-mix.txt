@@ -1,0 +1,14 @@
+translation unit ranking
+based on metrics: arg_count + include_path_count + define_count
+top 2 of 2 translation units
+1. src/a.cpp [directory: build/a]
+   arg_count=8 include_path_count=2 define_count=0
+2. src/b.cpp [directory: build/b]
+   arg_count=8 include_path_count=2 define_count=0
+
+Include Hotspots (scope=all, depth=all; excluded: 0 unknown, 0 mixed):
+  include/config.h [project, mixed] (2 translation units)
+  include/wrapper.h [project, direct] (2 translation units)
+  neighbor.h [unknown, direct] (2 translation units)
+  system/vector [external, direct] (2 translation units)
+note: include-based results are heuristic; conditional or generated includes may be missing
