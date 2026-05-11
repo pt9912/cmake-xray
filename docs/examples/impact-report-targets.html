@@ -38,28 +38,38 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 <dl>
 <dt>report_type</dt><dd>impact</dd>
 <dt>format_version</dt><dd>5</dd>
-<dt>changed_file</dt><dd>include/common/config.h</dd>
-<dt>affected_translation_units</dt><dd>0</dd>
-<dt>classification</dt><dd>uncertain</dd>
-<dt>observation_source</dt><dd>derived</dd>
-<dt>target_metadata</dt><dd>loaded</dd>
+<dt>changed_file</dt><dd>/project/src/main.cpp</dd>
+<dt>affected_translation_units</dt><dd>1</dd>
+<dt>classification</dt><dd>direct</dd>
+<dt>observation_source</dt><dd>exact</dd>
+<dt>target_metadata</dt><dd>partial</dd>
 </dl></header>
 <section class="inputs"><h2>Inputs</h2>
 <dl>
-<dt>compile_database_path</dt><dd>not provided</dd>
-<dt>compile_database_source</dt><dd>not provided</dd>
-<dt>cmake_file_api_path</dt><dd>tests/e2e/testdata/m4/file_api_only/build</dd>
-<dt>cmake_file_api_resolved_path</dt><dd>tests/e2e/testdata/m4/file_api_only/build/.cmake/api/v1/reply</dd>
+<dt>compile_database_path</dt><dd>tests/e2e/testdata/m4/partial_targets/compile_commands.json</dd>
+<dt>compile_database_source</dt><dd>cli</dd>
+<dt>cmake_file_api_path</dt><dd>tests/e2e/testdata/m4/partial_targets/build</dd>
+<dt>cmake_file_api_resolved_path</dt><dd>tests/e2e/testdata/m4/partial_targets/build/.cmake/api/v1/reply</dd>
 <dt>cmake_file_api_source</dt><dd>cli</dd>
-<dt>changed_file</dt><dd>include/common/config.h</dd>
-<dt>changed_file_source</dt><dd>file_api_source_root</dd>
+<dt>changed_file</dt><dd>/project/src/main.cpp</dd>
+<dt>changed_file_source</dt><dd>cli_absolute</dd>
 </dl></section>
 <section class="impact-direct-tus"><h2>Directly Affected Translation Units</h2>
-<p class="empty">No directly affected translation units.</p></section>
+<div class="table-wrap"><table>
+<thead><tr><th scope="col">Source path</th><th scope="col">Directory</th><th scope="col">Targets</th></tr></thead>
+<tbody>
+<tr><td>/project/src/main.cpp</td><td>/project/build</td><td><ul><li>app <span class="badge">EXECUTABLE</span></li></ul></td></tr>
+</tbody>
+</table></div></section>
 <section class="impact-heuristic-tus"><h2>Heuristically Affected Translation Units</h2>
 <p class="empty">No heuristically affected translation units.</p></section>
 <section class="impact-direct-targets"><h2>Directly Affected Targets</h2>
-<p class="empty">No directly affected targets.</p></section>
+<div class="table-wrap"><table>
+<thead><tr><th scope="col">Display name</th><th scope="col">Type</th></tr></thead>
+<tbody>
+<tr><td><span class="badge badge--evidence-direct">app</span></td><td>EXECUTABLE</td></tr>
+</tbody>
+</table></div></section>
 <section class="impact-heuristic-targets"><h2>Heuristically Affected Targets</h2>
 <p class="empty">No heuristically affected targets.</p></section>
 <section class="target-graph-reference"><h2>Target Graph Reference</h2>
@@ -67,13 +77,16 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 <p class="empty">No direct target dependencies.</p></section>
 <section class="prioritised-affected-targets"><h2>Prioritised Affected Targets</h2>
 <p>Requested depth: 2. Effective depth: 0.</p>
-<p class="empty">No prioritised targets.</p></section>
+<div class="table-wrap"><table>
+<thead><tr><th scope="col">Display name</th><th scope="col">Type</th><th scope="col">Priority class</th><th scope="col">Graph distance</th><th scope="col">Evidence strength</th><th scope="col">Unique key</th></tr></thead>
+<tbody>
+<tr><td>app</td><td>EXECUTABLE</td><td>direct</td><td>0</td><td>direct</td><td>app::EXECUTABLE</td></tr>
+</tbody>
+</table></div></section>
 <section class="diagnostics"><h2>Diagnostics</h2>
 <ul>
-<li><span class="badge">warning</span> cannot read source file for include analysis: src/core.cpp</li>
-<li><span class="badge">warning</span> cannot read source file for include analysis: src/main.cpp</li>
-<li><span class="badge">note</span> conditional or generated includes may be missing from this result</li>
-<li><span class="badge">note</span> the file was not present in the loaded compile database or resolved include graph</li>
+<li><span class="badge">note</span> 1 of 2 targets have no compilable sources and are not included in the analysis</li>
+<li><span class="badge">note</span> reverse target graph traversal stopped at depth 0 (no further reachable targets)</li>
 </ul></section>
 </main>
 </body>

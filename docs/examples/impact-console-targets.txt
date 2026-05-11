@@ -1,11 +1,12 @@
-impact analysis for include/common/config.h [heuristic]
-affected translation units: 0
-observation source: derived
-target metadata: loaded
-affected targets: 0
+impact analysis for /project/src/main.cpp
+affected translation units: 1
+observation source: exact
+target metadata: partial
+affected targets: 1
+  /project/src/main.cpp [directory: /project/build] [targets: app] [direct]
 
 directly affected targets
-no directly affected targets
+- app [type: EXECUTABLE]
 
 heuristically affected targets
 no heuristically affected targets
@@ -14,8 +15,6 @@ Target Graph Reference (target_graph_status: loaded):
   No direct target dependencies.
 
 Prioritised Affected Targets (requested depth: 2, effective depth: 0):
-  No prioritised targets.
-warning: cannot read source file for include analysis: src/core.cpp
-warning: cannot read source file for include analysis: src/main.cpp
-note: conditional or generated includes may be missing from this result
-note: the file was not present in the loaded compile database or resolved include graph
+  [direct, distance=0, evidence=direct] app
+note: 1 of 2 targets have no compilable sources and are not included in the analysis
+note: reverse target graph traversal stopped at depth 0 (no further reachable targets)
