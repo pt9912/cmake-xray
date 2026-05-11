@@ -180,12 +180,48 @@ struct GraphHeader {
     IncludeScope include_scope{IncludeScope::all};
     IncludeDepthFilter include_depth{IncludeDepthFilter::all};
     bool include_node_budget_reached{false};
+    // AP M6-1.5 A.4: analysis_configuration graph attributes per plan
+    // §651-660. Seven Pflicht-Attribute fuer Analyze-DOT;
+    // Impact-DOT laesst sie weg.
+    std::string analysis_sections_text;
+    std::size_t min_hotspot_tus{2};
+    std::size_t target_hub_in_threshold{10};
+    std::size_t target_hub_out_threshold{10};
+    std::size_t tu_threshold_arg_count{0};
+    std::size_t tu_threshold_include_path_count{0};
+    std::size_t tu_threshold_define_count{0};
 };
 
 std::string target_graph_status_text(TargetGraphStatus status) {
     if (status == TargetGraphStatus::loaded) return "loaded";
     if (status == TargetGraphStatus::partial) return "partial";
+    if (status == TargetGraphStatus::disabled) return "disabled";
     return "not_loaded";
+}
+
+std::string analysis_section_text(xray::hexagon::model::AnalysisSection section) {
+    using xray::hexagon::model::AnalysisSection;
+    if (section == AnalysisSection::tu_ranking) return "tu-ranking";
+    if (section == AnalysisSection::include_hotspots) return "include-hotspots";
+    if (section == AnalysisSection::target_graph) return "target-graph";
+    return "target-hubs";
+}
+
+std::string join_analysis_sections(
+    const std::vector<xray::hexagon::model::AnalysisSection>& sections) {
+    std::string out;
+    for (std::size_t index = 0; index < sections.size(); ++index) {
+        if (index != 0) out.push_back(',');
+        out += analysis_section_text(sections[index]);
+    }
+    return std::string(std::move(out));
+}
+
+std::size_t tu_threshold_value(
+    const xray::hexagon::model::AnalysisConfiguration& cfg,
+    xray::hexagon::model::TuRankingMetric metric) {
+    const auto it = cfg.tu_thresholds.find(metric);
+    return it == cfg.tu_thresholds.end() ? 0 : it->second;
 }
 
 void emit_impact_depth_attributes(std::ostringstream& out, const GraphHeader& header) {
@@ -213,6 +249,40 @@ void emit_analyze_include_filter_attributes(std::ostringstream& out, const Graph
     out << "  ";
     append_boolean_attribute(out, "graph_include_node_budget_reached",
                              header.include_node_budget_reached);
+    out << ";\n";
+}
+
+void emit_analyze_configuration_attributes(std::ostringstream& out, const GraphHeader& header) {
+    // AP M6-1.5 A.4 plan §651-660: seven Pflicht-Graph-Attribute fuer
+    // Analyze-DOT. Werden auch dann ausgegeben, wenn die zugehoerige
+    // Section disabled oder not_loaded ist - sie spiegeln die wirksame
+    // CLI-Konfiguration, nicht den Datenstand.
+    if (header.report_type != "analyze") return;
+    out << "  ";
+    append_string_attribute(out, "graph_analysis_sections", header.analysis_sections_text);
+    out << ";\n";
+    out << "  ";
+    append_integer_attribute(out, "graph_min_hotspot_tus", header.min_hotspot_tus);
+    out << ";\n";
+    out << "  ";
+    append_integer_attribute(out, "graph_target_hub_in_threshold",
+                              header.target_hub_in_threshold);
+    out << ";\n";
+    out << "  ";
+    append_integer_attribute(out, "graph_target_hub_out_threshold",
+                              header.target_hub_out_threshold);
+    out << ";\n";
+    out << "  ";
+    append_integer_attribute(out, "graph_tu_threshold_arg_count",
+                              header.tu_threshold_arg_count);
+    out << ";\n";
+    out << "  ";
+    append_integer_attribute(out, "graph_tu_threshold_include_path_count",
+                              header.tu_threshold_include_path_count);
+    out << ";\n";
+    out << "  ";
+    append_integer_attribute(out, "graph_tu_threshold_define_count",
+                              header.tu_threshold_define_count);
     out << ";\n";
 }
 
@@ -247,6 +317,7 @@ void emit_graph_header(std::ostringstream& out, const GraphHeader& header) {
     out << ";\n";
     emit_impact_depth_attributes(out, header);
     emit_analyze_include_filter_attributes(out, header);
+    emit_analyze_configuration_attributes(out, header);
 }
 
 void emit_graph_footer(std::ostringstream& out) { out << "}\n"; }
@@ -790,11 +861,21 @@ void emit_analyze_graph(std::ostringstream& out, const AnalyzeGraph& graph,
                         const DotBudget& budget,
                         TargetGraphStatus target_graph_status,
                         const AnalysisResult& result) {
+    using xray::hexagon::model::TuRankingMetric;
+    const auto& cfg = result.analysis_configuration;
     GraphHeader header{"cmake_xray_analysis", "analyze", budget, graph.truncated,
                        target_graph_status};
     header.include_scope = result.include_scope_effective;
     header.include_depth = result.include_depth_filter_effective;
     header.include_node_budget_reached = result.include_node_budget_reached;
+    header.analysis_sections_text = join_analysis_sections(cfg.effective_sections);
+    header.min_hotspot_tus = cfg.min_hotspot_tus;
+    header.target_hub_in_threshold = cfg.target_hub_in_threshold;
+    header.target_hub_out_threshold = cfg.target_hub_out_threshold;
+    header.tu_threshold_arg_count = tu_threshold_value(cfg, TuRankingMetric::arg_count);
+    header.tu_threshold_include_path_count =
+        tu_threshold_value(cfg, TuRankingMetric::include_path_count);
+    header.tu_threshold_define_count = tu_threshold_value(cfg, TuRankingMetric::define_count);
     emit_graph_header(out, header);
     for (const auto& node : graph.tu_nodes) emit_analyze_tu_node(out, node);
     for (const auto& node : graph.hotspot_nodes) emit_analyze_hotspot_node(out, node);
