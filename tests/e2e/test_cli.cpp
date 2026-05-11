@@ -116,7 +116,8 @@ TEST_CASE_FIXTURE(CliFixture, "analyze success path renders ranking and hotspots
           ExitCode::success);
     CHECK(out.str().find("translation unit ranking") != std::string::npos);
     CHECK(out.str().find("top 2 of 3 translation units") != std::string::npos);
-    CHECK(out.str().find("include hotspots [heuristic]") != std::string::npos);
+    // AP M6-1.4 A.5 step 23: v4 Include Hotspots heading.
+    CHECK(out.str().find("Include Hotspots (scope=all, depth=all;") != std::string::npos);
     CHECK(out.str().find("warning: could not resolve include") != std::string::npos);
     CHECK(err.str().empty());
 }
@@ -303,7 +304,9 @@ TEST_CASE_FIXTURE(CliFixture,
             ExitCode::success);
     CHECK(out.str().find("src/app/main.cpp [directory: build/debug]") != std::string::npos);
     CHECK(out.str().find("src/app/main.cpp [directory: build/release]") != std::string::npos);
-    CHECK(out.str().find("include/common/config.h (affected translation units: 3)") !=
+    // AP M6-1.4 A.5 step 23: v4 per-hotspot line format with origin/depth
+    // suffix replacing the M3 "(affected translation units: N)" wording.
+    CHECK(out.str().find("include/common/config.h [project, direct] (3 translation units)") !=
           std::string::npos);
 }
 

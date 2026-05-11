@@ -76,7 +76,9 @@ TEST_CASE("full M2 analyze pipeline wires from CLI through hexagon to adapters")
     CHECK(exit_code == xray::adapters::cli::ExitCode::success);
     CHECK(out.str().find("translation unit ranking") != std::string::npos);
     CHECK(out.str().find("top 2 of 3 translation units") != std::string::npos);
-    CHECK(out.str().find("include hotspots [heuristic]") != std::string::npos);
+    // AP M6-1.4 A.5 step 23: Include Hotspots heading carries the filter
+    // parenthetical and drops the M3 [heuristic] suffix.
+    CHECK(out.str().find("Include Hotspots (scope=all, depth=all;") != std::string::npos);
     CHECK(out.str().find("include/common/config.h") != std::string::npos);
     CHECK(err.str().empty());
 }
