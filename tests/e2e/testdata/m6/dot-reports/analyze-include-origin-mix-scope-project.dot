@@ -1,6 +1,6 @@
 digraph cmake_xray_analysis {
   xray_report_type="analyze";
-  format_version=4;
+  format_version=5;
   graph_node_limit=50;
   graph_edge_limit=80;
   graph_truncated=false;
@@ -8,6 +8,13 @@ digraph cmake_xray_analysis {
   graph_include_scope="project";
   graph_include_depth="all";
   graph_include_node_budget_reached=false;
+  graph_analysis_sections="tu-ranking,include-hotspots,target-graph,target-hubs";
+  graph_min_hotspot_tus=2;
+  graph_target_hub_in_threshold=10;
+  graph_target_hub_out_threshold=10;
+  graph_tu_threshold_arg_count=0;
+  graph_tu_threshold_include_path_count=0;
+  graph_tu_threshold_define_count=0;
   tu_1 [kind="translation_unit", rank=1, label="a.cpp", path="src/a.cpp", directory="build/a", unique_key="/Development/cmake-xray/tests/e2e/testdata/m6/include_origin_mix/src/a.cpp|/Development/cmake-xray/tests/e2e/testdata/m6/include_origin_mix/build/a"];
   tu_2 [kind="translation_unit", rank=2, label="b.cpp", path="src/b.cpp", directory="build/b", unique_key="/Development/cmake-xray/tests/e2e/testdata/m6/include_origin_mix/src/b.cpp|/Development/cmake-xray/tests/e2e/testdata/m6/include_origin_mix/build/b"];
   hotspot_1 [kind="include_hotspot", label="config.h", path="include/config.h", origin="project", depth_kind="mixed", context_total_count=2, context_returned_count=2, context_truncated=false];

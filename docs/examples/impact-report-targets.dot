@@ -1,16 +1,13 @@
 digraph cmake_xray_impact {
   xray_report_type="impact";
-  format_version=4;
+  format_version=5;
   graph_node_limit=100;
   graph_edge_limit=200;
   graph_truncated=false;
   graph_target_graph_status="loaded";
   graph_impact_target_depth_requested=2;
   graph_impact_target_depth_effective=0;
-  changed_file [kind="changed_file", label="main.cpp", path="/project/src/main.cpp"];
-  direct_tu_1 [kind="translation_unit", impact="direct", label="main.cpp", path="/project/src/main.cpp", directory="/project/build", unique_key="/project/src/main.cpp|/project/build"];
-  target_1 [kind="target", impact="direct", priority_class="direct", graph_distance=0, evidence_strength="direct", label="app", name="app", type="EXECUTABLE", unique_key="app::EXECUTABLE"];
-  target_2 [kind="target", label="iface", name="iface", type="INTERFACE_LIBRARY", unique_key="iface::INTERFACE_LIBRARY"];
-  changed_file -> direct_tu_1 [kind="changed_file_direct_tu", style="solid"];
-  direct_tu_1 -> target_1 [kind="direct_tu_target", style="solid"];
+  changed_file [kind="changed_file", label="config.h", path="include/common/config.h"];
+  target_1 [kind="target", label="app", name="app", type="EXECUTABLE", unique_key="app::EXECUTABLE"];
+  target_2 [kind="target", label="core", name="core", type="STATIC_LIBRARY", unique_key="core::STATIC_LIBRARY"];
 }

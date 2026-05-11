@@ -1,6 +1,6 @@
 {
   "format": "cmake-xray.impact",
-  "format_version": 4,
+  "format_version": 5,
   "report_type": "impact",
   "inputs": {
     "compile_database_path": "tests/e2e/testdata/m3/report_impact_header/compile_commands.json",

@@ -1,6 +1,6 @@
 {
   "format": "cmake-xray.analysis",
-  "format_version": 4,
+  "format_version": 5,
   "report_type": "analyze",
   "inputs": {
     "compile_database_path": null,
@@ -16,7 +16,32 @@
     "top_limit": 10,
     "include_analysis_heuristic": true,
     "observation_source": "derived",
-    "target_metadata": "loaded"
+    "target_metadata": "loaded",
+    "tu_ranking_total_count_after_thresholds": 11,
+    "tu_ranking_excluded_by_thresholds_count": 0,
+    "include_hotspot_excluded_by_min_tus_count": 0
+  },
+  "analysis_configuration": {
+    "analysis_sections": [
+      "tu-ranking",
+      "include-hotspots",
+      "target-graph",
+      "target-hubs"
+    ],
+    "tu_thresholds": {
+      "arg_count": 0,
+      "include_path_count": 0,
+      "define_count": 0
+    },
+    "min_hotspot_tus": 2,
+    "target_hub_in_threshold": 10,
+    "target_hub_out_threshold": 10
+  },
+  "analysis_section_states": {
+    "tu-ranking": "active",
+    "include-hotspots": "active",
+    "target-graph": "active",
+    "target-hubs": "active"
   },
   "include_filter": {
     "include_scope": "all",

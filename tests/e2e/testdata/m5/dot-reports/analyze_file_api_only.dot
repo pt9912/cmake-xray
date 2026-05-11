@@ -1,6 +1,6 @@
 digraph cmake_xray_analysis {
   xray_report_type="analyze";
-  format_version=4;
+  format_version=5;
   graph_node_limit=25;
   graph_edge_limit=40;
   graph_truncated=false;
@@ -8,6 +8,13 @@ digraph cmake_xray_analysis {
   graph_include_scope="all";
   graph_include_depth="all";
   graph_include_node_budget_reached=false;
+  graph_analysis_sections="tu-ranking,include-hotspots,target-graph,target-hubs";
+  graph_min_hotspot_tus=2;
+  graph_target_hub_in_threshold=10;
+  graph_target_hub_out_threshold=10;
+  graph_tu_threshold_arg_count=0;
+  graph_tu_threshold_include_path_count=0;
+  graph_tu_threshold_define_count=0;
   tu_1 [kind="translation_unit", rank=1, label="main.cpp", path="src/main.cpp", directory="build", unique_key="/project/src/main.cpp|/project/build"];
   tu_2 [kind="translation_unit", rank=2, label="core.cpp", path="src/core.cpp", directory="build", unique_key="/project/src/core.cpp|/project/build"];
   target_1 [kind="target", label="app", name="app", type="EXECUTABLE", unique_key="app::EXECUTABLE"];
