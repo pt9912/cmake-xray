@@ -240,6 +240,51 @@ void configure_verbosity_options(CLI::App& command, CliOptions& options) {
                      "stderr for artifact formats. Mutually exclusive with --quiet.");
 }
 
+// AP M6-1.4 A.3: --include-scope / --include-depth filters. Raw text is
+// captured so validate_include_scope/_depth can emit their documented
+// error phrases; ->take_last() defers the "option specified more than
+// once" wording to the validator via Option::count().
+void configure_include_filter_options(CLI::App& analyze_cmd, CliOptions& options) {
+    options.include_scope_option = analyze_cmd.add_option(
+        "--include-scope", options.include_scope_text,
+        "Include hotspot origin filter: all (default), project, external, or unknown");
+    options.include_scope_option->take_last();
+    options.include_depth_option = analyze_cmd.add_option(
+        "--include-depth", options.include_depth_text,
+        "Include hotspot depth filter: all (default), direct, or indirect");
+    options.include_depth_option->take_last();
+}
+
+// AP M6-1.5 A.1: register the five new analyze options in one place so
+// configure_analyze_command stays under the lizard length threshold.
+void configure_analysis_options(CLI::App& analyze_cmd, CliOptions& options) {
+    options.analysis_option = analyze_cmd.add_option(
+        "--analysis", options.analysis_text,
+        "Comma-separated analysis sections to emit: all (default), tu-ranking, "
+        "include-hotspots, target-graph, target-hubs. target-hubs requires "
+        "target-graph in the same list");
+    options.analysis_option->take_last();
+    analyze_cmd.add_option(
+        "--tu-threshold", options.tu_threshold_texts,
+        "TU-ranking metric threshold as <metric>=<n>; metric is one of "
+        "arg_count, include_path_count, define_count. May be set once per metric");
+    options.min_hotspot_tus_option = analyze_cmd.add_option(
+        "--min-hotspot-tus", options.min_hotspot_tus_text,
+        "Minimum number of affected translation units to register an include "
+        "hotspot (default 2)");
+    options.min_hotspot_tus_option->take_last();
+    options.target_hub_in_threshold_option = analyze_cmd.add_option(
+        "--target-hub-in-threshold", options.target_hub_in_threshold_text,
+        "Minimum number of incoming target dependencies to classify a target "
+        "as an inbound hub (default 10)");
+    options.target_hub_in_threshold_option->take_last();
+    options.target_hub_out_threshold_option = analyze_cmd.add_option(
+        "--target-hub-out-threshold", options.target_hub_out_threshold_text,
+        "Minimum number of outgoing target dependencies to classify a target "
+        "as an outbound hub (default 10)");
+    options.target_hub_out_threshold_option->take_last();
+}
+
 void configure_analyze_command(CLI::App& app, CliOptions& options, CLI::App*& analyze_cmd) {
     analyze_cmd = app.add_subcommand("analyze", "Analyze a CMake project");
     configure_input_options(*analyze_cmd, options);
@@ -248,55 +293,8 @@ void configure_analyze_command(CLI::App& app, CliOptions& options, CLI::App*& an
                      "Limit ranking and hotspot output to the top N")
         ->default_val(options.top_limit)
         ->check(CLI::PositiveNumber);
-    // AP M6-1.4 A.3: --include-scope and --include-depth analyze filters.
-    // Captured as raw strings so validate_include_scope/_depth can emit the
-    // three documented error phrases each. take_last() lets CLI11 accept
-    // duplicates silently so the validator owns the
-    // "option specified more than once" phrasing via Option::count().
-    options.include_scope_option = analyze_cmd->add_option(
-        "--include-scope", options.include_scope_text,
-        "Include hotspot origin filter: all (default), project, external, or unknown");
-    options.include_scope_option->take_last();
-    options.include_depth_option = analyze_cmd->add_option(
-        "--include-depth", options.include_depth_text,
-        "Include hotspot depth filter: all (default), direct, or indirect");
-    options.include_depth_option->take_last();
-    // AP M6-1.5 A.1: --analysis <list> selects which analyze sections are
-    // emitted. Raw text is captured here; validate_analysis owns the six
-    // documented error phrases.
-    options.analysis_option = analyze_cmd->add_option(
-        "--analysis", options.analysis_text,
-        "Comma-separated analysis sections to emit: all (default), tu-ranking, "
-        "include-hotspots, target-graph, target-hubs. target-hubs requires "
-        "target-graph in the same list");
-    options.analysis_option->take_last();
-    // AP M6-1.5 A.1: --tu-threshold <metric>=<n> is multi-instance. CLI11
-    // accumulates each occurrence into the raw-text vector so the
-    // validator can re-emit the source-order spelling in the five
-    // documented error phrases.
-    analyze_cmd->add_option(
-        "--tu-threshold", options.tu_threshold_texts,
-        "TU-ranking metric threshold as <metric>=<n>; metric is one of "
-        "arg_count, include_path_count, define_count. May be set once per "
-        "metric");
-    // AP M6-1.5 A.1: three single-value size_t options; each uses
-    // ->take_last() so validate_size_option owns the
-    // "option specified more than once" error phrase via Option::count().
-    options.min_hotspot_tus_option = analyze_cmd->add_option(
-        "--min-hotspot-tus", options.min_hotspot_tus_text,
-        "Minimum number of affected translation units to register an include "
-        "hotspot (default 2)");
-    options.min_hotspot_tus_option->take_last();
-    options.target_hub_in_threshold_option = analyze_cmd->add_option(
-        "--target-hub-in-threshold", options.target_hub_in_threshold_text,
-        "Minimum number of incoming target dependencies to classify a target "
-        "as an inbound hub (default 10)");
-    options.target_hub_in_threshold_option->take_last();
-    options.target_hub_out_threshold_option = analyze_cmd->add_option(
-        "--target-hub-out-threshold", options.target_hub_out_threshold_text,
-        "Minimum number of outgoing target dependencies to classify a target "
-        "as an outbound hub (default 10)");
-    options.target_hub_out_threshold_option->take_last();
+    configure_include_filter_options(*analyze_cmd, options);
+    configure_analysis_options(*analyze_cmd, options);
     configure_report_options(*analyze_cmd, options);
     configure_verbosity_options(*analyze_cmd, options);
 }
@@ -484,44 +482,45 @@ std::optional<xray::hexagon::model::AnalysisSection> analysis_token_to_section(
     return std::nullopt;
 }
 
-std::optional<int> validate_analysis(CliOptions& options, std::ostream& err) {
-    using xray::hexagon::model::AnalysisSection;
-    if (options.analysis_option == nullptr) return std::nullopt;
-    if (options.analysis_option->count() > 1) {
-        err << "error: --analysis: option specified more than once\n";
-        return ExitCode::cli_usage_error;
-    }
-    if (options.analysis_option->count() == 0) return std::nullopt;
+// AP M6-1.5 A.1: helpers extracted from validate_analysis so the public
+// validator stays under the readability-function-cognitive-complexity
+// threshold and the lizard CCN/length limits. Each helper owns one of
+// the four parse phases (split, classify, dedup, dependency check).
 
-    // Split on `,`. Each token is trimmed; a fully-empty token after trim is
-    // the "empty analysis value in list" error case from plan §337-338.
-    std::vector<std::string_view> tokens;
-    std::string_view remaining{options.analysis_text};
+std::optional<int> split_analysis_tokens(std::string_view raw,
+                                         std::vector<std::string_view>& tokens,
+                                         std::ostream& err) {
+    std::string_view remaining{raw};
     while (true) {
         const auto comma = remaining.find(',');
-        const auto raw = comma == std::string_view::npos ? remaining
-                                                          : remaining.substr(0, comma);
-        const auto trimmed = trim_ascii_whitespace(raw);
+        const auto chunk = comma == std::string_view::npos ? remaining
+                                                            : remaining.substr(0, comma);
+        const auto trimmed = trim_ascii_whitespace(chunk);
         if (trimmed.empty()) {
             err << "error: --analysis: empty analysis value in list\n";
             return ExitCode::cli_usage_error;
         }
         tokens.push_back(trimmed);
-        if (comma == std::string_view::npos) break;
+        if (comma == std::string_view::npos) return std::nullopt;
         remaining = remaining.substr(comma + 1);
     }
+}
 
-    // Validate each token; collect both the canonical-string form (for
-    // duplicate / dependency error phrases) and the resolved enum.
+struct AnalysisTokenClassification {
     std::vector<std::string_view> canonical;
-    std::vector<AnalysisSection> sections;
-    bool saw_all = false;
-    canonical.reserve(tokens.size());
-    sections.reserve(tokens.size());
+    std::vector<xray::hexagon::model::AnalysisSection> sections;
+    bool saw_all{false};
+};
+
+std::optional<int> classify_analysis_tokens(const std::vector<std::string_view>& tokens,
+                                             AnalysisTokenClassification& out,
+                                             std::ostream& err) {
+    out.canonical.reserve(tokens.size());
+    out.sections.reserve(tokens.size());
     for (const auto& token : tokens) {
         if (token == "all") {
-            saw_all = true;
-            canonical.push_back(token);
+            out.saw_all = true;
+            out.canonical.push_back(token);
             continue;
         }
         const auto resolved = analysis_token_to_section(token);
@@ -530,12 +529,14 @@ std::optional<int> validate_analysis(CliOptions& options, std::ostream& err) {
                 << "'; allowed: all, tu-ranking, include-hotspots, target-graph, target-hubs\n";
             return ExitCode::cli_usage_error;
         }
-        canonical.push_back(token);
-        sections.push_back(*resolved);
+        out.canonical.push_back(token);
+        out.sections.push_back(*resolved);
     }
+    return std::nullopt;
+}
 
-    // Dedup detection runs over the visible token strings so the error
-    // phrase can quote the original spelling.
+std::optional<int> reject_duplicate_analysis_tokens(
+    const std::vector<std::string_view>& canonical, std::ostream& err) {
     for (std::size_t i = 0; i < canonical.size(); ++i) {
         for (std::size_t j = i + 1; j < canonical.size(); ++j) {
             if (canonical[i] == canonical[j]) {
@@ -545,13 +546,52 @@ std::optional<int> validate_analysis(CliOptions& options, std::ostream& err) {
             }
         }
     }
+    return std::nullopt;
+}
 
-    if (saw_all && canonical.size() > 1) {
+std::optional<int> reject_target_hubs_without_target_graph(
+    const std::vector<xray::hexagon::model::AnalysisSection>& sections, std::ostream& err) {
+    using xray::hexagon::model::AnalysisSection;
+    const auto has_hubs =
+        std::find(sections.begin(), sections.end(), AnalysisSection::target_hubs) !=
+        sections.end();
+    const auto has_graph =
+        std::find(sections.begin(), sections.end(), AnalysisSection::target_graph) !=
+        sections.end();
+    if (has_hubs && !has_graph) {
+        err << "error: --analysis: target-hubs requires target-graph\n";
+        return ExitCode::cli_usage_error;
+    }
+    return std::nullopt;
+}
+
+std::optional<int> validate_analysis(CliOptions& options, std::ostream& err) {
+    using xray::hexagon::model::AnalysisSection;
+    if (options.analysis_option == nullptr) return std::nullopt;
+    if (options.analysis_option->count() > 1) {
+        err << "error: --analysis: option specified more than once\n";
+        return ExitCode::cli_usage_error;
+    }
+    if (options.analysis_option->count() == 0) return std::nullopt;
+
+    std::vector<std::string_view> tokens;
+    if (const auto e = split_analysis_tokens(options.analysis_text, tokens, err);
+        e.has_value()) {
+        return e;
+    }
+    AnalysisTokenClassification classification;
+    if (const auto e = classify_analysis_tokens(tokens, classification, err); e.has_value()) {
+        return e;
+    }
+    if (const auto e = reject_duplicate_analysis_tokens(classification.canonical, err);
+        e.has_value()) {
+        return e;
+    }
+    if (classification.saw_all && classification.canonical.size() > 1) {
         err << "error: --analysis: 'all' must not be combined with other analysis values\n";
         return ExitCode::cli_usage_error;
     }
-
-    if (saw_all) {
+    if (classification.saw_all) {
         options.parsed_analysis_sections = {
             AnalysisSection::tu_ranking,
             AnalysisSection::include_hotspots,
@@ -560,23 +600,14 @@ std::optional<int> validate_analysis(CliOptions& options, std::ostream& err) {
         };
         return std::nullopt;
     }
-
-    // target-hubs without target-graph is a configuration conflict per
-    // plan §334-336 (errors before input is even read).
-    const auto has_hubs = std::find(sections.begin(), sections.end(),
-                                    AnalysisSection::target_hubs) != sections.end();
-    const auto has_graph = std::find(sections.begin(), sections.end(),
-                                     AnalysisSection::target_graph) != sections.end();
-    if (has_hubs && !has_graph) {
-        err << "error: --analysis: target-hubs requires target-graph\n";
-        return ExitCode::cli_usage_error;
+    if (const auto e = reject_target_hubs_without_target_graph(classification.sections, err);
+        e.has_value()) {
+        return e;
     }
-
     // Canonical sort per plan §213-216 rank table; enum declaration order in
-    // analysis_configuration.h matches the rank table (tu_ranking=0,
-    // include_hotspots=1, target_graph=2, target_hubs=3).
-    std::sort(sections.begin(), sections.end());
-    options.parsed_analysis_sections = std::move(sections);
+    // analysis_configuration.h matches the rank table.
+    std::sort(classification.sections.begin(), classification.sections.end());
+    options.parsed_analysis_sections = std::move(classification.sections);
     return std::nullopt;
 }
 
@@ -589,55 +620,65 @@ std::optional<xray::hexagon::model::TuRankingMetric> tu_metric_token_to_enum(
     return std::nullopt;
 }
 
+// AP M6-1.5 A.1: parse_non_negative_decimal validates the numeric tail of
+// --tu-threshold and (in spirit) the three single-value size_t options.
+// It mirrors validate_size_option's "negative value" / "not an integer"
+// branches so the per-row parser of validate_tu_thresholds can stay
+// linear.
+std::optional<std::size_t> parse_non_negative_decimal(std::string_view value_text,
+                                                       std::string_view option_name,
+                                                       std::ostream& err) {
+    if (!value_text.empty() && value_text.front() == '-') {
+        err << "error: " << option_name << ": negative value\n";
+        return std::nullopt;
+    }
+    if (value_text.empty() ||
+        !std::all_of(value_text.begin(), value_text.end(),
+                     [](unsigned char ch) { return std::isdigit(ch) != 0; })) {
+        err << "error: " << option_name << ": not an integer\n";
+        return std::nullopt;
+    }
+    std::size_t numeric_value = 0;
+    for (const char ch : value_text) {
+        numeric_value = numeric_value * 10 +
+                        static_cast<std::size_t>(static_cast<unsigned char>(ch) - '0');
+    }
+    return numeric_value;
+}
+
+std::optional<int> apply_tu_threshold(
+    const std::string& raw,
+    std::map<xray::hexagon::model::TuRankingMetric, std::size_t>& parsed, std::ostream& err) {
+    const auto eq = raw.find('=');
+    if (eq == std::string::npos) {
+        err << "error: --tu-threshold: invalid syntax '" << raw << "'; expected <metric>=<n>\n";
+        return ExitCode::cli_usage_error;
+    }
+    const std::string_view metric_text{raw.data(), eq};
+    const std::string_view value_text{raw.data() + eq + 1, raw.size() - eq - 1};
+    const auto metric = tu_metric_token_to_enum(metric_text);
+    if (!metric.has_value()) {
+        err << "error: --tu-threshold: unknown metric '" << metric_text
+            << "'; allowed: arg_count, include_path_count, define_count\n";
+        return ExitCode::cli_usage_error;
+    }
+    if (parsed.find(*metric) != parsed.end()) {
+        err << "error: --tu-threshold: duplicate metric '" << metric_text << "'\n";
+        return ExitCode::cli_usage_error;
+    }
+    const auto numeric_value = parse_non_negative_decimal(value_text, "--tu-threshold", err);
+    if (!numeric_value.has_value()) return ExitCode::cli_usage_error;
+    parsed.emplace(*metric, *numeric_value);
+    return std::nullopt;
+}
+
 std::optional<int> validate_tu_thresholds(CliOptions& options, std::ostream& err) {
     using xray::hexagon::model::TuRankingMetric;
     if (options.tu_threshold_texts.empty()) return std::nullopt;
-
     std::map<TuRankingMetric, std::size_t> parsed;
     for (const auto& raw : options.tu_threshold_texts) {
-        const auto eq = raw.find('=');
-        if (eq == std::string::npos) {
-            err << "error: --tu-threshold: invalid syntax '" << raw
-                << "'; expected <metric>=<n>\n";
-            return ExitCode::cli_usage_error;
-        }
-        const std::string_view metric_text{raw.data(), eq};
-        const std::string_view value_text{raw.data() + eq + 1, raw.size() - eq - 1};
-
-        const auto metric = tu_metric_token_to_enum(metric_text);
-        if (!metric.has_value()) {
-            err << "error: --tu-threshold: unknown metric '" << metric_text
-                << "'; allowed: arg_count, include_path_count, define_count\n";
-            return ExitCode::cli_usage_error;
-        }
-
-        // Reject leading sign and any non-digit character. A leading '-'
-        // shortcut to the "negative value" branch keeps the error phrase
-        // closer to user intent than the generic "not an integer" phrase.
-        if (!value_text.empty() && value_text.front() == '-') {
-            err << "error: --tu-threshold: negative value\n";
-            return ExitCode::cli_usage_error;
-        }
-        if (value_text.empty() ||
-            !std::all_of(value_text.begin(), value_text.end(),
-                         [](unsigned char ch) { return std::isdigit(ch) != 0; })) {
-            err << "error: --tu-threshold: not an integer\n";
-            return ExitCode::cli_usage_error;
-        }
-
-        if (parsed.find(*metric) != parsed.end()) {
-            err << "error: --tu-threshold: duplicate metric '" << metric_text << "'\n";
-            return ExitCode::cli_usage_error;
-        }
-
-        std::size_t numeric_value = 0;
-        for (const char ch : value_text) {
-            numeric_value = numeric_value * 10 +
-                            static_cast<std::size_t>(static_cast<unsigned char>(ch) - '0');
-        }
-        parsed.emplace(*metric, numeric_value);
+        if (const auto e = apply_tu_threshold(raw, parsed, err); e.has_value()) return e;
     }
-
     options.parsed_tu_thresholds = std::move(parsed);
     return std::nullopt;
 }
@@ -647,31 +688,19 @@ std::optional<int> validate_size_option(CLI::Option* option, std::string_view op
                                         std::ostream& err) {
     // AP M6-1.5 A.1: shared validator for the three single-value size_t
     // CLI options --min-hotspot-tus, --target-hub-in-threshold and
-    // --target-hub-out-threshold. Emits the three plan-pinned error
-    // phrases prefixed with the option_name argument so each call site
-    // re-uses the helper without copy-pasting the parse logic.
+    // --target-hub-out-threshold. The "option specified more than once"
+    // phrase lives here; parse_non_negative_decimal owns the negative-
+    // value and not-an-integer phrases so the parse logic stays shared
+    // with --tu-threshold.
     if (option == nullptr) return std::nullopt;
     if (option->count() > 1) {
         err << "error: " << option_name << ": option specified more than once\n";
         return ExitCode::cli_usage_error;
     }
     if (option->count() == 0) return std::nullopt;
-    if (!raw_text.empty() && raw_text.front() == '-') {
-        err << "error: " << option_name << ": negative value\n";
-        return ExitCode::cli_usage_error;
-    }
-    if (raw_text.empty() ||
-        !std::all_of(raw_text.begin(), raw_text.end(),
-                     [](unsigned char ch) { return std::isdigit(ch) != 0; })) {
-        err << "error: " << option_name << ": not an integer\n";
-        return ExitCode::cli_usage_error;
-    }
-    std::size_t numeric_value = 0;
-    for (const char ch : raw_text) {
-        numeric_value = numeric_value * 10 +
-                        static_cast<std::size_t>(static_cast<unsigned char>(ch) - '0');
-    }
-    parsed_value = numeric_value;
+    const auto numeric_value = parse_non_negative_decimal(raw_text, option_name, err);
+    if (!numeric_value.has_value()) return ExitCode::cli_usage_error;
+    parsed_value = *numeric_value;
     return std::nullopt;
 }
 
@@ -1127,6 +1156,36 @@ xray::hexagon::ports::driving::AnalyzeImpactRequest build_impact_request(
             options.require_target_graph_flag};
 }
 
+// AP M6-1.5 A.1: validate_analyze_subcommand_options pulls the seven
+// analyze-only option validators out of validate_subcommand_options so
+// the dispatch function stays under the readability-function-cognitive-
+// complexity threshold even as AP 1.5 adds five new options.
+std::optional<int> validate_analyze_subcommand_options(CliOptions& options, std::ostream& err) {
+    if (const auto e = validate_include_scope(options, err); e.has_value()) return e;
+    if (const auto e = validate_include_depth(options, err); e.has_value()) return e;
+    if (const auto e = validate_analysis(options, err); e.has_value()) return e;
+    if (const auto e = validate_tu_thresholds(options, err); e.has_value()) return e;
+    if (const auto e =
+            validate_size_option(options.min_hotspot_tus_option, "--min-hotspot-tus",
+                                 options.min_hotspot_tus_text, options.parsed_min_hotspot_tus, err);
+        e.has_value()) {
+        return e;
+    }
+    if (const auto e = validate_size_option(
+            options.target_hub_in_threshold_option, "--target-hub-in-threshold",
+            options.target_hub_in_threshold_text, options.parsed_target_hub_in_threshold, err);
+        e.has_value()) {
+        return e;
+    }
+    if (const auto e = validate_size_option(
+            options.target_hub_out_threshold_option, "--target-hub-out-threshold",
+            options.target_hub_out_threshold_text, options.parsed_target_hub_out_threshold, err);
+        e.has_value()) {
+        return e;
+    }
+    return std::nullopt;
+}
+
 std::optional<int> validate_subcommand_options(CliOptions& options, bool is_impact,
                                                 std::ostream& err) {
     if (const auto e = validate_verbosity_options(options, err); e.has_value()) return e;
@@ -1135,29 +1194,7 @@ std::optional<int> validate_subcommand_options(CliOptions& options, bool is_impa
         if (const auto e = validate_changed_file_required(options, err); e.has_value()) return e;
         if (const auto e = validate_impact_target_depth(options, err); e.has_value()) return e;
     } else {
-        if (const auto e = validate_include_scope(options, err); e.has_value()) return e;
-        if (const auto e = validate_include_depth(options, err); e.has_value()) return e;
-        if (const auto e = validate_analysis(options, err); e.has_value()) return e;
-        if (const auto e = validate_tu_thresholds(options, err); e.has_value()) return e;
-        if (const auto e = validate_size_option(options.min_hotspot_tus_option,
-                                                "--min-hotspot-tus",
-                                                options.min_hotspot_tus_text,
-                                                options.parsed_min_hotspot_tus, err);
-            e.has_value()) {
-            return e;
-        }
-        if (const auto e = validate_size_option(options.target_hub_in_threshold_option,
-                                                "--target-hub-in-threshold",
-                                                options.target_hub_in_threshold_text,
-                                                options.parsed_target_hub_in_threshold, err);
-            e.has_value()) {
-            return e;
-        }
-        if (const auto e = validate_size_option(options.target_hub_out_threshold_option,
-                                                "--target-hub-out-threshold",
-                                                options.target_hub_out_threshold_text,
-                                                options.parsed_target_hub_out_threshold, err);
-            e.has_value()) {
+        if (const auto e = validate_analyze_subcommand_options(options, err); e.has_value()) {
             return e;
         }
     }
