@@ -86,6 +86,8 @@ AnalysisResult make_analysis_result() {
                 {
                     {DiagnosticSeverity::note, "hotspot detail"},
                 },
+            .origin = xray::hexagon::model::IncludeOrigin::project,
+            .depth_kind = xray::hexagon::model::IncludeDepthKind::direct,
         },
     };
     result.diagnostics = {
@@ -159,13 +161,14 @@ TEST_CASE("markdown report adapter renders project reports with exact section st
           "    - warning: could not resolve include \"generated/version.h\" from src/app/main.cpp\n"
           "\n"
           "## Include Hotspots\n"
-          "1. Header: include/common/config.h\n"
-          "    Affected translation units: 2\n"
-          "    Translation units:\n"
-          "    - src/app/main.cpp [directory: build/debug]\n"
-          "    - src/lib/core.cpp [directory: build/lib]\n"
-          "    Diagnostics:\n"
-          "    - note: hotspot detail\n"
+          "\n"
+          "Filter: `scope=all`, `depth=all`. Excluded: `0` unknown, `0` mixed.\n"
+          "\n"
+          "| Header | Origin | Depth | Affected TUs | Context |\n"
+          "|---|---|---|---|---|\n"
+          "| `include/common/config.h` | `project` | `direct` | 2 | "
+          "src/app/main.cpp [directory: build/debug] / "
+          "src/lib/core.cpp [directory: build/lib] |\n"
           "\n"
           "## Diagnostics\n"
           "- warning: compile database was normalized\n"
@@ -236,7 +239,11 @@ TEST_CASE("markdown report adapter renders file api target metadata for analyze"
           std::string::npos);
     CHECK(report.find("1. src/app/main.cpp [directory: build/debug] [targets: app]\n") !=
           std::string::npos);
-    CHECK(report.find("    - src/lib/core.cpp [directory: build/lib] [targets: core\\_lib]\n") !=
+    // Hotspot Context cell (v4 tabular form per plan step 22.4 / 22.6):
+    // free-form per-TU shape with target suffix flowing through
+    // disambiguate_target_display_names.
+    CHECK(report.find("src/app/main.cpp [directory: build/debug] [targets: app] / "
+                      "src/lib/core.cpp [directory: build/lib] [targets: core\\_lib] |\n") !=
           std::string::npos);
 }
 
@@ -333,6 +340,8 @@ TEST_CASE("markdown report adapter renders direct impact classification without 
 }
 
 TEST_CASE("markdown report adapter preserves marker-dependent indentation for two-digit list entries") {
+    // AP M6-1.4 A.5 step 22: hotspots no longer use a numbered list, so the
+    // two-digit-marker fixture only exercises Translation Unit Ranking.
     const MarkdownReportAdapter adapter;
     AnalysisResult result;
     result.application = xray::hexagon::model::application_info();
@@ -347,21 +356,6 @@ TEST_CASE("markdown report adapter preserves marker-dependent indentation for tw
                                      {{DiagnosticSeverity::note, "rank 10 diagnostic"}}),
     };
 
-    for (std::size_t index = 1; index <= 10; ++index) {
-        result.include_hotspots.push_back(IncludeHotspot{
-            .header_path = "include/hotspot_" + std::to_string(index) + ".h",
-            .affected_translation_units =
-                {
-                    make_reference("src/hotspot.cpp", "build/hotspot",
-                                   "src/hotspot.cpp|build/hotspot"),
-                },
-            .diagnostics =
-                index == 10 ? std::vector<Diagnostic>{{DiagnosticSeverity::note,
-                                                       "hotspot 10 diagnostic"}}
-                            : std::vector<Diagnostic>{},
-        });
-    }
-
     const auto report = adapter.write_analysis_report(result, 10);
 
     CHECK(report.find("9. src/nine.cpp [directory: build/nine]\n"
@@ -371,17 +365,129 @@ TEST_CASE("markdown report adapter preserves marker-dependent indentation for tw
                       "     Metrics: arg_count=5, include_path_count=1, define_count=1\n"
                       "     Diagnostics:\n"
                       "     - note: rank 10 diagnostic\n") != std::string::npos);
-    CHECK(report.find("9. Header: include/hotspot\\_9.h\n"
-                      "    Affected translation units: 1\n"
-                      "    Translation units:\n"
-                      "    - src/hotspot.cpp [directory: build/hotspot]\n") !=
+}
+
+TEST_CASE("markdown analyze v4: hotspot filter line carries default scope/depth and zero excluded counts") {
+    const MarkdownReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(make_analysis_result(), 1);
+
+    CHECK(report.find("## Include Hotspots\n"
+                      "\n"
+                      "Filter: `scope=all`, `depth=all`. Excluded: `0` unknown, `0` mixed.\n") !=
           std::string::npos);
-    CHECK(report.find("10. Header: include/hotspot\\_10.h\n"
-                      "     Affected translation units: 1\n"
-                      "     Translation units:\n"
-                      "     - src/hotspot.cpp [directory: build/hotspot]\n"
-                      "     Diagnostics:\n"
-                      "     - note: hotspot 10 diagnostic\n") != std::string::npos);
+}
+
+TEST_CASE("markdown analyze v4: hotspot filter line carries non-default scope/depth and excluded counts") {
+    const MarkdownReportAdapter adapter;
+    auto result = make_analysis_result();
+    result.include_scope_effective = xray::hexagon::model::IncludeScope::project;
+    result.include_depth_filter_effective = xray::hexagon::model::IncludeDepthFilter::indirect;
+    result.include_hotspot_excluded_unknown_count = 4;
+    result.include_hotspot_excluded_mixed_count = 2;
+
+    const auto report = adapter.write_analysis_report(result, 1);
+
+    CHECK(report.find(
+              "Filter: `scope=project`, `depth=indirect`. Excluded: `4` unknown, `2` mixed.\n") !=
+          std::string::npos);
+}
+
+TEST_CASE("markdown analyze v4: hotspot section emits filter line and empty marker when hotspots are empty") {
+    // Per plan step 22.2 the filter paragraph reflects analysis
+    // configuration and therefore renders even when the hotspot set is
+    // empty; the "No include hotspots found." marker sits below it.
+    const MarkdownReportAdapter adapter;
+    auto result = make_analysis_result();
+    result.include_hotspots.clear();
+
+    const auto report = adapter.write_analysis_report(result, 10);
+
+    CHECK(report.find("## Include Hotspots\n"
+                      "\n"
+                      "Filter: `scope=all`, `depth=all`. Excluded: `0` unknown, `0` mixed.\n"
+                      "\n"
+                      "No include hotspots found.\n") != std::string::npos);
+    CHECK(report.find("| Header | Origin |") == std::string::npos);
+}
+
+TEST_CASE("markdown analyze v4: hotspot section emits budget note when include_node_budget_reached is set") {
+    const MarkdownReportAdapter adapter;
+    auto result = make_analysis_result();
+    result.include_node_budget_reached = true;
+    result.include_node_budget_effective = 10000;
+
+    const auto report = adapter.write_analysis_report(result, 10);
+
+    CHECK(report.find("Filter: `scope=all`, `depth=all`. Excluded: `0` unknown, `0` mixed.\n"
+                      "\n"
+                      "Note: include analysis stopped at 10000 nodes (budget reached).\n") !=
+          std::string::npos);
+}
+
+TEST_CASE("markdown analyze v4: hotspot section emits Showing line when top limit drops entries") {
+    const MarkdownReportAdapter adapter;
+    AnalysisResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.compile_database_path = "tests/e2e/testdata/m3/report_top_limit/compile_commands.json";
+    for (std::size_t index = 1; index <= 5; ++index) {
+        result.include_hotspots.push_back(IncludeHotspot{
+            .header_path = "include/hotspot_" + std::to_string(index) + ".h",
+            .affected_translation_units = {make_reference(
+                "src/hotspot.cpp", "build/hotspot", "src/hotspot.cpp|build/hotspot")},
+            .origin = xray::hexagon::model::IncludeOrigin::project,
+            .depth_kind = xray::hexagon::model::IncludeDepthKind::direct,
+        });
+    }
+
+    const auto report = adapter.write_analysis_report(result, 2);
+
+    CHECK(report.find("Filter: `scope=all`, `depth=all`. Excluded: `0` unknown, `0` mixed.\n"
+                      "\n"
+                      "Showing 2 of 5 include hotspots.\n") != std::string::npos);
+    // Two table rows (top_limit=2) — third entry must not appear.
+    // append_table_cell_target wraps in backticks but does NOT
+    // markdown-escape `_`; the code span suppresses emphasis.
+    CHECK(report.find("| `include/hotspot_1.h` |") != std::string::npos);
+    CHECK(report.find("| `include/hotspot_2.h` |") != std::string::npos);
+    CHECK(report.find("| `include/hotspot_3.h` |") == std::string::npos);
+}
+
+TEST_CASE("markdown analyze v4: hotspot table covers origin/depth combinations and escapes pipe characters") {
+    const MarkdownReportAdapter adapter;
+    AnalysisResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.compile_database_path = "tests/e2e/testdata/m3/report_top_limit/compile_commands.json";
+    result.include_hotspots = {
+        IncludeHotspot{
+            .header_path = "include/external_lib.h",
+            .affected_translation_units = {make_reference("src/a|b.cpp", "build/dir",
+                                                          "src/a|b.cpp|build/dir")},
+            .origin = xray::hexagon::model::IncludeOrigin::external,
+            .depth_kind = xray::hexagon::model::IncludeDepthKind::indirect,
+        },
+        IncludeHotspot{
+            .header_path = "include/mixed.h",
+            .affected_translation_units = {make_reference("src/m.cpp", "build/m",
+                                                          "src/m.cpp|build/m")},
+            .origin = xray::hexagon::model::IncludeOrigin::unknown,
+            .depth_kind = xray::hexagon::model::IncludeDepthKind::mixed,
+        },
+    };
+
+    const auto report = adapter.write_analysis_report(result, 10);
+
+    // External / indirect row with pipe character in source_path escaped.
+    // Header cell goes through append_table_cell_target (backticks + pipe
+    // escape, no markdown escape of `_`); source_path goes through
+    // append_context_value (markdown escape applies, but `|` is the only
+    // escape that fires for this fixture).
+    CHECK(report.find("| `include/external_lib.h` | `external` | `indirect` | 1 | "
+                      "src/a\\|b.cpp [directory: build/dir] |\n") != std::string::npos);
+    // Unknown / mixed row.
+    CHECK(report.find("| `include/mixed.h` | `unknown` | `mixed` | 1 | "
+                      "src/m.cpp [directory: build/m] |\n") != std::string::npos);
 }
 
 // ---- M6 AP 1.2 Tranche A.3: Target Graph / Target Hubs / Target Graph

@@ -10,9 +10,11 @@
 #include <vector>
 
 #include "adapters/output/impact_priority_text.h"
+#include "adapters/output/include_text_helpers.h"
 #include "adapters/output/target_display_support.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
+#include "hexagon/model/include_classification.h"
 #include "hexagon/model/observation_source.h"
 #include "hexagon/model/target_graph.h"
 #include "hexagon/model/target_info.h"
@@ -28,6 +30,7 @@ using xray::hexagon::model::Diagnostic;
 using xray::hexagon::model::DiagnosticSeverity;
 using xray::hexagon::model::ImpactKind;
 using xray::hexagon::model::ImpactResult;
+using xray::hexagon::model::IncludeHotspot;
 using xray::hexagon::model::TargetDependency;
 using xray::hexagon::model::TargetDependencyResolution;
 using xray::hexagon::model::TargetGraphStatus;
@@ -226,44 +229,10 @@ void append_ranking_section(std::ostringstream& out, const AnalysisResult& analy
     }
 }
 
-void append_hotspot_section(std::ostringstream& out, const AnalysisResult& analysis_result,
-                            std::size_t hotspot_count) {
-    std::map<std::string, const std::vector<TargetInfo>*> targets_by_key;
-    for (const auto& assignment : analysis_result.target_assignments) {
-        targets_by_key.emplace(assignment.observation_key, &assignment.targets);
-    }
-
-    out << "## Include Hotspots\n";
-
-    if (analysis_result.include_hotspots.empty()) {
-        out << "No include hotspots found.\n";
-        return;
-    }
-
-    for (std::size_t index = 0; index < hotspot_count; ++index) {
-        const auto item_index = index + 1;
-        const auto indent = ordered_list_indent(item_index);
-        const auto& hotspot = analysis_result.include_hotspots[index];
-
-        out << item_index << ". Header: ";
-        append_escaped_markdown(out, hotspot.header_path);
-        out << '\n';
-        out << indent << "Affected translation units: "
-            << hotspot.affected_translation_units.size() << '\n';
-        out << indent << "Translation units:\n";
-
-        for (const auto& reference : hotspot.affected_translation_units) {
-            out << indent << "- ";
-            append_reference(out, reference, targets_by_key);
-            out << '\n';
-        }
-
-        if (hotspot.diagnostics.empty()) continue;
-
-        out << indent << "Diagnostics:\n";
-        append_diagnostic_list(out, hotspot.diagnostics, indent);
-    }
-}
+// AP M6-1.4 A.5 step 22: see new tabular append_hotspot_section below,
+// next to the AP 1.2 table-cell helpers it builds on. The old numbered-list
+// hotspot rendering is removed in favour of the v4 contract pinned in
+// docs/planning/in-progress/plan-M6-1-4.md step 22.
 
 void append_report_diagnostics(std::ostringstream& out, const std::vector<Diagnostic>& diagnostics) {
     out << "## Diagnostics\n";
@@ -467,6 +436,121 @@ void append_target_graph_table(std::ostringstream& out,
         if (edge.resolution == TargetDependencyResolution::external) {
             append_table_cell_target(out, edge.to_display_name);
         }
+        out << " |\n";
+    }
+}
+
+// AP M6-1.4 A.5 step 22: Context-cell composition helpers for the
+// tabular Include Hotspots section. The Context cell carries free-form
+// text per docs/planning/in-progress/plan-M6-1-4.md step 22.4 (variant A,
+// flat TU list with " / " separator) so it does NOT wrap in backticks
+// like append_table_cell_target; it still inherits the AP 1.2 table-cell
+// escaping for whitespace and the `|` column-boundary character.
+
+void append_context_value(std::ostringstream& out, std::string_view value) {
+    std::ostringstream value_stream;
+    append_escaped_markdown(value_stream, value);
+    const auto normalized = normalize_table_cell_whitespace(value_stream.str());
+    for (const char ch : normalized) {
+        if (ch == '|') {
+            out << "\\|";
+        } else {
+            out << ch;
+        }
+    }
+}
+
+void append_hotspot_context_cell(
+    std::ostringstream& out, const IncludeHotspot& hotspot,
+    const std::map<std::string, const std::vector<TargetInfo>*>& targets_by_key) {
+    // Per-TU shape: <source_path> [directory: <directory>] plus, when
+    // target metadata is loaded, [targets: <name1>, <name2>] with
+    // disambiguated display names per plan step 22.6 (variant Z). The
+    // inter-TU separator is " / " mirroring normalize_table_cell_whitespace.
+    bool first = true;
+    for (const auto& reference : hotspot.affected_translation_units) {
+        if (!first) {
+            out << " / ";
+        }
+        first = false;
+        append_context_value(out, reference.source_path);
+        out << " [directory: ";
+        append_context_value(out, reference.directory);
+        out << "]";
+        const auto it = targets_by_key.find(reference.unique_key);
+        if (it == targets_by_key.end() || it->second->empty()) {
+            continue;
+        }
+        std::vector<TargetDisplayEntry> entries;
+        entries.reserve(it->second->size());
+        for (const auto& target : *it->second) {
+            entries.push_back({target_label(target), target.unique_key});
+        }
+        const auto disambiguated = disambiguate_target_display_names(entries);
+        out << " [targets: ";
+        for (std::size_t index = 0; index < disambiguated.size(); ++index) {
+            if (index > 0) {
+                out << ", ";
+            }
+            append_context_value(out, disambiguated[index]);
+        }
+        out << "]";
+    }
+}
+
+void append_hotspot_filter_paragraph(std::ostringstream& out, const AnalysisResult& result) {
+    // Filter paragraph as pinned in plan step 22.1: backticks around the
+    // scope/depth values AND around the excluded counts (the form
+    // unified at docs/planning/in-progress/plan-M6-1-4.md:866).
+    out << "Filter: `scope=" << include_scope_text(result.include_scope_effective)
+        << "`, `depth=" << include_depth_filter_text(result.include_depth_filter_effective)
+        << "`. Excluded: `" << result.include_hotspot_excluded_unknown_count
+        << "` unknown, `" << result.include_hotspot_excluded_mixed_count
+        << "` mixed.\n";
+}
+
+void append_hotspot_section(std::ostringstream& out, const AnalysisResult& result,
+                            std::size_t hotspot_count) {
+    // AP M6-1.4 A.5 step 22: v4 tabular form pinned at plan step 22.1-22.6.
+    // Order: heading, filter paragraph, optional budget note, optional
+    // top-limit note, then either empty marker OR the hotspot table.
+    // Filter and optional budget paragraphs ALSO render for the
+    // empty-include_hotspots case (step 22.2) because they reflect
+    // analysis configuration, not the result set.
+    std::map<std::string, const std::vector<TargetInfo>*> targets_by_key;
+    for (const auto& assignment : result.target_assignments) {
+        targets_by_key.emplace(assignment.observation_key, &assignment.targets);
+    }
+
+    out << "## Include Hotspots\n\n";
+    append_hotspot_filter_paragraph(out, result);
+    if (result.include_node_budget_reached) {
+        out << "\nNote: include analysis stopped at "
+            << result.include_node_budget_effective
+            << " nodes (budget reached).\n";
+    }
+    if (result.include_hotspots.size() > hotspot_count) {
+        out << "\nShowing " << hotspot_count << " of "
+            << result.include_hotspots.size() << " include hotspots.\n";
+    }
+
+    if (result.include_hotspots.empty()) {
+        out << "\nNo include hotspots found.\n";
+        return;
+    }
+
+    out << "\n| Header | Origin | Depth | Affected TUs | Context |\n";
+    out << "|---|---|---|---|---|\n";
+    for (std::size_t index = 0; index < hotspot_count; ++index) {
+        const auto& hotspot = result.include_hotspots[index];
+        out << "| ";
+        append_table_cell_target(out, hotspot.header_path);
+        out << " | ";
+        append_table_cell_target(out, include_origin_text(hotspot.origin));
+        out << " | ";
+        append_table_cell_target(out, include_depth_kind_text(hotspot.depth_kind));
+        out << " | " << hotspot.affected_translation_units.size() << " | ";
+        append_hotspot_context_cell(out, hotspot, targets_by_key);
         out << " |\n";
     }
 }
