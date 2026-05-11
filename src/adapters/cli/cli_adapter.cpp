@@ -565,20 +565,23 @@ std::optional<int> reject_target_hubs_without_target_graph(
     return std::nullopt;
 }
 
+std::vector<xray::hexagon::model::AnalysisSection> all_analysis_sections() {
+    // Named helper so the four-section default flows through a single
+    // covered call site instead of a multi-line brace-initializer that
+    // gcov attributes inconsistently.
+    using xray::hexagon::model::AnalysisSection;
+    return {AnalysisSection::tu_ranking, AnalysisSection::include_hotspots,
+            AnalysisSection::target_graph, AnalysisSection::target_hubs};
+}
+
 std::optional<int> finalize_analysis_sections(AnalysisTokenClassification classification,
                                                CliOptions& options, std::ostream& err) {
-    using xray::hexagon::model::AnalysisSection;
     if (classification.saw_all) {
         if (classification.canonical.size() > 1) {
             err << "error: --analysis: 'all' must not be combined with other analysis values\n";
             return ExitCode::cli_usage_error;
         }
-        options.parsed_analysis_sections = {
-            AnalysisSection::tu_ranking,
-            AnalysisSection::include_hotspots,
-            AnalysisSection::target_graph,
-            AnalysisSection::target_hubs,
-        };
+        options.parsed_analysis_sections = all_analysis_sections();
         return std::nullopt;
     }
     if (const auto e = reject_target_hubs_without_target_graph(classification.sections, err);
