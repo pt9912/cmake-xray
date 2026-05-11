@@ -1,0 +1,12 @@
+[
+  {
+    "directory": "build/a",
+    "command": "clang++ -I../../include -isystem ../../system -c ../../src/a.cpp -o a.o",
+    "file": "../../src/a.cpp"
+  },
+  {
+    "directory": "build/b",
+    "command": "clang++ -I../../include -isystem ../../system -c ../../src/b.cpp -o b.o",
+    "file": "../../src/b.cpp"
+  }
+]
