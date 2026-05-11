@@ -220,12 +220,15 @@ void append_target_section(std::ostringstream& out, std::string_view title,
 // ---- M6 AP 1.2 Tranche A.3: Target-Graph-related sections ---------------
 
 std::string target_graph_status_text(TargetGraphStatus status) {
-    // Caller filters not_loaded before reaching here; the not_loaded path
-    // omits the entire section per docs/planning/plan-M6-1-2.md "Console- und
-    // Markdown-Vertragsregeln". Mapping the remaining two enum values via
-    // a ternary keeps the helper byte-stable without an unreachable third
-    // branch that would otherwise miss coverage.
-    return status == TargetGraphStatus::loaded ? "loaded" : "partial";
+    // AP M6-1.5 A.3 added TargetGraphStatus::disabled. Callers still filter
+    // not_loaded before reaching here; the legacy ternary keeps the
+    // loaded / partial mapping byte-stable and the new disabled value
+    // falls through to "partial" until A.5 Console v5 rewires the
+    // call sites that emit Target-Graph / Target-Hubs sections to
+    // route disabled to the new "Section disabled." marker.
+    if (status == TargetGraphStatus::loaded) return "loaded";
+    if (status == TargetGraphStatus::disabled) return "disabled";
+    return "partial";
 }
 
 std::vector<std::string> render_from_column_with_suffix(

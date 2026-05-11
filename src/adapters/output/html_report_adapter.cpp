@@ -222,18 +222,22 @@ std::string target_metadata_text(TargetMetadataStatus status) {
 }
 
 std::string target_graph_status_text(TargetGraphStatus status) {
-    // emit_target_graph_status_line is only invoked for loaded/partial
-    // (the not_loaded branch routes through a dedicated empty-section
-    // paragraph without a Status banner); the helper therefore needs to
-    // map only the two reachable enum values.
-    return status == TargetGraphStatus::loaded ? "loaded" : "partial";
+    // emit_target_graph_status_line is invoked for loaded/partial (the
+    // not_loaded branch routes through a dedicated empty-section
+    // paragraph). AP M6-1.5 A.3 adds TargetGraphStatus::disabled; A.5
+    // HTML v5 rewires that into the new section_state badge surface.
+    if (status == TargetGraphStatus::loaded) return "loaded";
+    if (status == TargetGraphStatus::disabled) return "disabled";
+    return "partial";
 }
 
 std::string target_graph_status_badge_class(TargetGraphStatus status) {
     // NRVO-defeating return so the closing brace counts as a covered line
     // under gcov; mirrors src/adapters/output/dot_report_adapter.cpp Z. 291.
-    std::string out = status == TargetGraphStatus::loaded ? "badge--loaded"
-                                                          : "badge--partial";
+    std::string out = status == TargetGraphStatus::loaded
+                          ? "badge--loaded"
+                          : (status == TargetGraphStatus::disabled ? "badge--disabled"
+                                                                    : "badge--partial");
     return std::string(std::move(out));
 }
 
