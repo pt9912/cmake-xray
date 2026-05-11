@@ -29,6 +29,12 @@ enum class TargetGraphStatus {
     not_loaded,
     loaded,
     partial,
+    // AP M6-1.5 A.3: disabled means "Target Graph section not requested via
+    // --analysis". Semantically distinct from not_loaded ("requested, but
+    // data not available"). The JSON serialization uses the
+    // analysis_section_states block to distinguish; for the legacy
+    // target_graph_status field, disabled lands as a new enum string.
+    disabled,
 };
 
 struct TargetGraph {
