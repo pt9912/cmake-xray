@@ -82,24 +82,9 @@ void append_target_suffix(std::ostringstream& out, const std::vector<TargetInfo>
     out << ']';
 }
 
-const std::vector<TargetInfo>* find_targets(
-    const std::map<std::string, const std::vector<TargetInfo>*>& targets_by_key,
-    const TranslationUnitReference& reference) {
-    const auto it = targets_by_key.find(reference.unique_key);
-    return it == targets_by_key.end() ? nullptr : it->second;
-}
-
 void append_translation_unit_reference(std::ostringstream& out,
                                        const TranslationUnitReference& reference) {
     out << reference.source_path << " [directory: " << reference.directory << ']';
-}
-
-void append_translation_unit_reference(
-    std::ostringstream& out, const TranslationUnitReference& reference,
-    const std::map<std::string, const std::vector<TargetInfo>*>& targets_by_key) {
-    append_translation_unit_reference(out, reference);
-    const auto* targets = find_targets(targets_by_key, reference);
-    if (targets != nullptr) append_target_suffix(out, *targets);
 }
 
 void append_diagnostics(std::ostringstream& out, const std::vector<Diagnostic>& diagnostics,
