@@ -1566,3 +1566,108 @@ TEST_CASE_FIXTURE(CliFixture,
                "src/app/main.cpp", "--include-scope", "project"}) ==
           ExitCode::cli_usage_error);
 }
+
+// ---- AP M6-1.5 A.1: --analysis ----
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.5 A.1: --analysis omitted uses the default (all sections)") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str()}) ==
+          ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "AP1.5 A.1: --analysis all is accepted (explicit default)") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--analysis",
+               "all"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "AP1.5 A.1: --analysis tu-ranking is accepted") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--analysis",
+               "tu-ranking"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --analysis target-graph,target-hubs is accepted (dependency satisfied)") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--analysis",
+               "target-graph,target-hubs"}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.5 A.1: --analysis trims ASCII whitespace around comma-separated tokens") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--analysis",
+               " tu-ranking , include-hotspots "}) == ExitCode::success);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.5 A.1: --analysis bogus returns exit 2 with 'unknown analysis' phrase") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--analysis",
+               "bogus"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--analysis: unknown analysis 'bogus'; allowed: all, tu-ranking, "
+                          "include-hotspots, target-graph, target-hubs") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --analysis all combined with another value returns exit 2 with 'all must not be combined'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--analysis",
+               "all,tu-ranking"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--analysis: 'all' must not be combined with other analysis values") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.5 A.1: --analysis with a duplicate value returns exit 2 with 'duplicate' phrase") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--analysis",
+               "tu-ranking,tu-ranking"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--analysis: duplicate analysis value 'tu-ranking'") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.5 A.1: --analysis target-hubs without target-graph is rejected") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--analysis",
+               "target-hubs"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--analysis: target-hubs requires target-graph") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(
+    CliFixture,
+    "AP1.5 A.1: --analysis target-hubs,tu-ranking without target-graph is rejected") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--analysis",
+               "target-hubs,tu-ranking"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--analysis: target-hubs requires target-graph") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.5 A.1: --analysis with an empty token returns exit 2 with 'empty analysis value' phrase") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--analysis",
+               "tu-ranking,,target-graph"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--analysis: empty analysis value in list") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture,
+                   "AP1.5 A.1: --analysis specified twice returns exit 2 with 'option specified more than once'") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"analyze", "--compile-commands", compile_commands.c_str(), "--analysis",
+               "tu-ranking", "--analysis", "target-graph"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("--analysis: option specified more than once") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "AP1.5 A.1: --analysis is not exposed on impact") {
+    const auto compile_commands = fixture_path("m2/basic_project/compile_commands.json");
+    CHECK(run({"impact", "--compile-commands", compile_commands.c_str(), "--changed-file",
+               "src/app/main.cpp", "--analysis", "tu-ranking"}) == ExitCode::cli_usage_error);
+}

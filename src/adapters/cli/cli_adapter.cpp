@@ -1,16 +1,20 @@
 #include "adapters/cli/cli_adapter.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #include <CLI/CLI.hpp>
 
 #include "adapters/cli/cli_console_renderers.h"
 #include "adapters/cli/exit_codes.h"
 #include "adapters/cli/output_verbosity.h"
+#include "hexagon/model/analysis_configuration.h"
 #include "hexagon/model/application_info.h"
 #include "hexagon/model/compile_database_result.h"
 #include "hexagon/model/include_filter_options.h"
@@ -75,6 +79,19 @@ struct CliOptions {
     CLI::Option* include_depth_option{nullptr};
     xray::hexagon::model::IncludeDepthFilter parsed_include_depth{
         xray::hexagon::model::IncludeDepthFilter::all};
+    // AP M6-1.5 A.1: --analysis <list> selects which analyze sections are
+    // emitted. Raw text is captured so validate_analysis can split, trim,
+    // dedup and resolve `all`; the parsed canonical sorted enum list lands
+    // in parsed_analysis_sections and is then forwarded into
+    // AnalyzeProjectRequest.analysis_sections.
+    std::string analysis_text;
+    CLI::Option* analysis_option{nullptr};
+    std::vector<xray::hexagon::model::AnalysisSection> parsed_analysis_sections{
+        xray::hexagon::model::AnalysisSection::tu_ranking,
+        xray::hexagon::model::AnalysisSection::include_hotspots,
+        xray::hexagon::model::AnalysisSection::target_graph,
+        xray::hexagon::model::AnalysisSection::target_hubs,
+    };
 };
 
 OutputVerbosity resolve_verbosity(const CliOptions& options) {
@@ -221,6 +238,15 @@ void configure_analyze_command(CLI::App& app, CliOptions& options, CLI::App*& an
         "--include-depth", options.include_depth_text,
         "Include hotspot depth filter: all (default), direct, or indirect");
     options.include_depth_option->take_last();
+    // AP M6-1.5 A.1: --analysis <list> selects which analyze sections are
+    // emitted. Raw text is captured here; validate_analysis owns the six
+    // documented error phrases.
+    options.analysis_option = analyze_cmd->add_option(
+        "--analysis", options.analysis_text,
+        "Comma-separated analysis sections to emit: all (default), tu-ranking, "
+        "include-hotspots, target-graph, target-hubs. target-hubs requires "
+        "target-graph in the same list");
+    options.analysis_option->take_last();
     configure_report_options(*analyze_cmd, options);
     configure_verbosity_options(*analyze_cmd, options);
 }
@@ -379,6 +405,129 @@ std::optional<int> validate_include_scope(CliOptions& options, std::ostream& err
     err << "error: --include-scope: invalid value '" << options.include_scope_text
         << "'; allowed: all, project, external, unknown\n";
     return ExitCode::cli_usage_error;
+}
+
+// AP M6-1.5 A.1: --analysis token tokenisation and lookup helpers.
+//
+// trim_ascii_whitespace mirrors the wording "ASCII-Whitespace-Trim" from
+// plan-M6-1-5.md §320: leading and trailing spaces / tabs / cr / lf are
+// stripped before the token is validated. The plan treats the resulting
+// empty string as the "empty analysis value in list" error case.
+std::string_view trim_ascii_whitespace(std::string_view value) {
+    const auto is_ws = [](char ch) {
+        return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
+    };
+    std::size_t begin = 0;
+    while (begin < value.size() && is_ws(value[begin])) ++begin;
+    std::size_t end = value.size();
+    while (end > begin && is_ws(value[end - 1])) --end;
+    return value.substr(begin, end - begin);
+}
+
+std::optional<xray::hexagon::model::AnalysisSection> analysis_token_to_section(
+    std::string_view token) {
+    using xray::hexagon::model::AnalysisSection;
+    if (token == "tu-ranking") return AnalysisSection::tu_ranking;
+    if (token == "include-hotspots") return AnalysisSection::include_hotspots;
+    if (token == "target-graph") return AnalysisSection::target_graph;
+    if (token == "target-hubs") return AnalysisSection::target_hubs;
+    return std::nullopt;
+}
+
+std::optional<int> validate_analysis(CliOptions& options, std::ostream& err) {
+    using xray::hexagon::model::AnalysisSection;
+    if (options.analysis_option == nullptr) return std::nullopt;
+    if (options.analysis_option->count() > 1) {
+        err << "error: --analysis: option specified more than once\n";
+        return ExitCode::cli_usage_error;
+    }
+    if (options.analysis_option->count() == 0) return std::nullopt;
+
+    // Split on `,`. Each token is trimmed; a fully-empty token after trim is
+    // the "empty analysis value in list" error case from plan §337-338.
+    std::vector<std::string_view> tokens;
+    std::string_view remaining{options.analysis_text};
+    while (true) {
+        const auto comma = remaining.find(',');
+        const auto raw = comma == std::string_view::npos ? remaining
+                                                          : remaining.substr(0, comma);
+        const auto trimmed = trim_ascii_whitespace(raw);
+        if (trimmed.empty()) {
+            err << "error: --analysis: empty analysis value in list\n";
+            return ExitCode::cli_usage_error;
+        }
+        tokens.push_back(trimmed);
+        if (comma == std::string_view::npos) break;
+        remaining = remaining.substr(comma + 1);
+    }
+
+    // Validate each token; collect both the canonical-string form (for
+    // duplicate / dependency error phrases) and the resolved enum.
+    std::vector<std::string_view> canonical;
+    std::vector<AnalysisSection> sections;
+    bool saw_all = false;
+    canonical.reserve(tokens.size());
+    sections.reserve(tokens.size());
+    for (const auto& token : tokens) {
+        if (token == "all") {
+            saw_all = true;
+            canonical.push_back(token);
+            continue;
+        }
+        const auto resolved = analysis_token_to_section(token);
+        if (!resolved.has_value()) {
+            err << "error: --analysis: unknown analysis '" << token
+                << "'; allowed: all, tu-ranking, include-hotspots, target-graph, target-hubs\n";
+            return ExitCode::cli_usage_error;
+        }
+        canonical.push_back(token);
+        sections.push_back(*resolved);
+    }
+
+    // Dedup detection runs over the visible token strings so the error
+    // phrase can quote the original spelling.
+    for (std::size_t i = 0; i < canonical.size(); ++i) {
+        for (std::size_t j = i + 1; j < canonical.size(); ++j) {
+            if (canonical[i] == canonical[j]) {
+                err << "error: --analysis: duplicate analysis value '" << canonical[i]
+                    << "'\n";
+                return ExitCode::cli_usage_error;
+            }
+        }
+    }
+
+    if (saw_all && canonical.size() > 1) {
+        err << "error: --analysis: 'all' must not be combined with other analysis values\n";
+        return ExitCode::cli_usage_error;
+    }
+
+    if (saw_all) {
+        options.parsed_analysis_sections = {
+            AnalysisSection::tu_ranking,
+            AnalysisSection::include_hotspots,
+            AnalysisSection::target_graph,
+            AnalysisSection::target_hubs,
+        };
+        return std::nullopt;
+    }
+
+    // target-hubs without target-graph is a configuration conflict per
+    // plan §334-336 (errors before input is even read).
+    const auto has_hubs = std::find(sections.begin(), sections.end(),
+                                    AnalysisSection::target_hubs) != sections.end();
+    const auto has_graph = std::find(sections.begin(), sections.end(),
+                                     AnalysisSection::target_graph) != sections.end();
+    if (has_hubs && !has_graph) {
+        err << "error: --analysis: target-hubs requires target-graph\n";
+        return ExitCode::cli_usage_error;
+    }
+
+    // Canonical sort per plan §213-216 rank table; enum declaration order in
+    // analysis_configuration.h matches the rank table (tu_ranking=0,
+    // include_hotspots=1, target_graph=2, target_hubs=3).
+    std::sort(sections.begin(), sections.end());
+    options.parsed_analysis_sections = std::move(sections);
+    return std::nullopt;
 }
 
 std::optional<int> validate_include_depth(CliOptions& options, std::ostream& err) {
@@ -814,7 +963,12 @@ xray::hexagon::ports::driving::AnalyzeProjectRequest build_project_request(
             optional_input_path(options.cmake_file_api_path, report_display_base),
             report_display_base,
             options.parsed_include_scope,
-            options.parsed_include_depth};
+            options.parsed_include_depth,
+            options.parsed_analysis_sections,
+            /*tu_thresholds=*/{},
+            /*min_hotspot_tus=*/2,
+            /*target_hub_in_threshold=*/10,
+            /*target_hub_out_threshold=*/10};
 }
 
 xray::hexagon::ports::driving::AnalyzeImpactRequest build_impact_request(
@@ -838,6 +992,7 @@ std::optional<int> validate_subcommand_options(CliOptions& options, bool is_impa
     } else {
         if (const auto e = validate_include_scope(options, err); e.has_value()) return e;
         if (const auto e = validate_include_depth(options, err); e.has_value()) return e;
+        if (const auto e = validate_analysis(options, err); e.has_value()) return e;
     }
     return validate_input_options(options, err);
 }
