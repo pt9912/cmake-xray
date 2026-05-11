@@ -493,9 +493,15 @@ void append_hotspot_context_cell(
 void append_hotspot_filter_paragraph(std::ostringstream& out, const AnalysisResult& result) {
     // Filter paragraph as pinned in plan step 22.1: backticks around the
     // scope/depth values AND around the excluded counts (the form
-    // unified at docs/planning/in-progress/plan-M6-1-4.md:866).
-    out << "Filter: `scope=" << include_scope_text(result.include_scope_effective)
-        << "`, `depth=" << include_depth_filter_text(result.include_depth_filter_effective)
+    // unified at docs/planning/in-progress/plan-M6-1-4.md:866). Local
+    // scope/depth bindings mirror the HTML adapter pattern in
+    // emit_hotspots_filter_line; without them gcov treats the first line
+    // of the multi-line `out << ...` chain as a separate basic block
+    // that the coverage gate marks uncovered.
+    const auto scope_value = include_scope_text(result.include_scope_effective);
+    const auto depth_value = include_depth_filter_text(result.include_depth_filter_effective);
+    out << "Filter: `scope=" << scope_value
+        << "`, `depth=" << depth_value
         << "`. Excluded: `" << result.include_hotspot_excluded_unknown_count
         << "` unknown, `" << result.include_hotspot_excluded_mixed_count
         << "` mixed.\n";

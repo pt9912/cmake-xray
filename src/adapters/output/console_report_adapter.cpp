@@ -152,9 +152,15 @@ void append_hotspot_section(std::ostringstream& out, const AnalysisResult& resul
     // step 23.3 each hotspot is a single indented line; TU listing and
     // hotspot diagnostics are dropped (variant β, consistent with HTML
     // and Markdown).
+    // Local scope/depth bindings mirror the HTML adapter pattern in
+    // emit_hotspots_filter_line; without them gcov treats the first line
+    // of the multi-line `out << ...` chain as a separate basic block
+    // that the coverage gate marks uncovered.
+    const auto scope_value = include_scope_text(result.include_scope_effective);
+    const auto depth_value = include_depth_filter_text(result.include_depth_filter_effective);
     out << '\n';
-    out << "Include Hotspots (scope=" << include_scope_text(result.include_scope_effective)
-        << ", depth=" << include_depth_filter_text(result.include_depth_filter_effective)
+    out << "Include Hotspots (scope=" << scope_value
+        << ", depth=" << depth_value
         << "; excluded: " << result.include_hotspot_excluded_unknown_count
         << " unknown, " << result.include_hotspot_excluded_mixed_count << " mixed):\n";
 

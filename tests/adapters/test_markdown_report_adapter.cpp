@@ -247,6 +247,25 @@ TEST_CASE("markdown report adapter renders file api target metadata for analyze"
           std::string::npos);
 }
 
+TEST_CASE("markdown analyze v4: hotspot Context cell joins multi-target TU assignments with comma separator") {
+    // Covers the disambiguated.size() > 1 comma branch in
+    // append_hotspot_context_cell: when a single TU maps to two targets,
+    // the Context cell lists both inside one `[targets: a, b]` group.
+    const MarkdownReportAdapter adapter;
+    const TargetInfo app{"app", "EXECUTABLE", "app::EXECUTABLE"};
+    const TargetInfo support{"support", "STATIC_LIBRARY", "support::STATIC_LIBRARY"};
+    auto result = make_analysis_result();
+    result.target_metadata = TargetMetadataStatus::loaded;
+    result.target_assignments = {
+        {"src/app/main.cpp|build/debug", {app, support}},
+    };
+
+    const auto report = adapter.write_analysis_report(result, 1);
+
+    CHECK(report.find("src/app/main.cpp [directory: build/debug] [targets: app, support] /") !=
+          std::string::npos);
+}
+
 TEST_CASE("markdown report adapter renders target impact sections") {
     const MarkdownReportAdapter adapter;
     const TargetInfo app{"app", "EXECUTABLE", "app::EXECUTABLE"};
