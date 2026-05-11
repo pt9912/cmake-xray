@@ -140,8 +140,8 @@ std::string_view html_report_css() {
         ".table-wrap{overflow-x:auto;}\n"
         ".badge{display:inline-block;padding:0.1rem 0.5rem;border:1px solid #1a1a1a;"
         "border-radius:0.25rem;background:#f0f0f0;color:#1a1a1a;font-size:0.875rem;}\n"
-        ".badge-direct{background:#1a1a1a;color:#ffffff;}\n"
-        ".badge-heuristic{background:#ffffff;color:#1a1a1a;}\n"
+        ".badge--evidence-direct{background:#1a1a1a;color:#ffffff;}\n"
+        ".badge--evidence-heuristic{background:#ffffff;color:#1a1a1a;}\n"
         ".badge--project{background:#e8f1ff;color:#0b3a8c;border-color:#0b3a8c;}\n"
         ".badge--external{background:#fff4e0;color:#7a4a00;border-color:#7a4a00;}\n"
         ".badge--unknown{background:#f0f0f0;color:#404040;}\n"
@@ -938,14 +938,14 @@ std::string render_impact(const ImpactResult& result) {
                                                          "Directly Affected Targets",
                                                          "No directly affected targets.",
                                                          TargetImpactClassification::direct,
-                                                         "badge-direct"});
+                                                         "badge--evidence-direct"});
     out << "\n";
     emit_impacted_target_section(out, result,
                                   ImpactedTargetSection{"impact-heuristic-targets",
                                                          "Heuristically Affected Targets",
                                                          "No heuristically affected targets.",
                                                          TargetImpactClassification::heuristic,
-                                                         "badge-heuristic"});
+                                                         "badge--evidence-heuristic"});
     out << "\n";
     emit_target_graph_reference_section(out, result);
     out << "\n";

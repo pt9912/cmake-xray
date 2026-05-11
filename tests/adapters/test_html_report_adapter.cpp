@@ -598,8 +598,8 @@ TEST_CASE("HTML impact target sections split direct and heuristic with badges") 
     };
     const HtmlReportAdapter adapter;
     const auto report = adapter.write_impact_report(result);
-    CHECK(report.find("badge-direct") != std::string::npos);
-    CHECK(report.find("badge-heuristic") != std::string::npos);
+    CHECK(report.find("badge--evidence-direct") != std::string::npos);
+    CHECK(report.find("badge--evidence-heuristic") != std::string::npos);
     CHECK(report.find("app") != std::string::npos);
     CHECK(report.find("core") != std::string::npos);
 }
@@ -1039,8 +1039,8 @@ TEST_CASE("HTML impact report renders both direct and heuristic sections in fixe
     // Both kinds populate their sections, no leersaetze for these.
     CHECK(report.find("src/direct.cpp") != std::string::npos);
     CHECK(report.find("src/heuristic.cpp") != std::string::npos);
-    CHECK(report.find("badge-direct") != std::string::npos);
-    CHECK(report.find("badge-heuristic") != std::string::npos);
+    CHECK(report.find("badge--evidence-direct") != std::string::npos);
+    CHECK(report.find("badge--evidence-heuristic") != std::string::npos);
 }
 
 // ---- M6 AP 1.2 Tranche A.3: Target Graph / Target Hubs / Target Graph
