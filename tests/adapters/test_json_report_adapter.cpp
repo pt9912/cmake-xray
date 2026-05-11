@@ -876,6 +876,6 @@ TEST_CASE("AP1.4 A.3: kReportFormatVersion is 4 alongside the new --include-scop
     // verifies the pair stays in sync. The structural v4 additions
     // (include_filter / origin / depth_kind) ship with the JSON adapter
     // rollout in A.4.
-    static_assert(xray::hexagon::model::kReportFormatVersion == 4);
-    CHECK(xray::hexagon::model::kReportFormatVersion == 4);
+    static_assert(xray::hexagon::model::kReportFormatVersion == 5);
+    CHECK(xray::hexagon::model::kReportFormatVersion == 5);
 }

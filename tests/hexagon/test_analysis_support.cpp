@@ -841,7 +841,7 @@ TEST_CASE("report format version is four") {
     // to 4 alongside the new --include-scope/--include-depth CLI options;
     // the structural include_filter / origin / depth_kind additions land
     // with the JSON adapter rollout in A.4.
-    CHECK(xray::hexagon::model::kReportFormatVersion == 4);
+    CHECK(xray::hexagon::model::kReportFormatVersion == 5);
 }
 
 TEST_CASE("report-json schema format_version const matches kReportFormatVersion") {
