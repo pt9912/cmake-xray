@@ -24,6 +24,7 @@ using xray::hexagon::model::IncludeScope;
 using xray::hexagon::model::RankedTranslationUnit;
 using xray::hexagon::model::TranslationUnitObservation;
 using xray::hexagon::model::TranslationUnitReference;
+using xray::hexagon::model::TuRankingMetric;
 
 enum class CompileFlagKind {
     include,
@@ -446,11 +447,29 @@ std::vector<TranslationUnitObservation> build_translation_unit_observations(
 
     return observations; }
 
-std::vector<RankedTranslationUnit> build_ranked_translation_units(
+bool translation_unit_passes_thresholds(
+    const RankedTranslationUnit& tu,
+    const std::map<TuRankingMetric, std::size_t>& tu_thresholds) {
+    // Plan-M6-1-5.md §464-467: a TU survives only if every set
+    // --tu-threshold is satisfied. Metrics absent from the map have an
+    // implicit threshold of 0 (no filter).
+    for (const auto& [metric, threshold] : tu_thresholds) {
+        const auto value = metric == TuRankingMetric::arg_count
+                               ? tu.arg_count
+                               : (metric == TuRankingMetric::include_path_count
+                                      ? tu.include_path_count
+                                      : tu.define_count);
+        if (value < threshold) return false;
+    }
+    return true;
+}
+
+RankedTranslationUnitsBuildResult build_ranked_translation_units(
     const std::vector<TranslationUnitObservation>& observations,
-    const IncludeResolutionResult& include_resolution) {
-    std::vector<RankedTranslationUnit> ranked;
-    ranked.reserve(observations.size());
+    const IncludeResolutionResult& include_resolution,
+    const std::map<TuRankingMetric, std::size_t>& tu_thresholds) {
+    RankedTranslationUnitsBuildResult out;
+    out.translation_units.reserve(observations.size());
 
     for (const auto& observation : observations) {
         auto diagnostics = observation.diagnostics;
@@ -459,7 +478,7 @@ std::vector<RankedTranslationUnit> build_ranked_translation_units(
         diagnostics.insert(diagnostics.end(), resolution_diagnostics.begin(),
                            resolution_diagnostics.end());
 
-        ranked.push_back({
+        RankedTranslationUnit ranked_tu{
             .reference = observation.reference,
             .rank = 0,
             .arg_count = observation.arg_count,
@@ -467,16 +486,24 @@ std::vector<RankedTranslationUnit> build_ranked_translation_units(
             .define_count = observation.define_count,
             .diagnostics = std::move(diagnostics),
             .targets = {},
-        });
+        };
+        if (!translation_unit_passes_thresholds(ranked_tu, tu_thresholds)) {
+            ++out.excluded_by_thresholds_count;
+            continue;
+        }
+        out.translation_units.push_back(std::move(ranked_tu));
     }
 
-    std::sort(ranked.begin(), ranked.end(), ranked_translation_unit_less);
+    // Plan-M6-1-5.md §476-481: threshold filter runs BEFORE sort so visible
+    // rank values stay consecutive (1..N) over the surviving TU set.
+    std::sort(out.translation_units.begin(), out.translation_units.end(),
+              ranked_translation_unit_less);
 
-    for (std::size_t index = 0; index < ranked.size(); ++index) {
-        ranked[index].rank = index + 1;
+    for (std::size_t index = 0; index < out.translation_units.size(); ++index) {
+        out.translation_units[index].rank = index + 1;
     }
-
-    return ranked;
+    out.total_count_after_thresholds = out.translation_units.size();
+    return out;
 }
 
 namespace {
@@ -623,6 +650,7 @@ IncludeHotspotsBuildResult build_include_hotspots(
     auto by_header = accumulate_hotspot_entries(observations, include_resolution);
 
     std::vector<model::IncludeHotspot> all_hotspots;
+    std::size_t excluded_by_min_tus_count = 0;
     for (auto& [header_key, acc] : by_header) {
         auto& affected = acc.affected_translation_units;
         std::sort(affected.begin(), affected.end(), translation_unit_reference_less);
@@ -631,7 +659,10 @@ IncludeHotspotsBuildResult build_include_hotspots(
                                        return lhs.unique_key == rhs.unique_key;
                                    }),
                        affected.end());
-        if (affected.size() < 2) continue;
+        if (affected.size() < filters.min_hotspot_tus) {
+            ++excluded_by_min_tus_count;
+            continue;
+        }
         all_hotspots.push_back(model::IncludeHotspot{
             .header_path = make_display_path(header_key, base_directory),
             .affected_translation_units = std::move(affected),
@@ -645,6 +676,7 @@ IncludeHotspotsBuildResult build_include_hotspots(
 
     IncludeHotspotsBuildResult out;
     out.total_count = all_hotspots.size();
+    out.excluded_by_min_tus_count = excluded_by_min_tus_count;
     for (auto& hotspot : all_hotspots) {
         if (!scope_matches(hotspot.origin, filters.scope)) {
             if (hotspot.origin == IncludeOrigin::unknown) ++out.excluded_unknown_count;

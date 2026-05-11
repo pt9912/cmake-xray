@@ -282,6 +282,7 @@ void populate_include_filter_telemetry(
     result.include_hotspot_returned_count = hotspots_build.hotspots.size();
     result.include_hotspot_excluded_unknown_count = hotspots_build.excluded_unknown_count;
     result.include_hotspot_excluded_mixed_count = hotspots_build.excluded_mixed_count;
+    result.include_hotspot_excluded_by_min_tus_count = hotspots_build.excluded_by_min_tus_count;
     result.include_depth_limit_requested = include_resolution.include_depth_limit_requested;
     result.include_depth_limit_effective = include_resolution.include_depth_limit_effective;
     result.include_node_budget_requested = include_resolution.include_node_budget_requested;
@@ -301,11 +302,18 @@ void finalize_analysis(const ProjectLoadContext& ctx, const ProjectLoadState& st
     }
 
     result.include_analysis_heuristic = include_resolution.heuristic;
-    result.translation_units = build_ranked_translation_units(observations, include_resolution);
+    auto ranked_build = build_ranked_translation_units(observations, include_resolution,
+                                                       ctx.request.tu_thresholds);
+    result.translation_units = std::move(ranked_build.translation_units);
+    result.tu_ranking_total_count_after_thresholds =
+        ranked_build.total_count_after_thresholds;
+    result.tu_ranking_excluded_by_thresholds_count =
+        ranked_build.excluded_by_thresholds_count;
     attach_targets_to_ranked_units(result.translation_units, result.target_assignments);
     auto hotspots_build = build_include_hotspots(
         observations, include_resolution, state.loaded.base_directory, state.loaded.source_root,
-        services::IncludeHotspotFilters{ctx.request.include_scope, ctx.request.include_depth});
+        services::IncludeHotspotFilters{ctx.request.include_scope, ctx.request.include_depth,
+                                         ctx.request.min_hotspot_tus});
     populate_include_filter_telemetry(include_resolution, hotspots_build, ctx.request, result);
     result.include_hotspots = std::move(hotspots_build.hotspots);
     append_unique_diagnostics(result.diagnostics, include_resolution.diagnostics);

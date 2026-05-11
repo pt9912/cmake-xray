@@ -1,11 +1,14 @@
 #pragma once
 
+#include <cstddef>
 #include <filesystem>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "hexagon/model/analysis_configuration.h"
 #include "hexagon/model/build_model_result.h"
 #include "hexagon/model/compile_entry.h"
 #include "hexagon/model/include_classification.h"
@@ -49,20 +52,37 @@ std::string make_display_path(const std::string& normalized_path,
 std::vector<model::TranslationUnitObservation> build_translation_unit_observations(
     const std::vector<model::CompileEntry>& entries, const std::filesystem::path& base_directory);
 
-std::vector<model::RankedTranslationUnit> build_ranked_translation_units(
+// AP M6-1.5 A.2: build_ranked_translation_units honours per-metric
+// --tu-threshold filters before the ranking sort runs, so visible
+// ranks stay consecutive (1..N) over the surviving TU set. Default
+// empty map keeps the pre-AP-1.5 behaviour where no metric is
+// filtered.
+struct RankedTranslationUnitsBuildResult {
+    std::vector<model::RankedTranslationUnit> translation_units;
+    std::size_t total_count_after_thresholds{0};
+    std::size_t excluded_by_thresholds_count{0};
+};
+
+RankedTranslationUnitsBuildResult build_ranked_translation_units(
     const std::vector<model::TranslationUnitObservation>& observations,
-    const model::IncludeResolutionResult& include_resolution);
+    const model::IncludeResolutionResult& include_resolution,
+    const std::map<model::TuRankingMetric, std::size_t>& tu_thresholds = {});
 
 struct IncludeHotspotsBuildResult {
     std::vector<model::IncludeHotspot> hotspots;
     std::size_t total_count{0};
     std::size_t excluded_unknown_count{0};
     std::size_t excluded_mixed_count{0};
+    std::size_t excluded_by_min_tus_count{0};
 };
 
+// AP M6-1.5 A.2: IncludeHotspotFilters now carries the configurable
+// minimum affected-TU count. Default 2 reproduces the M3 / pre-AP-1.5
+// hardcoded threshold.
 struct IncludeHotspotFilters {
     model::IncludeScope scope{model::IncludeScope::all};
     model::IncludeDepthFilter depth_filter{model::IncludeDepthFilter::all};
+    std::size_t min_hotspot_tus{2};
 };
 
 model::IncludeOrigin classify_include_origin(

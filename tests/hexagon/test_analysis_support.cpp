@@ -96,7 +96,7 @@ TEST_CASE("analysis support ranks translation units by include path tie-breaks")
         std::filesystem::path{"/tmp"});
 
     const auto ranked =
-        xray::hexagon::services::build_ranked_translation_units(observations, {});
+        xray::hexagon::services::build_ranked_translation_units(observations, {}).translation_units;
 
     REQUIRE(ranked.size() == 2);
     CHECK(ranked[0].reference.source_path == "/project/src/more-includes.cpp");
