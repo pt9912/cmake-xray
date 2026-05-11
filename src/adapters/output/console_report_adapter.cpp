@@ -10,9 +10,11 @@
 #include <vector>
 
 #include "adapters/output/impact_priority_text.h"
+#include "adapters/output/include_text_helpers.h"
 #include "adapters/output/target_display_support.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
+#include "hexagon/model/include_classification.h"
 #include "hexagon/model/observation_source.h"
 #include "hexagon/model/target_graph.h"
 #include "hexagon/model/target_info.h"
@@ -155,36 +157,42 @@ AnalysisSectionCounts append_ranking_section(std::ostringstream& out,
     };
 }
 
-void append_hotspot_section(std::ostringstream& out, const AnalysisResult& analysis_result,
+void append_hotspot_section(std::ostringstream& out, const AnalysisResult& result,
                             std::size_t hotspot_count) {
-    std::map<std::string, const std::vector<TargetInfo>*> targets_by_key;
-    for (const auto& assignment : analysis_result.target_assignments) {
-        targets_by_key.emplace(assignment.observation_key, &assignment.targets);
+    // AP M6-1.4 A.5 step 23: v4 Console form pinned at plan step 23.1-23.5.
+    // Heading carries the include-filter parenthetical; [heuristic] is
+    // intentionally removed (M3 console marker no longer surfaces on the
+    // Include Hotspots heading per plan step 23.2). Optional budget and
+    // Showing lines render below the heading with two-space indent. Per
+    // step 23.3 each hotspot is a single indented line; TU listing and
+    // hotspot diagnostics are dropped (variant β, consistent with HTML
+    // and Markdown).
+    out << '\n';
+    out << "Include Hotspots (scope=" << include_scope_text(result.include_scope_effective)
+        << ", depth=" << include_depth_filter_text(result.include_depth_filter_effective)
+        << "; excluded: " << result.include_hotspot_excluded_unknown_count
+        << " unknown, " << result.include_hotspot_excluded_mixed_count << " mixed):\n";
+
+    if (result.include_node_budget_reached) {
+        out << "  Note: include analysis stopped at "
+            << result.include_node_budget_effective << " nodes (budget reached).\n";
+    }
+    if (result.include_hotspots.size() > hotspot_count) {
+        out << "  Showing " << hotspot_count << " of "
+            << result.include_hotspots.size() << " include hotspots.\n";
     }
 
-    out << '\n';
-    out << "include hotspots";
-    if (analysis_result.include_analysis_heuristic) out << " [heuristic]";
-    out << '\n';
-
-    if (analysis_result.include_hotspots.empty()) {
-        out << "no include hotspots found\n";
+    if (result.include_hotspots.empty()) {
+        out << "  No include hotspots found.\n";
         return;
     }
 
-    out << "top " << hotspot_count << " of " << analysis_result.include_hotspots.size()
-        << " include hotspots\n";
-
     for (std::size_t index = 0; index < hotspot_count; ++index) {
-        const auto& hotspot = analysis_result.include_hotspots[index];
-        out << "- " << hotspot.header_path << " (affected translation units: "
-            << hotspot.affected_translation_units.size() << ")\n";
-        for (const auto& translation_unit : hotspot.affected_translation_units) {
-            out << "  ";
-            append_translation_unit_reference(out, translation_unit, targets_by_key);
-            out << '\n';
-        }
-        append_diagnostics(out, hotspot.diagnostics, "  ");
+        const auto& hotspot = result.include_hotspots[index];
+        out << "  " << hotspot.header_path << " ["
+            << include_origin_text(hotspot.origin) << ", "
+            << include_depth_kind_text(hotspot.depth_kind) << "] ("
+            << hotspot.affected_translation_units.size() << " translation units)\n";
     }
 }
 

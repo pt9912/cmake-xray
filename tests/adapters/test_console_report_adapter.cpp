@@ -69,6 +69,8 @@ AnalysisResult make_analysis_result() {
                                    "src/lib/core.cpp|build/lib"),
                 },
             .diagnostics = {},
+            .origin = xray::hexagon::model::IncludeOrigin::project,
+            .depth_kind = xray::hexagon::model::IncludeDepthKind::direct,
         },
     };
     return result;
@@ -86,16 +88,113 @@ std::size_t count_occurrences(std::string_view text, std::string_view needle) {
 
 }  // namespace
 
-TEST_CASE("console report adapter keeps full hotspot mapping for emitted hotspots") {
+TEST_CASE("console analyze v4: Include Hotspots heading carries filter parenthetical and per-hotspot origin/depth suffix") {
+    // AP M6-1.4 A.5 step 23.1 / 23.3: v4 Console hotspot section uses
+    // Title-Case heading with embedded scope/depth/excluded parenthetical
+    // and a single per-hotspot line of the shape
+    //   <header> [<origin>, <depth_kind>] (<n> translation units)
+    // The TU listing and hotspot-level diagnostics that the M3 form
+    // emitted are intentionally dropped (variant β, plan step 23.3).
     const ConsoleReportAdapter adapter;
 
     const auto report = adapter.write_analysis_report(make_analysis_result(), 1);
 
-    CHECK(report.find("include hotspots [heuristic]") != std::string::npos);
-    CHECK(report.find("top 1 of 1 include hotspots") != std::string::npos);
-    CHECK(report.find("src/app/main.cpp [directory: build/debug]") != std::string::npos);
-    CHECK(report.find("src/app/main.cpp [directory: build/release]") != std::string::npos);
-    CHECK(report.find("src/lib/core.cpp [directory: build/lib]") != std::string::npos);
+    CHECK(report.find("Include Hotspots (scope=all, depth=all; excluded: 0 unknown, 0 mixed):\n"
+                      "  include/common/config.h [project, direct] (3 translation units)\n") !=
+          std::string::npos);
+    // [heuristic] no longer appears on the Include Hotspots heading.
+    CHECK(report.find("include hotspots [heuristic]") == std::string::npos);
+    // No "top N of M include hotspots" line — Showing only fires when top
+    // limit drops entries; here hotspot_count == include_hotspots.size().
+    CHECK(report.find("top 1 of 1 include hotspots") == std::string::npos);
+    // No TU listing within the hotspot block.
+    CHECK(report.find("  src/app/main.cpp [directory: build/release]") == std::string::npos);
+}
+
+TEST_CASE("console analyze v4: Include Hotspots heading carries non-default scope/depth and excluded counts") {
+    const ConsoleReportAdapter adapter;
+    auto result = make_analysis_result();
+    result.include_scope_effective = xray::hexagon::model::IncludeScope::external;
+    result.include_depth_filter_effective = xray::hexagon::model::IncludeDepthFilter::indirect;
+    result.include_hotspot_excluded_unknown_count = 7;
+    result.include_hotspot_excluded_mixed_count = 3;
+
+    const auto report = adapter.write_analysis_report(result, 1);
+
+    CHECK(report.find(
+              "Include Hotspots (scope=external, depth=indirect; excluded: 7 unknown, 3 mixed):\n") !=
+          std::string::npos);
+}
+
+TEST_CASE("console analyze v4: Include Hotspots emits budget Note when include_node_budget_reached is set") {
+    const ConsoleReportAdapter adapter;
+    auto result = make_analysis_result();
+    result.include_node_budget_reached = true;
+    result.include_node_budget_effective = 10000;
+
+    const auto report = adapter.write_analysis_report(result, 1);
+
+    CHECK(report.find("Include Hotspots (scope=all, depth=all; excluded: 0 unknown, 0 mixed):\n"
+                      "  Note: include analysis stopped at 10000 nodes (budget reached).\n") !=
+          std::string::npos);
+}
+
+TEST_CASE("console analyze v4: Include Hotspots emits Showing line when top limit drops entries") {
+    const ConsoleReportAdapter adapter;
+    AnalysisResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    for (std::size_t index = 1; index <= 4; ++index) {
+        result.include_hotspots.push_back(IncludeHotspot{
+            .header_path = "include/hotspot_" + std::to_string(index) + ".h",
+            .affected_translation_units = {make_reference(
+                "src/hotspot.cpp", "build/hotspot", "src/hotspot.cpp|build/hotspot")},
+            .diagnostics = {},
+            .origin = xray::hexagon::model::IncludeOrigin::project,
+            .depth_kind = xray::hexagon::model::IncludeDepthKind::direct,
+        });
+    }
+
+    const auto report = adapter.write_analysis_report(result, 2);
+
+    CHECK(report.find("Include Hotspots (scope=all, depth=all; excluded: 0 unknown, 0 mixed):\n"
+                      "  Showing 2 of 4 include hotspots.\n"
+                      "  include/hotspot_1.h [project, direct] (1 translation units)\n"
+                      "  include/hotspot_2.h [project, direct] (1 translation units)\n") !=
+          std::string::npos);
+    CHECK(report.find("  include/hotspot_3.h") == std::string::npos);
+}
+
+TEST_CASE("console analyze v4: Include Hotspots covers external/indirect and unknown/mixed origin combinations") {
+    const ConsoleReportAdapter adapter;
+    AnalysisResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.include_hotspots = {
+        IncludeHotspot{
+            .header_path = "/usr/include/iostream",
+            .affected_translation_units = {make_reference(
+                "src/main.cpp", "build/debug", "src/main.cpp|build/debug")},
+            .diagnostics = {},
+            .origin = xray::hexagon::model::IncludeOrigin::external,
+            .depth_kind = xray::hexagon::model::IncludeDepthKind::indirect,
+        },
+        IncludeHotspot{
+            .header_path = "include/mixed.h",
+            .affected_translation_units = {make_reference(
+                "src/m.cpp", "build/m", "src/m.cpp|build/m")},
+            .diagnostics = {},
+            .origin = xray::hexagon::model::IncludeOrigin::unknown,
+            .depth_kind = xray::hexagon::model::IncludeDepthKind::mixed,
+        },
+    };
+
+    const auto report = adapter.write_analysis_report(result, 5);
+
+    CHECK(report.find("  /usr/include/iostream [external, indirect] (1 translation units)\n") !=
+          std::string::npos);
+    CHECK(report.find("  include/mixed.h [unknown, mixed] (1 translation units)\n") !=
+          std::string::npos);
 }
 
 TEST_CASE("console report adapter disambiguates duplicate impact observations") {
@@ -163,10 +262,10 @@ TEST_CASE("console report adapter renders file api target metadata for analyze")
           std::string::npos);
     CHECK(report.find("src/app/main.cpp [directory: build/debug] [targets: app]\n") !=
           std::string::npos);
-    CHECK(report.find("src/app/main.cpp [directory: build/release] [targets: app-release]\n") !=
-          std::string::npos);
-    CHECK(report.find("src/lib/core.cpp [directory: build/lib] [targets: core]\n") !=
-          std::string::npos);
+    // The build/release and build/lib assignment lines previously surfaced
+    // via the hotspot TU listing; v4 Console drops that listing (plan
+    // step 23.3, variant β) so those target suffixes only render where
+    // there is a matching Translation Unit Ranking entry.
 }
 
 TEST_CASE("console report adapter renders target impact sections") {
@@ -266,7 +365,8 @@ TEST_CASE("console report adapter preserves inline diagnostics and handles empty
 
     const auto report = adapter.write_analysis_report(result, 2);
 
-    CHECK(report.find("no include hotspots found") != std::string::npos);
+    CHECK(report.find("Include Hotspots (scope=all, depth=all; excluded: 0 unknown, 0 mixed):\n"
+                      "  No include hotspots found.\n") != std::string::npos);
     CHECK(count_occurrences(
               report,
               "could not resolve include \"generated/version.h\" from src/app/main.cpp") == 2);
