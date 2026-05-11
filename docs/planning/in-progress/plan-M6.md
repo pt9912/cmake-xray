@@ -5,10 +5,10 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M6 `cmake-xray` |
-| Dokumentrevision | `0.1` |
+| Dokumentrevision | `0.2` |
 | Zielrelease | `v1.3.0` |
-| Stand | `2026-04-30` |
-| Status | Entwurf |
+| Stand | `2026-05-11` |
+| Status | in Arbeit |
 | Referenzen | [Lastenheft](../../../spec/lastenheft.md), [Design](../../../spec/design.md), [Architektur](../../../spec/architecture.md), [Phasenplan](./roadmap.md), [Plan M5](../done/plan-M5.md), [Qualitaet](../../user/quality.md), [Releasing](../../user/releasing.md) |
 
 ### 0.1 Zweck
@@ -63,6 +63,21 @@ Nicht Bestandteil von M6 sind:
 - vollstaendige Plattform-Hochstufung ueber den in M5 dokumentierten Status hinaus, sofern dafuer keine eigenen Release- und CI-Gates entstehen
 
 M6 baut auf M4 und M5 auf. Ohne CMake-File-API-Daten bleiben Target-Graph-Abschnitte leer, entfallen nach dokumentierter Formatregel oder melden `not_loaded`; bestehende Analysepfade ueber `compile_commands.json` muessen weiter nutzbar bleiben.
+
+### 0.4 Aktueller Stand der Arbeitspakete
+
+| AP                       | Status      | Plan                                                | Lead-Commit |
+| ------------------------ | ----------- | --------------------------------------------------- | ----------- |
+| 1.1 Target-Graph-Vertraege   | `erledigt`  | [`done/plan-M6-1-1.md`](../done/plan-M6-1-1.md)     | siehe Liefer-Stand-Block im Plan |
+| 1.2 Target-Graph-Ausgaben    | `erledigt`  | [`done/plan-M6-1-2.md`](../done/plan-M6-1-2.md)     | siehe Liefer-Stand-Block im Plan |
+| 1.3 Impact-Priorisierung     | `erledigt`  | [`done/plan-M6-1-3.md`](../done/plan-M6-1-3.md)     | siehe Liefer-Stand-Block im Plan |
+| 1.4 Include-Sicht v4         | `erledigt`  | [`done/plan-M6-1-4.md`](../done/plan-M6-1-4.md)     | `2f83d7e` (Lead A.5 step 25c), Liefer-Stand-Block listet alle Tranche-Hashes |
+| 1.5 Analyseauswahl + Budgets | `offen`     | [`open/plan-M6-1-5.md`](../open/plan-M6-1-5.md)     | —           |
+| 1.6 Compare-Sicht            | `offen`     | [`open/plan-M6-1-6.md`](../open/plan-M6-1-6.md)     | —           |
+| 1.7 Referenzdaten + Doku     | `offen`     | [`open/plan-M6-1-7.md`](../open/plan-M6-1-7.md)     | —           |
+| 1.8 Praeprozessor-Include    | `offen`     | [`open/plan-M6-1-8.md`](../open/plan-M6-1-8.md)     | —           |
+
+Roadmap §0.2 spiegelt dieselbe Status-Sicht milestone-uebergreifend. Per-AP-Liefer-Stand-Bloecke leben in den jeweiligen Sub-Plaenen; dieses Dokument bleibt der M6-Master mit Arbeitspaket-Beschreibungen und Reihenfolge.
 
 ## 1. Arbeitspakete
 
