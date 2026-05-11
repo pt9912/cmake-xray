@@ -763,29 +763,29 @@ Feldreihenfolge im Analyze-JSON (`format_version=4`):
 
 `include_filter`-Schema:
 
-| Feld | Typ | Pflicht | Werte |
-| --- | --- | --- | --- |
-| `include_scope` | string | ja | `all`, `project`, `external`, `unknown`. |
-| `include_depth` | string | ja | `all`, `direct`, `indirect`. |
-| `include_depth_limit_requested` | integer | ja | `32` in M6. |
-| `include_depth_limit_effective` | integer | ja | `0..32`. |
-| `include_node_budget_requested` | integer | ja | `10000` in M6. |
-| `include_node_budget_effective` | integer | ja | `0..10000`. |
-| `include_node_budget_reached` | boolean | ja | `true`/`false`. |
+| Feld                            | Typ     | Pflicht | Werte                                    |
+| ------------------------------- | ------- | ------- | ---------------------------------------- |
+| `include_scope`                 | string  | ja      | `all`, `project`, `external`, `unknown`. |
+| `include_depth`                 | string  | ja      | `all`, `direct`, `indirect`.             |
+| `include_depth_limit_requested` | integer | ja      | `32` in M6.                              |
+| `include_depth_limit_effective` | integer | ja      | `0..32`.                                 |
+| `include_node_budget_requested` | integer | ja      | `10000` in M6.                           |
+| `include_node_budget_effective` | integer | ja      | `0..10000`.                              |
+| `include_node_budget_reached`   | boolean | ja      | `true`/`false`.                          |
 
 Hotspot-Item-Schema-Erweiterung:
 
-| Feld | Typ | Pflicht | Werte |
-| --- | --- | --- | --- |
-| `origin` | string | ja | `project`, `external`, `unknown`. |
-| `depth_kind` | string | ja | `direct`, `indirect`, `mixed`. |
+| Feld         | Typ    | Pflicht | Werte                             |
+| ------------ | ------ | ------- | --------------------------------- |
+| `origin`     | string | ja      | `project`, `external`, `unknown`. |
+| `depth_kind` | string | ja      | `direct`, `indirect`, `mixed`.    |
 
 Hotspot-Container-Schema-Erweiterung:
 
-| Feld | Typ | Pflicht | Beschreibung |
-| --- | --- | --- | --- |
-| `excluded_unknown_count` | integer | ja | Hotspots, die durch `--include-scope project|external` ausgefiltert wurden. |
-| `excluded_mixed_count` | integer | ja | Hotspots, die durch `--include-depth direct|indirect` ausgefiltert wurden. |
+| Feld                     | Typ     | Pflicht | Beschreibung                                                                |
+| ------------------------ | ------- | ------- | --------------------------------------------------------------------------- |
+| `excluded_unknown_count` | integer | ja      | Hotspots, die durch `--include-scope project external` ausgefiltert wurden. |
+| `excluded_mixed_count`   | integer | ja      | Hotspots, die durch `--include-depth direct  indirect` ausgefiltert wurden. |
 
 Schema-Erweiterung in `report-json.schema.json`:
 
@@ -865,9 +865,9 @@ Section:
 
 Filter: `scope=all`, `depth=all`. Excluded: `0` unknown, `0` mixed.
 
-| Header | Origin | Depth | Affected TUs | Context |
-|---|---|---|---|---|
-| `src/include/foo.h` | `project` | `direct` | 5 | ... |
+| Header              | Origin    | Depth    | Affected TUs | Context |
+| ------------------- | --------- | -------- | ------------ | ------- |
+| `src/include/foo.h` | `project` | `direct` | 5            | ...     |
 ```
 
 - Markdown-Tabellen-Escaping aus AP 1.2 gilt fuer alle Zellen.
@@ -1138,7 +1138,7 @@ Innerhalb von **A.5 (HTML-, Markdown- und Console-Adapter)**:
     Konkret zu ergaenzen:
     - Neue Pflicht-Filter-Zeile in der `Include Hotspots`-Section:
       `<p class="include-filter">Filter: scope=<span class="badge badge--<scope>">…</span>, depth=<span class="badge badge--<depth>">…</span>. Excluded: <unknown> unknown, <mixed> mixed.</p>`
-      Wording, Position (zwischen `<h2>` und Tabelle / Empty-Marker)
+      Wording, Position (zwischen `\<h2\>` und Tabelle / Empty-Marker)
       und die Tatsache, dass die Zeile auch im Empty-Hotspot-Fall
       ausgegeben wird (siehe naechster Punkt) muessen pinnt sein.
     - Empty-Hotspot-Verhalten ausdruecklich dokumentieren: die
