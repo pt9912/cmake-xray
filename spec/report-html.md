@@ -7,6 +7,8 @@
 > **M6 AP 1.3 Tranche A.4:** `format_version` steigt auf `3`. Impact-HTML traegt eine zusaetzliche Pflichtsection `Prioritised Affected Targets` zwischen `Target Graph Reference` und `Diagnostics`; sie zeigt die Reverse-BFS-priorisierte Sicht ueber den Target-Graphen mit Tiefen-Metadaten. Analyze-HTML aendert sich nicht (Reverse-BFS gilt nur fuer Impact). Die Section bleibt bei `target_graph_status="not_loaded"` mit `h2` plus Tiefen-Header und Fallback-Absatz erhalten.
 >
 > **M6 AP 1.4 Tranche A.5:** `format_version` steigt auf `4`. Analyze-HTML erweitert die `Include Hotspots`-Section um eine Pflicht-Filter-Zeile (`<p class="include-filter">`) zwischen `<h2>` und Tabelle/Empty-Marker, eine optionale Budget-Note (`<p class="include-budget-note">`) bei `include_node_budget_reached=true`, und zwei neue Pflichtspalten `Origin` und `Depth` in der Hotspot-Tabelle. Sechs neue CSS-Badge-Klassen (`badge--project`, `badge--external`, `badge--unknown`, `badge--direct`, `badge--indirect`, `badge--mixed`) landen im inline-CSS-Block. Die Filter-Zeile spiegelt Analyse-Konfiguration, nicht Ergebnis, und erscheint auch im Empty-Hotspot-Fall. Impact-HTML aendert sich strukturell nicht; die `format_version`-Anhebung dokumentiert nur die Analyze-Erweiterung. Konsole- und Markdown-Pendants leben in `docs/planning/in-progress/plan-M6-1-4.md` (Steps 22/23) und tragen denselben Filter-/Origin-/Depth-Datenstrom auf format-spezifischer Praesentation.
+>
+> **M6 AP 1.5 Tranche A.5:** `format_version` steigt auf `5`. Analyze-HTML traegt eine neue Pflichtsection `<section class="analysis-configuration">` zwischen `Inputs` und `Translation Unit Ranking` mit einem `<dl>` fuer die vier Konfigurationswerte (`Sections`, `TU thresholds`, `Min hotspot TUs`, `Target hub thresholds`) und einer Untersection `<h3>Section States</h3>` mit einem zweiten `<dl class="section-states">` fuer die vier Sections und ihren `AnalysisSectionState`. Jede der vier fachlichen Sections (`Translation Unit Ranking`, `Include Hotspots`, `Target Graph`, `Target Hubs`) traegt ab v5 inline im `<h2>` ein Section-State-Badge `<span class="badge badge--state-<state>">Status: <state></span>` mit `<state>` einer von `active`, `disabled`, `not_loaded`. Wenn `analysis_section_states[<section>]` `disabled` oder `not_loaded` ist, ersetzt die Section ihren Body durch genau einen Absatz `<p class="empty">Section disabled.</p>` bzw. `<p class="empty">Section not loaded.</p>`; die Section bleibt mit `<h2>` und Status-Badge erhalten. Die bis AP 1.2 in `Target Graph` und `Target Hubs` getragenen Section-spezifischen Leersaetze `Target graph not loaded.` und `Target hubs not available.` entfallen im Analyze-HTML zugunsten dieses unifizierten Markers. Drei neue CSS-Badge-Modifier-Klassen `badge--state-active`, `badge--state-disabled`, `badge--state-not-loaded` ergaenzen den CSS-Vertrag; sie sind reine Modifier-Markierungen und tragen keine erzwungenen Farben. `Target Hubs` liest seine `Incoming threshold` / `Outgoing threshold`-Werte ab v5 aus `analysis_configuration.target_hub_in_threshold` bzw. `target_hub_out_threshold` (CLI-konfigurierbar), nicht mehr aus den Default-Konstanten. Impact-HTML aendert sich strukturell nicht; insbesondere bleibt die `Target Graph Reference`-Section bei `target_graph_status="not_loaded"` mit dem Legacy-Leersatz `Target graph not loaded.`, weil Impact keine `analysis_section_states`-Surface fuehrt. Konsole- und Markdown-Pendants leben in `docs/planning/in-progress/plan-M6-1-5.md` (Steps 18a/18b) und tragen denselben Konfigurations-/Section-State-Datenstrom auf format-spezifischer Praesentation.
 
 ## Zweck
 
@@ -41,12 +43,12 @@ Das Geruest ist fuer Analyze und Impact identisch:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="xray-report-format-version" content="4">
+  <meta name="xray-report-format-version" content="5">
   <title>cmake-xray analyze report</title>
   <style>...</style>
 </head>
 <body>
-  <main class="report" data-report-type="analyze" data-format-version="4">
+  <main class="report" data-report-type="analyze" data-format-version="5">
     ...
   </main>
 </body>
@@ -71,6 +73,7 @@ Regeln:
 - Hintergrundfarbe Body `#ffffff`, Vordergrundfarbe `#1a1a1a`. Kontrastverhaeltnis &ge; 4.5:1 (WCAG AA fuer Fliesstext).
 - Status-Badges nutzen Hintergrund + Text in Kombination, nie nur Farbe; sichtbarer Text wie `direct`, `heuristic`, `loaded`, `partial`, `not_loaded`, `warning`, `note` bleibt erhalten.
 - M6 AP 1.4 ergaenzt sechs CSS-Klassen `badge--project`, `badge--external`, `badge--unknown`, `badge--direct`, `badge--indirect`, `badge--mixed` als Vertragsbestandteil. Sie tragen die Origin- und Depth-Werte der `Include Hotspots`-Tabelle sowie die Filter-Zeilen-Badges (`scope=<span class="badge badge--<scope>">…`, `depth=<span class="badge badge--<depth>">…`) ein. M6 AP 1.4 A.5 Step 25c hat zusaetzlich die beiden M5-Impact-Evidenz-Klassen auf die gleiche BEM-Doppeldash-Notation gehoben: `badge-direct` → `badge--evidence-direct`, `badge-heuristic` → `badge--evidence-heuristic`. Damit folgen alle Badge-Klassen einheitlich der `badge--<X>`-Form; die bis dahin bestehende Single-/Doppel-Dash-Naming-Asymmetrie ist beseitigt.
+- M6 AP 1.5 ergaenzt drei CSS-Modifier-Klassen `badge--state-active`, `badge--state-disabled`, `badge--state-not-loaded` als Vertragsbestandteil. Sie kennzeichnen das Section-State-Badge `<span class="badge badge--state-<state>">Status: <state></span>` im `<h2>` jeder der vier fachlichen Analyze-Sections (`Translation Unit Ranking`, `Include Hotspots`, `Target Graph`, `Target Hubs`). Die Klassen sind reine Modifier-Markierungen; das Base-`.badge`-Styling liefert die Affordanz, und das textbasierte Section-State-Label (`active` / `disabled` / `not_loaded`) traegt die fachliche Information unabhaengig von der CSS-Farbe.
 - Tabellen sind auf dem Bildschirm horizontal scrollbar (`overflow-x: auto`), ohne dass das Seitenlayout bricht. Im Drucklayout setzt der Adapter `.table-wrap { overflow-x: visible }`, damit gedruckte Tabellen nicht abgeschnitten werden.
 - Drucklayout (`@media print`) entfernt Hintergrundfarben und reduziert Schriftfarbkontrast nicht unter Lesbarkeit.
 - Eine `@page { margin: 1.5cm }`-Regel setzt deterministische Druckraender; weitere Druckregeln sind ausschliesslich im Adapter-CSS hinterlegt und enthalten keine zufaelligen oder dynamischen Werte.
@@ -155,12 +158,15 @@ Pflichtsections (in Reihenfolge):
 
 1. Header / Summary
 2. Inputs
-3. Translation Unit Ranking
-4. Include Hotspots
-5. Target Metadata
-6. Target Graph (M6 AP 1.2)
-7. Target Hubs (M6 AP 1.2)
-8. Diagnostics
+3. Analysis Configuration (M6 AP 1.5)
+4. Translation Unit Ranking
+5. Include Hotspots
+6. Target Metadata
+7. Target Graph (M6 AP 1.2)
+8. Target Hubs (M6 AP 1.2)
+9. Diagnostics
+
+Ab v5 traegt jede der vier fachlichen Sections `Translation Unit Ranking`, `Include Hotspots`, `Target Graph` und `Target Hubs` inline im `<h2>` ein Section-State-Badge `<span class="badge badge--state-<state>">Status: <state></span>`, wobei `<state>` aus `result.analysis_section_states[<section>]` stammt (Mapping: `AnalysisSection::tu_ranking` → `tu-ranking`, `include_hotspots` → `include-hotspots`, `target_graph` → `target-graph`, `target_hubs` → `target-hubs`). Wenn der Section-State `disabled` oder `not_loaded` ist, ersetzt die Section ihren gesamten Body durch genau einen Absatz `<p class="empty">Section disabled.</p>` bzw. `<p class="empty">Section not loaded.</p>`; die Section bleibt mit `<h2>` und Status-Badge im Output. Tabellen, Filter-Zeilen, Statusbadges innerhalb der Section, Empty-Marker der Section selbst und alle weiteren AP-1.2-/AP-1.4-Bausteine entfallen in dieser Variante.
 
 ### Header / Summary (analyze)
 
@@ -172,16 +178,32 @@ Pflichtsections (in Reihenfolge):
 
 Quelle: `AnalysisResult::inputs`. Pflichtzeilen `compile_database_path`, `compile_database_source`, `cmake_file_api_path`, `cmake_file_api_resolved_path`, `cmake_file_api_source`. Fehlende Werte als `not provided`.
 
+### Analysis Configuration (M6 AP 1.5)
+
+- `<section class="analysis-configuration">` mit `<h2>Analysis Configuration</h2>` (kein Status-Badge, da diese Section keinen Eintrag in `analysis_section_states` traegt).
+- Erstes `<dl>` mit vier Pflicht-Key/Value-Paaren in dieser Reihenfolge:
+  1. `<dt>Sections</dt><dd><effective>...</dd>` — kommagetrennte Liste der `analysis_configuration.effective_sections` in Eingabereihenfolge, HTML-escapt. Leere Liste bleibt zulaessig (`<dd></dd>`); semantisch entspricht das `--analysis ` ohne Werte, was die CLI bereits ablehnt, aber bare-Fixture-Adapter-Tests treffen den Pfad.
+  2. `<dt>TU thresholds</dt><dd>arg_count=<n>, include_path_count=<n>, define_count=<n></dd>` — die drei Werte aus `analysis_configuration.tu_thresholds`. Fehlt eine der drei Metriken im Map, gilt `0`.
+  3. `<dt>Min hotspot TUs</dt><dd><n></dd>` — `analysis_configuration.min_hotspot_tus`.
+  4. `<dt>Target hub thresholds</dt><dd>in=<n>, out=<n></dd>` — `analysis_configuration.target_hub_in_threshold` und `target_hub_out_threshold`. Defaults `10`/`10`.
+- Anschliessend `<h3>Section States</h3>` und ein zweites `<dl class="section-states">` mit genau vier `<dt>/<dd>`-Paaren in fester Reihenfolge: `tu-ranking`, `include-hotspots`, `target-graph`, `target-hubs`. Jeder `<dd>` traegt den zugehoerigen `AnalysisSectionState`-Text (`active`, `disabled`, `not_loaded`).
+- Die Section ist immer vorhanden, unabhaengig von der CLI-Konfiguration; ihre Werte spiegeln Konfiguration, nicht Ergebnis.
+- Konsole und Markdown bringen denselben Datenstrom in formatspezifischer Praesentation (siehe `spec/report-json.md` und Plan §678-698 / §702-727).
+
 ### Translation Unit Ranking
 
 Spalten: `Rank`, `Source path`, `Directory`, `Score`, `Arguments`, `Include paths`, `Defines`, `Targets`, `Diagnostics`.
 Hoechstens `top_limit` Zeilen. Bei `translation_units.size() > top_limit` zusaetzlich der Hinweis `Showing N of M entries.`. Leersatz `No translation units to report.` wenn die Liste leer ist.
 
+Ab v5: Wenn `analysis_section_states["tu-ranking"]` `disabled` oder `not_loaded` ist, ersetzt der unifizierte `<p class="empty">Section disabled.</p>` / `Section not loaded.`-Absatz die Tabelle und alle Empty-/Showing-Marker; das `<h2>Translation Unit Ranking <span class="badge badge--state-<state>">Status: <state></span></h2>` bleibt erhalten.
+
 ### Include Hotspots
 
-Section-Struktur in fester Reihenfolge:
+Ab v5: Das `<h2>` traegt inline ein Section-State-Badge `<span class="badge badge--state-<state>">Status: <state></span>`. Wenn `analysis_section_states["include-hotspots"]` `disabled` oder `not_loaded` ist, ersetzt der unifizierte `<p class="empty">Section disabled.</p>` / `Section not loaded.`-Absatz Filter-Zeile, Budget-Note, Showing-Hinweis, Empty-Marker und Tabelle; `<h2>` bleibt erhalten.
 
-1. `<h2>Include Hotspots</h2>`.
+Section-Struktur in fester Reihenfolge (wenn Section `active`):
+
+1. `<h2>Include Hotspots <span class="badge badge--state-active">Status: active</span></h2>`.
 2. **Pflicht-Filter-Zeile** als `<p class="include-filter">`: `Filter: scope=<span class="badge badge--<scope>">…</span>, depth=<span class="badge badge--<depth>">…</span>. Excluded: <unknown> unknown, <mixed> mixed.`. `<scope>` ist einer von `all`, `project`, `external`, `unknown`; `<depth>` ist einer von `all`, `direct`, `indirect`. `<unknown>` und `<mixed>` sind die Zaehler `include_hotspot_excluded_unknown_count` bzw. `include_hotspot_excluded_mixed_count` aus dem `AnalysisResult`. Die Zeile spiegelt Analyse-Konfiguration, nicht Ergebnis, und erscheint deshalb auch im Empty-Hotspot-Fall direkt unter dem `<h2>`.
 3. **Optionale Budget-Note** als `<p class="include-budget-note">Note: include analysis stopped at <effective> nodes (budget reached).</p>`. Erscheint genau dann, wenn `include_node_budget_reached=true`. `<effective>` ist der Wert von `include_node_budget_effective`. Wording ist Vertragsbestandteil.
 4. **Optionale Top-Limit-Hinweiszeile** `<p>Showing N of M entries.</p>` bei `include_hotspots.size() > top_limit`. Wording ist identisch zu Translation Unit Ranking.
@@ -200,19 +222,19 @@ Observation Source, Target Metadata Status, Anzahl TU mit Target-Mapping, Liste 
 
 ### Target Graph (analyze, M6 AP 1.2)
 
-- `h2`: `Target Graph`.
-- Sichtbarer Statuswert: `Status: <target_graph_status>`. Die Status-Badge-Klassen `badge--loaded`, `badge--partial` und `badge--not-loaded` aus M5 werden dafuer wiederverwendet; keine neuen CSS-Klassen.
-- Wenn `target_graph_status="not_loaded"`: nur ein Absatz mit dem Leersatz `Target graph not loaded.`. Keine Tabelle. Section bleibt im Output (nicht weggelassen), analog zur M5-`Target Metadata`-Section.
-- Wenn `target_graph_status="loaded"` oder `"partial"` und `target_graph.edges` leer: Tabelle entfaellt, Leersatz `No direct target dependencies.`.
-- Wenn `target_graph_status="loaded"` oder `"partial"` und `target_graph.edges` nicht leer: Tabelle mit Spalten `From`, `To`, `Resolution`, `External target`. `External target`-Zelle bleibt leer fuer `resolution="resolved"` und enthaelt den HTML-escapten `raw_id` fuer `resolution="external"`.
+- `h2`: `Target Graph`. Ab v5 inline mit Section-State-Badge `<span class="badge badge--state-<state>">Status: <state></span>`, wobei `<state>` aus `analysis_section_states["target-graph"]` stammt.
+- Wenn `analysis_section_states["target-graph"]` `disabled` oder `not_loaded` ist (v5): Section bleibt mit `<h2>` und ersetzt den Body durch genau einen Absatz `<p class="empty">Section disabled.</p>` bzw. `<p class="empty">Section not loaded.</p>`. Der Legacy-Leersatz `Target graph not loaded.` aus AP 1.2 wird im Analyze-HTML durch diesen unifizierten Marker abgeloest; die Impact-`Target Graph Reference`-Section traegt ihn weiterhin (siehe Impact-Vertrag).
+- Wenn `analysis_section_states["target-graph"]` `active` ist: Sichtbarer Statuswert `Status: <target_graph_status>` in einem `<p>`-Element direkt unter dem `<h2>`. Die Status-Badge-Klassen `badge--loaded`, `badge--partial`, `badge--disabled` und `badge--not-loaded` werden hier weiterhin wiederverwendet; sie fuehren den Modellstatus, waehrend das `<h2>`-Badge den Section-State traegt.
+- Wenn Section `active` und `target_graph.edges` leer: Tabelle entfaellt, Leersatz `No direct target dependencies.`.
+- Wenn Section `active` und `target_graph.edges` nicht leer: Tabelle mit Spalten `From`, `To`, `Resolution`, `External target`. `External target`-Zelle bleibt leer fuer `resolution="resolved"` und enthaelt den HTML-escapten `raw_id` fuer `resolution="external"`.
 - Zeilenreihenfolge nach `(from_unique_key, to_unique_key, kind, from_display_name, to_display_name)`, identisch zu JSON `target_graph.edges` und Console/Markdown. HTML-Adapter rufen `target_graph_support::sort_target_graph` NICHT erneut auf; sie verlassen sich auf die bereits sortierten Modelldaten aus `AnalysisResult`.
 
 ### Target Hubs (analyze, M6 AP 1.2)
 
-- `h2`: `Target Hubs`.
-- Wenn `target_graph_status="not_loaded"`: Section bleibt mit `h2` und Absatz `Target hubs not available.`. Keine Tabelle.
-- Sonst sichtbare Schwellenwerte: `Incoming threshold: <in_threshold>. Outgoing threshold: <out_threshold>.`. In AP 1.2 sind beide Werte fest auf `10` gesetzt; AP 1.5 macht sie ueber CLI konfigurierbar.
-- Tabelle mit Spalten `Direction`, `Threshold`, `Targets`. Eine Zeile fuer `Inbound`, eine fuer `Outbound` (feste Reihenfolge).
+- `h2`: `Target Hubs`. Ab v5 inline mit Section-State-Badge `<span class="badge badge--state-<state>">Status: <state></span>`, wobei `<state>` aus `analysis_section_states["target-hubs"]` stammt.
+- Wenn `analysis_section_states["target-hubs"]` `disabled` oder `not_loaded` ist (v5): Section bleibt mit `<h2>` und ersetzt den Body durch den unifizierten `<p class="empty">Section disabled.</p>` bzw. `<p class="empty">Section not loaded.</p>`-Absatz. Der Legacy-Leersatz `Target hubs not available.` entfaellt.
+- Wenn Section `active`: Sichtbare Schwellenwerte `Incoming threshold: <in_threshold>. Outgoing threshold: <out_threshold>.` Ab v5 stammen beide Werte aus `analysis_configuration.target_hub_in_threshold` bzw. `target_hub_out_threshold` (CLI-konfigurierbar; Defaults `10`/`10`); bis v4 waren sie fest auf `10` gesetzt.
+- Tabelle mit Spalten `Direction`, `Threshold`, `Targets`. Eine Zeile fuer `Inbound`, eine fuer `Outbound` (feste Reihenfolge). Die `Threshold`-Spalte traegt denselben CLI-konfigurierbaren Wert wie der einleitende Absatz.
 - `Targets`-Zelle: kommagetrennte Display-Namen, jeweils HTML-escapt. Bei Namens-Kollision innerhalb der Liste mit ` [key: <unique_key>]`-Suffix; spitze Klammern aus `<external>::*`-Schluesseln werden HTML-escaped. Innerhalb jeder Zelle ist die kommaweise Reihenfolge nach `(unique_key, display_name, type)` sortiert, identisch zu JSON `target_hubs.inbound`/`target_hubs.outbound`.
 - Leerer `inbound`- bzw. `outbound`-Vector: `Targets`-Zelle traegt den Leersatz `No incoming hubs.` bzw. `No outgoing hubs.` als Textinhalt.
 
@@ -275,7 +297,7 @@ Reportweite Diagnostics aus `ImpactResult::diagnostics`. Leersatz `No diagnostic
 
 ## Goldens
 
-- Goldens liegen unter `tests/e2e/testdata/m5/html-reports/` und `tests/e2e/testdata/m6/html-reports/`. Beide Verzeichnisse enthalten ausschliesslich `format_version=4`-Goldens (AP M6-1.4 A.3 inhaltlich migriert); die `m5/`-/`m6/`-Trennung ist fachlich (Datensatz-Szenarien), nicht versionell, analog zur JSON- und DOT-Goldens-Aufteilung.
+- Goldens liegen unter `tests/e2e/testdata/m5/html-reports/` und `tests/e2e/testdata/m6/html-reports/`. Beide Verzeichnisse enthalten ab AP M6-1.5 A.5 Step 20 ausschliesslich `format_version=5`-Goldens (Step 20 migriert die `format_version=4`-Goldens aus AP M6-1.4 A.3 inhaltlich); die `m5/`-/`m6/`-Trennung ist fachlich (Datensatz-Szenarien), nicht versionell, analog zur JSON- und DOT-Goldens-Aufteilung.
 - Manifeste `tests/e2e/testdata/m5/html-reports/manifest.txt` und `tests/e2e/testdata/m6/html-reports/manifest.txt` listen jeden Goldenpfad einmal; Verzeichnis und Manifest werden beidseitig abgeglichen.
 - Goldens enthalten keine Host-/Workspace-spezifischen Absolutpfade. Synthetische Pfade wie `/project/...` oder `C:/project/...` bleiben erlaubt.
 - Goldens enthalten keine Zeitstempel, Hostnamen, zufaellige IDs oder Buildpfade.
