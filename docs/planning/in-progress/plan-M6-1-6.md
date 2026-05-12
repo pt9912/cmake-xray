@@ -1087,9 +1087,20 @@ Bis zum Abschluss aller A-Tranchen ist AP 1.6 nicht abnahmefaehig.
   Goldens und `docs/examples` sind auf v6 regeneriert. Lokale Gates
   gruen: `make docker-test` (41/41), `make coverage-gate
   COVERAGE_THRESHOLD=100` (Coverage 100%) und `make quality-gate`
-  (clang-tidy 0, lizard 0). Lead-Commit wird nach Auslieferung
-  gepinnt.
-- A.2 (Compare-Modell und JSON-Reader): noch nicht ausgeliefert.
+  (clang-tidy 0, lizard 0). Lead-Commit: `85de345`; Stabilisierung
+  bis `53b9dfb`.
+- A.2 (Compare-Modell und JSON-Reader): **lokal umgesetzt**.
+  `CompareResult` und Diff-/Diagnostic-Strukturen sind als
+  Hexagon-Modell angelegt, inklusive eigenem
+  `kCompareFormatVersion=1`. `AnalysisJsonReader` liest Analyze-v6-
+  JSON, validiert den fokussierten Compare-Eingangsvertrag,
+  unterscheidet IO-/Parser-/Schema-/Versions-/Reporttyp- und
+  project_identity-Fehler und liefert die raw sections fuer den
+  spaeteren Compare-Service. Reader-Tests decken Success- und
+  Fehlerpfade ab. Lokale Gates gruen: `make docker-test` (41/41),
+  `make coverage-gate COVERAGE_THRESHOLD=100` (Coverage 100%) und
+  `make quality-gate` (clang-tidy 0, lizard 0). Commit wird nach
+  Auslieferung gepinnt.
 - A.3 (Compare-Service und Diff-Logik): noch nicht ausgeliefert.
 - A.4 (CLI und Compare-Schema): noch nicht ausgeliefert.
 - A.5 (JSON-Compare-Adapter): noch nicht ausgeliefert.

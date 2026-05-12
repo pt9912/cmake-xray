@@ -3,6 +3,7 @@ add_library(
     cli/atomic_report_writer.cpp
     cli/cli_adapter.cpp
     cli/cli_console_renderers.cpp
+    input/analysis_json_reader.cpp
     input/cmake_file_api_adapter.cpp
     input/compile_commands_json_adapter.cpp
     input/source_parsing_include_adapter.cpp
