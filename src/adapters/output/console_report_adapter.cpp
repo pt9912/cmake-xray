@@ -12,6 +12,7 @@
 #include "adapters/output/impact_priority_text.h"
 #include "adapters/output/include_text_helpers.h"
 #include "adapters/output/target_display_support.h"
+#include "hexagon/model/analysis_configuration.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
 #include "hexagon/model/include_classification.h"
@@ -25,7 +26,10 @@ namespace xray::adapters::output {
 
 namespace {
 
+using xray::hexagon::model::AnalysisConfiguration;
 using xray::hexagon::model::AnalysisResult;
+using xray::hexagon::model::AnalysisSection;
+using xray::hexagon::model::AnalysisSectionState;
 using xray::hexagon::model::Diagnostic;
 using xray::hexagon::model::DiagnosticSeverity;
 using xray::hexagon::model::ImpactKind;
@@ -37,6 +41,7 @@ using xray::hexagon::model::TargetImpactClassification;
 using xray::hexagon::model::TargetInfo;
 using xray::hexagon::model::TargetMetadataStatus;
 using xray::hexagon::model::TranslationUnitReference;
+using xray::hexagon::model::TuRankingMetric;
 
 struct AnalysisSectionCounts {
     std::size_t ranking_count{0};
@@ -220,15 +225,118 @@ void append_target_section(std::ostringstream& out, std::string_view title,
 // ---- M6 AP 1.2 Tranche A.3: Target-Graph-related sections ---------------
 
 std::string target_graph_status_text(TargetGraphStatus status) {
-    // AP M6-1.5 A.3 added TargetGraphStatus::disabled. Callers still filter
-    // not_loaded before reaching here; the legacy ternary keeps the
-    // loaded / partial mapping byte-stable and the new disabled value
-    // falls through to "partial" until A.5 Console v5 rewires the
-    // call sites that emit Target-Graph / Target-Hubs sections to
-    // route disabled to the new "Section disabled." marker.
+    // AP M6-1.5 A.5 Console v5: section_active() filters disabled and
+    // not_loaded before the target-graph and target-hubs sections render,
+    // so this helper now sees only loaded / partial in analyze output. The
+    // impact paths still pass any status through; loaded/partial render
+    // byte-stable as before, while disabled / not_loaded map to their
+    // explicit string for the impact "Target Graph Reference" line.
     if (status == TargetGraphStatus::loaded) return "loaded";
     if (status == TargetGraphStatus::disabled) return "disabled";
+    if (status == TargetGraphStatus::not_loaded) return "not_loaded";
     return "partial";
+}
+
+// ---- AP M6-1.5 A.5 Tranche A.5 step 18a: Analysis Configuration block ---
+
+std::string analysis_section_text(AnalysisSection section) {
+    if (section == AnalysisSection::tu_ranking) return "tu-ranking";
+    if (section == AnalysisSection::include_hotspots) return "include-hotspots";
+    if (section == AnalysisSection::target_graph) return "target-graph";
+    return "target-hubs";
+}
+
+std::string analysis_section_state_text(AnalysisSectionState state) {
+    if (state == AnalysisSectionState::active) return "active";
+    if (state == AnalysisSectionState::disabled) return "disabled";
+    return "not_loaded";
+}
+
+std::size_t tu_threshold_value(const AnalysisConfiguration& cfg,
+                               TuRankingMetric metric) {
+    const auto it = cfg.tu_thresholds.find(metric);
+    return it == cfg.tu_thresholds.end() ? 0 : it->second;
+}
+
+// Resolve the effective section state for a given AnalysisSection. The
+// real service always populates analysis_section_states (see
+// populate_analysis_section_states in project_analyzer.cpp). Adapter unit
+// tests construct a bare AnalysisResult and leave the map empty; for that
+// case we fall back to the legacy gating so the v4 "v2: not_loaded omits
+// Target Graph" regression tests keep passing without a fixture rewrite:
+// tu-ranking and include-hotspots have no legacy gate and stay active,
+// target-graph and target-hubs mirror target_graph_status (not_loaded
+// stays not_loaded; any other value renders as active).
+AnalysisSectionState resolve_section_state(const AnalysisResult& result,
+                                            AnalysisSection section) {
+    const auto it = result.analysis_section_states.find(section);
+    if (it != result.analysis_section_states.end()) return it->second;
+    if (section == AnalysisSection::target_graph ||
+        section == AnalysisSection::target_hubs) {
+        return result.target_graph_status == TargetGraphStatus::not_loaded
+                   ? AnalysisSectionState::not_loaded
+                   : AnalysisSectionState::active;
+    }
+    return AnalysisSectionState::active;
+}
+
+bool section_active(const AnalysisResult& result, AnalysisSection section) {
+    return resolve_section_state(result, section) == AnalysisSectionState::active;
+}
+
+void append_analysis_section_list(std::ostringstream& out,
+                                   const std::vector<AnalysisSection>& sections) {
+    for (std::size_t index = 0; index < sections.size(); ++index) {
+        if (index != 0) out << ", ";
+        out << analysis_section_text(sections[index]);
+    }
+}
+
+void append_analysis_configuration_block(std::ostringstream& out,
+                                          const AnalysisResult& result) {
+    // Plan §678-693 pins the byte-shape: a two-block render with the
+    // "Analysis Configuration:" key/value group followed by the
+    // "Section states:" enumeration. Both blocks are always present in
+    // v5 Console analyze output, regardless of which sections render
+    // below. The fields read straight from analysis_configuration; if a
+    // tu_thresholds metric is absent from the map, lookup falls back to
+    // 0 per the v5 schema invariant that the three metrics are always
+    // serialized.
+    const auto& cfg = result.analysis_configuration;
+    const auto arg_value =
+        tu_threshold_value(cfg, TuRankingMetric::arg_count);
+    const auto include_value =
+        tu_threshold_value(cfg, TuRankingMetric::include_path_count);
+    const auto define_value =
+        tu_threshold_value(cfg, TuRankingMetric::define_count);
+    out << "Analysis Configuration:\n";
+    out << "  Sections: ";
+    append_analysis_section_list(out, cfg.effective_sections);
+    out << '\n';
+    out << "  TU thresholds: arg_count=" << arg_value
+        << ", include_path_count=" << include_value
+        << ", define_count=" << define_value << '\n';
+    out << "  Min hotspot TUs: " << cfg.min_hotspot_tus << '\n';
+    out << "  Target hub thresholds: in=" << cfg.target_hub_in_threshold
+        << ", out=" << cfg.target_hub_out_threshold << '\n';
+    out << '\n';
+    out << "Section states:\n";
+    out << "  tu-ranking: "
+        << analysis_section_state_text(
+               resolve_section_state(result, AnalysisSection::tu_ranking))
+        << '\n';
+    out << "  include-hotspots: "
+        << analysis_section_state_text(
+               resolve_section_state(result, AnalysisSection::include_hotspots))
+        << '\n';
+    out << "  target-graph: "
+        << analysis_section_state_text(
+               resolve_section_state(result, AnalysisSection::target_graph))
+        << '\n';
+    out << "  target-hubs: "
+        << analysis_section_state_text(
+               resolve_section_state(result, AnalysisSection::target_hubs))
+        << '\n';
 }
 
 std::vector<std::string> render_from_column_with_suffix(
@@ -369,11 +477,15 @@ void append_hub_line(std::ostringstream& out, const ConsoleHubLine& line) {
 }
 
 void append_target_hubs_section(std::ostringstream& out, const AnalysisResult& result) {
+    // AP M6-1.5 A.5 Console v5: hub thresholds are sourced from the
+    // resolved AnalysisConfiguration so --target-hub-in-threshold /
+    // --target-hub-out-threshold overrides surface in the inline section
+    // header. The model defaults the unconfigured fields to 10/10
+    // (matching the legacy hexagon::services::kDefault* constants), so
+    // bare-fixture unit tests stay byte-stable.
     out << '\n';
-    constexpr auto in_threshold =
-        xray::hexagon::services::kDefaultTargetHubInThreshold;
-    constexpr auto out_threshold =
-        xray::hexagon::services::kDefaultTargetHubOutThreshold;
+    const auto in_threshold = result.analysis_configuration.target_hub_in_threshold;
+    const auto out_threshold = result.analysis_configuration.target_hub_out_threshold;
     out << "Target Hubs (in_threshold: " << in_threshold
         << ", out_threshold: " << out_threshold << "):\n";
     append_hub_line(
@@ -388,13 +500,28 @@ void append_target_hubs_section(std::ostringstream& out, const AnalysisResult& r
 
 std::string ConsoleReportAdapter::write_analysis_report(const AnalysisResult& analysis_result,
                                                         std::size_t top_limit) const {
+    // AP M6-1.5 A.5 Console v5: emit the Analysis Configuration block
+    // after the optional target-overview header and gate every fachliche
+    // section on resolve_section_state == active. Sections marked
+    // disabled or not_loaded are dropped entirely; their visibility lives
+    // solely in the Section states block above (plan §695-698).
     std::ostringstream out;
 
     append_analysis_target_overview(out, analysis_result);
-    const auto counts = append_ranking_section(out, analysis_result, top_limit);
-    append_hotspot_section(out, analysis_result, counts.hotspot_count);
-    if (analysis_result.target_graph_status != TargetGraphStatus::not_loaded) {
+    append_analysis_configuration_block(out, analysis_result);
+    if (section_active(analysis_result, AnalysisSection::tu_ranking)) {
+        out << '\n';
+        append_ranking_section(out, analysis_result, top_limit);
+    }
+    if (section_active(analysis_result, AnalysisSection::include_hotspots)) {
+        const auto hotspot_count = std::min(
+            top_limit, analysis_result.include_hotspots.size());
+        append_hotspot_section(out, analysis_result, hotspot_count);
+    }
+    if (section_active(analysis_result, AnalysisSection::target_graph)) {
         append_target_graph_section(out, analysis_result);
+    }
+    if (section_active(analysis_result, AnalysisSection::target_hubs)) {
         append_target_hubs_section(out, analysis_result);
     }
     append_diagnostics(out, analysis_result.diagnostics, "");
