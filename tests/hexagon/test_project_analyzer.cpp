@@ -407,6 +407,7 @@ TEST_CASE("AP1.5 A.2: project analyzer populates all four section states with di
 TEST_CASE("AP1.5 A.2: project analyzer marks omitted sections as disabled") {
     using xray::hexagon::model::AnalysisSection;
     using xray::hexagon::model::AnalysisSectionState;
+    using xray::hexagon::model::TargetGraphStatus;
     const StubBuildModelPort build_model_port;
     const UnusedBuildModelPort unused_port;
     const StubIncludeResolverPort include_resolver_port;
@@ -426,6 +427,7 @@ TEST_CASE("AP1.5 A.2: project analyzer marks omitted sections as disabled") {
           AnalysisSectionState::disabled);
     CHECK(result.analysis_section_states.at(AnalysisSection::target_hubs) ==
           AnalysisSectionState::disabled);
+    CHECK(result.target_graph_status == TargetGraphStatus::disabled);
 }
 
 TEST_CASE("AP1.5 A.2: project analyzer applies tu_thresholds before ranking and counts excluded") {

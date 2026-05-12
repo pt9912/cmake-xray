@@ -24,6 +24,8 @@ namespace {
 
 using xray::adapters::output::JsonReportAdapter;
 using xray::hexagon::model::AnalysisResult;
+using xray::hexagon::model::AnalysisSection;
+using xray::hexagon::model::AnalysisSectionState;
 using xray::hexagon::model::ChangedFileSource;
 using xray::hexagon::model::CompileDatabaseError;
 using xray::hexagon::model::CompileDatabaseResult;
@@ -824,6 +826,61 @@ TEST_CASE("json analyze v2: external edges serialize with <external>::* to_uniqu
     CHECK(doc["target_graph"]["edges"][0]["to_unique_key"] == "<external>::ghost");
     CHECK(doc["target_graph"]["edges"][0]["to_display_name"] == "ghost");
     CHECK(doc["target_graph"]["edges"][0]["resolution"] == "external");
+}
+
+TEST_CASE("json analyze v5: disabled sections serialize deterministic empty section containers") {
+    AnalysisResult result = make_analysis_result_with_heuristic(true);
+    result.analysis_configuration.effective_sections = {AnalysisSection::tu_ranking};
+    result.analysis_configuration.target_hub_in_threshold = 3;
+    result.analysis_configuration.target_hub_out_threshold = 4;
+    result.analysis_section_states = {
+        {AnalysisSection::tu_ranking, AnalysisSectionState::active},
+        {AnalysisSection::include_hotspots, AnalysisSectionState::disabled},
+        {AnalysisSection::target_graph, AnalysisSectionState::disabled},
+        {AnalysisSection::target_hubs, AnalysisSectionState::disabled},
+    };
+    result.target_graph_status = TargetGraphStatus::disabled;
+    result.target_graph.nodes.push_back({"hidden", "STATIC_LIBRARY",
+                                         "hidden::STATIC_LIBRARY"});
+    result.target_hubs_in.push_back({"hidden", "STATIC_LIBRARY",
+                                     "hidden::STATIC_LIBRARY"});
+
+    const JsonReportAdapter adapter;
+    const auto doc = nlohmann::json::parse(adapter.write_analysis_report(result, 10));
+
+    CHECK(doc["analysis_section_states"]["include-hotspots"] == "disabled");
+    CHECK(doc["target_graph_status"] == "disabled");
+    CHECK(doc["translation_unit_ranking"]["total_count"] == 2);
+    CHECK(doc["include_hotspots"]["total_count"] == 0);
+    CHECK(doc["include_hotspots"]["returned_count"] == 0);
+    CHECK(doc["include_hotspots"]["items"].empty());
+    CHECK(doc["target_graph"]["nodes"].empty());
+    CHECK(doc["target_graph"]["edges"].empty());
+    CHECK(doc["target_hubs"]["inbound"].empty());
+    CHECK(doc["target_hubs"]["outbound"].empty());
+    CHECK(doc["target_hubs"]["thresholds"]["in_threshold"] == 3);
+    CHECK(doc["target_hubs"]["thresholds"]["out_threshold"] == 4);
+}
+
+TEST_CASE("json analyze v5: disabled tu-ranking serializes zero counters") {
+    AnalysisResult result = make_analysis_result_with_heuristic(true);
+    result.analysis_configuration.effective_sections = {AnalysisSection::include_hotspots};
+    result.analysis_section_states = {
+        {AnalysisSection::tu_ranking, AnalysisSectionState::disabled},
+        {AnalysisSection::include_hotspots, AnalysisSectionState::active},
+        {AnalysisSection::target_graph, AnalysisSectionState::disabled},
+        {AnalysisSection::target_hubs, AnalysisSectionState::disabled},
+    };
+    result.target_graph_status = TargetGraphStatus::disabled;
+
+    const JsonReportAdapter adapter;
+    const auto doc = nlohmann::json::parse(adapter.write_analysis_report(result, 10));
+
+    CHECK(doc["translation_unit_ranking"]["total_count"] == 0);
+    CHECK(doc["translation_unit_ranking"]["returned_count"] == 0);
+    CHECK(doc["translation_unit_ranking"]["truncated"] == false);
+    CHECK(doc["translation_unit_ranking"]["items"].empty());
+    CHECK(doc["include_hotspots"]["total_count"] == 1);
 }
 
 TEST_CASE("json impact v2: target_graph is serialized but target_hubs is absent (schema asymmetry)") {

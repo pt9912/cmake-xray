@@ -24,7 +24,6 @@
 #include "hexagon/model/target_graph.h"
 #include "hexagon/model/target_info.h"
 #include "hexagon/model/translation_unit.h"
-#include "hexagon/services/target_graph_support.h"
 
 namespace xray::adapters::output {
 
@@ -122,6 +121,23 @@ std::string analysis_section_state_text(AnalysisSectionState state) {
     return "not_loaded";
 }
 
+AnalysisSectionState resolve_analysis_section_state(const AnalysisResult& result,
+                                                    AnalysisSection section) {
+    const auto it = result.analysis_section_states.find(section);
+    if (it != result.analysis_section_states.end()) return it->second;
+    if (section == AnalysisSection::target_graph ||
+        section == AnalysisSection::target_hubs) {
+        return result.target_graph_status == TargetGraphStatus::not_loaded
+                   ? AnalysisSectionState::not_loaded
+                   : AnalysisSectionState::active;
+    }
+    return AnalysisSectionState::active;
+}
+
+bool analysis_section_active(const AnalysisResult& result, AnalysisSection section) {
+    return resolve_analysis_section_state(result, section) == AnalysisSectionState::active;
+}
+
 std::size_t tu_threshold_value(const AnalysisConfiguration& cfg, TuRankingMetric metric) {
     const auto it = cfg.tu_thresholds.find(metric);
     return it == cfg.tu_thresholds.end() ? 0 : it->second;
@@ -152,10 +168,7 @@ ordered_json render_analysis_configuration(const AnalysisResult& result) {
 
 ordered_json render_analysis_section_states(const AnalysisResult& result) {
     const auto state_text = [&](AnalysisSection section) {
-        const auto it = result.analysis_section_states.find(section);
-        return it == result.analysis_section_states.end()
-                   ? std::string{"disabled"}
-                   : analysis_section_state_text(it->second);
+        return analysis_section_state_text(resolve_analysis_section_state(result, section));
     };
     return ordered_json{
         {"tu-ranking", state_text(AnalysisSection::tu_ranking)},
@@ -228,7 +241,8 @@ struct TargetHubsView {
     const std::vector<TargetInfo>& outbound;
 };
 
-ordered_json render_target_hubs(const TargetHubsView& hubs_view) {
+ordered_json render_target_hubs(const TargetHubsView& hubs_view,
+                                const AnalysisConfiguration& cfg) {
     ordered_json hubs;
     auto in_arr = ordered_json::array();
     for (const auto& n : hubs_view.inbound) in_arr.push_back(render_target_node(n));
@@ -237,10 +251,8 @@ ordered_json render_target_hubs(const TargetHubsView& hubs_view) {
     for (const auto& n : hubs_view.outbound) out_arr.push_back(render_target_node(n));
     hubs["outbound"] = std::move(out_arr);
     ordered_json thresholds;
-    thresholds["in_threshold"] =
-        xray::hexagon::services::kDefaultTargetHubInThreshold;
-    thresholds["out_threshold"] =
-        xray::hexagon::services::kDefaultTargetHubOutThreshold;
+    thresholds["in_threshold"] = cfg.target_hub_in_threshold;
+    thresholds["out_threshold"] = cfg.target_hub_out_threshold;
     hubs["thresholds"] = std::move(thresholds);
     return ordered_json(std::move(hubs));
 }
@@ -377,6 +389,15 @@ void append_ranked_units_sorted(ordered_json& items_array,
 }
 
 ordered_json render_ranking_container(const AnalysisResult& result, std::size_t top_limit) {
+    if (!analysis_section_active(result, AnalysisSection::tu_ranking)) {
+        ordered_json disabled;
+        disabled["limit"] = top_limit;
+        disabled["total_count"] = 0;
+        disabled["returned_count"] = 0;
+        disabled["truncated"] = false;
+        disabled["items"] = ordered_json::array();
+        return ordered_json(std::move(disabled));
+    }
     const auto total = result.translation_units.size();
     const auto returned = std::min(top_limit, total);
     const bool truncated = returned < total;
@@ -457,6 +478,17 @@ void append_hotspot_items_sorted(
 }
 
 ordered_json render_hotspot_container(const AnalysisResult& result, std::size_t top_limit) {
+    if (!analysis_section_active(result, AnalysisSection::include_hotspots)) {
+        ordered_json disabled;
+        disabled["limit"] = top_limit;
+        disabled["total_count"] = 0;
+        disabled["returned_count"] = 0;
+        disabled["truncated"] = false;
+        disabled["excluded_unknown_count"] = 0;
+        disabled["excluded_mixed_count"] = 0;
+        disabled["items"] = ordered_json::array();
+        return ordered_json(std::move(disabled));
+    }
     const auto total = result.include_hotspots.size();
     const auto returned = std::min(top_limit, total);
     const bool truncated = returned < total;
@@ -621,10 +653,19 @@ std::string JsonReportAdapter::write_analysis_report(
         render_hotspot_container(analysis_result, top_limit);
     document["target_graph_status"] =
         target_graph_status_text(analysis_result.target_graph_status);
-    document["target_graph"] = render_target_graph(analysis_result.target_graph);
+    const bool emit_target_graph =
+        analysis_section_active(analysis_result, AnalysisSection::target_graph);
+    document["target_graph"] =
+        render_target_graph(emit_target_graph ? analysis_result.target_graph : TargetGraph{});
     const TargetHubsView hubs_view{analysis_result.target_hubs_in,
                                     analysis_result.target_hubs_out};
-    document["target_hubs"] = render_target_hubs(hubs_view);
+    const bool emit_target_hubs =
+        analysis_section_active(analysis_result, AnalysisSection::target_hubs);
+    const std::vector<TargetInfo> empty_targets;
+    const TargetHubsView empty_hubs_view{empty_targets, empty_targets};
+    document["target_hubs"] =
+        render_target_hubs(emit_target_hubs ? hubs_view : empty_hubs_view,
+                           analysis_result.analysis_configuration);
     document["diagnostics"] = std::move(diagnostics_array);
     return document.dump(2) + "\n";
 }

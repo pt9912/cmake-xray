@@ -57,6 +57,8 @@ DotBudget compute_impact_budget() {
 namespace {
 
 using xray::hexagon::model::AnalysisResult;
+using xray::hexagon::model::AnalysisSection;
+using xray::hexagon::model::AnalysisSectionState;
 using xray::hexagon::model::ImpactedTarget;
 using xray::hexagon::model::ImpactedTranslationUnit;
 using xray::hexagon::model::ImpactKind;
@@ -199,22 +201,37 @@ std::string target_graph_status_text(TargetGraphStatus status) {
     return "not_loaded";
 }
 
-std::string analysis_section_text(xray::hexagon::model::AnalysisSection section) {
-    using xray::hexagon::model::AnalysisSection;
+std::string analysis_section_text(AnalysisSection section) {
     if (section == AnalysisSection::tu_ranking) return "tu-ranking";
     if (section == AnalysisSection::include_hotspots) return "include-hotspots";
     if (section == AnalysisSection::target_graph) return "target-graph";
     return "target-hubs";
 }
 
-std::string join_analysis_sections(
-    const std::vector<xray::hexagon::model::AnalysisSection>& sections) {
+std::string join_analysis_sections(const std::vector<AnalysisSection>& sections) {
     std::string out;
     for (std::size_t index = 0; index < sections.size(); ++index) {
         if (index != 0) out.push_back(',');
         out += analysis_section_text(sections[index]);
     }
     return std::string(std::move(out));
+}
+
+AnalysisSectionState resolve_analysis_section_state(const AnalysisResult& result,
+                                                    AnalysisSection section) {
+    const auto it = result.analysis_section_states.find(section);
+    if (it != result.analysis_section_states.end()) return it->second;
+    if (section == AnalysisSection::target_graph ||
+        section == AnalysisSection::target_hubs) {
+        return result.target_graph_status == TargetGraphStatus::not_loaded
+                   ? AnalysisSectionState::not_loaded
+                   : AnalysisSectionState::active;
+    }
+    return AnalysisSectionState::active;
+}
+
+bool analysis_section_active(const AnalysisResult& result, AnalysisSection section) {
+    return resolve_analysis_section_state(result, section) == AnalysisSectionState::active;
 }
 
 std::size_t tu_threshold_value(
@@ -896,7 +913,14 @@ std::string render_analyze(const AnalysisResult& result, std::size_t top_limit) 
                                                result.include_hotspots.end()};
     sort_top_n_hotspots_in_place(top_hotspots, top_limit);
     std::vector<TargetInfo> target_candidates;
-    collect_primary_targets_in_place(target_candidates, primary);
+    const bool emit_tu_ranking = analysis_section_active(result, AnalysisSection::tu_ranking);
+    const bool emit_hotspots =
+        analysis_section_active(result, AnalysisSection::include_hotspots);
+    const bool emit_target_graph =
+        analysis_section_active(result, AnalysisSection::target_graph);
+    if (!emit_tu_ranking) primary.clear();
+    if (!emit_hotspots) top_hotspots.clear();
+    if (emit_tu_ranking) collect_primary_targets_in_place(target_candidates, primary);
 
     AnalyzeGraph graph;
     std::map<std::string, std::string> tu_id_by_key;
@@ -910,9 +934,9 @@ std::string render_analyze(const AnalysisResult& result, std::size_t top_limit) 
 
     build_analyze_nodes(ctx, primary, top_hotspots, target_candidates);
     build_analyze_context_nodes(ctx, top_hotspots);
-    build_extra_target_nodes(ctx, result.target_graph);
+    if (emit_target_graph) build_extra_target_nodes(ctx, result.target_graph);
     build_analyze_edges(ctx, primary);
-    build_target_dependency_edges(ctx, result.target_graph);
+    if (emit_target_graph) build_target_dependency_edges(ctx, result.target_graph);
     remove_orphan_context_nodes(graph);
     compute_hotspot_context_counts(graph);
 

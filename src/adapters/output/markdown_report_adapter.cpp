@@ -383,9 +383,10 @@ void append_analysis_section_inline_list(std::ostringstream& out,
 
 void append_section_states_table_row(std::ostringstream& out, AnalysisSection section,
                                       const AnalysisResult& result) {
-    out << "| " << analysis_section_text(section) << " | "
-        << analysis_section_state_text(resolve_section_state(result, section))
-        << " |\n";
+    const auto section_text = analysis_section_text(section);
+    const auto state_text =
+        analysis_section_state_text(resolve_section_state(result, section));
+    out << "| " << section_text << " | " << state_text << " |\n";
 }
 
 void append_analysis_configuration_section(std::ostringstream& out,

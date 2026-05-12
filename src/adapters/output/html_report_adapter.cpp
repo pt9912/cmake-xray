@@ -288,10 +288,6 @@ AnalysisSectionState resolve_section_state(const AnalysisResult& result,
     return AnalysisSectionState::active;
 }
 
-bool section_active(const AnalysisResult& result, AnalysisSection section) {
-    return resolve_section_state(result, section) == AnalysisSectionState::active;
-}
-
 void emit_section_state_badge(std::ostringstream& out, AnalysisSectionState state) {
     // Inline span placed inside the section's `<h2>` per plan §636-639.
     // The badge text reads "Status: <state>" verbatim; the modifier

@@ -27,6 +27,8 @@ using xray::adapters::output::normalize_html_whitespace;
 using xray::adapters::output::render_attribute;
 using xray::adapters::output::render_text;
 using xray::hexagon::model::AnalysisResult;
+using xray::hexagon::model::AnalysisSection;
+using xray::hexagon::model::AnalysisSectionState;
 using xray::hexagon::model::ChangedFileSource;
 using xray::hexagon::model::CompileDatabaseError;
 using xray::hexagon::model::CompileDatabaseResult;
@@ -1097,6 +1099,35 @@ TEST_CASE("HTML analyze v5: not_loaded keeps Target Graph and Target Hubs sectio
     // No Target Graph table or Hub table when not_loaded.
     CHECK(report.find("<th scope=\"col\">From</th>") == std::string::npos);
     CHECK(report.find("<th scope=\"col\">Direction</th>") == std::string::npos);
+}
+
+TEST_CASE("HTML analyze v5: disabled ranking and hotspots use unified empty section body") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.analysis_configuration.effective_sections = {AnalysisSection::target_graph};
+    result.analysis_section_states = {
+        {AnalysisSection::tu_ranking, AnalysisSectionState::disabled},
+        {AnalysisSection::include_hotspots, AnalysisSectionState::disabled},
+        {AnalysisSection::target_graph, AnalysisSectionState::not_loaded},
+        {AnalysisSection::target_hubs, AnalysisSectionState::disabled},
+    };
+    result.translation_units = {
+        ranked_tu("src/app/main.cpp", "build/debug", "src/app/main.cpp|build/debug")};
+    result.include_hotspots = {IncludeHotspot{
+        "include/common/config.h",
+        {reference("src/app/main.cpp", "build/debug", "src/app/main.cpp|build/debug")},
+        {},
+    }};
+
+    const HtmlReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+
+    CHECK(report.find("<h2>Translation Unit Ranking <span class=\"badge badge--state-disabled\">Status: disabled</span></h2>") !=
+          std::string::npos);
+    CHECK(report.find("<h2>Include Hotspots <span class=\"badge badge--state-disabled\">Status: disabled</span></h2>") !=
+          std::string::npos);
+    CHECK(report.find("Section disabled.") != std::string::npos);
+    CHECK(report.find("<td>src/app/main.cpp") == std::string::npos);
+    CHECK(report.find("include/common/config.h") == std::string::npos);
 }
 
 TEST_CASE("HTML analyze v2: pflichtsection order extends to eight sections including Target Graph and Target Hubs") {

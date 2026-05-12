@@ -293,6 +293,15 @@ bool analysis_section_in(const std::vector<model::AnalysisSection>& sections,
     return std::find(sections.begin(), sections.end(), section) != sections.end();
 }
 
+void normalize_target_graph_status_for_sections(model::AnalysisResult& result) {
+    using model::AnalysisSection;
+    using model::TargetGraphStatus;
+    const auto& effective = result.analysis_configuration.effective_sections;
+    if (!effective.empty() && !analysis_section_in(effective, AnalysisSection::target_graph)) {
+        result.target_graph_status = TargetGraphStatus::disabled;
+    }
+}
+
 void populate_analysis_section_states(model::AnalysisResult& result) {
     // AP M6-1.5 A.2 plan §415-431: per-section state is disabled when the
     // section is not in effective_sections, not_loaded when requested but
@@ -402,6 +411,7 @@ model::AnalysisResult ProjectAnalyzer::analyze_project(AnalyzeProjectRequest req
     if (load_project_inputs(ctx, state, result)) {
         finalize_analysis(ctx, state, include_resolver_port_, result);
     }
+    normalize_target_graph_status_for_sections(result);
     populate_analysis_section_states(result);
     return result;
 }

@@ -22,6 +22,8 @@ using xray::adapters::output::compute_analyze_budget;
 using xray::adapters::output::compute_impact_budget;
 using xray::adapters::output::DotReportAdapter;
 using xray::hexagon::model::AnalysisResult;
+using xray::hexagon::model::AnalysisSection;
+using xray::hexagon::model::AnalysisSectionState;
 using xray::hexagon::model::ChangedFileSource;
 using xray::hexagon::model::CompileDatabaseError;
 using xray::hexagon::model::CompileDatabaseResult;
@@ -176,6 +178,41 @@ TEST_CASE("DOT analyze emits a translation_unit node with the documented attribu
     CHECK(pos_label < pos_path);
     CHECK(pos_path < pos_directory);
     CHECK(pos_directory < pos_unique_key);
+}
+
+TEST_CASE("DOT analyze v5 suppresses nodes and edges for disabled sections") {
+    AnalysisResult result = make_minimal_analysis_result();
+    result.analysis_configuration.effective_sections = {AnalysisSection::tu_ranking};
+    result.analysis_section_states = {
+        {AnalysisSection::tu_ranking, AnalysisSectionState::disabled},
+        {AnalysisSection::include_hotspots, AnalysisSectionState::disabled},
+        {AnalysisSection::target_graph, AnalysisSectionState::disabled},
+        {AnalysisSection::target_hubs, AnalysisSectionState::disabled},
+    };
+    result.target_graph_status = TargetGraphStatus::disabled;
+    result.translation_units = {ranked_tu("src/app/main.cpp", "build/debug",
+                                          "src/app/main.cpp|build/debug")};
+    result.include_hotspots = {IncludeHotspot{
+        "include/common/config.h",
+        {reference("src/app/main.cpp", "build/debug",
+                   "src/app/main.cpp|build/debug")},
+        {},
+    }};
+    result.target_graph.nodes.push_back({"lib", "STATIC_LIBRARY", "lib::STATIC_LIBRARY"});
+    result.target_graph.nodes.push_back({"app", "EXECUTABLE", "app::EXECUTABLE"});
+    result.target_graph.edges.push_back(TargetDependency{
+        "app::EXECUTABLE", "app", "lib::STATIC_LIBRARY", "lib",
+        TargetDependencyKind::direct, TargetDependencyResolution::resolved});
+
+    const DotReportAdapter adapter;
+    const auto report = adapter.write_analysis_report(result, 3);
+
+    CHECK(report.find("graph_analysis_sections=\"tu-ranking\";") != std::string::npos);
+    CHECK(report.find("target_graph_status=\"disabled\";") != std::string::npos);
+    CHECK(report.find("kind=\"translation_unit\"") == std::string::npos);
+    CHECK(report.find("kind=\"include_hotspot\"") == std::string::npos);
+    CHECK(report.find("kind=\"target\"") == std::string::npos);
+    CHECK(report.find("kind=\"target_dependency\"") == std::string::npos);
 }
 
 TEST_CASE("DOT escape preserves backslash, quote, newline, tab and control bytes") {

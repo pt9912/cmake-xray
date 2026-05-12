@@ -980,55 +980,26 @@ parallel zu AP 1.4 entwickelbar.
   umgesetzt; alle aktuellen Tests fahren mit `--analysis all`, also
   bleibt die Suppression eine Folgearbeit fuer A.5/A.6, sobald
   Adapter-Tests einen non-default `--analysis`-Lauf einfuehren.
-- A.5 (HTML-, Markdown- und Console-Adapter): noch nicht ausgeliefert.
-- A.6 (Audit-Pass): noch nicht ausgeliefert.
-
-### Wiederaufnahme-Plan A.3+A.4
-
-Reihenfolge fuer die naechste Sitzung, beginnend mit dem unpushed
-`570820d`-Commit als Vorbedingung:
-
-1. Step 12: `spec/report-json.schema.json` v5 — neue Top-Level-
-   Pflichtfelder `analysis_configuration` und
-   `analysis_section_states`, drei neue Summary-Counter, Erweiterung
-   `TargetGraphStatus`-Enum um `"disabled"`, `FormatVersion.const`
-   von `4` auf `5`. Alle neuen Objekte `additionalProperties: false`.
-2. Step 13: `spec/report-json.md` v5 (Prosa-Spec spiegelt das
-   Schema).
-3. Step 14: JSON-Adapter v5 — emit
-   `analysis_configuration`/`analysis_section_states`/neue Summary-
-   Counter; `TargetGraphStatus::disabled` als String `"disabled"` in
-   `target_graph_status_text`; `disabled`/`not_loaded`-Sections mit
-   den Empty-Strukturen aus §572-594 ausgeben.
-4. Step 15: DOT-Adapter v5 — sieben neue `graph_*`-Attribute aus
-   `analysis_configuration`; `disabled`/`not_loaded`-Sections lassen
-   ihre Knoten und Kanten weg, die `graph_*`-Attribute bleiben.
-5. Step 16: `spec/report-dot.md` v5.
-6. Step 17: Goldens regen fuer alle JSON+DOT-Outputs unter
-   `tests/e2e/testdata/m3/`, `m4/`, `m5/json-reports/`,
-   `m5/dot-reports/`, `m6/json-reports/`, `m6/dot-reports/`, plus
-   `docs/examples/analyze-report.json`, `analyze-report.dot`,
-   `analyze-report-targets.json`, `analyze-report-targets.dot`,
-   `analyze-target-graph.json`, `analyze-target-graph.dot`,
-   `impact-report.json`, `impact-report.dot`,
-   `impact-report-targets.json`, `impact-report-targets.dot`,
-   `impact-target-graph.json`, `impact-target-graph.dot` plus die
-   docs/examples/manifest.txt-Hashes.
-7. Adapter-Tests in `tests/adapters/test_json_report_adapter.cpp`
-   und `tests/adapters/test_dot_report_adapter.cpp` um Asserts auf
-   die neuen Pflichtfelder erweitern; Coverage- und Quality-Tidy-Up
-   bei Bedarf (Multi-Line-`out <<`-Ketten, brace-init-Map, NRVO-
-   Returns wie bei A.1/A.2).
-
-`TargetGraphStatus::disabled`-Folgearbeit beim A.4-Adapter-Schritt:
-die String-Mapping-Funktionen in `dot_report_adapter.cpp:186-187`,
-`json_report_adapter.cpp:102-103`, `console_report_adapter.cpp:228`,
-`markdown_report_adapter.cpp:322`, `html_report_adapter.cpp:229,235`
-muessen den neuen Enum-Wert behandeln (zu `"disabled"`-String fuer
-JSON/DOT/Console/Markdown; CSS-Klasse `badge--disabled` fuer HTML).
-Console- und Markdown-Adapter-Aenderungen gehoeren formal zu A.5,
-aber das Enum-Mapping kann im selben Schritt aufgehen, damit kein
-Compiler-Warning bei `-Wswitch` haengen bleibt.
+- A.5 (HTML-, Markdown- und Console-Adapter): **erledigt**. Lead-
+  Commit `95d2db2` (Step 20 Goldens fuer Console/Markdown/HTML).
+  Tranche-Hashes: `12d327c` (Step 18a Console adapter v5 emits
+  Analysis Configuration + Section states blocks), `4ab303e`
+  (Step 18b Markdown adapter v5 emits Analysis Configuration section
+  and Section States table), `f9a3669` (Step 18c HTML adapter v5 emits
+  Analysis Configuration section, section-state badges and unified
+  Section disabled / not loaded paragraphs), `5fac8ab` (Step 19
+  report-html.md v5) und `95d2db2` (Step 20 Console-/Markdown-/HTML-
+  Goldens und docs/examples-Regen).
+- A.6 (Audit-Pass): **lokal erledigt**. Der Audit schliesst die
+  verbliebenen Abnahmeluecken aus A.4/A.5: `target_graph_status`
+  wird bei deaktivierter Target-Graph-Section auf `disabled`
+  normalisiert; JSON serialisiert `disabled`/`not_loaded`-Sections mit
+  deterministischen Empty-Section-Strukturen; DOT unterdrueckt Knoten
+  und Kanten deaktivierter bzw. nicht geladener Sections, behaelt aber
+  die `graph_*`-Konfigurationsattribute. Lokale Gates auf diesem
+  Arbeitsstand gruen: `make docker-test` (41/41), `make coverage-gate
+  COVERAGE_THRESHOLD=100` (41/41, Coverage 100%), `make quality-gate`
+  (clang-tidy 0, lizard 0) und `git diff --check`.
 
 ## Abnahmekriterien
 
