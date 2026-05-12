@@ -64,7 +64,7 @@ TEST_CASE("compile-db project identity strips shared absolute checkout prefixes"
     };
 
     CHECK(xray::hexagon::services::compile_db_project_identity_from_source_paths(first_checkout) ==
-          "compile-db:6afc7a7213bdd1ebdb9fcf68bbbccb056f44c6b2887388e508163c8421691464");
+          "compile-db:822ff9e3fb10e105a4c439080c6dd645cf1b4bf853dc4ad0b43336dacabdc82c");
     CHECK(xray::hexagon::services::compile_db_project_identity_from_source_paths(first_checkout) ==
           xray::hexagon::services::compile_db_project_identity_from_source_paths(second_checkout));
 }
@@ -80,12 +80,42 @@ TEST_CASE("compile-db project identity stabilizes mixed relative and absolute pa
     };
 
     CHECK(xray::hexagon::services::compile_db_project_identity_from_source_paths(first_checkout) ==
-          "compile-db:93a818b6f77b718f641cb3d6b13aaa5e2c64775fe9f872cffc59e73688df7bb8");
+          "compile-db:1beb28bb485d513729913b5b385ce9d027670f35a2fa5840ea9e3d5db94ec689");
     CHECK(xray::hexagon::services::compile_db_project_identity_from_source_paths(first_checkout) ==
           xray::hexagon::services::compile_db_project_identity_from_source_paths(second_checkout));
 }
 
-TEST_CASE("compile-db project identity keeps original paths on relative suffix collision") {
+TEST_CASE("compile-db project identity keeps root anchors in stabilized paths") {
+    const std::vector<std::string> paths{
+        "\\\\server\\share\\repo\\src\\main.cpp",
+        "/server/share/repo/src/main.cpp",
+    };
+
+    CHECK(xray::hexagon::services::compile_db_project_identity_from_source_paths(paths) ==
+          "compile-db:dd5ca6c6cecfc99f1ae4b4ba2ec8fa346048b2152e0c2265123194d90e1b8b86");
+}
+
+TEST_CASE("compile-db project identity keeps drive root anchors in stabilized paths") {
+    const std::vector<std::string> paths{
+        "C:\\repo\\src\\main.cpp",
+        "/repo/src/main.cpp",
+    };
+
+    CHECK(xray::hexagon::services::compile_db_project_identity_from_source_paths(paths) ==
+          "compile-db:8b92861d606565bac13518c82f44c413aa8c984121095a181bdeec324c65001a");
+}
+
+TEST_CASE("compile-db project identity keeps root-level absolute paths without prefix") {
+    const std::vector<std::string> paths{
+        "/main.cpp",
+        "/lib.cpp",
+    };
+
+    CHECK(xray::hexagon::services::compile_db_project_identity_from_source_paths(paths) ==
+          "compile-db:822ff9e3fb10e105a4c439080c6dd645cf1b4bf853dc4ad0b43336dacabdc82c");
+}
+
+TEST_CASE("compile-db project identity avoids relative suffix collision") {
     const std::vector<std::string> paths{
         "main.cpp",
         "/home/user/cmake-xray/src/main.cpp",

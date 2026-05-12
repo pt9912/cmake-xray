@@ -375,14 +375,15 @@ Regeln:
    - UNC-Roots bleiben als `//server/share/...` erhalten.
    - Pfade werden NICHT case-gefoldet (POSIX bleibt case-sensitiv).
 2. **Absolute-Path-Stabilisierung**: Die Teilmenge normalisierter
-   `source_path`-Werte mit absoluten/rooted Pfaden wird separat
-   betrachtet. Wenn diese Teilmenge einen gemeinsamen Verzeichnispraefix
-   besitzt, wird dieser Praefix vor Hashbildung entfernt; relative Pfade
-   bleiben unveraendert. Falls eine stabilisierte absolute Datei mit einem
-   bereits vorhandenen relativen Pfad kollidieren wuerde, bleiben die
-   Originalpfade erhalten. Damit bleibt der Compile-DB-Fallback ueber
-   unterschiedliche Checkout-/Workspace-Pfade stabil, ohne zwei Dateien
-   in gemischten Compile-DBs zusammenzufalten.
+   `source_path`-Werte mit absoluten/rooted Pfaden wird nach Root-Anker
+   gruppiert (`/`, `c:`, `//server/share`, ...). Nur innerhalb derselben
+   Gruppe darf ein gemeinsamer Verzeichnispraefix unterhalb dieses
+   Root-Ankers entfernt werden; relative Pfade bleiben unveraendert.
+   Falls eine stabilisierte Datei mit einem bereits vorhandenen Pfad
+   kollidieren wuerde, bleiben die Originalpfade erhalten. Damit bleibt
+   der Compile-DB-Fallback ueber unterschiedliche Checkout-/Workspace-
+   Pfade stabil, ohne Root-Grenzen oder Dateien in gemischten Compile-DBs
+   zusammenzufalten.
 3. **Deduplizierung**: Identische Pfade werden zusammengezogen.
 4. **Sortierung**: lexikografisch aufsteigend nach UTF-8-Byte-Folge.
 5. **Kanonische JSON-Payload**:

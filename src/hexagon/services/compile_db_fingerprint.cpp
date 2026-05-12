@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iomanip>
+#include <map>
 #include <set>
 #include <sstream>
 #include <string_view>
@@ -222,6 +223,31 @@ bool is_rooted_identity_path(std::string_view path) {
            is_drive_rooted_path(path);
 }
 
+struct RootedIdentityPath {
+    std::string root_anchor;
+    std::vector<std::string> parts_below_root;
+};
+
+RootedIdentityPath split_unc_identity_path(std::string_view path,
+                                           std::vector<std::string> parts) {
+    if (parts.size() < 2U) return {std::string(path), {}};
+
+    auto root_anchor = "//" + parts[0] + "/" + parts[1];
+    return {std::move(root_anchor), {parts.begin() + 2, parts.end()}};
+}
+
+RootedIdentityPath split_drive_identity_path(std::vector<std::string> parts) {
+    auto root_anchor = parts.front();
+    return {std::move(root_anchor), {parts.begin() + 1, parts.end()}};
+}
+
+RootedIdentityPath split_rooted_identity_path(std::string_view path) {
+    auto parts = normalized_path_parts(path);
+    if (is_unc_path(path)) return split_unc_identity_path(path, std::move(parts));
+    if (is_drive_rooted_path(path)) return split_drive_identity_path(std::move(parts));
+    return {"/", std::move(parts)};
+}
+
 std::vector<std::string> parent_parts(const std::vector<std::string>& parts) {
     if (parts.empty()) return {};
     return {parts.begin(), parts.end() - 1};
@@ -252,29 +278,48 @@ std::string join_relative_suffix(const std::vector<std::string>& parts,
     return join_path_parts(suffix, false);
 }
 
+std::string join_rooted_suffix(const std::string& root_anchor, std::string_view suffix) {
+    if (suffix.empty()) return root_anchor;
+    return root_anchor == "/" ? "/" + std::string(suffix)
+                              : root_anchor + "/" + std::string(suffix);
+}
+
+bool append_stabilized_root_group(const std::string& root_anchor,
+                                  const std::vector<std::vector<std::string>>& path_parts,
+                                  std::set<std::string>& stable_paths) {
+    const auto prefix = common_parent_prefix(path_parts);
+    if (prefix.empty()) return false;
+
+    for (const auto& parts : path_parts) {
+        const auto relative = join_relative_suffix(parts, prefix);
+        if (relative.empty()) return false;
+        const auto [unused, inserted] =
+            stable_paths.insert(join_rooted_suffix(root_anchor, relative));
+        (void)unused;
+        if (!inserted) return false;
+    }
+    return true;
+}
+
 std::set<std::string> relativize_absolute_paths_for_fingerprint(
     const std::set<std::string>& normalized_paths) {
     std::set<std::string> stable_paths;
-    std::vector<std::vector<std::string>> rooted_path_parts;
-    rooted_path_parts.reserve(normalized_paths.size());
+    std::map<std::string, std::vector<std::vector<std::string>>> rooted_groups;
     for (const auto& path : normalized_paths) {
         if (is_rooted_identity_path(path)) {
-            rooted_path_parts.push_back(normalized_path_parts(path));
+            auto rooted = split_rooted_identity_path(path);
+            rooted_groups[std::move(rooted.root_anchor)].push_back(
+                std::move(rooted.parts_below_root));
         } else {
             stable_paths.insert(path);
         }
     }
-    if (rooted_path_parts.empty()) return normalized_paths;
+    if (rooted_groups.empty()) return normalized_paths;
 
-    const auto prefix = common_parent_prefix(rooted_path_parts);
-    if (prefix.empty()) return normalized_paths;
-
-    for (const auto& parts : rooted_path_parts) {
-        const auto relative = join_relative_suffix(parts, prefix);
-        if (relative.empty()) return normalized_paths;
-        const auto [unused, inserted] = stable_paths.insert(relative);
-        (void)unused;
-        if (!inserted) return normalized_paths;
+    for (const auto& [root_anchor, path_parts] : rooted_groups) {
+        if (!append_stabilized_root_group(root_anchor, path_parts, stable_paths)) {
+            return normalized_paths;
+        }
     }
     return stable_paths;
 }

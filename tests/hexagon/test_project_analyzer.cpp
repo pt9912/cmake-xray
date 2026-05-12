@@ -215,7 +215,7 @@ TEST_CASE("project analyzer builds ranked translation units and hotspots") {
     CHECK(result.inputs.cmake_file_api_source == ReportInputSource::not_provided);
     REQUIRE(result.inputs.project_identity.has_value());
     CHECK(*result.inputs.project_identity ==
-          "compile-db:77012a153413bf9c5a0ee2f740ddeb29c214215a435deaea4d2cbf7d2410fdc2");
+          "compile-db:c601ff49b1b7d69ab8e6cd28e28e726eaf6d8c488ec11ca7a142cf545a76dde1");
     REQUIRE(result.inputs.project_identity_source.has_value());
     CHECK(*result.inputs.project_identity_source ==
           ProjectIdentitySource::fallback_compile_database_fingerprint);
