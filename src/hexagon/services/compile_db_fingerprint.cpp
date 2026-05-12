@@ -254,24 +254,29 @@ std::string join_relative_suffix(const std::vector<std::string>& parts,
 
 std::set<std::string> relativize_absolute_paths_for_fingerprint(
     const std::set<std::string>& normalized_paths) {
-    const bool all_rooted =
-        std::all_of(normalized_paths.begin(), normalized_paths.end(), is_rooted_identity_path);
-    if (!all_rooted) return normalized_paths;
-
-    std::vector<std::vector<std::string>> path_parts;
-    path_parts.reserve(normalized_paths.size());
+    std::set<std::string> stable_paths;
+    std::vector<std::vector<std::string>> rooted_path_parts;
+    rooted_path_parts.reserve(normalized_paths.size());
     for (const auto& path : normalized_paths) {
-        path_parts.push_back(normalized_path_parts(path));
+        if (is_rooted_identity_path(path)) {
+            rooted_path_parts.push_back(normalized_path_parts(path));
+        } else {
+            stable_paths.insert(path);
+        }
     }
-    const auto prefix = common_parent_prefix(path_parts);
+    if (rooted_path_parts.empty()) return normalized_paths;
+
+    const auto prefix = common_parent_prefix(rooted_path_parts);
     if (prefix.empty()) return normalized_paths;
 
-    std::set<std::string> relative_paths;
-    for (const auto& parts : path_parts) {
+    for (const auto& parts : rooted_path_parts) {
         const auto relative = join_relative_suffix(parts, prefix);
-        if (!relative.empty()) relative_paths.insert(relative);
+        if (relative.empty()) return normalized_paths;
+        const auto [unused, inserted] = stable_paths.insert(relative);
+        (void)unused;
+        if (!inserted) return normalized_paths;
     }
-    return relative_paths.empty() ? normalized_paths : relative_paths;
+    return stable_paths;
 }
 
 }  // namespace

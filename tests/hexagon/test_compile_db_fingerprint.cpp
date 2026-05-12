@@ -69,6 +69,33 @@ TEST_CASE("compile-db project identity strips shared absolute checkout prefixes"
           xray::hexagon::services::compile_db_project_identity_from_source_paths(second_checkout));
 }
 
+TEST_CASE("compile-db project identity stabilizes mixed relative and absolute paths") {
+    const std::vector<std::string> first_checkout{
+        "gen/generated.cpp",
+        "/home/user/cmake-xray/src/main.cpp",
+    };
+    const std::vector<std::string> second_checkout{
+        "/workspace/cmake-xray/src/main.cpp",
+        "gen/generated.cpp",
+    };
+
+    CHECK(xray::hexagon::services::compile_db_project_identity_from_source_paths(first_checkout) ==
+          "compile-db:93a818b6f77b718f641cb3d6b13aaa5e2c64775fe9f872cffc59e73688df7bb8");
+    CHECK(xray::hexagon::services::compile_db_project_identity_from_source_paths(first_checkout) ==
+          xray::hexagon::services::compile_db_project_identity_from_source_paths(second_checkout));
+}
+
+TEST_CASE("compile-db project identity keeps original paths on relative suffix collision") {
+    const std::vector<std::string> paths{
+        "main.cpp",
+        "/home/user/cmake-xray/src/main.cpp",
+    };
+
+    CHECK(xray::hexagon::services::compile_db_project_identity_from_source_paths(paths) !=
+          xray::hexagon::services::compile_db_project_identity_from_source_paths(
+              {"main.cpp"}));
+}
+
 TEST_CASE("project identity path normalization handles windows drive letters") {
     CHECK(xray::hexagon::services::normalize_project_identity_path(
               "C:\\Repo\\.\\src\\foo.cpp\\") == "c:/Repo/src/foo.cpp");
