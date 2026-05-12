@@ -154,6 +154,29 @@ TEST_CASE("markdown report adapter renders project reports with exact section st
           "- Top limit: 1\n"
           "- Include analysis heuristic: yes\n"
           "\n"
+          // AP M6-1.5 A.5 step 18b: bare-fixture analysis_configuration
+          // emits an empty effective_sections list ("Sections: " with
+          // trailing space) and the four hardcoded defaults for the
+          // numeric fields. analysis_section_states is empty, so the
+          // section-states table falls back to legacy gating: tu-ranking
+          // and include-hotspots stay active, target-graph and target-hubs
+          // inherit the default target_graph_status=not_loaded.
+          "## Analysis Configuration\n"
+          "\n"
+          "- Sections: \n"
+          "- TU thresholds: `arg_count=0`, `include_path_count=0`, `define_count=0`\n"
+          "- Min hotspot TUs: `2`\n"
+          "- Target hub thresholds: in=`10`, out=`10`\n"
+          "\n"
+          "### Section States\n"
+          "\n"
+          "| Section | State |\n"
+          "|---|---|\n"
+          "| tu-ranking | active |\n"
+          "| include-hotspots | active |\n"
+          "| target-graph | not_loaded |\n"
+          "| target-hubs | not_loaded |\n"
+          "\n"
           "## Translation Unit Ranking\n"
           "1. src/app/main.cpp [directory: build/debug]\n"
           "    Metrics: arg_count=8, include_path_count=2, define_count=1\n"

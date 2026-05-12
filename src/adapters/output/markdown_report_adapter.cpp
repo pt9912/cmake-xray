@@ -12,6 +12,7 @@
 #include "adapters/output/impact_priority_text.h"
 #include "adapters/output/include_text_helpers.h"
 #include "adapters/output/target_display_support.h"
+#include "hexagon/model/analysis_configuration.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
 #include "hexagon/model/include_classification.h"
@@ -25,7 +26,10 @@ namespace xray::adapters::output {
 
 namespace {
 
+using xray::hexagon::model::AnalysisConfiguration;
 using xray::hexagon::model::AnalysisResult;
+using xray::hexagon::model::AnalysisSection;
+using xray::hexagon::model::AnalysisSectionState;
 using xray::hexagon::model::Diagnostic;
 using xray::hexagon::model::DiagnosticSeverity;
 using xray::hexagon::model::ImpactKind;
@@ -38,6 +42,7 @@ using xray::hexagon::model::TargetImpactClassification;
 using xray::hexagon::model::TargetInfo;
 using xray::hexagon::model::TargetMetadataStatus;
 using xray::hexagon::model::TranslationUnitReference;
+using xray::hexagon::model::TuRankingMetric;
 
 struct AnalysisSectionCounts {
     std::size_t ranking_count{0};
@@ -314,14 +319,111 @@ void append_target_section(std::ostringstream& out, std::string_view title,
 // ---- M6 AP 1.2 Tranche A.3: Target-Graph-related sections ---------------
 
 std::string target_graph_status_text(TargetGraphStatus status) {
-    // AP M6-1.5 A.3 added TargetGraphStatus::disabled. Callers still filter
-    // not_loaded before reaching here; legacy loaded / partial mapping
-    // stays byte-stable while the new disabled value gets its own
-    // "disabled" string for A.5 Markdown v5 callers that will surface
-    // a "Section disabled." marker.
+    // AP M6-1.5 A.5 Markdown v5: section_active() filters disabled and
+    // not_loaded before the analyze paths reach this helper, but impact
+    // "Target Graph Reference" still passes any status through, so the
+    // helper handles all four enum values explicitly.
     if (status == TargetGraphStatus::loaded) return "loaded";
     if (status == TargetGraphStatus::disabled) return "disabled";
+    if (status == TargetGraphStatus::not_loaded) return "not_loaded";
     return "partial";
+}
+
+// ---- AP M6-1.5 A.5 Tranche A.5 step 18b: Analysis Configuration block ---
+
+std::string analysis_section_text(AnalysisSection section) {
+    if (section == AnalysisSection::tu_ranking) return "tu-ranking";
+    if (section == AnalysisSection::include_hotspots) return "include-hotspots";
+    if (section == AnalysisSection::target_graph) return "target-graph";
+    return "target-hubs";
+}
+
+std::string analysis_section_state_text(AnalysisSectionState state) {
+    if (state == AnalysisSectionState::active) return "active";
+    if (state == AnalysisSectionState::disabled) return "disabled";
+    return "not_loaded";
+}
+
+std::size_t tu_threshold_value(const AnalysisConfiguration& cfg,
+                               TuRankingMetric metric) {
+    const auto it = cfg.tu_thresholds.find(metric);
+    return it == cfg.tu_thresholds.end() ? 0 : it->second;
+}
+
+// Bare-fixture fallback mirrors console_report_adapter::resolve_section_state:
+// the real service always populates analysis_section_states, so the
+// fallback only matters for adapter unit tests that construct an
+// AnalysisResult without going through the service. target-graph and
+// target-hubs inherit the legacy target_graph_status gating; the other
+// two sections stay active.
+AnalysisSectionState resolve_section_state(const AnalysisResult& result,
+                                            AnalysisSection section) {
+    const auto it = result.analysis_section_states.find(section);
+    if (it != result.analysis_section_states.end()) return it->second;
+    if (section == AnalysisSection::target_graph ||
+        section == AnalysisSection::target_hubs) {
+        return result.target_graph_status == TargetGraphStatus::not_loaded
+                   ? AnalysisSectionState::not_loaded
+                   : AnalysisSectionState::active;
+    }
+    return AnalysisSectionState::active;
+}
+
+bool section_active(const AnalysisResult& result, AnalysisSection section) {
+    return resolve_section_state(result, section) == AnalysisSectionState::active;
+}
+
+void append_analysis_section_inline_list(std::ostringstream& out,
+                                          const std::vector<AnalysisSection>& sections) {
+    for (std::size_t index = 0; index < sections.size(); ++index) {
+        if (index != 0) out << ", ";
+        out << '`' << analysis_section_text(sections[index]) << '`';
+    }
+}
+
+void append_section_states_table_row(std::ostringstream& out, AnalysisSection section,
+                                      const AnalysisResult& result) {
+    out << "| " << analysis_section_text(section) << " | "
+        << analysis_section_state_text(resolve_section_state(result, section))
+        << " |\n";
+}
+
+void append_analysis_configuration_section(std::ostringstream& out,
+                                            const AnalysisResult& result) {
+    // Plan §702-722 pins the byte-shape: the `## Analysis Configuration`
+    // section carries a bullet list of the four config values, followed
+    // by an `### Section States` H3 with a two-column table. AP 1.2
+    // table-cell escaping is implied for every cell, but the values
+    // emitted here are adapter-controlled enums (section keys, state
+    // tokens) plus non-negative integers, none of which can carry a
+    // backtick or pipe, so plain `<<` streaming is sound. Lookup
+    // fallbacks to 0 keep the three tu_thresholds metrics serialized
+    // even when the request omitted them.
+    const auto& cfg = result.analysis_configuration;
+    const auto arg_value =
+        tu_threshold_value(cfg, TuRankingMetric::arg_count);
+    const auto include_value =
+        tu_threshold_value(cfg, TuRankingMetric::include_path_count);
+    const auto define_value =
+        tu_threshold_value(cfg, TuRankingMetric::define_count);
+    out << "## Analysis Configuration\n\n";
+    out << "- Sections: ";
+    append_analysis_section_inline_list(out, cfg.effective_sections);
+    out << '\n';
+    out << "- TU thresholds: `arg_count=" << arg_value
+        << "`, `include_path_count=" << include_value
+        << "`, `define_count=" << define_value << "`\n";
+    out << "- Min hotspot TUs: `" << cfg.min_hotspot_tus << "`\n";
+    out << "- Target hub thresholds: in=`" << cfg.target_hub_in_threshold
+        << "`, out=`" << cfg.target_hub_out_threshold << "`\n";
+    out << '\n';
+    out << "### Section States\n\n";
+    out << "| Section | State |\n";
+    out << "|---|---|\n";
+    append_section_states_table_row(out, AnalysisSection::tu_ranking, result);
+    append_section_states_table_row(out, AnalysisSection::include_hotspots, result);
+    append_section_states_table_row(out, AnalysisSection::target_graph, result);
+    append_section_states_table_row(out, AnalysisSection::target_hubs, result);
 }
 
 std::string target_dependency_resolution_text(TargetDependencyResolution res) {
@@ -592,15 +694,18 @@ void append_hub_row(std::ostringstream& out, std::string_view direction,
 }
 
 void append_target_hubs_section(std::ostringstream& out, const AnalysisResult& result) {
-    // Caller guarantees status != not_loaded.
+    // AP M6-1.5 A.5 Markdown v5: hub thresholds source from the resolved
+    // AnalysisConfiguration so --target-hub-in-threshold /
+    // --target-hub-out-threshold overrides surface in the table.
+    // Caller guarantees the section state is active.
     out << "## Target Hubs\n\n";
     out << "| Direction | Threshold | Targets |\n";
     out << "|---|---|---|\n";
     append_hub_row(out, "Inbound",
-                   xray::hexagon::services::kDefaultTargetHubInThreshold,
+                   result.analysis_configuration.target_hub_in_threshold,
                    result.target_hubs_in, "No incoming hubs.");
     append_hub_row(out, "Outbound",
-                   xray::hexagon::services::kDefaultTargetHubOutThreshold,
+                   result.analysis_configuration.target_hub_out_threshold,
                    result.target_hubs_out, "No outgoing hubs.");
 }
 
@@ -656,6 +761,11 @@ void append_prioritised_affected_targets_section(std::ostringstream& out,
 
 std::string MarkdownReportAdapter::write_analysis_report(const AnalysisResult& analysis_result,
                                                          std::size_t top_limit) const {
+    // AP M6-1.5 A.5 Markdown v5: emit `## Analysis Configuration` after
+    // the summary list and gate every fachliche `##`-section on
+    // resolve_section_state == active. Sections marked disabled or
+    // not_loaded are dropped entirely; their visibility lives solely in
+    // the `### Section States` table above (plan §724-727).
     std::ostringstream out;
     const auto counts = AnalysisSectionCounts{
         .ranking_count = std::min(top_limit, analysis_result.translation_units.size()),
@@ -665,16 +775,24 @@ std::string MarkdownReportAdapter::write_analysis_report(const AnalysisResult& a
     out << "# Project Analysis Report\n\n";
     append_analysis_overview(out, analysis_result, top_limit, counts);
     out << '\n';
-    append_ranking_section(out, analysis_result, counts.ranking_count);
+    append_analysis_configuration_section(out, analysis_result);
     out << '\n';
-    append_hotspot_section(out, analysis_result, counts.hotspot_count);
-    if (analysis_result.target_graph_status != TargetGraphStatus::not_loaded) {
+    if (section_active(analysis_result, AnalysisSection::tu_ranking)) {
+        append_ranking_section(out, analysis_result, counts.ranking_count);
         out << '\n';
+    }
+    if (section_active(analysis_result, AnalysisSection::include_hotspots)) {
+        append_hotspot_section(out, analysis_result, counts.hotspot_count);
+        out << '\n';
+    }
+    if (section_active(analysis_result, AnalysisSection::target_graph)) {
         append_target_graph_section(out, analysis_result);
         out << '\n';
-        append_target_hubs_section(out, analysis_result);
     }
-    out << '\n';
+    if (section_active(analysis_result, AnalysisSection::target_hubs)) {
+        append_target_hubs_section(out, analysis_result);
+        out << '\n';
+    }
     append_report_diagnostics(out, analysis_result.diagnostics);
 
     return out.str();
