@@ -3,6 +3,7 @@ add_library(
     services/diagnostic_support.cpp
     services/analysis_support.cpp
     services/compile_db_fingerprint.cpp
+    services/compare_service.cpp
     services/impact_analyzer.cpp
     services/project_analyzer.cpp
     services/report_generator.cpp

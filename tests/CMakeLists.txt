@@ -3,6 +3,7 @@ add_executable(
     test_main.cpp
     hexagon/test_analysis_support.cpp
     hexagon/test_compile_db_fingerprint.cpp
+    hexagon/test_compare_service.cpp
     hexagon/test_project_analyzer.cpp
     hexagon/test_impact_analyzer.cpp
     hexagon/test_target_graph_support.cpp

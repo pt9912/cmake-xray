@@ -25,6 +25,9 @@ using CompareScalarVariant =
 
 struct CompareScalarValue {
     CompareScalarVariant value;
+
+    friend bool operator==(const CompareScalarValue&,
+                           const CompareScalarValue&) = default;
 };
 
 struct CompareFieldChange {
@@ -90,6 +93,11 @@ struct CompareDiagnosticProjectIdentityDrift {
     std::size_t shared_source_path_count{0};
 };
 
+struct CompareServiceError {
+    std::string code;
+    std::string message;
+};
+
 struct CompareInputs {
     std::string baseline_path;
     std::string current_path;
@@ -128,6 +136,7 @@ struct CompareResult {
     std::vector<CompareDiagnosticConfigurationDrift> configuration_drifts;
     std::vector<CompareDiagnosticDataAvailabilityDrift> data_availability_drifts;
     std::optional<CompareDiagnosticProjectIdentityDrift> project_identity_drift;
+    std::optional<CompareServiceError> service_error;
 };
 
 }  // namespace xray::hexagon::model

@@ -1099,9 +1099,21 @@ Bis zum Abschluss aller A-Tranchen ist AP 1.6 nicht abnahmefaehig.
   spaeteren Compare-Service. Reader-Tests decken Success- und
   Fehlerpfade ab. Lokale Gates gruen: `make docker-test` (41/41),
   `make coverage-gate COVERAGE_THRESHOLD=100` (Coverage 100%) und
+  `make quality-gate` (clang-tidy 0, lizard 0). Commit: `b4f7e76`.
+- A.3 (Compare-Service und Diff-Logik): **lokal umgesetzt**.
+  `CompareAnalysisPort`, `AnalysisReportReaderPort` und
+  `AnalysisReportSnapshot` trennen die Hexagon-Diff-Logik von der
+  JSON-Adapter-Schicht. `CompareService` validiert Reader-/Versions-
+  und Projektidentitaetsfehler, erlaubt explizit freigegebene
+  Fallback-Compile-DB-Identity-Drift als Diagnostic und berechnet
+  Added-/Removed-/Changed-Diffs fuer Translation Units,
+  Include-Hotspots, Target-Knoten, Target-Kanten und Target-Hubs.
+  Konfigurations-Drift und Datenverfuegbarkeits-Drift werden als
+  Diagnostics erfasst; Summary-Zaehler werden aus den Diff-Listen
+  abgeleitet. Lokale Gates gruen: `make docker-test` (41/41),
+  `make coverage-gate COVERAGE_THRESHOLD=100` (Coverage 100%) und
   `make quality-gate` (clang-tidy 0, lizard 0). Commit wird nach
   Auslieferung gepinnt.
-- A.3 (Compare-Service und Diff-Logik): noch nicht ausgeliefert.
 - A.4 (CLI und Compare-Schema): noch nicht ausgeliefert.
 - A.5 (JSON-Compare-Adapter): noch nicht ausgeliefert.
 - A.6 (Console- und Markdown-Compare-Adapter): noch nicht ausgeliefert.
