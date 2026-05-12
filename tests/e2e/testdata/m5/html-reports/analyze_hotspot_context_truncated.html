@@ -52,7 +52,21 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 <dt>cmake_file_api_resolved_path</dt><dd>not provided</dd>
 <dt>cmake_file_api_source</dt><dd>not provided</dd>
 </dl></section>
-<section class="ranking"><h2>Translation Unit Ranking</h2>
+<section class="analysis-configuration"><h2>Analysis Configuration</h2>
+<dl>
+<dt>Sections</dt><dd>tu-ranking, include-hotspots, target-graph, target-hubs</dd>
+<dt>TU thresholds</dt><dd>arg_count=0, include_path_count=0, define_count=0</dd>
+<dt>Min hotspot TUs</dt><dd>2</dd>
+<dt>Target hub thresholds</dt><dd>in=10, out=10</dd>
+</dl>
+<h3>Section States</h3>
+<dl class="section-states">
+<dt>tu-ranking</dt><dd>active</dd>
+<dt>include-hotspots</dt><dd>active</dd>
+<dt>target-graph</dt><dd>not_loaded</dd>
+<dt>target-hubs</dt><dd>not_loaded</dd>
+</dl></section>
+<section class="ranking"><h2>Translation Unit Ranking <span class="badge badge--state-active">Status: active</span></h2>
 <p>Showing 3 of 30 entries.</p>
 <div class="table-wrap"><table>
 <thead><tr><th scope="col">Rank</th><th scope="col">Source path</th><th scope="col">Directory</th><th scope="col">Score</th><th scope="col">Arguments</th><th scope="col">Include paths</th><th scope="col">Defines</th><th scope="col">Targets</th><th scope="col">Diagnostics</th></tr></thead>
@@ -62,7 +76,7 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 <tr><td>3</td><td>src/file_02.cpp</td><td>build</td><td>5</td><td>4</td><td>1</td><td>0</td><td><span class="empty">no targets</span></td><td><span class="empty">no diagnostics</span></td></tr>
 </tbody>
 </table></div></section>
-<section class="hotspots"><h2>Include Hotspots</h2>
+<section class="hotspots"><h2>Include Hotspots <span class="badge badge--state-active">Status: active</span></h2>
 <p class="include-filter">Filter: scope=<span class="badge badge--all">all</span>, depth=<span class="badge badge--all">all</span>. Excluded: 0 unknown, 0 mixed.</p>
 <p>Showing 3 of 6 entries.</p>
 <div class="table-wrap"><table>
@@ -80,10 +94,10 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 <dt>translation_units_with_targets</dt><dd>0 of 30</dd>
 </dl>
 <p class="empty">No target metadata loaded.</p></section>
-<section class="target-graph"><h2>Target Graph</h2>
-<p class="empty">Target graph not loaded.</p></section>
-<section class="target-hubs"><h2>Target Hubs</h2>
-<p class="empty">Target hubs not available.</p></section>
+<section class="target-graph"><h2>Target Graph <span class="badge badge--state-not-loaded">Status: not_loaded</span></h2>
+<p class="empty">Section not loaded.</p></section>
+<section class="target-hubs"><h2>Target Hubs <span class="badge badge--state-not-loaded">Status: not_loaded</span></h2>
+<p class="empty">Section not loaded.</p></section>
 <section class="diagnostics"><h2>Diagnostics</h2>
 <ul>
 <li><span class="badge">note</span> include-based results are heuristic; conditional or generated includes may be missing</li>

@@ -52,7 +52,21 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 <dt>cmake_file_api_resolved_path</dt><dd>tests/e2e/testdata/m4/with_targets/build/.cmake/api/v1/reply</dd>
 <dt>cmake_file_api_source</dt><dd>cli</dd>
 </dl></section>
-<section class="ranking"><h2>Translation Unit Ranking</h2>
+<section class="analysis-configuration"><h2>Analysis Configuration</h2>
+<dl>
+<dt>Sections</dt><dd>tu-ranking, include-hotspots, target-graph, target-hubs</dd>
+<dt>TU thresholds</dt><dd>arg_count=0, include_path_count=0, define_count=0</dd>
+<dt>Min hotspot TUs</dt><dd>2</dd>
+<dt>Target hub thresholds</dt><dd>in=10, out=10</dd>
+</dl>
+<h3>Section States</h3>
+<dl class="section-states">
+<dt>tu-ranking</dt><dd>active</dd>
+<dt>include-hotspots</dt><dd>active</dd>
+<dt>target-graph</dt><dd>active</dd>
+<dt>target-hubs</dt><dd>active</dd>
+</dl></section>
+<section class="ranking"><h2>Translation Unit Ranking <span class="badge badge--state-active">Status: active</span></h2>
 <p>Showing 2 of 3 entries.</p>
 <div class="table-wrap"><table>
 <thead><tr><th scope="col">Rank</th><th scope="col">Source path</th><th scope="col">Directory</th><th scope="col">Score</th><th scope="col">Arguments</th><th scope="col">Include paths</th><th scope="col">Defines</th><th scope="col">Targets</th><th scope="col">Diagnostics</th></tr></thead>
@@ -61,7 +75,7 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 <tr><td>2</td><td>src/tools/tool.cpp</td><td>build/tools</td><td>9</td><td>7</td><td>1</td><td>1</td><td><ul><li>tool <span class="badge">EXECUTABLE</span></li></ul></td><td><span class="empty">no diagnostics</span></td></tr>
 </tbody>
 </table></div></section>
-<section class="hotspots"><h2>Include Hotspots</h2>
+<section class="hotspots"><h2>Include Hotspots <span class="badge badge--state-active">Status: active</span></h2>
 <p class="include-filter">Filter: scope=<span class="badge badge--all">all</span>, depth=<span class="badge badge--all">all</span>. Excluded: 0 unknown, 0 mixed.</p>
 <div class="table-wrap"><table>
 <thead><tr><th scope="col">Header</th><th scope="col">Origin</th><th scope="col">Depth</th><th scope="col">Affected translation units</th><th scope="col">Translation unit context</th></tr></thead>
@@ -84,10 +98,10 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 <tr><td>tool</td><td>EXECUTABLE</td></tr>
 </tbody>
 </table></div></section>
-<section class="target-graph"><h2>Target Graph</h2>
+<section class="target-graph"><h2>Target Graph <span class="badge badge--state-active">Status: active</span></h2>
 <p>Status: <span class="badge badge--loaded">loaded</span></p>
 <p class="empty">No direct target dependencies.</p></section>
-<section class="target-hubs"><h2>Target Hubs</h2>
+<section class="target-hubs"><h2>Target Hubs <span class="badge badge--state-active">Status: active</span></h2>
 <p>Incoming threshold: 10. Outgoing threshold: 10.</p>
 <div class="table-wrap"><table>
 <thead><tr><th scope="col">Direction</th><th scope="col">Threshold</th><th scope="col">Targets</th></tr></thead>

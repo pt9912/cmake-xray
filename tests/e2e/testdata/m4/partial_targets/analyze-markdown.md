@@ -11,6 +11,22 @@
 - Target metadata: partial
 - Translation units with target mapping: 1 of 1
 
+## Analysis Configuration
+
+- Sections: `tu-ranking`, `include-hotspots`, `target-graph`, `target-hubs`
+- TU thresholds: `arg_count=0`, `include_path_count=0`, `define_count=0`
+- Min hotspot TUs: `2`
+- Target hub thresholds: in=`10`, out=`10`
+
+### Section States
+
+| Section | State |
+|---|---|
+| tu-ranking | active |
+| include-hotspots | active |
+| target-graph | active |
+| target-hubs | active |
+
 ## Translation Unit Ranking
 1. /project/src/main.cpp [directory: /project/build] [targets: app]
     Metrics: arg_count=5, include_path_count=1, define_count=0
