@@ -1072,17 +1072,28 @@ TargetDependency external_edge(std::string from_uk, std::string from_dn,
 
 }  // namespace m6_html
 
-TEST_CASE("HTML analyze v2: not_loaded keeps Target Graph and Target Hubs sections with empty paragraphs") {
-    // Compile-DB-only run: target_graph_status defaults to not_loaded, both
-    // sections must remain present with h2 and the documented empty paragraph.
+TEST_CASE("HTML analyze v5: not_loaded keeps Target Graph and Target Hubs sections with status badge and Section not loaded paragraph") {
+    // AP M6-1.5 A.5 HTML v5: target_graph_status defaults to not_loaded for
+    // a Compile-DB-only run; resolve_section_state derives
+    // AnalysisSectionState::not_loaded for both target-graph and
+    // target-hubs and routes the section body through
+    // emit_section_empty_paragraph. The legacy "Target graph not loaded."
+    // and "Target hubs not available." literals are replaced by the
+    // unified plan §640-647 phrasing "Section not loaded." and the
+    // section-state badge inside the h2 carries the status label.
     const HtmlReportAdapter adapter;
     const auto report = adapter.write_analysis_report(make_minimal_analysis_result(), 3);
     CHECK(report.find("class=\"target-graph\"") != std::string::npos);
-    CHECK(report.find("<h2>Target Graph</h2>") != std::string::npos);
-    CHECK(report.find("Target graph not loaded.") != std::string::npos);
+    CHECK(report.find("<h2>Target Graph <span class=\"badge badge--state-not-loaded\">Status: not_loaded</span></h2>") !=
+          std::string::npos);
     CHECK(report.find("class=\"target-hubs\"") != std::string::npos);
-    CHECK(report.find("<h2>Target Hubs</h2>") != std::string::npos);
-    CHECK(report.find("Target hubs not available.") != std::string::npos);
+    CHECK(report.find("<h2>Target Hubs <span class=\"badge badge--state-not-loaded\">Status: not_loaded</span></h2>") !=
+          std::string::npos);
+    // Both sections share the new unified empty marker.
+    CHECK(report.find("Section not loaded.") != std::string::npos);
+    // The legacy section-specific literals are gone.
+    CHECK(report.find("Target graph not loaded.") == std::string::npos);
+    CHECK(report.find("Target hubs not available.") == std::string::npos);
     // No Target Graph table or Hub table when not_loaded.
     CHECK(report.find("<th scope=\"col\">From</th>") == std::string::npos);
     CHECK(report.find("<th scope=\"col\">Direction</th>") == std::string::npos);

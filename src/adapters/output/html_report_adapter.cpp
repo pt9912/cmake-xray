@@ -11,6 +11,7 @@
 #include "adapters/output/impact_priority_text.h"
 #include "adapters/output/include_text_helpers.h"
 #include "adapters/output/target_display_support.h"
+#include "hexagon/model/analysis_configuration.h"
 #include "hexagon/model/analysis_result.h"
 #include "hexagon/model/diagnostic.h"
 #include "hexagon/model/impact_result.h"
@@ -161,7 +162,10 @@ std::string_view html_report_css() {
 
 namespace {
 
+using xray::hexagon::model::AnalysisConfiguration;
 using xray::hexagon::model::AnalysisResult;
+using xray::hexagon::model::AnalysisSection;
+using xray::hexagon::model::AnalysisSectionState;
 using xray::hexagon::model::ChangedFileSource;
 using xray::hexagon::model::Diagnostic;
 using xray::hexagon::model::DiagnosticSeverity;
@@ -187,6 +191,7 @@ using xray::hexagon::model::TargetImpactClassification;
 using xray::hexagon::model::TargetInfo;
 using xray::hexagon::model::TargetMetadataStatus;
 using xray::hexagon::model::TranslationUnitReference;
+using xray::hexagon::model::TuRankingMetric;
 
 // ---- Static text mappings -----------------------------------------------
 
@@ -222,13 +227,149 @@ std::string target_metadata_text(TargetMetadataStatus status) {
 }
 
 std::string target_graph_status_text(TargetGraphStatus status) {
-    // emit_target_graph_status_line is invoked for loaded/partial (the
-    // not_loaded branch routes through a dedicated empty-section
-    // paragraph). AP M6-1.5 A.3 adds TargetGraphStatus::disabled; A.5
-    // HTML v5 rewires that into the new section_state badge surface.
+    // AP M6-1.5 A.5 HTML v5: section_active() filters disabled and
+    // not_loaded before the analyze paths reach this helper, but the
+    // impact "Target Graph Reference" section still passes any status
+    // through. All four enum values map explicitly so the helper stays
+    // total.
     if (status == TargetGraphStatus::loaded) return "loaded";
     if (status == TargetGraphStatus::disabled) return "disabled";
+    if (status == TargetGraphStatus::not_loaded) return "not_loaded";
     return "partial";
+}
+
+// ---- AP M6-1.5 A.5 Tranche A.5 step 18c: section state helpers ---------
+
+std::string analysis_section_text(AnalysisSection section) {
+    if (section == AnalysisSection::tu_ranking) return "tu-ranking";
+    if (section == AnalysisSection::include_hotspots) return "include-hotspots";
+    if (section == AnalysisSection::target_graph) return "target-graph";
+    return "target-hubs";
+}
+
+std::string analysis_section_state_text(AnalysisSectionState state) {
+    if (state == AnalysisSectionState::active) return "active";
+    if (state == AnalysisSectionState::disabled) return "disabled";
+    return "not_loaded";
+}
+
+std::string analysis_section_state_modifier(AnalysisSectionState state) {
+    // Maps to the CSS modifier suffix appended to `badge--state-`. The
+    // not_loaded enum value emits the source-stable "not_loaded" text in
+    // the badge content, but the class name uses the hyphenated form
+    // "not-loaded" matching the existing badge--evidence-heuristic
+    // hyphen convention.
+    if (state == AnalysisSectionState::active) return "active";
+    if (state == AnalysisSectionState::disabled) return "disabled";
+    return "not-loaded";
+}
+
+std::size_t tu_threshold_value(const AnalysisConfiguration& cfg,
+                               TuRankingMetric metric) {
+    const auto it = cfg.tu_thresholds.find(metric);
+    return it == cfg.tu_thresholds.end() ? 0 : it->second;
+}
+
+// resolve_section_state mirrors console_report_adapter and
+// markdown_report_adapter: real service runs always populate the map;
+// bare-fixture adapter unit tests fall back to legacy gating so the
+// existing target_graph_status tests keep passing without a fixture
+// rewrite.
+AnalysisSectionState resolve_section_state(const AnalysisResult& result,
+                                            AnalysisSection section) {
+    const auto it = result.analysis_section_states.find(section);
+    if (it != result.analysis_section_states.end()) return it->second;
+    if (section == AnalysisSection::target_graph ||
+        section == AnalysisSection::target_hubs) {
+        return result.target_graph_status == TargetGraphStatus::not_loaded
+                   ? AnalysisSectionState::not_loaded
+                   : AnalysisSectionState::active;
+    }
+    return AnalysisSectionState::active;
+}
+
+bool section_active(const AnalysisResult& result, AnalysisSection section) {
+    return resolve_section_state(result, section) == AnalysisSectionState::active;
+}
+
+void emit_section_state_badge(std::ostringstream& out, AnalysisSectionState state) {
+    // Inline span placed inside the section's `<h2>` per plan §636-639.
+    // The badge text reads "Status: <state>" verbatim; the modifier
+    // class follows the badge-- convention (hyphenated). No CSS rule
+    // ships with this commit; the base `.badge` style provides visual
+    // affordance and downstream styling can layer onto the modifier.
+    const auto state_label = analysis_section_state_text(state);
+    const auto modifier = analysis_section_state_modifier(state);
+    out << " <span class=\"badge badge--state-" << modifier << "\">Status: "
+        << state_label << "</span>";
+}
+
+void emit_section_empty_paragraph(std::ostringstream& out,
+                                   AnalysisSectionState state) {
+    // Plan §640-647: disabled and not_loaded sections keep their `<h2>`
+    // and replace the body with a single explanatory paragraph. The
+    // "empty" class lets the existing CSS rule colour the italic prose
+    // identically to other empty-section markers (M6 AP 1.2 contract).
+    if (state == AnalysisSectionState::disabled) {
+        out << "<p class=\"empty\">Section disabled.</p>";
+        return;
+    }
+    out << "<p class=\"empty\">Section not loaded.</p>";
+}
+
+void emit_analysis_section_inline_list(
+    std::ostringstream& out, const std::vector<AnalysisSection>& sections) {
+    for (std::size_t index = 0; index < sections.size(); ++index) {
+        if (index != 0) out << ", ";
+        out << render_text(analysis_section_text(sections[index]));
+    }
+}
+
+void emit_section_states_dt_dd_row(std::ostringstream& out,
+                                    AnalysisSection section,
+                                    const AnalysisResult& result) {
+    out << "<dt>" << render_text(analysis_section_text(section)) << "</dt><dd>"
+        << render_text(
+               analysis_section_state_text(resolve_section_state(result, section)))
+        << "</dd>\n";
+}
+
+void emit_analysis_configuration_section(std::ostringstream& out,
+                                          const AnalysisResult& result) {
+    // Plan §614-635: new top-level section between Inputs and Translation
+    // Unit Ranking that surfaces the resolved analysis configuration plus
+    // the four section states. Layout uses dl/dt/dd for the config
+    // key-value group (matching the existing Inputs section) and a second
+    // dl for the Section States enumeration so the markup remains
+    // accessible without introducing a new table. The dl-based shape
+    // also keeps the byte-shape compact for goldens.
+    const auto& cfg = result.analysis_configuration;
+    const auto arg_value =
+        tu_threshold_value(cfg, TuRankingMetric::arg_count);
+    const auto include_value =
+        tu_threshold_value(cfg, TuRankingMetric::include_path_count);
+    const auto define_value =
+        tu_threshold_value(cfg, TuRankingMetric::define_count);
+    out << "<section class=\"analysis-configuration\">"
+        << "<h2>Analysis Configuration</h2>\n"
+        << "<dl>\n"
+        << "<dt>Sections</dt><dd>";
+    emit_analysis_section_inline_list(out, cfg.effective_sections);
+    out << "</dd>\n"
+        << "<dt>TU thresholds</dt><dd>arg_count=" << arg_value
+        << ", include_path_count=" << include_value
+        << ", define_count=" << define_value << "</dd>\n"
+        << "<dt>Min hotspot TUs</dt><dd>" << cfg.min_hotspot_tus << "</dd>\n"
+        << "<dt>Target hub thresholds</dt><dd>in=" << cfg.target_hub_in_threshold
+        << ", out=" << cfg.target_hub_out_threshold << "</dd>\n"
+        << "</dl>\n"
+        << "<h3>Section States</h3>\n"
+        << "<dl class=\"section-states\">\n";
+    emit_section_states_dt_dd_row(out, AnalysisSection::tu_ranking, result);
+    emit_section_states_dt_dd_row(out, AnalysisSection::include_hotspots, result);
+    emit_section_states_dt_dd_row(out, AnalysisSection::target_graph, result);
+    emit_section_states_dt_dd_row(out, AnalysisSection::target_hubs, result);
+    out << "</dl></section>";
 }
 
 std::string target_graph_status_badge_class(TargetGraphStatus status) {
@@ -417,7 +558,15 @@ struct RankingContext {
 
 void emit_ranking_section(std::ostringstream& out, const AnalysisResult& result,
                            const RankingContext& ctx) {
-    out << "<section class=\"ranking\"><h2>Translation Unit Ranking</h2>\n";
+    const auto state = resolve_section_state(result, AnalysisSection::tu_ranking);
+    out << "<section class=\"ranking\"><h2>Translation Unit Ranking";
+    emit_section_state_badge(out, state);
+    out << "</h2>\n";
+    if (state != AnalysisSectionState::active) {
+        emit_section_empty_paragraph(out, state);
+        out << "</section>";
+        return;
+    }
     if (result.translation_units.empty()) {
         out << "<p class=\"empty\">No translation units to report.</p></section>";
         return;
@@ -502,7 +651,16 @@ void emit_hotspots_filter_line(std::ostringstream& out, const AnalysisResult& re
 }
 
 void emit_hotspots_section(std::ostringstream& out, const HotspotContext& ctx) {
-    out << "<section class=\"hotspots\"><h2>Include Hotspots</h2>\n";
+    const auto state =
+        resolve_section_state(ctx.result, AnalysisSection::include_hotspots);
+    out << "<section class=\"hotspots\"><h2>Include Hotspots";
+    emit_section_state_badge(out, state);
+    out << "</h2>\n";
+    if (state != AnalysisSectionState::active) {
+        emit_section_empty_paragraph(out, state);
+        out << "</section>";
+        return;
+    }
     emit_hotspots_filter_line(out, ctx.result);
     if (ctx.result.include_hotspots.empty()) {
         out << "<p class=\"empty\">No include hotspots to report.</p></section>";
@@ -637,9 +795,13 @@ void emit_target_graph_table(std::ostringstream& out, const TargetGraph& graph) 
 }
 
 void emit_target_graph_section(std::ostringstream& out, const AnalysisResult& result) {
-    out << "<section class=\"target-graph\"><h2>Target Graph</h2>\n";
-    if (result.target_graph_status == TargetGraphStatus::not_loaded) {
-        out << "<p class=\"empty\">Target graph not loaded.</p></section>";
+    const auto state = resolve_section_state(result, AnalysisSection::target_graph);
+    out << "<section class=\"target-graph\"><h2>Target Graph";
+    emit_section_state_badge(out, state);
+    out << "</h2>\n";
+    if (state != AnalysisSectionState::active) {
+        emit_section_empty_paragraph(out, state);
+        out << "</section>";
         return;
     }
     emit_target_graph_status_line(out, result.target_graph_status);
@@ -674,15 +836,21 @@ void emit_hub_row(std::ostringstream& out, std::string_view direction,
 }
 
 void emit_target_hubs_section(std::ostringstream& out, const AnalysisResult& result) {
-    out << "<section class=\"target-hubs\"><h2>Target Hubs</h2>\n";
-    if (result.target_graph_status == TargetGraphStatus::not_loaded) {
-        out << "<p class=\"empty\">Target hubs not available.</p></section>";
+    // AP M6-1.5 A.5 HTML v5: hub thresholds source from the resolved
+    // AnalysisConfiguration so CLI overrides surface in the inline
+    // <p> + table header. disabled / not_loaded route through the
+    // shared empty-paragraph helper.
+    const auto state = resolve_section_state(result, AnalysisSection::target_hubs);
+    out << "<section class=\"target-hubs\"><h2>Target Hubs";
+    emit_section_state_badge(out, state);
+    out << "</h2>\n";
+    if (state != AnalysisSectionState::active) {
+        emit_section_empty_paragraph(out, state);
+        out << "</section>";
         return;
     }
-    constexpr auto in_threshold =
-        xray::hexagon::services::kDefaultTargetHubInThreshold;
-    constexpr auto out_threshold =
-        xray::hexagon::services::kDefaultTargetHubOutThreshold;
+    const auto in_threshold = result.analysis_configuration.target_hub_in_threshold;
+    const auto out_threshold = result.analysis_configuration.target_hub_out_threshold;
     out << "<p>Incoming threshold: " << in_threshold
         << ". Outgoing threshold: " << out_threshold << ".</p>\n"
         << "<div class=\"table-wrap\"><table>\n"
@@ -901,6 +1069,8 @@ std::string render_analyze(const AnalysisResult& result, std::size_t top_limit) 
     emit_analyze_summary(out, result, top_limit, counts);
     out << "\n";
     emit_inputs_section(out, result.inputs, /*include_changed_file=*/false);
+    out << "\n";
+    emit_analysis_configuration_section(out, result);
     out << "\n";
     emit_ranking_section(out, result, RankingContext{top_limit, counts.ranking_count});
     out << "\n";
