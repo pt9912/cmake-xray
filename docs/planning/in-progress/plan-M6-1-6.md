@@ -5,7 +5,7 @@
 `F-11` aus dem Lastenheft verlangt einen Vergleich zweier
 Analysezeitpunkte. AP 1.6 implementiert das als
 `cmake-xray compare`-Subkommando, das zwei stabile
-Analyze-JSON-Berichte (von AP 1.2 bis AP 1.5 standardisierte
+Analyze-JSON-Berichte (von AP 1.2 bis AP 1.6 standardisierte
 maschinenlesbare Reportbasis) gegenueberstellt und Aenderungen an
 Build-Komplexitaet, Include-Hotspots, Target-Struktur und
 Konfiguration sichtbar macht.
@@ -30,7 +30,7 @@ expliziter Folgeumfang nach M6.
 
 AP 1.6 fuehrt einen **eigenen** Format-Versions-Counter
 `xray::hexagon::model::kCompareFormatVersion` mit Initialwert `1` ein,
-unabhaengig von `kReportFormatVersion` aus AP 1.2-1.5. Damit kann der
+unabhaengig von `kReportFormatVersion` aus AP 1.2-1.6. Damit kann der
 Compare-Vertrag in spaeteren APs unabhaengig vom Analyze-/Impact-
 Vertrag versioniert werden.
 
@@ -83,9 +83,10 @@ Nicht umsetzen:
   `fallback_compile_database_fingerprint`. Beide Modi haben
   unterschiedliche Provenienzgarantien; Cross-Mode-Compare ist
   Folgeumfang.
-- Migration von v1-v4-Goldens fuer `compare`. Compare unterstuetzt in
-  M6 ausschliesslich `kReportFormatVersion=5` (Stand nach AP 1.5);
-  aeltere Versionen werden aktiv abgelehnt.
+- Migration von v1-v5-Goldens fuer `compare`. Compare unterstuetzt in
+  M6 ausschliesslich `kReportFormatVersion=6` (Stand nach AP 1.6 A.1);
+  aeltere Versionen werden aktiv abgelehnt, weil sie keine belastbare
+  `project_identity` tragen.
 - Diff-Goldens unter `m5/`. Compare-Goldens leben ausschliesslich
   unter `m6/compare-reports/`.
 - CLI-Optionen fuer Diff-Filterung (z. B. `--diff-only-added`).
@@ -94,17 +95,17 @@ Nicht umsetzen:
 Diese Punkte folgen in spaeteren Arbeitspaketen oder bleiben bewusst
 ausserhalb von M6.
 
-## Voraussetzungen aus AP 1.1-1.5
+## Voraussetzungen aus AP 1.1-1.6 A.1
 
 AP 1.6 baut auf folgenden Vertraegen auf:
 
-- Stabiler Analyze-JSON-Vertrag aus AP 1.2-1.5
-  (`format: cmake-xray.analysis`, `format_version=5`).
+- Stabiler Analyze-JSON-Vertrag aus AP 1.2-1.6
+  (`format: cmake-xray.analysis`, `format_version=6`).
 - `target_graph`/`target_graph_status`/`target_hubs` aus AP 1.1-1.2.
 - `include_filter`-Block, `IncludeOrigin`/`IncludeDepthKind`-Felder
   pro Hotspot aus AP 1.4.
 - `analysis_configuration`/`analysis_section_states` aus AP 1.5.
-- `kReportFormatVersion=5` (Pflicht-Stand nach AP 1.5).
+- `kReportFormatVersion=6` (Pflicht-Stand nach AP 1.6 A.1).
 
 AP 1.6 ergaenzt den bestehenden Analyze-JSON-Vertrag um:
 
@@ -113,20 +114,10 @@ AP 1.6 ergaenzt den bestehenden Analyze-JSON-Vertrag um:
   `cmake_file_api_source_root` oder
   `fallback_compile_database_fingerprint`).
 
-Diese beiden Felder sind in v5 Pflichtfelder; ohne sie kann AP 1.6
-keine Compare-Eingangsvalidierung durchfuehren. Damit besteht eine
-**harte Tranchen-Reihenfolge**: AP-1.6-A.1 (project_identity in
-Analyze-JSON) muss in derselben oder einer vorhergehenden Tranche
-landen wie AP-1.5-A.3 (Schema v5), oder AP 1.5 nimmt
-`project_identity` direkt mit auf. **Empfehlung**: AP 1.5 ergaenzt
-das Schema um die `project_identity`-Felder (sie sind ohnehin
-v5-konsistent), und AP 1.6-A.1 nutzt sie ohne weitere
-Schemaaenderung.
-
-In diesem Plan wird davon ausgegangen, dass AP 1.5 die Felder
-`inputs.project_identity` und `inputs.project_identity_source` schon
-mit aufnimmt. Falls AP 1.5 das nicht tut, hebt AP 1.6 stattdessen
-`kReportFormatVersion` von `5` auf `6`. Dieser Pfad wird im
+Diese beiden Felder sind in v6 Pflichtfelder; ohne sie kann AP 1.6
+keine Compare-Eingangsvalidierung durchfuehren. AP 1.5 hat die Felder
+nicht aufgenommen, daher hebt AP-1.6-A.1 den Analyze-JSON-Vertrag von
+`format_version=5` auf `format_version=6`. Dieser Pfad wird im
 **Tranchen-Schnitt**-Abschnitt unten ausdruecklich beschrieben.
 
 ## Dateien
@@ -204,18 +195,18 @@ Begruendung:
   jedes Mal Analyze und Impact mitzuziehen.
 - `format: cmake-xray.compare` traegt `format_version=1` aus
   `kCompareFormatVersion`, identisch zur Analyze-/Impact-Konvention.
-- AP 1.6 traegt **keinen** Sprung an `kReportFormatVersion` ein, sofern
-  `project_identity` schon in AP 1.5 v5 enthalten ist.
+- AP 1.6 A.1 hebt `kReportFormatVersion` von `5` auf `6`, weil
+  `project_identity` in AP 1.5 nicht enthalten war und nun als
+  Pflichtfeld in Analyze-JSON aufgenommen wird.
 
-Begruendung gegen einen `kReportFormatVersion`-Sprung in AP 1.6
-(falls `project_identity` schon in AP 1.5 enthalten):
+Begruendung fuer den `kReportFormatVersion`-Sprung in AP 1.6 A.1:
 
-- Compare aendert die Analyze-JSON-Struktur nicht.
-- Compare braucht `project_identity` als bestehendes Feld, fuegt
-  aber kein neues Pflichtfeld an Analyze-JSON hinzu.
-- Wenn AP 1.5 `project_identity` nicht aufnimmt, hebt AP 1.6
-  stattdessen `kReportFormatVersion` von `5` auf `6` und nimmt die
-  Felder selbst auf. Die Abnahmekriterien decken beide Pfade ab.
+- Compare braucht `project_identity` als belastbares Pflichtfeld fuer
+  die Eingangsvalidierung.
+- Das Feld aendert die Analyze-JSON-Struktur und muss deshalb ueber
+  die bestehende Analyze-/Impact-Formatversion sichtbar werden.
+- Der Compare-Output selbst bleibt davon unabhaengig und startet mit
+  `kCompareFormatVersion=1`.
 
 ## CLI-Vertrag
 
@@ -407,16 +398,14 @@ Akzeptierter Trade-off:
 ## Compare-Kompatibilitaetsmatrix
 
 In M6 unterstuetzt `compare` genau die Analyze-JSON-Version, die nach
-AP 1.6 das `project_identity`-Feld enthaelt. Wenn AP 1.5
-`project_identity` schon in `format_version=5` aufgenommen hat, ist nur
-`(5, 5)` erlaubt. Wenn AP 1.6 A.1 dafuer auf `format_version=6` heben
-muss, ist nur `(6, 6)` erlaubt. Gemischte Versionspaare bleiben
-abgelehnt.
+AP 1.6 A.1 das `project_identity`-Feld enthaelt. AP 1.5 hat
+`project_identity` nicht in `format_version=5` aufgenommen, daher ist
+in M6 nur `(6, 6)` erlaubt. Gemischte Versionspaare bleiben abgelehnt.
 
 | baseline_format_version | current_format_version | Status | Hinweise |
 |---|---|---|---|
-| 5 | 5 | OK, falls `project_identity` in v5 enthalten ist | Vollstaendiger Vergleich aller M6-Sektionen. |
-| 6 | 6 | OK, falls AP 1.6 A.1 Analyze-JSON auf v6 hebt | Vollstaendiger Vergleich aller M6-Sektionen. |
+| 5 | 5 | abgelehnt | v5 enthaelt keine `project_identity`; AP 1.6 A.1 hebt auf v6. |
+| 6 | 6 | OK | Vollstaendiger Vergleich aller M6-Sektionen. |
 | 5 | 6 | abgelehnt | Keine Cross-Version-Migration in M6. |
 | 6 | 5 | abgelehnt | Keine Cross-Version-Migration in M6. |
 | 1, 2, 3, 4 | beliebig | abgelehnt | Aeltere Versionen werden in M6 nicht produziert; Migration erforderlich. |
@@ -438,7 +427,7 @@ erlaubter Versionskombination:
   vorher als `project_identity_source`-Mismatch abgelehnt werden.
 
 Pflicht: AP-1.6-Implementierung darf nicht starten, bevor die
-Matrix fuer die `(5, 5)`-Kombination dokumentiert und mit Schema-
+Matrix fuer die `(6, 6)`-Kombination dokumentiert und mit Schema-
 und Golden-Tests abgesichert ist.
 
 ## Pfadnormalisierung fuer Compare
@@ -821,8 +810,8 @@ Beispiel:
 
 ```
 cmake-xray compare
-  baseline: /repo/baseline.json (v5)
-  current:  /repo/current.json  (v5)
+  baseline: /repo/baseline.json (v6)
+  current:  /repo/current.json  (v6)
   project_identity: /repo (cmake_file_api_source_root)
 
 Summary:
@@ -939,8 +928,8 @@ Schema-Tests:
 - Negativtest: ein Compare-JSON ohne `inputs` oder ohne `summary`
   validiert NICHT.
 - Compare-Kompatibilitaetsmatrix-Tests:
-  - `(5, 5)` ist erlaubt.
-  - `(4, 5)`, `(5, 4)`, `(6, 5)`, `(5, 7)` und `(7, 6)` sind
+  - `(6, 6)` ist erlaubt.
+  - `(4, 6)`, `(5, 5)`, `(5, 6)`, `(6, 5)` und `(7, 6)` sind
     abgelehnt.
 
 E2E-/Golden-Tests:
@@ -975,8 +964,7 @@ Pflicht:
   bleiben unveraendert. AP 1.6 fuegt nur das `compare`-Subkommando
   hinzu.
 - Die analyze-JSON-Pflichtfelder `project_identity` und
-  `project_identity_source` werden in v5 aufgenommen
-  (Empfehlung an AP 1.5).
+  `project_identity_source` werden in v6 aufgenommen.
 
 Verboten:
 
@@ -1043,7 +1031,9 @@ APs.
 - **A.1 project_identity in Analyze-JSON**: Falls AP 1.5 die Felder
   nicht aufnimmt, fuegt AP-1.6-A.1 sie hinzu und hebt
   `kReportFormatVersion` von `5` auf `6`. Falls AP 1.5 die Felder
-  schon aufnimmt, ist A.1 leer und kann verschmolzen werden.
+  schon aufnimmt, ist A.1 leer und kann verschmolzen werden. Der
+  v6-Pfad ist aktiv, weil AP 1.5 ohne `project_identity` ausgeliefert
+  wurde.
 - **A.2 Compare-Modell und JSON-Reader**: Modellstrukturen und
   Eingangs-Reader. Schema- und CLI-Anpassungen folgen in A.4.
 - **A.3 Compare-Service und Diff-Logik (atomar)**: Service-Logik,
@@ -1059,21 +1049,35 @@ APs.
 - **A.7 Audit-Pass**.
 
 **Begruendung**: A.1 muss zuerst, weil project_identity die
-Eingangsvalidierung speist. A.2 baut auf v5-Schema (oder v6, falls
-A.1 das Schema hebt). A.3 ist atomar wegen der Diff-/Diagnostic-
+Eingangsvalidierung speist. A.2 baut auf dem v6-Schema aus A.1 auf.
+A.3 ist atomar wegen der Diff-/Diagnostic-
 Komplexitaet. A.4 ist atomar wegen Schema-CLI-Kohaerenz. A.5 und
 A.6 koennen parallel entwickelt werden.
 
 **Harte Tranchen-Abhaengigkeit zu AP 1.5**: A.1 muss nach AP-1.5-A.3
-landen, weil AP 1.5 v5 setzt und A.1 entweder darauf aufbaut oder
-es zu v6 erweitert.
+landen, weil AP 1.5 v5 setzt und A.1 darauf mit dem v6-Vertrag
+aufbaut.
 
 ## Liefer-Stand
 
 Wird nach dem Schnitt der A-Tranchen mit Commit-Hashes befuellt.
-Bis dahin ist AP 1.6 nicht abnahmefaehig.
+Bis zum Abschluss aller A-Tranchen ist AP 1.6 nicht abnahmefaehig.
 
-- A.1 (project_identity in Analyze-JSON): noch nicht ausgeliefert.
+- A.1 (project_identity in Analyze-JSON): **lokal umgesetzt**.
+  `kReportFormatVersion` ist von `5` auf `6` gehoben; Analyze-JSON
+  serialisiert `inputs.project_identity` und
+  `inputs.project_identity_source`; Impact-JSON bekommt nur den
+  Versions-Bump und keine neuen Identity-Felder. Der File-API-Pfad
+  nutzt die normalisierte Source-Root
+  (`project_identity_source=cmake_file_api_source_root`), der
+  Compile-DB-Fallback einen kanonischen SHA-256-Fingerprint ueber die
+  normalisierten Source-Pfade
+  (`project_identity_source=fallback_compile_database_fingerprint`).
+  Goldens und `docs/examples` sind auf v6 regeneriert. Lokale Gates
+  gruen: `make docker-test` (41/41), `make coverage-gate
+  COVERAGE_THRESHOLD=100` (Coverage 100%) und `make quality-gate`
+  (clang-tidy 0, lizard 0). Lead-Commit wird nach Auslieferung
+  gepinnt.
 - A.2 (Compare-Modell und JSON-Reader): noch nicht ausgeliefert.
 - A.3 (Compare-Service und Diff-Logik): noch nicht ausgeliefert.
 - A.4 (CLI und Compare-Schema): noch nicht ausgeliefert.
@@ -1098,8 +1102,8 @@ AP 1.6 ist abgeschlossen, wenn:
   bleiben CLI-Eingabefehler;
 - die Compare-Kompatibilitaetsmatrix in
   `spec/report-json.md`/`spec/compare-matrix.md` dokumentiert ist;
-- die Matrix ausschliesslich `(5, 5)` (oder `(6, 6)` falls A.1 v6
-  einfuehrt) als erlaubte Versionskombination listet;
+- die Matrix ausschliesslich `(6, 6)` als erlaubte
+  Versionskombination listet;
 - der Compile-DB-Fingerprint deterministisch reproduzierbar ist
   (gleicher Source-Path-Satz nach Normalisierung -> gleicher Hash);
 - impact-JSON-Eingaben aktiv abgelehnt werden;

@@ -1,6 +1,18 @@
 observation source: derived
 target metadata: loaded
 translation units with target mapping: 2 of 2
+Analysis Configuration:
+  Sections: tu-ranking, include-hotspots, target-graph, target-hubs
+  TU thresholds: arg_count=0, include_path_count=0, define_count=0
+  Min hotspot TUs: 2
+  Target hub thresholds: in=10, out=10
+
+Section states:
+  tu-ranking: active
+  include-hotspots: active
+  target-graph: active
+  target-hubs: active
+
 translation unit ranking
 based on metrics: arg_count + include_path_count + define_count
 top 2 of 2 translation units

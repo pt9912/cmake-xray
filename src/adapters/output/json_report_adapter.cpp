@@ -48,6 +48,7 @@ using xray::hexagon::model::IncludeHotspot;
 using xray::hexagon::model::IncludeOrigin;
 using xray::hexagon::model::IncludeScope;
 using xray::hexagon::model::ObservationSource;
+using xray::hexagon::model::ProjectIdentitySource;
 using xray::hexagon::model::RankedTranslationUnit;
 using xray::hexagon::model::ReportInputs;
 using xray::hexagon::model::ReportInputSource;
@@ -71,6 +72,13 @@ ordered_json string_or_null(const std::optional<std::string>& value) {
 ordered_json source_or_null(ReportInputSource source) {
     if (source == ReportInputSource::cli) return std::string{"cli"};
     return nullptr;
+}
+
+std::string project_identity_source_text(ProjectIdentitySource source) {
+    if (source == ProjectIdentitySource::cmake_file_api_source_root) {
+        return "cmake_file_api_source_root";
+    }
+    return "fallback_compile_database_fingerprint";
 }
 
 std::string changed_file_source_text(ChangedFileSource source) {
@@ -342,6 +350,18 @@ ordered_json render_inputs_common(const ReportInputs& inputs) {
         {"cmake_file_api_resolved_path", std::move(cmake_file_api_resolved_path)},
         {"cmake_file_api_source", std::move(cmake_file_api_source)},
     };
+}
+
+ordered_json render_analysis_inputs(const ReportInputs& inputs) {
+    auto out = render_inputs_common(inputs);
+    out["project_identity"] = inputs.project_identity.value_or("");
+    out["project_identity_source"] =
+        inputs.project_identity_source.has_value()
+            ? project_identity_source_text(*inputs.project_identity_source)
+            : std::string{};
+    // Keep parity with render_impact_inputs: returning a fresh ordered_json
+    // avoids an uncovered function-end brace under the 100%-coverage gate.
+    return ordered_json(std::move(out));
 }
 
 void index_targets(std::map<std::string, const std::vector<TargetInfo>*>& by_key,
@@ -642,7 +662,7 @@ std::string JsonReportAdapter::write_analysis_report(
     document["format"] = "cmake-xray.analysis";
     document["format_version"] = kReportFormatVersion;
     document["report_type"] = "analyze";
-    document["inputs"] = render_inputs_common(analysis_result.inputs);
+    document["inputs"] = render_analysis_inputs(analysis_result.inputs);
     document["summary"] = render_analysis_summary(analysis_result, top_limit);
     document["analysis_configuration"] = render_analysis_configuration(analysis_result);
     document["analysis_section_states"] = render_analysis_section_states(analysis_result);

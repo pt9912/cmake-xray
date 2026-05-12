@@ -1,13 +1,15 @@
 {
   "format": "cmake-xray.analysis",
-  "format_version": 5,
+  "format_version": 6,
   "report_type": "analyze",
   "inputs": {
     "compile_database_path": null,
     "compile_database_source": null,
     "cmake_file_api_path": "tests/e2e/testdata/m6/file_api_partial/build",
     "cmake_file_api_resolved_path": "tests/e2e/testdata/m6/file_api_partial/build/.cmake/api/v1/reply",
-    "cmake_file_api_source": "cli"
+    "cmake_file_api_source": "cli",
+    "project_identity": "/project",
+    "project_identity_source": "cmake_file_api_source_root"
   },
   "summary": {
     "translation_unit_count": 2,

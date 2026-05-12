@@ -1,6 +1,6 @@
 verbose analysis summary
   report_type: analyze
-  format_version: 5
+  format_version: 6
   translation_units: 2
   ranking_entries: 2 of 2
   include_hotspots: 0 of 0

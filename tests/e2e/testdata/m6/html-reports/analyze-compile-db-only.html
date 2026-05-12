@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="xray-report-format-version" content="5">
+<meta name="xray-report-format-version" content="6">
 <title>cmake-xray analyze report</title>
 <style>
 body{margin:0;padding:1.5rem;background:#ffffff;color:#1a1a1a;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;}
@@ -32,12 +32,12 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 </style>
 </head>
 <body>
-<main class="report" data-report-type="analyze" data-format-version="5">
+<main class="report" data-report-type="analyze" data-format-version="6">
 <header class="summary">
 <h1>cmake-xray analyze report</h1>
 <dl>
 <dt>report_type</dt><dd>analyze</dd>
-<dt>format_version</dt><dd>5</dd>
+<dt>format_version</dt><dd>6</dd>
 <dt>translation_units</dt><dd>3</dd>
 <dt>ranking_entries</dt><dd>3 of 3</dd>
 <dt>top_limit</dt><dd>10</dd>
@@ -52,7 +52,21 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 <dt>cmake_file_api_resolved_path</dt><dd>not provided</dd>
 <dt>cmake_file_api_source</dt><dd>not provided</dd>
 </dl></section>
-<section class="ranking"><h2>Translation Unit Ranking</h2>
+<section class="analysis-configuration"><h2>Analysis Configuration</h2>
+<dl>
+<dt>Sections</dt><dd>tu-ranking, include-hotspots, target-graph, target-hubs</dd>
+<dt>TU thresholds</dt><dd>arg_count=0, include_path_count=0, define_count=0</dd>
+<dt>Min hotspot TUs</dt><dd>2</dd>
+<dt>Target hub thresholds</dt><dd>in=10, out=10</dd>
+</dl>
+<h3>Section States</h3>
+<dl class="section-states">
+<dt>tu-ranking</dt><dd>active</dd>
+<dt>include-hotspots</dt><dd>active</dd>
+<dt>target-graph</dt><dd>not_loaded</dd>
+<dt>target-hubs</dt><dd>not_loaded</dd>
+</dl></section>
+<section class="ranking"><h2>Translation Unit Ranking <span class="badge badge--state-active">Status: active</span></h2>
 <div class="table-wrap"><table>
 <thead><tr><th scope="col">Rank</th><th scope="col">Source path</th><th scope="col">Directory</th><th scope="col">Score</th><th scope="col">Arguments</th><th scope="col">Include paths</th><th scope="col">Defines</th><th scope="col">Targets</th><th scope="col">Diagnostics</th></tr></thead>
 <tbody>
@@ -61,7 +75,7 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 <tr><td>3</td><td>src/lib/core.cpp</td><td>build/lib</td><td>7</td><td>6</td><td>1</td><td>0</td><td><span class="empty">no targets</span></td><td><span class="empty">no diagnostics</span></td></tr>
 </tbody>
 </table></div></section>
-<section class="hotspots"><h2>Include Hotspots</h2>
+<section class="hotspots"><h2>Include Hotspots <span class="badge badge--state-active">Status: active</span></h2>
 <p class="include-filter">Filter: scope=<span class="badge badge--all">all</span>, depth=<span class="badge badge--all">all</span>. Excluded: 0 unknown, 0 mixed.</p>
 <div class="table-wrap"><table>
 <thead><tr><th scope="col">Header</th><th scope="col">Origin</th><th scope="col">Depth</th><th scope="col">Affected translation units</th><th scope="col">Translation unit context</th></tr></thead>
@@ -77,10 +91,10 @@ code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;
 <dt>translation_units_with_targets</dt><dd>0 of 3</dd>
 </dl>
 <p class="empty">No target metadata loaded.</p></section>
-<section class="target-graph"><h2>Target Graph</h2>
-<p class="empty">Target graph not loaded.</p></section>
-<section class="target-hubs"><h2>Target Hubs</h2>
-<p class="empty">Target hubs not available.</p></section>
+<section class="target-graph"><h2>Target Graph <span class="badge badge--state-not-loaded">Status: not_loaded</span></h2>
+<p class="empty">Section not loaded.</p></section>
+<section class="target-hubs"><h2>Target Hubs <span class="badge badge--state-not-loaded">Status: not_loaded</span></h2>
+<p class="empty">Section not loaded.</p></section>
 <section class="diagnostics"><h2>Diagnostics</h2>
 <ul>
 <li><span class="badge">note</span> include-based results are heuristic; conditional or generated includes may be missing</li>

@@ -37,7 +37,7 @@ Jeder JSON-Report enthaelt diese Pflichtfelder in genau dieser Reihenfolge:
 | Feld | Typ | Pflicht | Beschreibung |
 | --- | --- | --- | --- |
 | `format` | string | ja | Maschinenlesbarer Dokumenttyp. `cmake-xray.analysis` oder `cmake-xray.impact`. |
-| `format_version` | integer | ja | Aktuell `5` (M6 AP 1.5). Erhoeht sich bei vertragsbrechenden Aenderungen. v5 fuegt zwei neue Top-Level-Pflichtfelder `analysis_configuration` und `analysis_section_states` ein, drei neue Summary-Counter (`tu_ranking_total_count_after_thresholds`, `tu_ranking_excluded_by_thresholds_count`, `include_hotspot_excluded_by_min_tus_count`) und erweitert `target_graph_status` um den Wert `"disabled"`. v4 fuegt den `include_filter`-Block sowie `origin` und `depth_kind` an jedem Hotspot-Item und `excluded_unknown_count`/`excluded_mixed_count` am Hotspot-Container ein. |
+| `format_version` | integer | ja | Aktuell `6` (M6 AP 1.6 A.1). Erhoeht sich bei vertragsbrechenden Aenderungen. v6 fuegt im Analyze-`inputs`-Block `project_identity` und `project_identity_source` ein. v5 fuegt zwei neue Top-Level-Pflichtfelder `analysis_configuration` und `analysis_section_states` ein, drei neue Summary-Counter (`tu_ranking_total_count_after_thresholds`, `tu_ranking_excluded_by_thresholds_count`, `include_hotspot_excluded_by_min_tus_count`) und erweitert `target_graph_status` um den Wert `"disabled"`. v4 fuegt den `include_filter`-Block sowie `origin` und `depth_kind` an jedem Hotspot-Item und `excluded_unknown_count`/`excluded_mixed_count` am Hotspot-Container ein. |
 | `report_type` | string | ja | `analyze` oder `impact`. Kurzer Workflow-Identifier; nicht der CLI-Wert `--format json`. |
 | `inputs` | object | ja | Eingabeprovenienz aus `ReportInputs`. Schema je Reporttyp unten. |
 | `summary` | object | ja | Aggregierte Kennzahlen je Reporttyp. |
@@ -90,6 +90,11 @@ Sortierung von Target-Listen: nach `display_name` aufsteigend; Tie-Breaker `type
 
 Regel: jedes der oben gelisteten Felder ist immer im Output, niemals weggelassen. Fehlende Werte sind JSON-`null`.
 
+Analyze-JSON ab `format_version=6` erweitert `inputs` zusaetzlich um
+die beiden Compare-Identitaetsfelder `project_identity` und
+`project_identity_source`; Impact-JSON nutzt weiter nur den gemeinsamen
+Anteil plus `changed_file`/`changed_file_source`.
+
 ## Analyze JSON
 
 Format-Identifier und Reporttyp:
@@ -116,7 +121,16 @@ Format-Identifier und Reporttyp:
 
 ### `inputs` (analyze)
 
-Enthaelt die fuenf Felder aus dem gemeinsamen `inputs`-Anteil. `changed_file` und `changed_file_source` sind nicht Teil des Analyze-`inputs`-Vertrags.
+Enthaelt die fuenf Felder aus dem gemeinsamen `inputs`-Anteil plus ab
+`format_version=6`:
+
+| Feld | Typ | Pflicht | Werte |
+| --- | --- | --- | --- |
+| `project_identity` | string | ja | Nicht leer. Bei File-API-Aufrufen die lexikalisch normalisierte Source-Root; bei Compile-DB-only-Aufrufen `compile-db:<64 lowercase hex chars>`. |
+| `project_identity_source` | string | ja | `cmake_file_api_source_root` oder `fallback_compile_database_fingerprint`. |
+
+`changed_file` und `changed_file_source` sind nicht Teil des
+Analyze-`inputs`-Vertrags.
 
 ### `summary` (analyze)
 

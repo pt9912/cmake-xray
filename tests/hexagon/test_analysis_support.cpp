@@ -833,15 +833,17 @@ TEST_CASE("to_report_display_path with case_insensitive policy still rejects unr
     CHECK(*display == "/repo2/build");
 }
 
-TEST_CASE("report format version is four") {
+TEST_CASE("report format version is six") {
     // AP M6-1.2 bumped the contract from 1 to 2 with the target-graph and
     // target-hubs additions to the analyze JSON (impact JSON adds the graph
     // but not the hubs). AP M6-1.3 A.4 lifted it to 3 for the prioritised
     // impact view across all five report formats. AP M6-1.4 A.3 lifts it
     // to 4 alongside the new --include-scope/--include-depth CLI options;
     // the structural include_filter / origin / depth_kind additions land
-    // with the JSON adapter rollout in A.4.
-    CHECK(xray::hexagon::model::kReportFormatVersion == 5);
+    // with the JSON adapter rollout in A.4. AP M6-1.5 lifts it to 5 for
+    // analysis configuration and section-state fields. AP M6-1.6 A.1 lifts
+    // it to 6 for Analyze inputs.project_identity.
+    CHECK(xray::hexagon::model::kReportFormatVersion == 6);
 }
 
 TEST_CASE("report-json schema format_version const matches kReportFormatVersion") {

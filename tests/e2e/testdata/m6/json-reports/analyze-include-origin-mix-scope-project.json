@@ -1,13 +1,15 @@
 {
   "format": "cmake-xray.analysis",
-  "format_version": 5,
+  "format_version": 6,
   "report_type": "analyze",
   "inputs": {
     "compile_database_path": "tests/e2e/testdata/m6/include_origin_mix/compile_commands.json",
     "compile_database_source": "cli",
     "cmake_file_api_path": null,
     "cmake_file_api_resolved_path": null,
-    "cmake_file_api_source": null
+    "cmake_file_api_source": null,
+    "project_identity": "compile-db:b63f61b5bb5f474ee42e7c094c64b1c7aba5635d7c0099a03273ac81276b5e60",
+    "project_identity_source": "fallback_compile_database_fingerprint"
   },
   "summary": {
     "translation_unit_count": 2,

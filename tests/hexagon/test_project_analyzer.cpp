@@ -31,6 +31,7 @@ using xray::hexagon::model::IncludeDepthKind;
 using xray::hexagon::model::IncludeEntry;
 using xray::hexagon::model::IncludeResolutionResult;
 using xray::hexagon::model::ObservationSource;
+using xray::hexagon::model::ProjectIdentitySource;
 using xray::hexagon::model::ReportInputSource;
 using xray::hexagon::model::ResolvedTranslationUnitIncludes;
 using xray::hexagon::model::TargetAssignment;
@@ -212,6 +213,12 @@ TEST_CASE("project analyzer builds ranked translation units and hotspots") {
     CHECK_FALSE(result.inputs.cmake_file_api_path.has_value());
     CHECK_FALSE(result.inputs.cmake_file_api_resolved_path.has_value());
     CHECK(result.inputs.cmake_file_api_source == ReportInputSource::not_provided);
+    REQUIRE(result.inputs.project_identity.has_value());
+    CHECK(*result.inputs.project_identity ==
+          "compile-db:731312c4d463124b71c49d245c2cd5361fe4a028979d1f9502490583a9a45181");
+    REQUIRE(result.inputs.project_identity_source.has_value());
+    CHECK(*result.inputs.project_identity_source ==
+          ProjectIdentitySource::fallback_compile_database_fingerprint);
     CHECK_FALSE(result.inputs.changed_file.has_value());
     CHECK_FALSE(result.inputs.changed_file_source.has_value());
     CHECK(result.observation_source == ObservationSource::exact);
@@ -558,6 +565,11 @@ TEST_CASE("project analyzer uses file api as derived source with targets on TUs"
     REQUIRE(result.inputs.cmake_file_api_path.has_value());
     CHECK(*result.inputs.cmake_file_api_path == "/tmp/build");
     CHECK(result.inputs.cmake_file_api_source == ReportInputSource::cli);
+    REQUIRE(result.inputs.project_identity.has_value());
+    CHECK(*result.inputs.project_identity == "/project");
+    REQUIRE(result.inputs.project_identity_source.has_value());
+    CHECK(*result.inputs.project_identity_source ==
+          ProjectIdentitySource::cmake_file_api_source_root);
 }
 
 TEST_CASE("project analyzer filters file api assignments and attaches targets in mixed path") {

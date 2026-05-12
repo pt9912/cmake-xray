@@ -13,6 +13,7 @@
 #include "model/diagnostic.h"
 #include "model/report_inputs.h"
 #include "services/analysis_support.h"
+#include "services/compile_db_fingerprint.h"
 #include "services/diagnostic_support.h"
 #include "services/target_graph_support.h"
 
@@ -288,6 +289,27 @@ void populate_analysis_configuration(const AnalyzeProjectRequest& request,
     cfg.target_hub_out_threshold = request.target_hub_out_threshold;
 }
 
+void populate_project_identity(const LoadedInputs& loaded, model::AnalysisResult& result) {
+    using model::ProjectIdentitySource;
+    if (!loaded.source_root.empty()) {
+        const auto identity = normalize_project_identity_path(loaded.source_root.generic_string());
+        if (!identity.empty()) {
+            result.inputs.project_identity = identity;
+            result.inputs.project_identity_source =
+                ProjectIdentitySource::cmake_file_api_source_root;
+            return;
+        }
+    }
+
+    const auto identity =
+        compile_db_project_identity_from_ranked_units(result.translation_units);
+    if (!identity.empty()) {
+        result.inputs.project_identity = identity;
+        result.inputs.project_identity_source =
+            ProjectIdentitySource::fallback_compile_database_fingerprint;
+    }
+}
+
 bool analysis_section_in(const std::vector<model::AnalysisSection>& sections,
                           model::AnalysisSection section) {
     return std::find(sections.begin(), sections.end(), section) != sections.end();
@@ -411,6 +433,7 @@ model::AnalysisResult ProjectAnalyzer::analyze_project(AnalyzeProjectRequest req
     if (load_project_inputs(ctx, state, result)) {
         finalize_analysis(ctx, state, include_resolver_port_, result);
     }
+    populate_project_identity(state.loaded, result);
     normalize_target_graph_status_for_sections(result);
     populate_analysis_section_states(result);
     return result;

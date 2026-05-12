@@ -2,6 +2,7 @@ add_library(
     xray_hexagon
     services/diagnostic_support.cpp
     services/analysis_support.cpp
+    services/compile_db_fingerprint.cpp
     services/impact_analyzer.cpp
     services/project_analyzer.cpp
     services/report_generator.cpp

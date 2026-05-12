@@ -6,7 +6,7 @@
 | ---------- | -------------------------------------------------------------------------------------- |
 | Dokument   | Phasenplan `cmake-xray`                                                                |
 | Version    | `0.8`                                                                                  |
-| Stand      | `2026-05-02`                                                                           |
+| Stand      | `2026-05-12`                                                                           |
 | Status     | Entwurf                                                                                |
 | Referenzen | [Lastenheft](../../../spec/lastenheft.md), [Design](../../../spec/design.md), [Architektur](../../../spec/architecture.md) |
 
@@ -22,12 +22,12 @@ Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**.
 | M6 AP 1.2            | `erledigt`        | Target-Graph-Ausgaben + Hubs ([`done/plan-M6-1-2.md`](../done/plan-M6-1-2.md)).              |
 | M6 AP 1.3            | `erledigt`        | Impact-Priorisierung ueber Target-Graph ([`done/plan-M6-1-3.md`](../done/plan-M6-1-3.md)).   |
 | M6 AP 1.4            | `erledigt`        | Include-Sicht (Origin + Tiefe) — Liefer-Stand in [`done/plan-M6-1-4.md`](../done/plan-M6-1-4.md).             |
-| **M6 AP 1.5**        | **`in Arbeit`**   | Analyseauswahl, Schwellenwerte, Impact-Budget ([`in-progress/plan-M6-1-5.md`](./plan-M6-1-5.md)).  |
-| M6 AP 1.6            | `offen`           | Vergleich zweier Analyse-JSON-Berichte ([`open/plan-M6-1-6.md`](../open/plan-M6-1-6.md)).    |
+| M6 AP 1.5            | `erledigt`        | Analyseauswahl, Schwellenwerte, Impact-Budget ([`done/plan-M6-1-5.md`](../done/plan-M6-1-5.md)).    |
+| **M6 AP 1.6**        | **`in Arbeit`**   | Vergleich zweier Analyse-JSON-Berichte ([`in-progress/plan-M6-1-6.md`](./plan-M6-1-6.md)).           |
 | M6 AP 1.7            | `offen`           | Referenzdaten, Doku, Release ([`open/plan-M6-1-7.md`](../open/plan-M6-1-7.md)).              |
 | M6 AP 1.8            | `offen`           | Praeprozessor-Include + Konfig-Override ([`open/plan-M6-1-8.md`](../open/plan-M6-1-8.md)).   |
 
-Naechster konkreter Schritt: M6 AP 1.5 A.1 (Modelle und CLI-Parser), siehe `in-progress/plan-M6-1-5.md` Step 1.
+Naechster konkreter Schritt: M6 AP 1.6 A.2 (Compare-Modell und JSON-Reader), siehe `in-progress/plan-M6-1-6.md` Step 5.
 
 ## 1. Planungsgrundsaetze
 

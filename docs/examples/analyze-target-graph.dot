@@ -1,6 +1,6 @@
 digraph cmake_xray_analysis {
   xray_report_type="analyze";
-  format_version=5;
+  format_version=6;
   graph_node_limit=50;
   graph_edge_limit=80;
   graph_truncated=false;
@@ -15,16 +15,16 @@ digraph cmake_xray_analysis {
   graph_tu_threshold_arg_count=0;
   graph_tu_threshold_include_path_count=0;
   graph_tu_threshold_define_count=0;
-  tu_1 [kind="translation_unit", rank=1, label="hub.cpp", path="src/hub.cpp", directory="build", unique_key="HOSTPATH"];
-  tu_2 [kind="translation_unit", rank=2, label="src00.cpp", path="src/src00.cpp", directory="build", unique_key="HOSTPATH"];
-  tu_3 [kind="translation_unit", rank=3, label="src01.cpp", path="src/src01.cpp", directory="build", unique_key="HOSTPATH"];
-  tu_4 [kind="translation_unit", rank=4, label="src02.cpp", path="src/src02.cpp", directory="build", unique_key="HOSTPATH"];
-  tu_5 [kind="translation_unit", rank=5, label="src03.cpp", path="src/src03.cpp", directory="build", unique_key="HOSTPATH"];
-  tu_6 [kind="translation_unit", rank=6, label="src04.cpp", path="src/src04.cpp", directory="build", unique_key="HOSTPATH"];
-  tu_7 [kind="translation_unit", rank=7, label="src05.cpp", path="src/src05.cpp", directory="build", unique_key="HOSTPATH"];
-  tu_8 [kind="translation_unit", rank=8, label="src06.cpp", path="src/src06.cpp", directory="build", unique_key="HOSTPATH"];
-  tu_9 [kind="translation_unit", rank=9, label="src07.cpp", path="src/src07.cpp", directory="build", unique_key="HOSTPATH"];
-  tu_10 [kind="translation_unit", rank=10, label="src08.cpp", path="src/src08.cpp", directory="build", unique_key="HOSTPATH"];
+  tu_1 [kind="translation_unit", rank=1, label="hub.cpp", path="src/hub.cpp", directory="build", unique_key="/project/src/hub.cpp|/project/build"];
+  tu_2 [kind="translation_unit", rank=2, label="src00.cpp", path="src/src00.cpp", directory="build", unique_key="/project/src/src00.cpp|/project/build"];
+  tu_3 [kind="translation_unit", rank=3, label="src01.cpp", path="src/src01.cpp", directory="build", unique_key="/project/src/src01.cpp|/project/build"];
+  tu_4 [kind="translation_unit", rank=4, label="src02.cpp", path="src/src02.cpp", directory="build", unique_key="/project/src/src02.cpp|/project/build"];
+  tu_5 [kind="translation_unit", rank=5, label="src03.cpp", path="src/src03.cpp", directory="build", unique_key="/project/src/src03.cpp|/project/build"];
+  tu_6 [kind="translation_unit", rank=6, label="src04.cpp", path="src/src04.cpp", directory="build", unique_key="/project/src/src04.cpp|/project/build"];
+  tu_7 [kind="translation_unit", rank=7, label="src05.cpp", path="src/src05.cpp", directory="build", unique_key="/project/src/src05.cpp|/project/build"];
+  tu_8 [kind="translation_unit", rank=8, label="src06.cpp", path="src/src06.cpp", directory="build", unique_key="/project/src/src06.cpp|/project/build"];
+  tu_9 [kind="translation_unit", rank=9, label="src07.cpp", path="src/src07.cpp", directory="build", unique_key="/project/src/src07.cpp|/project/build"];
+  tu_10 [kind="translation_unit", rank=10, label="src08.cpp", path="src/src08.cpp", directory="build", unique_key="/project/src/src08.cpp|/project/build"];
   target_1 [kind="target", label="hub", name="hub", type="STATIC_LIBRARY", unique_key="hub::STATIC_LIBRARY"];
   target_2 [kind="target", label="src00", name="src00", type="STATIC_LIBRARY", unique_key="src00::STATIC_LIBRARY"];
   target_3 [kind="target", label="src01", name="src01", type="STATIC_LIBRARY", unique_key="src01::STATIC_LIBRARY"];

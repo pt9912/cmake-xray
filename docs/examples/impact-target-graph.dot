@@ -1,6 +1,6 @@
 digraph cmake_xray_impact {
   xray_report_type="impact";
-  format_version=5;
+  format_version=6;
   graph_node_limit=100;
   graph_edge_limit=200;
   graph_truncated=false;
@@ -8,7 +8,7 @@ digraph cmake_xray_impact {
   graph_impact_target_depth_requested=2;
   graph_impact_target_depth_effective=1;
   changed_file [kind="changed_file", label="hub.cpp", path="src/hub.cpp"];
-  direct_tu_1 [kind="translation_unit", impact="direct", label="hub.cpp", path="src/hub.cpp", directory="build", unique_key="HOSTPATH"];
+  direct_tu_1 [kind="translation_unit", impact="direct", label="hub.cpp", path="src/hub.cpp", directory="build", unique_key="/project/src/hub.cpp|/project/build"];
   target_1 [kind="target", impact="direct", priority_class="direct", graph_distance=0, evidence_strength="direct", label="hub", name="hub", type="STATIC_LIBRARY", unique_key="hub::STATIC_LIBRARY"];
   target_2 [kind="target", priority_class="direct_dependent", graph_distance=1, evidence_strength="direct", label="src00", name="src00", type="STATIC_LIBRARY", unique_key="src00::STATIC_LIBRARY"];
   target_3 [kind="target", priority_class="direct_dependent", graph_distance=1, evidence_strength="direct", label="src01", name="src01", type="STATIC_LIBRARY", unique_key="src01::STATIC_LIBRARY"];

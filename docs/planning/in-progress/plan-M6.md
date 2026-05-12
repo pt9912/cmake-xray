@@ -7,7 +7,7 @@
 | Dokument | Plan M6 `cmake-xray` |
 | Dokumentrevision | `0.2` |
 | Zielrelease | `v1.3.0` |
-| Stand | `2026-05-11` |
+| Stand | `2026-05-12` |
 | Status | in Arbeit |
 | Referenzen | [Lastenheft](../../../spec/lastenheft.md), [Design](../../../spec/design.md), [Architektur](../../../spec/architecture.md), [Phasenplan](./roadmap.md), [Plan M5](../done/plan-M5.md), [Qualitaet](../../user/quality.md), [Releasing](../../user/releasing.md) |
 
@@ -72,8 +72,8 @@ M6 baut auf M4 und M5 auf. Ohne CMake-File-API-Daten bleiben Target-Graph-Abschn
 | 1.2 Target-Graph-Ausgaben    | `erledigt`  | [`done/plan-M6-1-2.md`](../done/plan-M6-1-2.md)     | siehe Liefer-Stand-Block im Plan |
 | 1.3 Impact-Priorisierung     | `erledigt`  | [`done/plan-M6-1-3.md`](../done/plan-M6-1-3.md)     | siehe Liefer-Stand-Block im Plan |
 | 1.4 Include-Sicht v4         | `erledigt`  | [`done/plan-M6-1-4.md`](../done/plan-M6-1-4.md)     | `2f83d7e` (Lead A.5 step 25c), Liefer-Stand-Block listet alle Tranche-Hashes |
-| 1.5 Analyseauswahl + Budgets | `in Arbeit` | [`in-progress/plan-M6-1-5.md`](./plan-M6-1-5.md)    | — (A.1-A.6 noch nicht ausgeliefert) |
-| 1.6 Compare-Sicht            | `offen`     | [`open/plan-M6-1-6.md`](../open/plan-M6-1-6.md)     | —           |
+| 1.5 Analyseauswahl + Budgets | `erledigt`  | [`done/plan-M6-1-5.md`](../done/plan-M6-1-5.md)     | `4b03c0d` (Lead A.6 Audit-Pass), Liefer-Stand-Block listet alle Tranche-Hashes |
+| 1.6 Compare-Sicht            | `in Arbeit` | [`in-progress/plan-M6-1-6.md`](./plan-M6-1-6.md)    | — (A.1 lokal umgesetzt, Lead-Commit folgt) |
 | 1.7 Referenzdaten + Doku     | `offen`     | [`open/plan-M6-1-7.md`](../open/plan-M6-1-7.md)     | —           |
 | 1.8 Praeprozessor-Include    | `offen`     | [`open/plan-M6-1-8.md`](../open/plan-M6-1-8.md)     | —           |
 

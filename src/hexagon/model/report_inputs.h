@@ -17,6 +17,11 @@ enum class ChangedFileSource {
     unresolved_file_api_source_root,
 };
 
+enum class ProjectIdentitySource {
+    cmake_file_api_source_root,
+    fallback_compile_database_fingerprint,
+};
+
 struct ReportInputs {
     std::optional<std::string> compile_database_path;
     ReportInputSource compile_database_source{ReportInputSource::not_provided};
@@ -27,6 +32,9 @@ struct ReportInputs {
 
     std::optional<std::string> changed_file;
     std::optional<ChangedFileSource> changed_file_source;
+
+    std::optional<std::string> project_identity;
+    std::optional<ProjectIdentitySource> project_identity_source;
 };
 
 }  // namespace xray::hexagon::model

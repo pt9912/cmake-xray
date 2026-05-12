@@ -990,7 +990,8 @@ parallel zu AP 1.4 entwickelbar.
   Section disabled / not loaded paragraphs), `5fac8ab` (Step 19
   report-html.md v5) und `95d2db2` (Step 20 Console-/Markdown-/HTML-
   Goldens und docs/examples-Regen).
-- A.6 (Audit-Pass): **lokal erledigt**. Der Audit schliesst die
+- A.6 (Audit-Pass): **erledigt**. Lead-Commit `4b03c0d` (Audit-Gaps
+  und CI-Fix). Der Audit schliesst die
   verbliebenen Abnahmeluecken aus A.4/A.5: `target_graph_status`
   wird bei deaktivierter Target-Graph-Section auf `disabled`
   normalisiert; JSON serialisiert `disabled`/`not_loaded`-Sections mit

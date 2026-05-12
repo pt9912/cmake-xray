@@ -1,6 +1,6 @@
 {
   "format": "cmake-xray.impact",
-  "format_version": 5,
+  "format_version": 6,
   "report_type": "impact",
   "inputs": {
     "compile_database_path": null,

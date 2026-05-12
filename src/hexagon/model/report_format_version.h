@@ -11,10 +11,12 @@ namespace xray::hexagon::model {
 // (tu_ranking_total_count_after_thresholds,
 // tu_ranking_excluded_by_thresholds_count,
 // include_hotspot_excluded_by_min_tus_count) and the new
-// TargetGraphStatus::disabled value. The schema-side FormatVersion.const
-// in spec/report-json.schema.json must stay synchronised with this
-// constant; report_json_schema_validation CTest gate fails loud if the
-// two constants drift apart.
-inline constexpr int kReportFormatVersion = 5;
+// TargetGraphStatus::disabled value. AP M6-1.6 A.1 raises it to 6 so
+// Analyze JSON can carry inputs.project_identity and
+// inputs.project_identity_source for compare. The schema-side
+// FormatVersion.const in spec/report-json.schema.json must stay
+// synchronised with this constant; report_json_schema_validation CTest
+// gate fails loud if the two constants drift apart.
+inline constexpr int kReportFormatVersion = 6;
 
 }  // namespace xray::hexagon::model

@@ -37,6 +37,7 @@ using xray::hexagon::model::ImpactedTarget;
 using xray::hexagon::model::ImpactedTranslationUnit;
 using xray::hexagon::model::IncludeHotspot;
 using xray::hexagon::model::ObservationSource;
+using xray::hexagon::model::ProjectIdentitySource;
 using xray::hexagon::model::RankedTranslationUnit;
 using xray::hexagon::model::ReportInputs;
 using xray::hexagon::model::ReportInputSource;
@@ -177,6 +178,8 @@ TEST_CASE("json analyze inputs serialize cli-or-null and resolved file api path"
         std::optional<std::string>{"build"}, std::optional<std::string>{"build/.cmake/api/v1/reply"},
         ReportInputSource::cli, std::nullopt, std::nullopt,
     };
+    result.inputs.project_identity = "/repo/cmake-xray";
+    result.inputs.project_identity_source = ProjectIdentitySource::cmake_file_api_source_root;
 
     const JsonReportAdapter adapter;
     const auto doc = parse(adapter.write_analysis_report(result, 5));
@@ -187,6 +190,26 @@ TEST_CASE("json analyze inputs serialize cli-or-null and resolved file api path"
     CHECK(inputs["cmake_file_api_path"] == "build");
     CHECK(inputs["cmake_file_api_resolved_path"] == "build/.cmake/api/v1/reply");
     CHECK(inputs["cmake_file_api_source"] == "cli");
+    CHECK(inputs["project_identity"] == "/repo/cmake-xray");
+    CHECK(inputs["project_identity_source"] == "cmake_file_api_source_root");
+}
+
+TEST_CASE("json analyze inputs render empty project identity fallback for direct adapter calls") {
+    AnalysisResult result;
+    result.application = xray::hexagon::model::application_info();
+    result.compile_database = CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    result.inputs = ReportInputs{
+        std::nullopt, ReportInputSource::not_provided,
+        std::nullopt, std::nullopt,
+        ReportInputSource::not_provided, std::nullopt, std::nullopt,
+    };
+
+    const JsonReportAdapter adapter;
+    const auto doc = parse(adapter.write_analysis_report(result, 5));
+    const auto& inputs = doc["inputs"];
+
+    CHECK(inputs["project_identity"] == "");
+    CHECK(inputs["project_identity_source"] == "");
 }
 
 TEST_CASE("json analyze summary booleans honor include_analysis_heuristic flag") {
@@ -926,13 +949,10 @@ TEST_CASE("AP1.3 A.3: evidence_strength_text_v3 maps the three TargetEvidenceStr
           "uncertain");
 }
 
-TEST_CASE("AP1.4 A.3: kReportFormatVersion is 4 alongside the new --include-scope/--include-depth options") {
-    // AP M6-1.4 A.3 flips the production format-version constant from 3 to 4.
+TEST_CASE("AP1.6 A.1: kReportFormatVersion is 6 for Analyze project identity") {
     // The schema-side FormatVersion.const must follow in
     // spec/report-json.schema.json; report_json_schema_validation
-    // verifies the pair stays in sync. The structural v4 additions
-    // (include_filter / origin / depth_kind) ship with the JSON adapter
-    // rollout in A.4.
-    static_assert(xray::hexagon::model::kReportFormatVersion == 5);
-    CHECK(xray::hexagon::model::kReportFormatVersion == 5);
+    // verifies the pair stays in sync.
+    static_assert(xray::hexagon::model::kReportFormatVersion == 6);
+    CHECK(xray::hexagon::model::kReportFormatVersion == 6);
 }

@@ -10,7 +10,7 @@
   "$defs": {
     "FormatVersion": {
       "type": "integer",
-      "const": 5
+      "const": 6
     },
     "AnalysisSection": {
       "type": "string",
@@ -134,6 +134,13 @@
       "oneOf": [
         {"type": "string", "enum": ["cli"]},
         {"type": "null"}
+      ]
+    },
+    "ProjectIdentitySource": {
+      "type": "string",
+      "enum": [
+        "cmake_file_api_source_root",
+        "fallback_compile_database_fingerprint"
       ]
     },
     "ChangedFileSource": {
@@ -377,14 +384,18 @@
         "compile_database_source",
         "cmake_file_api_path",
         "cmake_file_api_resolved_path",
-        "cmake_file_api_source"
+        "cmake_file_api_source",
+        "project_identity",
+        "project_identity_source"
       ],
       "properties": {
         "compile_database_path": {"type": ["string", "null"]},
         "compile_database_source": {"$ref": "#/$defs/ReportInputSource"},
         "cmake_file_api_path": {"type": ["string", "null"]},
         "cmake_file_api_resolved_path": {"type": ["string", "null"]},
-        "cmake_file_api_source": {"$ref": "#/$defs/ReportInputSource"}
+        "cmake_file_api_source": {"$ref": "#/$defs/ReportInputSource"},
+        "project_identity": {"type": "string", "minLength": 1},
+        "project_identity_source": {"$ref": "#/$defs/ProjectIdentitySource"}
       }
     },
     "ImpactInputs": {
