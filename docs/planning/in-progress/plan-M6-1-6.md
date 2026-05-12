@@ -372,18 +372,24 @@ Regeln:
    - Keine Symlink-Aufloesung.
    - Trailing Slashes entfernt.
    - Windows-Drive-Letters lowercase.
+   - UNC-Roots bleiben als `//server/share/...` erhalten.
    - Pfade werden NICHT case-gefoldet (POSIX bleibt case-sensitiv).
-2. **Deduplizierung**: Identische Pfade werden zusammengezogen.
-3. **Sortierung**: lexikografisch aufsteigend nach UTF-8-Byte-Folge.
-4. **Kanonische JSON-Payload**:
+2. **Absolute-Path-Stabilisierung**: Wenn alle normalisierten
+   `source_path`-Werte absolute/rooted Pfade sind und einen gemeinsamen
+   Verzeichnispraefix besitzen, wird dieser Praefix vor Hashbildung
+   entfernt. Damit bleibt der Compile-DB-Fallback ueber unterschiedliche
+   Checkout-/Workspace-Pfade stabil.
+3. **Deduplizierung**: Identische Pfade werden zusammengezogen.
+4. **Sortierung**: lexikografisch aufsteigend nach UTF-8-Byte-Folge.
+5. **Kanonische JSON-Payload**:
    - Objekt-Schluessel exakt in der Reihenfolge `kind`, `version`,
      `source_paths`.
    - String-Escaping nach RFC 8259.
    - Keine unnoetigen Whitespace-Zeichen (kompakte Form, kein
      Newline, kein Indent).
-5. **Hash-Berechnung**: SHA-256 ueber die UTF-8-Bytes der kanonischen
+6. **Hash-Berechnung**: SHA-256 ueber die UTF-8-Bytes der kanonischen
    JSON-Payload. Ausgabe als 64 lowercase Hex-Zeichen.
-6. **Final-Wert**: `compile-db:<hash>`.
+7. **Final-Wert**: `compile-db:<hash>`.
 
 Akzeptierter Trade-off:
 

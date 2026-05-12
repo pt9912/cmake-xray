@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <iomanip>
 #include <set>
@@ -207,13 +208,81 @@ std::string join_path_parts(const std::vector<std::string>& parts, bool absolute
     return std::string(std::move(out));
 }
 
+bool is_unc_path(std::string_view path) {
+    return path.size() >= 2U && path[0] == '/' && path[1] == '/' &&
+           (path.size() == 2U || path[2] != '/');
+}
+
+bool is_drive_rooted_path(std::string_view path) {
+    return path.size() >= 3U && path[1] == ':' && path[2] == '/';
+}
+
+bool is_rooted_identity_path(std::string_view path) {
+    return is_unc_path(path) || (!path.empty() && path.front() == '/') ||
+           is_drive_rooted_path(path);
+}
+
+std::vector<std::string> parent_parts(const std::vector<std::string>& parts) {
+    if (parts.empty()) return {};
+    return {parts.begin(), parts.end() - 1};
+}
+
+std::vector<std::string> common_prefix(std::vector<std::string> prefix,
+                                       const std::vector<std::string>& parts) {
+    const auto mismatch = std::mismatch(prefix.begin(), prefix.end(), parts.begin(), parts.end());
+    prefix.erase(mismatch.first, prefix.end());
+    return prefix;
+}
+
+std::vector<std::string> common_parent_prefix(
+    const std::vector<std::vector<std::string>>& paths) {
+    if (paths.empty()) return {};
+    auto prefix = parent_parts(paths.front());
+    for (std::size_t i = 1; i < paths.size(); ++i) {
+        prefix = common_prefix(std::move(prefix), parent_parts(paths[i]));
+    }
+    return std::vector<std::string>(std::move(prefix));
+}
+
+std::string join_relative_suffix(const std::vector<std::string>& parts,
+                                 const std::vector<std::string>& prefix) {
+    if (prefix.empty()) return join_path_parts(parts, false);
+    std::vector<std::string> suffix(parts.begin() + static_cast<std::ptrdiff_t>(prefix.size()),
+                                    parts.end());
+    return join_path_parts(suffix, false);
+}
+
+std::set<std::string> relativize_absolute_paths_for_fingerprint(
+    const std::set<std::string>& normalized_paths) {
+    const bool all_rooted =
+        std::all_of(normalized_paths.begin(), normalized_paths.end(), is_rooted_identity_path);
+    if (!all_rooted) return normalized_paths;
+
+    std::vector<std::vector<std::string>> path_parts;
+    path_parts.reserve(normalized_paths.size());
+    for (const auto& path : normalized_paths) {
+        path_parts.push_back(normalized_path_parts(path));
+    }
+    const auto prefix = common_parent_prefix(path_parts);
+    if (prefix.empty()) return normalized_paths;
+
+    std::set<std::string> relative_paths;
+    for (const auto& parts : path_parts) {
+        const auto relative = join_relative_suffix(parts, prefix);
+        if (!relative.empty()) relative_paths.insert(relative);
+    }
+    return relative_paths.empty() ? normalized_paths : relative_paths;
+}
+
 }  // namespace
 
 std::string normalize_project_identity_path(std::string path) {
     std::replace(path.begin(), path.end(), '\\', '/');
     lowercase_windows_drive_letter(path);
 
-    const bool absolute = !path.empty() && path.front() == '/';
+    const bool unc = is_unc_path(path);
+    const bool absolute = !unc && !path.empty() && path.front() == '/';
+    if (unc) return "//" + join_path_parts(normalized_path_parts(path), false);
     return join_path_parts(normalized_path_parts(path), absolute);
 }
 
@@ -226,7 +295,9 @@ std::string compile_db_project_identity_from_source_paths(
     }
     if (normalized_paths.empty()) return {};
 
-    return "compile-db:" + sha256_hex(canonical_payload(normalized_paths));
+    return "compile-db:" +
+           sha256_hex(canonical_payload(relativize_absolute_paths_for_fingerprint(
+               normalized_paths)));
 }
 
 std::string compile_db_project_identity_from_ranked_units(

@@ -45,7 +45,36 @@ TEST_CASE("compile-db project identity keeps accepted build-context trade-off") 
           xray::hexagon::services::compile_db_project_identity_from_source_paths(second_context));
 }
 
+TEST_CASE("compile-db project identity ignores empty source paths") {
+    const std::vector<std::string> empty_paths{"", "."};
+
+    CHECK(xray::hexagon::services::normalize_project_identity_path("") == "");
+    CHECK(xray::hexagon::services::compile_db_project_identity_from_source_paths(empty_paths) ==
+          "");
+}
+
+TEST_CASE("compile-db project identity strips shared absolute checkout prefixes") {
+    const std::vector<std::string> first_checkout{
+        "/home/user/cmake-xray/src/main.cpp",
+        "/home/user/cmake-xray/src/lib.cpp",
+    };
+    const std::vector<std::string> second_checkout{
+        "/workspace/cmake-xray/src/lib.cpp",
+        "/workspace/cmake-xray/src/main.cpp",
+    };
+
+    CHECK(xray::hexagon::services::compile_db_project_identity_from_source_paths(first_checkout) ==
+          "compile-db:6afc7a7213bdd1ebdb9fcf68bbbccb056f44c6b2887388e508163c8421691464");
+    CHECK(xray::hexagon::services::compile_db_project_identity_from_source_paths(first_checkout) ==
+          xray::hexagon::services::compile_db_project_identity_from_source_paths(second_checkout));
+}
+
 TEST_CASE("project identity path normalization handles windows drive letters") {
     CHECK(xray::hexagon::services::normalize_project_identity_path(
               "C:\\Repo\\.\\src\\foo.cpp\\") == "c:/Repo/src/foo.cpp");
+}
+
+TEST_CASE("project identity path normalization preserves UNC roots") {
+    CHECK(xray::hexagon::services::normalize_project_identity_path(
+              "\\\\server\\share\\.\\repo\\") == "//server/share/repo");
 }
