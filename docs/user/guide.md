@@ -14,6 +14,8 @@ spezialisierten Dokumente massgeblich:
 - [docs/user/releasing.md](./releasing.md)
 - [docs/user/quality.md](./quality.md)
 - [docs/user/performance.md](./performance.md)
+- [spec/report-json.md](../../spec/report-json.md)
+- [spec/report-compare.md](../../spec/report-compare.md)
 
 ## Voraussetzungen
 
@@ -312,6 +314,78 @@ cmake-xray analyze \
 Die erzeugte Datei kann ohne weitere Build- oder Asset-Schritte direkt im
 Browser geoeffnet oder als CI-Artefakt veroeffentlicht werden.
 
+### Target-Graph-Sicht
+
+Mit File-API-Daten zeigt `analyze` direkte Target-Abhaengigkeiten und
+Target-Hubs:
+
+```bash
+cmake-xray analyze \
+  --cmake-file-api build \
+  --format console \
+  --top 10
+```
+
+Beispieloutput:
+[docs/examples/analyze-target-graph-loaded.txt](../examples/analyze-target-graph-loaded.txt).
+Der JSON-/HTML-Vertrag enthaelt auch dann Section-States, wenn einzelne
+Sections deaktiviert oder nicht geladen sind.
+
+### Include-Hotspots filtern
+
+Projekt-Header isolieren:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --include-scope project \
+  --format markdown
+```
+
+Nur direkte Includes anzeigen:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --include-depth direct \
+  --format markdown
+```
+
+Beispiele:
+[analyze-include-scope-project.md](../examples/analyze-include-scope-project.md)
+und
+[analyze-include-depth-direct.md](../examples/analyze-include-depth-direct.md).
+
+### Schwellenwerte setzen
+
+Translation Units und Hotspots koennen vor der Ausgabe gefiltert werden:
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --tu-threshold include_path_count=2 \
+  --min-hotspot-tus 3 \
+  --format markdown
+```
+
+Das Beispiel [analyze-thresholds.md](../examples/analyze-thresholds.md)
+zeigt, wie die wirksamen Werte im Report unter `Analysis Configuration`
+sichtbar bleiben.
+
+### Analyseabschnitte auswaehlen
+
+Fuer schmale Reports kann `--analysis` einzelne Sections auswaehlen:
+
+```bash
+cmake-xray analyze \
+  --cmake-file-api build \
+  --analysis tu-ranking,target-graph \
+  --format markdown
+```
+
+`target-hubs` setzt `target-graph` voraus. Beispiel:
+[analyze-disabled-target-hubs.md](../examples/analyze-disabled-target-hubs.md).
+
 ## Impact-Analyse
 
 Die Impact-Analyse schaetzt ab, welche Translation Units von einer geaenderten
@@ -382,8 +456,71 @@ erzeugt kein HTML-Fehlerdokument.
 Der Impact-JSON-Bericht enthaelt zusaetzlich `inputs.changed_file` und
 `inputs.changed_file_source`. Erlaubte Werte fuer `changed_file_source` sind
 `compile_database_directory`, `file_api_source_root` und `cli_absolute`. Der
-M5-Vertrag begrenzt Impact-Listen nicht ueber `--top`; alle betroffenen
+M6-Vertrag begrenzt Impact-Listen nicht ueber `--top`; alle betroffenen
 Translation Units und Targets aus dem Modell werden ausgegeben.
+
+### Welche Targets sind durch eine Header-Aenderung betroffen?
+
+Wenn Target-Graph-Daten vorhanden sind, priorisiert `impact` neben direkt
+betroffenen Translation Units auch Targets ueber Reverse-BFS:
+
+```bash
+cmake-xray impact \
+  --cmake-file-api build \
+  --changed-file src/hub.cpp \
+  --impact-target-depth 2 \
+  --format markdown
+```
+
+Beispiel: [impact-prioritised.md](../examples/impact-prioritised.md).
+`direct` bezeichnet Seed-Targets, `direct_dependent` und
+`transitive_dependent` stammen aus der Reverse-Target-Graph-Traversierung.
+
+### Wann lohnt sich `--require-target-graph` in CI?
+
+Ohne `--require-target-graph` degradiert `impact` kompatibel auf die
+Compile-DB-/Include-Sicht, wenn keine Target-Graph-Daten vorliegen. In CI
+ist ein harter Fehler sinnvoll, wenn nachgelagerte Jobs Target-Priorisierung
+erzwingen:
+
+```bash
+cmake-xray impact \
+  --compile-commands build/compile_commands.json \
+  --changed-file src/app/main.cpp \
+  --require-target-graph
+```
+
+Der Fehlervertrag ist als Beispiel gepinnt:
+[impact-require-target-graph-error.txt](../examples/impact-require-target-graph-error.txt).
+
+## Compare
+
+`compare` vergleicht zwei Analyze-JSON-Berichte:
+
+```bash
+cmake-xray compare \
+  --baseline build/reports/analyze-before.json \
+  --current build/reports/analyze-after.json \
+  --format markdown \
+  --output build/reports/analyze-diff.md
+```
+
+Typische Befunde sind hinzugefuegte, entfernte und veraenderte Translation
+Units, Include-Hotspots, Target-Knoten, Target-Kanten und Target-Hubs.
+Konfigurationsunterschiede erscheinen als `configuration_drift` mit
+`ci_policy_hint=review_required`.
+
+Beispiele:
+
+- [compare-typical.md](../examples/compare-typical.md)
+- [compare-config-drift.md](../examples/compare-config-drift.md)
+- [compare-project-identity-drift.md](../examples/compare-project-identity-drift.md)
+
+`compare` akzeptiert in M6 ausschliesslich Analyze-JSON
+`format_version=6` auf beiden Seiten. Die Matrix steht in
+[spec/compare-matrix.md](../../spec/compare-matrix.md), der
+Compare-JSON-Vertrag in
+[spec/report-compare.md](../../spec/report-compare.md).
 
 ## Reports lesen
 
@@ -428,6 +565,20 @@ Mit Target-Sicht (File API):
 - [docs/examples/impact-report-targets.html](../examples/impact-report-targets.html)
 - [docs/examples/impact-report-targets.json](../examples/impact-report-targets.json)
 - [docs/examples/impact-report-targets.dot](../examples/impact-report-targets.dot)
+
+M6-Beispiele:
+
+- [docs/examples/analyze-target-graph-loaded.txt](../examples/analyze-target-graph-loaded.txt)
+- [docs/examples/analyze-target-graph-partial.txt](../examples/analyze-target-graph-partial.txt)
+- [docs/examples/analyze-include-scope-project.md](../examples/analyze-include-scope-project.md)
+- [docs/examples/analyze-include-depth-direct.md](../examples/analyze-include-depth-direct.md)
+- [docs/examples/analyze-thresholds.md](../examples/analyze-thresholds.md)
+- [docs/examples/analyze-disabled-target-hubs.md](../examples/analyze-disabled-target-hubs.md)
+- [docs/examples/impact-prioritised.md](../examples/impact-prioritised.md)
+- [docs/examples/impact-require-target-graph-error.txt](../examples/impact-require-target-graph-error.txt)
+- [docs/examples/compare-typical.md](../examples/compare-typical.md)
+- [docs/examples/compare-config-drift.md](../examples/compare-config-drift.md)
+- [docs/examples/compare-project-identity-drift.md](../examples/compare-project-identity-drift.md)
 
 ## CLI-Modi: `--quiet` und `--verbose`
 
@@ -518,17 +669,21 @@ vollstaendiger Ersatz fuer Build-System- oder Compilerwissen.
 
 ## Quality Gate in einem Anwender-Projekt
 
-`cmake-xray` hat im aktuellen Stand keine konfigurierbaren Analyseschwellen.
-Die einzigen harten Fehlersignale sind die Exit-Codes `1`, `3` und `4` aus dem
-vorigen Abschnitt. Ein Quality Gate in einem Anwender-Projekt wird deshalb aus
-drei Bausteinen aufgebaut:
+`cmake-xray` kann Analyseumfang und Reportinhalt ueber `--analysis`,
+`--tu-threshold`, `--min-hotspot-tus`, `--target-hub-in-threshold`,
+`--target-hub-out-threshold`, `--include-scope`, `--include-depth` und
+`--impact-target-depth` steuern. Harte Fehlersignale fuer CI bleiben die
+Exit-Codes `1`, `3` und `4`; in `impact` kann `--require-target-graph`
+fehlende Target-Graph-Daten zusaetzlich zu einem Fehler machen. Ein Quality
+Gate in einem Anwender-Projekt wird deshalb aus drei Bausteinen aufgebaut:
 
 1. Eingabedaten reproduzierbar erzeugen
 2. `cmake-xray` aus Build oder CI heraus aufrufen
-3. den Markdown-Report als Artefakt sichern
+3. den Markdown-/JSON-/Compare-Report als Artefakt sichern
 
-Schwellen auf Reportinhalte sind nicht Bestandteil von `cmake-xray` und werden
-bei Bedarf ausserhalb des Tools gepflegt.
+Schwellen auf den Reportinhalt selbst, etwa "maximal N Hotspots", sind kein
+eigener `cmake-xray`-Exit-Code. Solche Policies werden ueber JSON/Compare-
+Auswertung in der CI gepflegt.
 
 ### Eingabedaten im Anwender-Projekt erzeugen
 
@@ -566,6 +721,7 @@ if(CMAKE_XRAY)
             --cmake-file-api ${CMAKE_BINARY_DIR}
             --format markdown
             --output ${CMAKE_BINARY_DIR}/reports/xray-analyze.md
+            --include-scope project
             --top 20
     VERBATIM)
 endif()
@@ -584,9 +740,18 @@ Skizze fuer GitHub Actions, wenn `cmake-xray` im `PATH` des Runners liegt:
     cmake-xray analyze \
       --compile-commands build/compile_commands.json \
       --cmake-file-api build \
-      --format markdown --output build/xray.md --top 20
+      --format json --output build/xray.json --top 20
+- run: |
+    cmake-xray compare \
+      --baseline baseline/xray.json \
+      --current build/xray.json \
+      --format markdown --output build/xray-diff.md
 - uses: actions/upload-artifact@v4
-  with: { name: cmake-xray, path: build/xray.md }
+  with:
+    name: cmake-xray
+    path: |
+      build/xray*.json
+      build/xray*.md
 ```
 
 Der CI-Schritt schlaegt automatisch fehl, wenn `cmake-xray` einen Exit-Code

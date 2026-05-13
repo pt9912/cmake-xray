@@ -12,7 +12,8 @@
 #     the codemodel-v2 reply matching the .cmake/api/v1/query/ stamp.
 #   - tests/reference/file-api-performance-manifest.json with the
 #     fixture list, scale, CMake version, generator, source/build/reply
-#     paths, regeneration command and ISO-8601 timestamp policy.
+#     paths, regeneration command, timestamp policy and AP M6 baseline
+#     measurement metadata.
 #
 # Usage:
 #   bash tests/reference/generate_file_api_fixtures.sh
@@ -41,7 +42,7 @@ manifest_path="$SCRIPT_DIR/file-api-performance-manifest.json"
 {
     cat <<EOF
 {
-  "\$comment": "AP M5-1.8 A.3 File-API performance baseline manifest. Fixtures are versioned reply directories under tests/reference/scale_*/build/.cmake/api/v1/reply/. Regenerate via tests/reference/generate_file_api_fixtures.sh; review the diff to absorb host-path or CMake-version drift.",
+  "\$comment": "AP M5-1.8 A.3 and AP M6-1.7 A.3 File-API performance baseline manifest. Fixtures are versioned reply directories under tests/reference/scale_*/build/.cmake/api/v1/reply/. Regenerate via tests/reference/generate_file_api_fixtures.sh; review the diff to absorb host-path or CMake-version drift.",
   "format_version": 1,
   "regeneration_command": "tests/reference/generate_file_api_fixtures.sh",
   "regenerated_at_policy": "host-local at regeneration time; not asserted in CI",
@@ -127,7 +128,112 @@ done
 
 cat <<'EOF' >> "$manifest_path"
 
-  ]
+  ],
+  "m6_performance_baselines": {
+    "measured_at": "2026-05-13",
+    "tool_version": "1.3.0",
+    "measurement_note": "Measured in the cmake-xray:test Docker image with /usr/bin/time; wall times below 0.01 s appear as 0.00 s.",
+    "datasets": [
+      {
+        "kind": "file_api_extraction",
+        "fixture": "file_api_loaded",
+        "build_dir": "tests/e2e/testdata/m6/file_api_loaded/build",
+        "target_count": 11,
+        "edge_count": 10,
+        "target_graph_status": "loaded",
+        "wall_time_s": 0.00,
+        "max_rss_kb": 5760
+      },
+      {
+        "kind": "file_api_extraction",
+        "fixture": "file_api_partial",
+        "build_dir": "tests/e2e/testdata/m6/file_api_partial/build",
+        "target_count": 2,
+        "edge_count": 1,
+        "target_graph_status": "partial",
+        "wall_time_s": 0.00,
+        "max_rss_kb": 5760
+      },
+      {
+        "kind": "file_api_extraction",
+        "fixture": "scale_500",
+        "build_dir": "tests/reference/scale_500/build",
+        "target_count": 1,
+        "edge_count": 0,
+        "target_graph_status": "loaded",
+        "wall_time_s": 0.39,
+        "max_rss_kb": 6880
+      },
+      {
+        "kind": "file_api_extraction",
+        "fixture": "scale_1000",
+        "build_dir": "tests/reference/scale_1000/build",
+        "target_count": 1,
+        "edge_count": 0,
+        "target_graph_status": "loaded",
+        "wall_time_s": 0.71,
+        "max_rss_kb": 8496
+      },
+      {
+        "kind": "reverse_bfs",
+        "fixture": "file_api_loaded",
+        "changed_file": "src/hub.cpp",
+        "impact_target_depth": 0,
+        "target_count": 11,
+        "prioritised_target_count": 1,
+        "effective_depth": 0,
+        "wall_time_s": 0.00,
+        "max_rss_kb": 5760
+      },
+      {
+        "kind": "reverse_bfs",
+        "fixture": "file_api_loaded",
+        "changed_file": "src/hub.cpp",
+        "impact_target_depth": 2,
+        "target_count": 11,
+        "prioritised_target_count": 11,
+        "effective_depth": 1,
+        "wall_time_s": 0.00,
+        "max_rss_kb": 5600
+      },
+      {
+        "kind": "compare",
+        "json_size_class": "small",
+        "scenario": "loaded_vs_partial",
+        "baseline": "tests/e2e/testdata/m6/json-reports/analyze-file-api-loaded.json",
+        "current": "tests/e2e/testdata/m6/json-reports/analyze-file-api-partial.json",
+        "tu_count": 5,
+        "hotspot_count": 7,
+        "target_count": 11,
+        "compare_ms": 0,
+        "max_rss_kb": 4960
+      },
+      {
+        "kind": "compare",
+        "json_size_class": "small",
+        "scenario": "include_all_vs_project",
+        "baseline": "tests/e2e/testdata/m6/json-reports/analyze-include-origin-mix.json",
+        "current": "tests/e2e/testdata/m6/json-reports/analyze-include-origin-mix-scope-project.json",
+        "tu_count": 5,
+        "hotspot_count": 7,
+        "target_count": 0,
+        "compare_ms": 0,
+        "max_rss_kb": 4800
+      },
+      {
+        "kind": "compare",
+        "json_size_class": "small",
+        "scenario": "compile_db_identity_drift",
+        "baseline": "tests/e2e/testdata/m6/json-reports/analyze-compile-db-only.json",
+        "current": "tests/e2e/testdata/m6/json-reports/analyze-include-origin-mix.json",
+        "tu_count": 5,
+        "hotspot_count": 7,
+        "target_count": 0,
+        "compare_ms": 0,
+        "max_rss_kb": 4960
+      }
+    ]
+  }
 }
 EOF
 

@@ -27,7 +27,7 @@ Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**.
 | **M6 AP 1.7**        | **`in Arbeit`**   | Referenzdaten, Doku, Release ([`in-progress/plan-M6-1-7.md`](./plan-M6-1-7.md)).             |
 | M6 AP 1.8            | `offen`           | Praeprozessor-Include + Konfig-Override ([`open/plan-M6-1-8.md`](../open/plan-M6-1-8.md)).   |
 
-Naechster konkreter Schritt: M6 AP 1.7 A.3 (README, guide, quality, performance, roadmap), siehe `in-progress/plan-M6-1-7.md` Steps 9-13.
+Naechster konkreter Schritt: M6 AP 1.7 A.4 (Audit-Pass und Liefer-Stand-Konsolidierung), siehe `in-progress/plan-M6-1-7.md` Steps 14-17.
 
 ## 1. Planungsgrundsaetze
 

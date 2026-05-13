@@ -521,7 +521,8 @@ Innerhalb von **A.3 (README, guide, quality, performance, roadmap)**:
 10. `docs/user/guide.md` mit M6-Praxisrezepten.
 11. `docs/user/quality.md` mit M6-Testumfang.
 12. `docs/user/performance.md` mit M6-Baseline.
-13. `docs/planning/roadmap.md` mit M6 als abgeschlossen.
+13. `docs/planning/roadmap.md` auf den naechsten A.4-Schritt
+    aktualisieren; die Abschlussmarkierung folgt erst mit A.4.
 
 Innerhalb von **A.4 (Audit-Pass und Liefer-Stand-Konsolidierung)**:
 
@@ -590,8 +591,18 @@ Bis dahin ist AP 1.7 nicht abnahmefaehig.
   `/workspace/build/cmake-xray`; `make docs-check`,
   `git diff --check` und `make docker-test` (47/47). Commit:
   `254bc09`.
-- A.3 (README, guide, quality, performance, roadmap): noch nicht
-  ausgeliefert.
+- A.3 (README, guide, quality, performance, roadmap): **lokal
+  umgesetzt**. `README.md` und `docs/user/guide.md` verlinken die
+  M6-Beispiele und dokumentieren Target-Graph-Sicht, Include-Filter,
+  Schwellenwerte, Analyseauswahl, Impact-Priorisierung,
+  `--require-target-graph` und `compare`. `docs/user/quality.md`
+  beschreibt den M6-Testumfang; `docs/user/performance.md` enthaelt
+  M6-Referenzwerte fuer Target-Graph-Extraktion, Reverse-BFS und
+  Compare. `tests/reference/file-api-performance-manifest.json`
+  fuehrt die M6-Datensatztypen `file_api_extraction`, `reverse_bfs`
+  und `compare`. `docs/planning/roadmap.md` zeigt A.4 als naechsten
+  Schritt; die M6-Abschlussmarkierung bleibt A.4 vorbehalten.
+  Commit: ausstehend.
 - A.4 (Audit-Pass und Liefer-Stand-Konsolidierung): noch nicht
   ausgeliefert.
 

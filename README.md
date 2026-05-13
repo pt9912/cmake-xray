@@ -1,18 +1,22 @@
 # cmake-xray
 
-`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Es liest `compile_commands.json` und optional CMake-File-API-Reply-Daten, rankt auffaellige Translation Units, leitet heuristische Include-Hotspots ab, analysiert Datei-Impact und zeigt betroffene Targets an. Ergebnisse werden als Konsolen-, Markdown-, JSON-, Graphviz-DOT- oder eigenstaendiger HTML-Report ausgegeben; JSON, DOT und HTML folgen den versionierten Vertraegen in [spec/report-json.md](./spec/report-json.md), [spec/report-dot.md](./spec/report-dot.md) und [spec/report-html.md](./spec/report-html.md). Die ausgegebene App-Version ist via `cmake-xray --version` einzusehen; der historische Funktionsverlauf je Releaselinie steht in [CHANGELOG.md](./CHANGELOG.md).
+`cmake-xray` ist ein Analyse- und Diagnosewerkzeug fuer CMake-basierte C++-Builds. Es liest `compile_commands.json` und optional CMake-File-API-Reply-Daten, rankt auffaellige Translation Units, leitet heuristische Include-Hotspots ab, analysiert Datei-Impact, zeigt betroffene Targets an und vergleicht zwei Analyze-JSON-Berichte. Ergebnisse werden als Konsolen-, Markdown-, JSON-, Graphviz-DOT- oder eigenstaendiger HTML-Report ausgegeben; JSON, DOT, HTML und Compare folgen den versionierten Vertraegen in [spec/report-json.md](./spec/report-json.md), [spec/report-dot.md](./spec/report-dot.md), [spec/report-html.md](./spec/report-html.md) und [spec/report-compare.md](./spec/report-compare.md). Die ausgegebene App-Version ist via `cmake-xray --version` einzusehen; der historische Funktionsverlauf je Releaselinie steht in [CHANGELOG.md](./CHANGELOG.md).
 
 ## Status
 
 Der Funktionsumfang umfasst:
 
-- CLI mit `analyze` und `impact`
+- CLI mit `analyze`, `impact` und `compare`
 - Validierung von `compile_commands.json`
 - deterministisches Translation-Unit-Ranking auf Basis von `arg_count`, `include_path_count` und `define_count`
 - heuristische Include-Hotspots und dateibasierte Impact-Analyse
 - CMake File API als optionale zweite Eingabequelle via `--cmake-file-api`
 - Target-Zuordnung: Translation Units werden ihren CMake-Targets zugeordnet (`[targets: app, core]`)
-- targetbezogene Impact-Ausgabe mit `direct` und `heuristic` Evidenzklassen
+- targetbezogene Impact-Ausgabe mit `direct`, `direct_dependent`, `transitive_dependent` und `heuristic` Evidenzklassen
+- Reverse-Target-Graph-Priorisierung ueber `--impact-target-depth` und harte Target-Graph-Anforderung ueber `--require-target-graph`
+- Include-Filter ueber `--include-scope` und `--include-depth`
+- Analyseauswahl und Schwellenwerte ueber `--analysis`, `--tu-threshold`, `--min-hotspot-tus`, `--target-hub-in-threshold` und `--target-hub-out-threshold`
+- Vergleich zweier Analyze-JSON-Berichte ueber `cmake-xray compare`
 - Analyse auch ohne `compile_commands.json`, wenn File-API-Daten ausreichen
 - Report-Ausgabe als `console`, `markdown`, `json`, `dot` oder `html`
 - atomisches Schreiben von Markdown-, JSON-, DOT- und HTML-Reports via `--output`
@@ -27,7 +31,6 @@ Nicht Ziel des aktuellen Stands sind insbesondere:
 
 - Ersatz fuer CMake
 - vollstaendige CMake-Interpretation
-- transitive Target-Graph-Analyse
 - IDE-Integration
 
 ## Voraussetzungen
@@ -231,6 +234,37 @@ cmake-xray analyze \
 
 Im Mischpfad bleibt die Compile Database die autoritative Grundlage fuer Ranking, Hotspots und Impact. Die File API reichert passende Beobachtungen um Target-Kontext an.
 
+### Include-Filter und Schwellenwerte
+
+```bash
+cmake-xray analyze \
+  --compile-commands build/compile_commands.json \
+  --include-scope project \
+  --include-depth direct \
+  --tu-threshold include_path_count=2 \
+  --min-hotspot-tus 3
+```
+
+`--include-scope` begrenzt Hotspots auf `all`, `project` oder `external`;
+`--include-depth` begrenzt auf `all`, `direct` oder `indirect`.
+`--tu-threshold <metric>=<n>` filtert Translation Units vor Ranking und
+`--min-hotspot-tus` filtert Include-Hotspots nach betroffenen Translation
+Units.
+
+### Analyseauswahl
+
+```bash
+cmake-xray analyze \
+  --cmake-file-api build \
+  --analysis tu-ranking,target-graph \
+  --top 10
+```
+
+`--analysis` akzeptiert `all`, `tu-ranking`, `include-hotspots`,
+`target-graph` und `target-hubs`. `target-hubs` setzt `target-graph`
+voraus; deaktivierte Sections bleiben in JSON/HTML als Section-State
+sichtbar.
+
 ### Impact-Analyse mit Target-Ausgabe
 
 ```bash
@@ -239,7 +273,41 @@ cmake-xray impact \
   --changed-file src/main.cpp
 ```
 
-Bei geladener Target-Sicht zeigt `impact` zusaetzlich betroffene Targets mit Evidenzklassifikation (`direct` oder `heuristic`). Transitive Target-Abhaengigkeiten werden im aktuellen Stand nicht ausgewertet.
+Bei geladener Target-Sicht zeigt `impact` zusaetzlich betroffene Targets mit
+Evidenzklassifikation. Die Reverse-Target-Graph-Tiefe ist per
+`--impact-target-depth` steuerbar:
+
+```bash
+cmake-xray impact \
+  --cmake-file-api build \
+  --changed-file src/main.cpp \
+  --impact-target-depth 2
+```
+
+Wenn fehlende Target-Graph-Daten in CI ein harter Fehler sein sollen:
+
+```bash
+cmake-xray impact \
+  --compile-commands build/compile_commands.json \
+  --changed-file src/main.cpp \
+  --require-target-graph
+```
+
+### Analyze-Berichte vergleichen
+
+```bash
+cmake-xray compare \
+  --baseline build/reports/analyze-before.json \
+  --current build/reports/analyze-after.json \
+  --format markdown \
+  --output build/reports/analyze-diff.md
+```
+
+`compare` akzeptiert in M6 nur Analyze-JSON mit `format_version=6` auf
+beiden Seiten. Die Kompatibilitaetsmatrix steht in
+[spec/compare-matrix.md](./spec/compare-matrix.md); der Compare-JSON-
+Vertrag in [spec/report-compare.md](./spec/report-compare.md).
+
 
 ### Pfadaufloesung fuer `--changed-file`
 
@@ -285,7 +353,7 @@ Ohne Target-Sicht (nur `compile_commands.json`):
 - [docs/examples/impact-report.json](./docs/examples/impact-report.json)
 - [docs/examples/impact-report.dot](./docs/examples/impact-report.dot)
 
-Mit Target-Sicht (File API):
+Mit Target-Sicht (File API, historische M4/M5-Beispiele):
 
 - [docs/examples/analyze-console-targets.txt](./docs/examples/analyze-console-targets.txt)
 - [docs/examples/analyze-report-targets.md](./docs/examples/analyze-report-targets.md)
@@ -297,6 +365,20 @@ Mit Target-Sicht (File API):
 - [docs/examples/impact-report-targets.html](./docs/examples/impact-report-targets.html)
 - [docs/examples/impact-report-targets.json](./docs/examples/impact-report-targets.json)
 - [docs/examples/impact-report-targets.dot](./docs/examples/impact-report-targets.dot)
+
+M6 Target-Graph, Include-Filter, Schwellenwerte und Compare:
+
+- [docs/examples/analyze-target-graph-loaded.txt](./docs/examples/analyze-target-graph-loaded.txt)
+- [docs/examples/analyze-target-graph-partial.txt](./docs/examples/analyze-target-graph-partial.txt)
+- [docs/examples/analyze-include-scope-project.md](./docs/examples/analyze-include-scope-project.md)
+- [docs/examples/analyze-include-depth-direct.md](./docs/examples/analyze-include-depth-direct.md)
+- [docs/examples/analyze-thresholds.md](./docs/examples/analyze-thresholds.md)
+- [docs/examples/analyze-disabled-target-hubs.md](./docs/examples/analyze-disabled-target-hubs.md)
+- [docs/examples/impact-prioritised.md](./docs/examples/impact-prioritised.md)
+- [docs/examples/impact-require-target-graph-error.txt](./docs/examples/impact-require-target-graph-error.txt)
+- [docs/examples/compare-typical.md](./docs/examples/compare-typical.md)
+- [docs/examples/compare-config-drift.md](./docs/examples/compare-config-drift.md)
+- [docs/examples/compare-project-identity-drift.md](./docs/examples/compare-project-identity-drift.md)
 </details>
 
 <details>

@@ -444,6 +444,74 @@ folgen dem gleichen Reviewpfad wie Mindestversions-Bumps in
 Runner-Default; ihre konkreten Werte loggt der Step `Show toolchain
 versions` plus der Configure-Status `AP M5-1.7 toolchain check: ...`.
 
+## M6-Testumfang
+
+M6 erweitert die bestehenden Gates ohne den Plattformstatus aus AP M5-1.7
+anzuheben. Linux x86_64 bleibt `supported`; macOS arm64 und Windows x86_64
+bleiben `validated_smoke`. Die Required Checks laufen weiterhin unter den
+Jobnamen `Native (linux-x86_64)`, `Native (macos-arm64)`,
+`Native (windows-x86_64)`, `Docker Test`, `Docker Coverage`,
+`Docker Quality`, `Docker Runtime Build` und
+`docs/examples Host-Portability`.
+
+Die M6-spezifische Absicherung liegt in diesen Testfamilien:
+
+- **Target-Graph-Extraktion und Determinismus**: Adapter- und Service-Tests
+  fuer CMake-File-API-Targets, direkte Target-Dependencies, externe Kanten,
+  Zyklen, Hub-Erkennung und sortierte Ausgabe. Goldens unter
+  `tests/e2e/testdata/m6/*-reports/analyze-file-api-*` pinnen Console,
+  Markdown, HTML, JSON und DOT.
+- **Impact-Priorisierung**: Service-, CLI- und Golden-Tests fuer
+  `--impact-target-depth`, `--require-target-graph`, Compile-DB-Fallback,
+  geladene/partielle/nicht geladene Target-Graph-Daten und zyklische
+  Graphen. Die `impact-prioritised-*`-Goldens decken alle fuenf
+  Reportformate ab.
+- **Include-Origin und Include-Tiefe**: `include_origin_mix`-Fixtures pinnen
+  `project`, `external`, `unknown`, `direct`, `indirect` und `mixed`.
+  `analyze-include-origin-mix-scope-project.*` prueft die Scope-Filterung;
+  `analyze-include-budget-reached.*` prueft deterministische Budget-Kappung.
+- **Analyseauswahl und Schwellenwerte**: CLI-Tests validieren
+  `--analysis`, doppelte/ungueltige Werte, `--tu-threshold`,
+  `--min-hotspot-tus`, `--target-hub-in-threshold` und
+  `--target-hub-out-threshold`. Adapter- und Golden-Tests pinnen
+  `analysis_configuration`, `analysis_section_states`, deaktivierte Sections
+  und Filterzaehler.
+- **Analyze-/Impact-JSON-Schema v6**: `report_json_schema_validation_m6`
+  validiert die M6-Goldens; Negativtests sichern die Analyze-vs-Impact-
+  Asymmetrie (`target_hubs` nur Analyze), Prioritaetsfelder und Cross-Field-
+  Constraints fuer Impact-Tiefen.
+- **Compare-Vertrag**: `report_compare_schema_validation_m6`,
+  `report_compare_input_schema_validation_m6`,
+  `compare_console_manifest_validation_m6` und
+  `compare_markdown_manifest_validation_m6` pruefen
+  `spec/report-compare.schema.json`, Eingangsberichte,
+  Console-/Markdown-Goldens und die Kompatibilitaetsmatrix. Service-Tests
+  decken added/removed/changed, `configuration_drift`,
+  `data_availability_drift`, `--allow-project-identity-drift`,
+  unbrauchbare Projektidentitaeten und nicht vergleichbare Impact-Reports ab.
+- **Compile-DB-Fingerprint**:
+  `tests/hexagon/test_compile_db_fingerprint.cpp` pinnt Unix-/Windows-Pfade,
+  Eingangsreihenfolge, Deduplikation und den dokumentierten Trade-off, dass
+  derselbe Source-Path-Satz in unterschiedlichen Build-Kontexten dieselbe
+  fallback-basierte Projektidentitaet ergeben kann.
+- **M6-Dokumentationsbeispiele**: `doc_examples_validation` prueft
+  `docs/examples/manifest.txt`, SHA-256-Stabilitaet, JSON-/DOT-/HTML-
+  Formatvalidierung und Generator-Drift fuer alle Beispiele aus
+  `docs/examples/generation-spec.json`. Der Validator waehlt fuer JSON
+  anhand von `format` zwischen `report-json.schema.json` und
+  `report-compare.schema.json` und kann absichtliche stderr/Exit-Code-
+  Beispiele wie `impact-require-target-graph-error.txt` validieren.
+
+Fuer A.2/A.3-Abnahmen ist der lokale Kurzpfad weiterhin:
+
+```bash
+make docker-test
+make docs-check
+```
+
+Vor Release- oder Abschlussbehauptungen, die Coverage und statische Analyse
+einschliessen, bleibt `make docker-gates` massgeblich.
+
 ## Zusammenhang mit Releasing
 
 Fuer M3 und spaetere Releases sind mindestens diese Make-Targets massgeblich:

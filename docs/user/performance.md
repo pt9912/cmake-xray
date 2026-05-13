@@ -2,7 +2,16 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt die Referenzumgebung, die versionierten Referenzprojekte und die gemessenen Baselines fuer `cmake-xray`. Die MVP-Baseline (Compile-Database-Pfad) wurde im Stand `v1.0.0` erhoben und gilt unveraendert fuer `v1.1.0` und `v1.2.0`. M5 (`v1.2.0`) ergaenzt die im AP M5-1.8 A.3 versionierten File-API-Reply-Fixtures plus eine getrennte Baseline fuer den CMake-File-API-Pfad; CMake-Configure-Zeit ist nicht Teil der gemessenen Laufzeit, weil die Reply-Daten unter `tests/reference/scale_*/build/.cmake/api/v1/reply/` versioniert sind.
+Dieses Dokument beschreibt die Referenzumgebung, die versionierten
+Referenzprojekte und die gemessenen Baselines fuer `cmake-xray`. Die
+MVP-Baseline (Compile-Database-Pfad) wurde im Stand `v1.0.0` erhoben und gilt
+unveraendert fuer `v1.1.0` und `v1.2.0`. M5 (`v1.2.0`) ergaenzt die im
+AP M5-1.8 A.3 versionierten File-API-Reply-Fixtures plus eine getrennte
+Baseline fuer den CMake-File-API-Pfad; CMake-Configure-Zeit ist nicht Teil der
+gemessenen Laufzeit, weil die Reply-Daten unter
+`tests/reference/scale_*/build/.cmake/api/v1/reply/` versioniert sind.
+M6 (`v1.3.0`) ergaenzt Referenzwerte fuer Target-Graph-Extraktion,
+Reverse-BFS-Impact-Priorisierung und Compare.
 
 ## Referenzdaten
 
@@ -26,6 +35,14 @@ Zusatzstichprobe fuer den separaten Impact-Pfad:
 
 - `tests/e2e/testdata/m3/report_impact_header/compile_commands.json`
 - `--changed-file include/common/config.h`
+
+M6-Zusatzstichproben:
+
+- `tests/e2e/testdata/m6/file_api_loaded/build` (11 Targets, 10 direkte
+  Target-Kanten, `target_graph_status=loaded`)
+- `tests/e2e/testdata/m6/file_api_partial/build` (2 Targets, 1 externe
+  Target-Kante, `target_graph_status=partial`)
+- `tests/e2e/testdata/m6/json-reports/*.json` fuer Compare-Baselines
 
 ## Referenzumgebung
 
@@ -139,6 +156,51 @@ Target-Metadaten-Aufloesung mit, die fuer `scale_1000` rund `0.05–0.15 s`
 und `~1 MB` zusaetzliches Maximum-RSS kostet. Die NF-04-Schwelle
 (`60 s` fuer `1.000` TUs) und die NF-05-Schwelle (`2 GB`) bleiben
 zwei Groessenordnungen entfernt.
+
+### M6 Target-Graph, Reverse-BFS und Compare
+
+Messdatum: `2026-05-13`
+
+Vorbedingung: `make docker-test` hat das Test-Image mit `cmake-xray 1.3.0`
+gebaut. Die Messungen nutzen die im Image enthaltene Binary und versionierte
+Fixtures; Werte unter `0.01 s` erscheinen durch `/usr/bin/time` als `0.00 s`.
+AP 1.7 setzt keine neue absolute Performance-Schwelle; diese Werte sind
+Referenzpunkte fuer kuenftige Phasen.
+
+Referenzaufrufe:
+
+```bash
+docker run --rm cmake-xray:test bash -lc \
+  '/usr/bin/time -f "wall=%e rss=%M" /workspace/build/cmake-xray analyze --cmake-file-api /workspace/tests/e2e/testdata/m6/file_api_loaded/build --format json --top 10 >/tmp/a.json'
+docker run --rm cmake-xray:test bash -lc \
+  '/usr/bin/time -f "wall=%e rss=%M" /workspace/build/cmake-xray impact --cmake-file-api /workspace/tests/e2e/testdata/m6/file_api_loaded/build --changed-file src/hub.cpp --impact-target-depth 2 --format json >/tmp/i.json'
+docker run --rm cmake-xray:test bash -lc \
+  '/usr/bin/time -f "wall=%e rss=%M" /workspace/build/cmake-xray compare --baseline /workspace/tests/e2e/testdata/m6/json-reports/analyze-file-api-loaded.json --current /workspace/tests/e2e/testdata/m6/json-reports/analyze-file-api-partial.json --format json >/tmp/c.json'
+```
+
+Target-Graph-Extraktion:
+
+| Szenario | Targets | Kanten | Status | Wall time | Max RSS |
+|---|---:|---:|---|---:|---:|
+| `file_api_loaded` | 11 | 10 | `loaded` | `0.00 s` | `5,760 KB` |
+| `file_api_partial` | 2 | 1 | `partial` | `0.00 s` | `5,760 KB` |
+| `scale_500` (File-API, JSON) | 1 | 0 | `loaded` | `0.39 s` | `6,880 KB` |
+| `scale_1000` (File-API, JSON) | 1 | 0 | `loaded` | `0.71 s` | `8,496 KB` |
+
+Reverse-BFS-Impact:
+
+| Szenario | Depth | Priorisierte Targets | Effektive Tiefe | Wall time | Max RSS |
+|---|---:|---:|---:|---:|---:|
+| `file_api_loaded`, `src/hub.cpp` | `0` | 1 | 0 | `0.00 s` | `5,760 KB` |
+| `file_api_loaded`, `src/hub.cpp` | `2` | 11 | 1 | `0.00 s` | `5,600 KB` |
+
+Compare:
+
+| Szenario | Eingangsberichte | Befund | Wall time | Max RSS |
+|---|---|---|---:|---:|
+| loaded vs. partial | `analyze-file-api-loaded.json` -> `analyze-file-api-partial.json` | Target-Graph-/Hub-Verfuegbarkeit driftet | `0.00 s` | `4,960 KB` |
+| include all vs. project | `analyze-include-origin-mix.json` -> `analyze-include-origin-mix-scope-project.json` | `configuration_drift` fuer `include_filter.include_scope` | `0.00 s` | `4,800 KB` |
+| Compile-DB identity drift | `analyze-compile-db-only.json` -> `analyze-include-origin-mix.json` | `project_identity_drift` mit `--allow-project-identity-drift` | `0.00 s` | `4,960 KB` |
 
 ## Bewertung gegen NF-04 und NF-05
 
