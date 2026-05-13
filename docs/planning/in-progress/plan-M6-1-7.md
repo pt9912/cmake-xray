@@ -563,7 +563,15 @@ Sub-Plan-Liefer-Stand-Bloecke auf nicht-leere Commit-Felder.
 Wird nach dem Schnitt der A-Tranchen mit Commit-Hashes befuellt.
 Bis dahin ist AP 1.7 nicht abnahmefaehig.
 
-- A.1 (Versionspin und CHANGELOG): noch nicht ausgeliefert.
+- A.1 (Versionspin und CHANGELOG): **lokal umgesetzt**.
+  Root-`CMakeLists.txt` meldet `1.3.0`; `CHANGELOG.md` enthaelt den
+  `[1.3.0]`-Abschnitt mit Added/Changed/Fixed/Migration/Platform status.
+  `m6_versionspin_consistency` prueft Release-Version, Analyze-/Compare-
+  Formatkonstanten, Schema-Konstanz und verbliebene Produktions-Code-
+  Vorkommen der Rohversion `1.2.0`; `m6_prerelease_version_context`
+  pinnt den expliziten Prerelease-Kontext `1.3.0-rc.1`. Lokaler
+  Testlauf gruen: `make docker-test` (47/47), `make docs-check`,
+  `git diff --check`. Commit wird nach Auslieferung gepinnt.
 - A.2 (Format-Vertrags-Final-Sweep und docs/examples/): noch nicht
   ausgeliefert.
 - A.3 (README, guide, quality, performance, roadmap): noch nicht

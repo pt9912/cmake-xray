@@ -4,6 +4,7 @@ add_executable(
     hexagon/test_analysis_support.cpp
     hexagon/test_compile_db_fingerprint.cpp
     hexagon/test_compare_service.cpp
+    hexagon/test_m6_versionspin_consistency.cpp
     hexagon/test_project_analyzer.cpp
     hexagon/test_impact_analyzer.cpp
     hexagon/test_target_graph_support.cpp
@@ -42,6 +43,8 @@ target_link_libraries(
 target_compile_definitions(
     xray_tests PRIVATE
     XRAY_REPORT_JSON_SCHEMA_PATH="${PROJECT_SOURCE_DIR}/spec/report-json.schema.json"
+    XRAY_REPORT_COMPARE_SCHEMA_PATH="${PROJECT_SOURCE_DIR}/spec/report-compare.schema.json"
+    XRAY_PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
 )
 
 if(MSVC)
@@ -58,6 +61,24 @@ xray_enable_coverage(xray_tests)
 
 add_test(NAME xray_tests COMMAND xray_tests)
 set_tests_properties(xray_tests PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+
+add_test(
+    NAME m6_versionspin_consistency
+    COMMAND xray_tests --test-case=m6_versionspin_consistency
+)
+set_tests_properties(m6_versionspin_consistency PROPERTIES
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_executable(
+    xray_m6_prerelease_version_test
+    hexagon/test_m6_prerelease_version.cpp
+)
+target_link_libraries(xray_m6_prerelease_version_test PRIVATE xray_hexagon)
+target_compile_features(xray_m6_prerelease_version_test PRIVATE cxx_std_20)
+xray_enable_coverage(xray_m6_prerelease_version_test)
+
+add_test(NAME m6_prerelease_version_context COMMAND xray_m6_prerelease_version_test)
 
 # AP M5-1.7 Tranche A follow-up: positive plus negative smokes for the
 # toolchain-minimums fail-fast gate in cmake/ToolchainMinimums.cmake. The

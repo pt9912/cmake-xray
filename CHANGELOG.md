@@ -9,39 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- M6 AP 1.4 introduces an include-origin and include-depth view across
-  all five report formats. Two new analyze-CLI options
-  `--include-scope` (values `all`, `project`, `external`, `unknown`,
-  default `all`) and `--include-depth` (values `all`, `direct`,
-  `indirect`, default `all`) filter the `Include Hotspots` section
-  while leaving translation-unit ranking untouched.
-- Every `Include Hotspots` entry carries two new classification
-  fields `origin` (`project` / `external` / `unknown`) and
-  `depth_kind` (`direct` / `indirect` / `mixed`); the hotspot
-  container also tracks `excluded_unknown_count` and
-  `excluded_mixed_count` counters for the scope/depth filters. Fields
-  surface in analyze JSON, DOT, HTML, Markdown and Console reports
-  with format-specific presentation (badges, table columns, suffix in
-  brackets).
-- Analyze-JSON adds an `include_filter` block with the effective
-  scope, depth and BFS-limit values plus `include_node_budget_reached`.
-- Analyze-DOT adds three graph attributes `graph_include_scope`,
-  `graph_include_depth` and `graph_include_node_budget_reached`.
-- HTML, Markdown and Console reports prefix the hotspot listing with
-  a `Filter:` line that mirrors the analysis configuration even when
-  the hotspot set is empty. An optional `Note: include analysis
-  stopped at <effective> nodes (budget reached).` line appears when
-  the BFS hits the node budget.
-- HTML report ships six new CSS badge classes
-  `badge--project`, `badge--external`, `badge--unknown`,
-  `badge--direct`, `badge--indirect`, `badge--mixed` for the new
-  origin and depth values.
+- None.
+
+## [1.3.0] - 2026-05-13
+
+M6 adds the target graph, impact prioritisation, include classification,
+analysis filtering and report comparison surface. This release is a
+breaking report-format update: regenerate analyze/impact JSON reports
+before using v1.3.0 tools or the new `compare` subcommand.
+
+### Added
+
+- Target graph extraction from CMake File API replies, including cycle
+  handling, external dependency markers and id-collision diagnostics.
+- Target graph and target hub sections in console, markdown, HTML, JSON
+  and DOT report formats.
+- Impact prioritisation via reverse target-graph BFS, with new CLI
+  options `--impact-target-depth` and `--require-target-graph`.
+- Include hotspot classification by origin (`project`, `external`,
+  `unknown`) and depth (`direct`, `indirect`, `mixed`), plus analyze
+  filters `--include-scope` and `--include-depth`.
+- Configurable analysis selection and thresholds via `--analysis`,
+  `--tu-threshold`, `--min-hotspot-tus`,
+  `--target-hub-in-threshold` and `--target-hub-out-threshold`.
+- Project identity in analyze JSON, derived from the CMake File API
+  source root or a deterministic compile-database fingerprint.
+- New `cmake-xray compare` subcommand for diffing two analyze JSON
+  reports, with console, markdown and JSON output plus structured drift
+  diagnostics.
 
 ### Changed
 
-- `kReportFormatVersion` rises from `3` to `4`. AP 1.4 A.3 carries the
-  version jump; AP 1.4 A.4 / A.5 land the structural fields and
-  format-specific renderings under the v4 contract.
+- Project and application version bumped to `1.3.0`.
+- Analyze/impact `kReportFormatVersion` rises from `1` to `6`; compare
+  reports start at `kCompareFormatVersion == 1`.
+- DOT graph attributes now include target graph status, include filter
+  values, include budget state, analysis configuration and impact
+  target-depth metadata.
+- HTML report sections now include analysis configuration, target
+  graph, target hubs and prioritised affected targets where applicable.
 - HTML evidence badges rename from single-dash to BEM double-dash to
   align with the new origin/depth classes: `badge-direct` →
   `badge--evidence-direct`, `badge-heuristic` →
@@ -71,6 +77,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Compare CI gate gaps from AP 1.6: reader error paths, bool/null scalar
+  rendering and CLI compare validation now have coverage sufficient for
+  the 100% Docker coverage gate, and compare-related functions are below
+  the Lizard warning thresholds.
 - `scripts/oci-image-publish.sh` `latest` command no longer aborts
   when `:latest` already points at a different digest than the new
   versioned tag. The pre-push abort blocked every release after the
@@ -95,6 +105,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path end-to-end against a pre-seeded `:latest` digest (the
   prerelease versions in scenarios 1-9 all skip `cmd_latest`, which
   is why both bugs shipped uncovered).
+
+### Migration
+
+- pre-M6 JSON reports are not consumable by v1.3.0 compare flows. Re-run
+  cmake-xray on your project to regenerate reports with
+  `format_version: 6` before using `cmake-xray compare`.
+- `cmake-xray compare` accepts only analyze JSON reports. Impact compare
+  remains post-M6.
+- JSON consumers must account for the closed-schema additions in M6:
+  target graph fields, include filter fields, analysis configuration and
+  project identity are part of the v6 contract.
+
+### Platform status
+
+| Platform | Status |
+|---|---|
+| Linux x86_64 | `supported` |
+| macOS arm64 | `validated_smoke` |
+| Windows x86_64 | `validated_smoke` |
 
 ## [1.2.0] - 2026-04-30
 
