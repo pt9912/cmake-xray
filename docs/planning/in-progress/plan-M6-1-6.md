@@ -1136,8 +1136,23 @@ Bis zum Abschluss aller A-Tranchen ist AP 1.6 nicht abnahmefaehig.
   `report_compare_schema_validation_m6` validiert ihn im CTest-Gate.
   Lokale Gates gruen: `make docker-test` (42/42). Commit wird nach
   Auslieferung gepinnt.
-- A.6 (Console- und Markdown-Compare-Adapter): noch nicht ausgeliefert.
-- A.7 (Audit-Pass): noch nicht ausgeliefert.
+- A.6 (Console- und Markdown-Compare-Adapter): **lokal umgesetzt**.
+  `ConsoleCompareAdapter` und `MarkdownCompareAdapter` serialisieren
+  `CompareResult` fuer `compare --format console` und
+  `compare --format markdown` mit Inputs, Summary, Diff-Gruppen und
+  Diagnostics. Die CLI delegiert alle drei Compare-Formate an
+  Output-Adapter. Goldens unter
+  `tests/e2e/testdata/m6/compare-reports/{console,markdown}/` pinnen
+  typische Textausgaben; eigene Manifest-Gates validieren die neuen
+  Compare-Text-Goldens. Lokale Gates gruen: `make docker-test` (44/44).
+  Commit wird nach Auslieferung gepinnt.
+- A.7 (Audit-Pass): **lokal umgesetzt**.
+  Compare-Eingangsdaten liegen unter
+  `tests/e2e/testdata/m6/compare-reports/inputs/` und werden mit
+  `report_compare_input_schema_validation_m6` gegen den Analyze-v6-
+  Vertrag validiert. Die CLI-E2E-Tests nutzen diese Inputs fuer JSON,
+  Console und Markdown. Der abschliessende Docker-Gate-Lauf ist gruen:
+  `make docker-test` (45/45). Commit wird nach Auslieferung gepinnt.
 
 ## Abnahmekriterien
 

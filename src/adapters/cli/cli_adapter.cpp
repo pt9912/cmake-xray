@@ -17,7 +17,9 @@
 #include "adapters/cli/cli_console_renderers.h"
 #include "adapters/cli/exit_codes.h"
 #include "adapters/cli/output_verbosity.h"
+#include "adapters/output/console_compare_adapter.h"
 #include "adapters/output/json_compare_adapter.h"
+#include "adapters/output/markdown_compare_adapter.h"
 #include "hexagon/model/analysis_configuration.h"
 #include "hexagon/model/application_info.h"
 #include "hexagon/model/compile_database_result.h"
@@ -1289,78 +1291,18 @@ int handle_impact_service_validation_error(
     return ExitCode::unexpected_error;
 }
 
-std::string render_compare_summary_lines(const xray::hexagon::model::CompareSummary& summary) {
-    std::ostringstream out;
-    out << "  Translation units: +" << summary.translation_units_added << " -"
-        << summary.translation_units_removed << " ~" << summary.translation_units_changed
-        << '\n';
-    out << "  Include hotspots:  +" << summary.include_hotspots_added << " -"
-        << summary.include_hotspots_removed << " ~" << summary.include_hotspots_changed
-        << '\n';
-    out << "  Target nodes:      +" << summary.target_nodes_added << " -"
-        << summary.target_nodes_removed << " ~" << summary.target_nodes_changed << '\n';
-    out << "  Target edges:      +" << summary.target_edges_added << " -"
-        << summary.target_edges_removed << " ~" << summary.target_edges_changed << '\n';
-    out << "  Target hubs:       +" << summary.target_hubs_added << " -"
-        << summary.target_hubs_removed << " ~" << summary.target_hubs_changed << '\n';
-    return out.str();
-}
-
-std::string render_compare_console(const xray::hexagon::model::CompareResult& result) {
-    std::ostringstream out;
-    out << "cmake-xray compare\n";
-    out << "  baseline: " << result.inputs.baseline_path << " (v"
-        << result.inputs.baseline_format_version << ")\n";
-    out << "  current:  " << result.inputs.current_path << " (v"
-        << result.inputs.current_format_version << ")\n";
-    out << "  project_identity: ";
-    if (result.inputs.project_identity.has_value()) {
-        out << *result.inputs.project_identity;
-    } else {
-        out << "drift allowed";
-    }
-    out << " (" << result.inputs.project_identity_source << ")\n\n";
-    out << "Summary:\n" << render_compare_summary_lines(result.summary);
-    return out.str();
-}
-
-std::string render_compare_markdown(const xray::hexagon::model::CompareResult& result) {
-    std::ostringstream out;
-    out << "# Compare Report\n\n";
-    out << "- Baseline: `" << result.inputs.baseline_path << "` (v"
-        << result.inputs.baseline_format_version << ")\n";
-    out << "- Current: `" << result.inputs.current_path << "` (v"
-        << result.inputs.current_format_version << ")\n";
-    out << "- Project identity source: `" << result.inputs.project_identity_source << "`\n\n";
-    out << "## Summary\n\n";
-    out << "| Group | Added | Removed | Changed |\n";
-    out << "| --- | ---: | ---: | ---: |\n";
-    out << "| Translation units | " << result.summary.translation_units_added << " | "
-        << result.summary.translation_units_removed << " | "
-        << result.summary.translation_units_changed << " |\n";
-    out << "| Include hotspots | " << result.summary.include_hotspots_added << " | "
-        << result.summary.include_hotspots_removed << " | "
-        << result.summary.include_hotspots_changed << " |\n";
-    out << "| Target nodes | " << result.summary.target_nodes_added << " | "
-        << result.summary.target_nodes_removed << " | "
-        << result.summary.target_nodes_changed << " |\n";
-    out << "| Target edges | " << result.summary.target_edges_added << " | "
-        << result.summary.target_edges_removed << " | "
-        << result.summary.target_edges_changed << " |\n";
-    out << "| Target hubs | " << result.summary.target_hubs_added << " | "
-        << result.summary.target_hubs_removed << " | "
-        << result.summary.target_hubs_changed << " |\n";
-    return out.str();
-}
-
 std::string render_compare_result(const xray::hexagon::model::CompareResult& result,
                                   ReportFormat format) {
     if (format == ReportFormat::json) {
         const xray::adapters::output::JsonCompareAdapter adapter;
         return adapter.write_compare_report(result);
     }
-    if (format == ReportFormat::markdown) return render_compare_markdown(result);
-    return render_compare_console(result);
+    if (format == ReportFormat::markdown) {
+        const xray::adapters::output::MarkdownCompareAdapter adapter;
+        return adapter.write_compare_report(result);
+    }
+    const xray::adapters::output::ConsoleCompareAdapter adapter;
+    return adapter.write_compare_report(result);
 }
 
 int handle_compare_result(const xray::hexagon::model::CompareResult& result,

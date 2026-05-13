@@ -182,14 +182,32 @@ TEST_CASE_FIXTURE(CliFixture, "compare reports project identity contract failure
 }
 
 TEST_CASE_FIXTURE(CliFixture, "compare json output uses compare report contract") {
-    const auto report = "docs/examples/analyze-report.json";
+    const auto baseline = fixture_path("m6/compare-reports/inputs/baseline-empty.json");
+    const auto current = fixture_path("m6/compare-reports/inputs/current-empty.json");
 
-    CHECK(run({"compare", "--baseline", report, "--current", report, "--format", "json"}) ==
-          ExitCode::success);
+    CHECK(run({"compare", "--baseline", baseline.c_str(), "--current", current.c_str(),
+               "--format", "json"}) == ExitCode::success);
     CHECK(err.str().empty());
     CHECK(out.str().find("\"format\": \"cmake-xray.compare\"") != std::string::npos);
     CHECK(out.str().find("\"diffs\":") != std::string::npos);
     CHECK(out.str().find("\"diagnostics\":") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "compare text outputs route through compare adapters") {
+    const auto baseline = fixture_path("m6/compare-reports/inputs/baseline-empty.json");
+    const auto current = fixture_path("m6/compare-reports/inputs/current-empty.json");
+
+    CHECK(run({"compare", "--baseline", baseline.c_str(), "--current", current.c_str(),
+               "--format", "console"}) == ExitCode::success);
+    CHECK(err.str().empty());
+    CHECK(out.str().find("cmake-xray compare") != std::string::npos);
+    CHECK(out.str().find("Translation units: +0 -0 ~0") != std::string::npos);
+
+    CHECK(run({"compare", "--baseline", baseline.c_str(), "--current", current.c_str(),
+               "--format", "markdown"}) == ExitCode::success);
+    CHECK(err.str().empty());
+    CHECK(out.str().find("# Compare Report") != std::string::npos);
+    CHECK(out.str().find("| Translation units | 0 | 0 | 0 |") != std::string::npos);
 }
 
 // ---- AP M5-1.6 Tranche A: --version-Flag ---------------------------------

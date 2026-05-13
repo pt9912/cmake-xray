@@ -1,0 +1,179 @@
+{
+  "format": "cmake-xray.analysis",
+  "format_version": 6,
+  "report_type": "analyze",
+  "inputs": {
+    "compile_database_path": "tests/e2e/testdata/m3/report_project/compile_commands.json",
+    "compile_database_source": "cli",
+    "cmake_file_api_path": null,
+    "cmake_file_api_resolved_path": null,
+    "cmake_file_api_source": null,
+    "project_identity": "compile-db:79780609d59f2e65ec7ae2d0766b24d42f0395710313fb513d595d1fefd183a6",
+    "project_identity_source": "fallback_compile_database_fingerprint"
+  },
+  "summary": {
+    "translation_unit_count": 3,
+    "ranking_total_count": 3,
+    "hotspot_total_count": 2,
+    "top_limit": 2,
+    "include_analysis_heuristic": true,
+    "observation_source": "exact",
+    "target_metadata": "not_loaded",
+    "tu_ranking_total_count_after_thresholds": 3,
+    "tu_ranking_excluded_by_thresholds_count": 0,
+    "include_hotspot_excluded_by_min_tus_count": 0
+  },
+  "analysis_configuration": {
+    "analysis_sections": [
+      "tu-ranking",
+      "include-hotspots",
+      "target-graph",
+      "target-hubs"
+    ],
+    "tu_thresholds": {
+      "arg_count": 0,
+      "include_path_count": 0,
+      "define_count": 0
+    },
+    "min_hotspot_tus": 2,
+    "target_hub_in_threshold": 10,
+    "target_hub_out_threshold": 10
+  },
+  "analysis_section_states": {
+    "tu-ranking": "active",
+    "include-hotspots": "active",
+    "target-graph": "not_loaded",
+    "target-hubs": "not_loaded"
+  },
+  "include_filter": {
+    "include_scope": "all",
+    "include_depth": "all",
+    "include_depth_limit_requested": 32,
+    "include_depth_limit_effective": 2,
+    "include_node_budget_requested": 10000,
+    "include_node_budget_effective": 6,
+    "include_node_budget_reached": false
+  },
+  "translation_unit_ranking": {
+    "limit": 2,
+    "total_count": 3,
+    "returned_count": 2,
+    "truncated": true,
+    "items": [
+      {
+        "rank": 1,
+        "reference": {
+          "source_path": "src/app/main.cpp",
+          "directory": "build/app"
+        },
+        "metrics": {
+          "arg_count": 8,
+          "include_path_count": 2,
+          "define_count": 1,
+          "score": 11
+        },
+        "targets": [],
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "message": "could not resolve include \"generated/version.h\" from src/app/main.cpp"
+          }
+        ]
+      },
+      {
+        "rank": 2,
+        "reference": {
+          "source_path": "src/tools/tool.cpp",
+          "directory": "build/tools"
+        },
+        "metrics": {
+          "arg_count": 7,
+          "include_path_count": 1,
+          "define_count": 1,
+          "score": 9
+        },
+        "targets": [],
+        "diagnostics": []
+      }
+    ]
+  },
+  "include_hotspots": {
+    "limit": 2,
+    "total_count": 2,
+    "returned_count": 2,
+    "truncated": false,
+    "excluded_unknown_count": 0,
+    "excluded_mixed_count": 0,
+    "items": [
+      {
+        "header_path": "include/common/config.h",
+        "origin": "project",
+        "depth_kind": "direct",
+        "affected_total_count": 3,
+        "affected_returned_count": 2,
+        "affected_truncated": true,
+        "affected_translation_units": [
+          {
+            "reference": {
+              "source_path": "src/app/main.cpp",
+              "directory": "build/app"
+            },
+            "targets": []
+          },
+          {
+            "reference": {
+              "source_path": "src/lib/core.cpp",
+              "directory": "build/lib"
+            },
+            "targets": []
+          }
+        ],
+        "diagnostics": []
+      },
+      {
+        "header_path": "include/common/shared.h",
+        "origin": "project",
+        "depth_kind": "indirect",
+        "affected_total_count": 3,
+        "affected_returned_count": 2,
+        "affected_truncated": true,
+        "affected_translation_units": [
+          {
+            "reference": {
+              "source_path": "src/app/main.cpp",
+              "directory": "build/app"
+            },
+            "targets": []
+          },
+          {
+            "reference": {
+              "source_path": "src/lib/core.cpp",
+              "directory": "build/lib"
+            },
+            "targets": []
+          }
+        ],
+        "diagnostics": []
+      }
+    ]
+  },
+  "target_graph_status": "not_loaded",
+  "target_graph": {
+    "nodes": [],
+    "edges": []
+  },
+  "target_hubs": {
+    "inbound": [],
+    "outbound": [],
+    "thresholds": {
+      "in_threshold": 10,
+      "out_threshold": 10
+    }
+  },
+  "diagnostics": [
+    {
+      "severity": "note",
+      "message": "include-based results are heuristic; conditional or generated includes may be missing"
+    }
+  ]
+}

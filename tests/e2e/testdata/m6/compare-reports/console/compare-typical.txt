@@ -1,0 +1,46 @@
+cmake-xray compare
+  baseline: baseline.json (v6)
+  current:  current.json (v6)
+  project_identity: compile-db:same (fallback_compile_database_fingerprint)
+
+Summary:
+  Translation units: +1 -1 ~1
+  Include hotspots:  +0 -0 ~1
+  Target nodes:      +0 -0 ~1
+  Target edges:      +1 -0 ~0
+  Target hubs:       +0 -1 ~0
+
+Translation Units (added):
+  src/new.cpp [build]
+
+Translation Units (removed):
+  src/old.cpp [build]
+
+Translation Units (changed):
+  src/app.cpp [build]
+    metrics.score: 10 -> 13
+    targets: [app, core] -> [app, ui]
+
+Include Hotspots (changed):
+  include/config.h [project, direct]
+    affected_total_count: 2 -> 3
+
+Target Nodes (changed):
+  app::EXECUTABLE
+    display_name: app -> app-renamed
+
+Target Edges (added):
+  app -> core [direct]
+
+Target Hubs (removed):
+  legacy [inbound]
+
+Diagnostics:
+  configuration_drift: include_filter.include_scope
+    baseline=all, current=project
+    severity=warning, ci_policy_hint=review_required
+  data_availability_drift: target_graph
+    baseline=loaded, current=partial
+  project_identity_drift:
+    baseline=compile-db:old, current=compile-db:new
+    baseline_source_paths=2, current_source_paths=3, shared_source_paths=2

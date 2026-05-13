@@ -14,6 +14,7 @@ add_executable(
     adapters/test_port_wiring.cpp
     adapters/test_cmake_file_api_adapter.cpp
     adapters/test_compile_commands_json.cpp
+    adapters/test_compare_text_adapters.cpp
     adapters/test_console_report_adapter.cpp
     adapters/test_dot_report_adapter.cpp
     adapters/test_html_report_adapter.cpp
@@ -212,6 +213,33 @@ add_test(
             --schema ${PROJECT_SOURCE_DIR}/spec/report-compare.schema.json
             --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/compare-reports/json
             --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/compare-reports/json/manifest.txt
+)
+
+add_test(
+    NAME report_compare_input_schema_validation_m6
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
+            --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
+            --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/compare-reports/inputs
+            --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/compare-reports/inputs/manifest.txt
+)
+
+add_test(
+    NAME compare_console_manifest_validation_m6
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_manifest_parity.py
+            --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/compare-reports/console
+            --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/compare-reports/console/manifest.txt
+            --suffix .txt
+)
+
+add_test(
+    NAME compare_markdown_manifest_validation_m6
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_manifest_parity.py
+            --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/compare-reports/markdown
+            --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/compare-reports/markdown/manifest.txt
+            --suffix .md
 )
 
 # AP M6-1.2 Tranche A.1: schema-asymmetry negative gates. The v2 schema

@@ -7,10 +7,12 @@ add_library(
     input/cmake_file_api_adapter.cpp
     input/compile_commands_json_adapter.cpp
     input/source_parsing_include_adapter.cpp
+    output/console_compare_adapter.cpp
     output/console_report_adapter.cpp
     output/dot_report_adapter.cpp
     output/html_report_adapter.cpp
     output/json_compare_adapter.cpp
+    output/markdown_compare_adapter.cpp
     output/json_report_adapter.cpp
     output/markdown_report_adapter.cpp
     output/target_display_support.cpp
