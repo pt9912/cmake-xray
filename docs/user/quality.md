@@ -454,6 +454,12 @@ Fuer M3 und spaetere Releases sind mindestens diese Make-Targets massgeblich:
 - `make quality-gate`
 - `make runtime`
 
+Fuer Tranche-, AP- und PR-Abschluesse ist `make docker-gates` der lokale
+Kurzpfad, weil er `docker-test`, `coverage-gate` und `quality-gate`
+zusammen ausfuehrt. `make docker-test` prueft nur Build und CTest im
+Docker-Test-Stage; es ersetzt weder den 100%-Coverage-Check noch das
+Lizard-/clang-tidy-Quality-Gate.
+
 Die Release-Checkliste selbst steht in [docs/user/releasing.md](./releasing.md).
 
 ## Hinweise

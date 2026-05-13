@@ -60,6 +60,9 @@ public:
         const std::filesystem::path& path) const override;
 };
 
+xray::hexagon::ports::driven::AnalysisReportReadError analysis_json_read_error_to_port_error(
+    AnalysisJsonReadError error);
+
 std::string project_identity_source_text(
     xray::hexagon::model::ProjectIdentitySource source);
 

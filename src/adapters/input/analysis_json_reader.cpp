@@ -1,8 +1,10 @@
 #include "adapters/input/analysis_json_reader.h"
 
 #include <array>
+#include <cstdint>
 #include <fstream>
 #include <initializer_list>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -91,12 +93,16 @@ bool has_exact_keys(const nlohmann::json& object,
 
 bool has_non_negative_integer(const nlohmann::json& object, std::string_view key) {
     const auto* value = member(object, key);
-    return value != nullptr && value->is_number_integer() && value->get<int>() >= 0;
+    return value != nullptr && value->is_number_integer() &&
+           value->get<std::int64_t>() >= 0 &&
+           value->get<std::int64_t>() <= std::numeric_limits<int>::max();
 }
 
 bool has_positive_integer(const nlohmann::json& object, std::string_view key) {
     const auto* value = member(object, key);
-    return value != nullptr && value->is_number_integer() && value->get<int>() >= 1;
+    return value != nullptr && value->is_number_integer() &&
+           value->get<std::int64_t>() >= 1 &&
+           value->get<std::int64_t>() <= std::numeric_limits<int>::max();
 }
 
 bool has_boolean(const nlohmann::json& object, std::string_view key) {
@@ -139,15 +145,18 @@ bool analysis_sections_shape(const nlohmann::json& value) {
     return true;
 }
 
-bool analysis_summary_shape(const nlohmann::json& summary) {
+bool analysis_summary_keys_shape(const nlohmann::json& summary) {
     return has_exact_keys(summary, {"translation_unit_count", "ranking_total_count",
                                     "hotspot_total_count", "top_limit",
                                     "include_analysis_heuristic", "observation_source",
                                     "target_metadata",
                                     "tu_ranking_total_count_after_thresholds",
                                     "tu_ranking_excluded_by_thresholds_count",
-                                    "include_hotspot_excluded_by_min_tus_count"}) &&
-           has_non_negative_integer(summary, "translation_unit_count") &&
+                                    "include_hotspot_excluded_by_min_tus_count"});
+}
+
+bool analysis_summary_values_shape(const nlohmann::json& summary) {
+    return has_non_negative_integer(summary, "translation_unit_count") &&
            has_non_negative_integer(summary, "ranking_total_count") &&
            has_non_negative_integer(summary, "hotspot_total_count") &&
            has_non_negative_integer(summary, "top_limit") &&
@@ -160,7 +169,11 @@ bool analysis_summary_shape(const nlohmann::json& summary) {
            has_non_negative_integer(summary,
                                     "tu_ranking_excluded_by_thresholds_count") &&
            has_non_negative_integer(summary,
-                                    "include_hotspot_excluded_by_min_tus_count");
+                                     "include_hotspot_excluded_by_min_tus_count");
+}
+
+bool analysis_summary_shape(const nlohmann::json& summary) {
+    return analysis_summary_keys_shape(summary) && analysis_summary_values_shape(summary);
 }
 
 bool diagnostics_shape(const nlohmann::json& diagnostics) {
@@ -201,24 +214,27 @@ bool reference_shape(const nlohmann::json& object) {
            has_string(object, "directory");
 }
 
-bool translation_unit_item_shape(const nlohmann::json& item) {
-    if (!has_exact_keys(item, {"rank", "reference", "metrics", "targets",
-                               "diagnostics"}) ||
-        !has_positive_integer(item, "rank") || !has_object(item, "reference") ||
-        !has_object(item, "metrics") || !has_array(item, "targets") ||
-        !has_array(item, "diagnostics")) {
-        return false;
-    }
-    const auto& metrics = item["metrics"];
-    return reference_shape(item["reference"]) &&
-           has_exact_keys(metrics, {"arg_count", "include_path_count", "define_count",
+bool translation_unit_item_header_shape(const nlohmann::json& item) {
+    return has_exact_keys(item, {"rank", "reference", "metrics", "targets",
+                                 "diagnostics"}) &&
+           has_positive_integer(item, "rank") && has_object(item, "reference") &&
+           has_object(item, "metrics") && has_array(item, "targets") &&
+           has_array(item, "diagnostics");
+}
+
+bool translation_unit_metrics_shape(const nlohmann::json& metrics) {
+    return has_exact_keys(metrics, {"arg_count", "include_path_count", "define_count",
                                     "score"}) &&
            has_non_negative_integer(metrics, "arg_count") &&
            has_non_negative_integer(metrics, "include_path_count") &&
            has_non_negative_integer(metrics, "define_count") &&
-           has_non_negative_integer(metrics, "score") &&
-           target_array_shape(item["targets"], false) &&
-           diagnostics_shape(item["diagnostics"]);
+           has_non_negative_integer(metrics, "score");
+}
+
+bool translation_unit_item_shape(const nlohmann::json& item) {
+    return translation_unit_item_header_shape(item) && reference_shape(item["reference"]) &&
+           translation_unit_metrics_shape(item["metrics"]) &&
+           target_array_shape(item["targets"], false) && diagnostics_shape(item["diagnostics"]);
 }
 
 bool translation_unit_ranking_shape(const nlohmann::json& ranking) {
@@ -250,15 +266,18 @@ bool affected_units_shape(const nlohmann::json& items) {
     return true;
 }
 
-bool include_hotspot_item_shape(const nlohmann::json& item) {
+bool include_hotspot_item_header_shape(const nlohmann::json& item) {
     return has_exact_keys(item, {"header_path", "origin", "depth_kind",
                                  "affected_total_count", "affected_returned_count",
                                  "affected_truncated", "affected_translation_units",
                                  "diagnostics"}) &&
            has_string(item, "header_path") &&
            string_is_one_of(item, "origin", {"project", "external", "unknown"}) &&
-           string_is_one_of(item, "depth_kind", {"direct", "indirect", "mixed"}) &&
-           has_non_negative_integer(item, "affected_total_count") &&
+           string_is_one_of(item, "depth_kind", {"direct", "indirect", "mixed"});
+}
+
+bool include_hotspot_item_payload_shape(const nlohmann::json& item) {
+    return has_non_negative_integer(item, "affected_total_count") &&
            has_non_negative_integer(item, "affected_returned_count") &&
            has_boolean(item, "affected_truncated") &&
            has_array(item, "affected_translation_units") &&
@@ -267,19 +286,25 @@ bool include_hotspot_item_shape(const nlohmann::json& item) {
            diagnostics_shape(item["diagnostics"]);
 }
 
+bool include_hotspot_item_shape(const nlohmann::json& item) {
+    return include_hotspot_item_header_shape(item) && include_hotspot_item_payload_shape(item);
+}
+
+bool include_hotspot_collection_shape(const nlohmann::json& hotspots) {
+    return has_exact_keys(hotspots, {"limit", "total_count", "returned_count",
+                                     "truncated", "excluded_unknown_count",
+                                     "excluded_mixed_count", "items"}) &&
+           has_non_negative_integer(hotspots, "limit") &&
+           has_non_negative_integer(hotspots, "total_count") &&
+           has_non_negative_integer(hotspots, "returned_count") &&
+           has_boolean(hotspots, "truncated") &&
+           has_non_negative_integer(hotspots, "excluded_unknown_count") &&
+           has_non_negative_integer(hotspots, "excluded_mixed_count") &&
+           has_array(hotspots, "items");
+}
+
 bool include_hotspots_shape(const nlohmann::json& hotspots) {
-    if (!has_exact_keys(hotspots, {"limit", "total_count", "returned_count",
-                                   "truncated", "excluded_unknown_count",
-                                   "excluded_mixed_count", "items"}) ||
-        !has_non_negative_integer(hotspots, "limit") ||
-        !has_non_negative_integer(hotspots, "total_count") ||
-        !has_non_negative_integer(hotspots, "returned_count") ||
-        !has_boolean(hotspots, "truncated") ||
-        !has_non_negative_integer(hotspots, "excluded_unknown_count") ||
-        !has_non_negative_integer(hotspots, "excluded_mixed_count") ||
-        !has_array(hotspots, "items")) {
-        return false;
-    }
+    if (!include_hotspot_collection_shape(hotspots)) return false;
     for (const auto& item : hotspots["items"]) {
         if (!include_hotspot_item_shape(item)) return false;
     }
@@ -333,14 +358,6 @@ bool has_required_analysis_keys(const nlohmann::json& root) {
     return root.contains("diagnostics");
 }
 
-bool has_required_input_keys(const nlohmann::json& inputs) {
-    return inputs.is_object() && inputs.contains("compile_database_path") &&
-           inputs.contains("compile_database_source") && inputs.contains("cmake_file_api_path") &&
-           inputs.contains("cmake_file_api_resolved_path") &&
-           inputs.contains("cmake_file_api_source") && inputs.contains("project_identity") &&
-           inputs.contains("project_identity_source");
-}
-
 bool analysis_inputs_shape(const nlohmann::json& inputs) {
     return has_exact_keys(inputs, {"compile_database_path", "compile_database_source",
                                    "cmake_file_api_path", "cmake_file_api_resolved_path",
@@ -382,72 +399,83 @@ AnalysisJsonReadResult validate_top_level_shape(const nlohmann::json& root) {
     return {};
 }
 
+bool analysis_configuration_header_shape(const nlohmann::json& configuration) {
+    return has_exact_keys(configuration, {"analysis_sections", "tu_thresholds",
+                                          "min_hotspot_tus",
+                                          "target_hub_in_threshold",
+                                          "target_hub_out_threshold"}) &&
+           has_array(configuration, "analysis_sections") &&
+           analysis_sections_shape(configuration["analysis_sections"]) &&
+           has_object(configuration, "tu_thresholds");
+}
+
+bool tu_thresholds_shape(const nlohmann::json& thresholds) {
+    return has_exact_keys(thresholds, {"arg_count", "include_path_count", "define_count"}) &&
+           has_non_negative_integer(thresholds, "arg_count") &&
+           has_non_negative_integer(thresholds, "include_path_count") &&
+           has_non_negative_integer(thresholds, "define_count");
+}
+
+bool analysis_configuration_limits_shape(const nlohmann::json& configuration) {
+    return has_non_negative_integer(configuration, "min_hotspot_tus") &&
+           has_non_negative_integer(configuration, "target_hub_in_threshold") &&
+           has_non_negative_integer(configuration, "target_hub_out_threshold");
+}
+
+bool analysis_configuration_shape(const nlohmann::json& configuration) {
+    return analysis_configuration_header_shape(configuration) &&
+           tu_thresholds_shape(configuration["tu_thresholds"]) &&
+           analysis_configuration_limits_shape(configuration);
+}
+
+bool section_states_shape(const nlohmann::json& section_states) {
+    return has_exact_keys(section_states, {"tu-ranking", "include-hotspots",
+                                           "target-graph", "target-hubs"}) &&
+           string_is_one_of(section_states, "tu-ranking",
+                            {"active", "disabled", "not_loaded"}) &&
+           string_is_one_of(section_states, "include-hotspots",
+                            {"active", "disabled", "not_loaded"}) &&
+           string_is_one_of(section_states, "target-graph",
+                            {"active", "disabled", "not_loaded"}) &&
+           string_is_one_of(section_states, "target-hubs",
+                            {"active", "disabled", "not_loaded"});
+}
+
+bool include_filter_shape(const nlohmann::json& include_filter) {
+    return has_exact_keys(include_filter, {"include_scope", "include_depth",
+                                           "include_depth_limit_requested",
+                                           "include_depth_limit_effective",
+                                           "include_node_budget_requested",
+                                           "include_node_budget_effective",
+                                           "include_node_budget_reached"}) &&
+           string_is_one_of(include_filter, "include_scope",
+                            {"all", "project", "external", "unknown"}) &&
+           string_is_one_of(include_filter, "include_depth",
+                            {"all", "direct", "indirect"}) &&
+           has_non_negative_integer(include_filter, "include_depth_limit_requested") &&
+           has_non_negative_integer(include_filter, "include_depth_limit_effective") &&
+           has_non_negative_integer(include_filter, "include_node_budget_requested") &&
+           has_non_negative_integer(include_filter, "include_node_budget_effective") &&
+           has_boolean(include_filter, "include_node_budget_reached");
+}
+
+bool analysis_payload_sections_shape(const nlohmann::json& root) {
+    return translation_unit_ranking_shape(root["translation_unit_ranking"]) &&
+           include_hotspots_shape(root["include_hotspots"]) &&
+           string_is_one_of(root, "target_graph_status",
+                            {"not_loaded", "loaded", "partial", "disabled"}) &&
+           target_graph_shape(root["target_graph"]) &&
+           target_hubs_shape(root["target_hubs"]) && diagnostics_shape(root["diagnostics"]);
+}
+
 AnalysisJsonReadResult validate_nested_shape(const nlohmann::json& root) {
-    if (!analysis_inputs_shape(root["inputs"]) ||
-        !analysis_summary_shape(root["summary"])) {
-        return schema_mismatch("analysis JSON does not match the analyze JSON schema");
+    if (analysis_inputs_shape(root["inputs"]) && analysis_summary_shape(root["summary"]) &&
+        analysis_configuration_shape(root["analysis_configuration"]) &&
+        section_states_shape(root["analysis_section_states"]) &&
+        include_filter_shape(root["include_filter"]) && analysis_payload_sections_shape(root)) {
+        return {};
     }
-
-    const auto& configuration = root["analysis_configuration"];
-    if (!has_exact_keys(configuration, {"analysis_sections", "tu_thresholds",
-                                        "min_hotspot_tus",
-                                        "target_hub_in_threshold",
-                                        "target_hub_out_threshold"}) ||
-        !has_array(configuration, "analysis_sections") ||
-        !analysis_sections_shape(configuration["analysis_sections"]) ||
-        !has_object(configuration, "tu_thresholds") ||
-        !has_exact_keys(configuration["tu_thresholds"],
-                        {"arg_count", "include_path_count", "define_count"}) ||
-        !has_non_negative_integer(configuration["tu_thresholds"], "arg_count") ||
-        !has_non_negative_integer(configuration["tu_thresholds"],
-                                  "include_path_count") ||
-        !has_non_negative_integer(configuration["tu_thresholds"], "define_count") ||
-        !has_non_negative_integer(configuration, "min_hotspot_tus") ||
-        !has_non_negative_integer(configuration, "target_hub_in_threshold") ||
-        !has_non_negative_integer(configuration, "target_hub_out_threshold")) {
-        return schema_mismatch("analysis JSON does not match the analyze JSON schema");
-    }
-
-    const auto& section_states = root["analysis_section_states"];
-    if (!has_exact_keys(section_states, {"tu-ranking", "include-hotspots",
-                                         "target-graph", "target-hubs"}) ||
-        !string_is_one_of(section_states, "tu-ranking",
-                          {"active", "disabled", "not_loaded"}) ||
-        !string_is_one_of(section_states, "include-hotspots",
-                          {"active", "disabled", "not_loaded"}) ||
-        !string_is_one_of(section_states, "target-graph",
-                          {"active", "disabled", "not_loaded"}) ||
-        !string_is_one_of(section_states, "target-hubs",
-                          {"active", "disabled", "not_loaded"})) {
-        return schema_mismatch("analysis JSON does not match the analyze JSON schema");
-    }
-
-    const auto& include_filter = root["include_filter"];
-    if (!has_exact_keys(include_filter, {"include_scope", "include_depth",
-                                         "include_depth_limit_requested",
-                                         "include_depth_limit_effective",
-                                         "include_node_budget_requested",
-                                         "include_node_budget_effective",
-                                         "include_node_budget_reached"}) ||
-        !string_is_one_of(include_filter, "include_scope",
-                          {"all", "project", "external", "unknown"}) ||
-        !string_is_one_of(include_filter, "include_depth",
-                          {"all", "direct", "indirect"}) ||
-        !has_non_negative_integer(include_filter, "include_depth_limit_requested") ||
-        !has_non_negative_integer(include_filter, "include_depth_limit_effective") ||
-        !has_non_negative_integer(include_filter, "include_node_budget_requested") ||
-        !has_non_negative_integer(include_filter, "include_node_budget_effective") ||
-        !has_boolean(include_filter, "include_node_budget_reached") ||
-        !translation_unit_ranking_shape(root["translation_unit_ranking"]) ||
-        !include_hotspots_shape(root["include_hotspots"]) ||
-        !string_is_one_of(root, "target_graph_status",
-                          {"not_loaded", "loaded", "partial", "disabled"}) ||
-        !target_graph_shape(root["target_graph"]) ||
-        !target_hubs_shape(root["target_hubs"]) ||
-        !diagnostics_shape(root["diagnostics"])) {
-        return schema_mismatch("analysis JSON does not match the analyze JSON schema");
-    }
-    return {};
+    return schema_mismatch("analysis JSON does not match the analyze JSON schema");
 }
 
 AnalysisJsonReadResult validate_report_type(const nlohmann::json& root) {
@@ -516,10 +544,6 @@ bool parse_project_identity_source(std::string_view value, ProjectIdentitySource
 
 AnalysisJsonReadResult populate_project_identity(const nlohmann::json& inputs,
                                                  AnalysisJsonReport& report) {
-    if (!has_required_input_keys(inputs)) {
-        return make_error(AnalysisJsonReadError::schema_mismatch,
-                          "analysis JSON inputs do not match the analyze JSON schema");
-    }
     if (!inputs["project_identity_source"].is_string()) {
         return make_error(AnalysisJsonReadError::invalid_project_identity_source,
                           inputs["project_identity_source"].dump());
@@ -603,7 +627,7 @@ std::vector<xray::hexagon::model::CompareDiagnosticSnapshot> diagnostic_snapshot
     std::vector<xray::hexagon::model::CompareDiagnosticSnapshot> out;
     if (!diagnostics.is_array()) return out;
     for (const auto& diagnostic : diagnostics) out.push_back(diagnostic_snapshot(diagnostic));
-    return out;
+    return std::vector<xray::hexagon::model::CompareDiagnosticSnapshot>(std::move(out));
 }
 
 xray::hexagon::model::CompareTargetSnapshot target_snapshot(const nlohmann::json& target) {
@@ -616,7 +640,7 @@ std::vector<xray::hexagon::model::CompareTargetSnapshot> target_snapshots(
     std::vector<xray::hexagon::model::CompareTargetSnapshot> out;
     if (!targets.is_array()) return out;
     for (const auto& target : targets) out.push_back(target_snapshot(target));
-    return out;
+    return std::vector<xray::hexagon::model::CompareTargetSnapshot>(std::move(out));
 }
 
 xray::hexagon::model::CompareTranslationUnitSnapshot translation_unit_snapshot(
@@ -646,20 +670,19 @@ std::vector<xray::hexagon::model::CompareHotspotAffectedUnitSnapshot> affected_u
     std::vector<xray::hexagon::model::CompareHotspotAffectedUnitSnapshot> out;
     if (!items.is_array()) return out;
     for (const auto& item : items) out.push_back(affected_unit_snapshot(item));
-    return out;
+    return std::vector<xray::hexagon::model::CompareHotspotAffectedUnitSnapshot>(
+        std::move(out));
 }
 
 xray::hexagon::model::CompareIncludeHotspotSnapshot hotspot_snapshot(
     const nlohmann::json& item) {
-    xray::hexagon::model::CompareIncludeHotspotSnapshot out;
-    out.header_path = string_value(item, "header_path");
-    out.include_origin = string_value(item, "origin");
-    out.include_depth_kind = string_value(item, "depth_kind");
-    out.affected_total_count = int_value(item, "affected_total_count");
-    out.affected_translation_units =
-        affected_unit_snapshots(item.value("affected_translation_units", nlohmann::json::array()));
-    out.diagnostics = diagnostic_snapshots(item.value("diagnostics", nlohmann::json::array()));
-    return out;
+    return {string_value(item, "header_path"),
+            string_value(item, "origin"),
+            string_value(item, "depth_kind"),
+            int_value(item, "affected_total_count"),
+            affected_unit_snapshots(
+                item.value("affected_translation_units", nlohmann::json::array())),
+            diagnostic_snapshots(item.value("diagnostics", nlohmann::json::array()))};
 }
 
 xray::hexagon::model::CompareTargetEdgeSnapshot edge_snapshot(const nlohmann::json& edge) {
@@ -673,7 +696,7 @@ std::vector<T> map_array(const nlohmann::json& items, Mapper mapper) {
     std::vector<T> out;
     if (!items.is_array()) return out;
     for (const auto& item : items) out.push_back(mapper(item));
-    return out;
+    return std::vector<T>(std::move(out));
 }
 
 xray::hexagon::model::AnalysisReportSnapshot to_snapshot(const AnalysisJsonReport& report) {
@@ -723,7 +746,9 @@ xray::hexagon::model::AnalysisReportSnapshot to_snapshot(const AnalysisJsonRepor
     return out;
 }
 
-AnalysisReportReadError to_port_error(AnalysisJsonReadError error) {
+}  // namespace
+
+AnalysisReportReadError analysis_json_read_error_to_port_error(AnalysisJsonReadError error) {
     switch (error) {
         case AnalysisJsonReadError::none:
             return AnalysisReportReadError::none;
@@ -744,8 +769,6 @@ AnalysisReportReadError to_port_error(AnalysisJsonReadError error) {
     }
     return AnalysisReportReadError::schema_mismatch;
 }
-
-}  // namespace
 
 std::string project_identity_source_text(ProjectIdentitySource source) {
     switch (source) {
@@ -773,18 +796,14 @@ AnalysisJsonReadResult AnalysisJsonReader::read(std::string_view path) const {
                           "analysis JSON file is not valid JSON: " + path_str);
     }
 
-    try {
-        return build_report(path, root);
-    } catch (const nlohmann::json::exception&) {
-        return schema_mismatch("analysis JSON does not match the analyze JSON schema");
-    }
+    return build_report(path, root);
 }
 
 AnalysisReportReadResult AnalysisJsonReader::read_analysis_report(
     const std::filesystem::path& path) const {
     const auto read_result = read(path.string());
     AnalysisReportReadResult result;
-    result.error = to_port_error(read_result.error);
+    result.error = analysis_json_read_error_to_port_error(read_result.error);
     result.message = read_result.error_message;
     if (read_result.is_success()) {
         result.report = to_snapshot(read_result.report);

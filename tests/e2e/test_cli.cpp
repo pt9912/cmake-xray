@@ -98,6 +98,35 @@ TEST_CASE_FIXTURE(CliFixture, "compare validates required inputs and supported f
     CHECK(run({"compare", "--baseline", "a.json", "--current", "b.json",
                "--format", "dot"}) == ExitCode::cli_usage_error);
     CHECK(err.str().find("allowed: console, markdown, json") != std::string::npos);
+
+    CHECK(run({"compare", "--baseline", "a.json", "--current", "b.json",
+               "--format", "json", "--output", ""}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("compare: --output requires a value") != std::string::npos);
+}
+
+TEST_CASE("compare reports missing service wiring") {
+    AnalysisResult unused_analysis;
+    unused_analysis.application = xray::hexagon::model::application_info();
+    unused_analysis.compile_database =
+        CompileDatabaseResult{CompileDatabaseError::none, {}, {}, {}};
+    const StubAnalyzeProjectPort analyze_port{unused_analysis};
+    const StubAnalyzeImpactPort impact_port;
+    const StubGenerateReportPort console_port;
+    const StubGenerateReportPort markdown_port;
+    const StubGenerateReportPort json_port;
+    const StubGenerateReportPort dot_port;
+    const StubGenerateReportPort html_port;
+    const xray::adapters::cli::ReportPorts ports{console_port, markdown_port, json_port,
+                                                  dot_port, html_port};
+    const CliAdapter cli{analyze_port, impact_port, ports};
+
+    std::ostringstream out;
+    std::ostringstream err;
+    const char* argv[] = {"cmake-xray", "compare", "--baseline", "a.json",
+                          "--current", "b.json"};
+    CHECK(cli.run(6, argv, out, err) == ExitCode::unexpected_error);
+    CHECK(err.str().find("compare: compare service is not configured") !=
+          std::string::npos);
 }
 
 TEST_CASE_FIXTURE(CliFixture, "compare rejects console output files before reading inputs") {

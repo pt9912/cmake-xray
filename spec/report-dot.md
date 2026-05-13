@@ -112,7 +112,7 @@ Analyse-Konfigurations-Vertrag analyze-only sind.
 
 DOT serialisiert bewusst NICHT den vollstaendigen
 `analysis_section_states`-Block aus dem JSON-Vertrag. Per
-[plan-M6-1-5.md](../docs/planning/in-progress/plan-M6-1-5.md) §663-669
+[plan-M6-1-5.md](../docs/planning/done/plan-M6-1-5.md) §663-669
 enthaelt der DOT-Vertrag nur konfigurationsrelevante Werte und die
 angeforderte, validierte `effective_sections`-Liste. Vollstaendige
 Section-States sind in JSON, HTML, Console und Markdown sichtbar; DOT

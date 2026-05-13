@@ -38,6 +38,16 @@ CompareScalarValue scalar_int(std::int64_t value) {
     return out;
 }
 
+CompareScalarValue scalar_bool(bool value) {
+    CompareScalarValue out;
+    out.value = value;
+    return out;
+}
+
+CompareScalarValue scalar_null() {
+    return {};
+}
+
 CompareScalarValue scalar_array(std::string lhs, std::string rhs) {
     CompareScalarArray values;
     values.push_back(scalar_string(std::move(lhs)));
@@ -151,6 +161,24 @@ TEST_CASE("json compare adapter groups diffs by kind with changed fields") {
           "app::EXECUTABLE");
     CHECK(doc["diffs"]["target_edges"]["added"][0]["from_unique_key"] == "app");
     CHECK(doc["diffs"]["target_hubs"]["removed"][0]["direction"] == "inbound");
+}
+
+TEST_CASE("json compare adapter renders boolean and null scalar values") {
+    auto result = compare_result();
+    result.translation_unit_diffs = {
+        TranslationUnitDiff{CompareDiffKind::changed,
+                            "src/app.cpp",
+                            "build",
+                            {CompareFieldChange{"feature.enabled", scalar_bool(false),
+                                                scalar_null()}}},
+    };
+
+    const JsonCompareAdapter adapter;
+    const auto doc = parse(adapter.write_compare_report(result));
+    const auto& change = doc["diffs"]["translation_units"]["changed"][0]["changes"][0];
+
+    CHECK(change["baseline_value"] == false);
+    CHECK(change["current_value"].is_null());
 }
 
 TEST_CASE("json compare adapter writes diagnostics object") {

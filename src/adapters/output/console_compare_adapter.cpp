@@ -145,8 +145,9 @@ void render_diagnostics(std::ostringstream& out, const CompareResult& result) {
     out << "\nDiagnostics:\n";
     for (const auto& drift : result.configuration_drifts) {
         out << "  configuration_drift: " << drift.field << "\n";
-        out << "    baseline=" << scalar_text(drift.baseline_value)
-            << ", current=" << scalar_text(drift.current_value) << "\n";
+        const auto baseline = scalar_text(drift.baseline_value);
+        const auto current = scalar_text(drift.current_value);
+        out << "    baseline=" << baseline << ", current=" << current << "\n";
         out << "    severity=" << drift.severity
             << ", ci_policy_hint=" << drift.ci_policy_hint << "\n";
     }

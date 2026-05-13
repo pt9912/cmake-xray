@@ -39,6 +39,16 @@ CompareScalarValue scalar_int(std::int64_t value) {
     return out;
 }
 
+CompareScalarValue scalar_bool(bool value) {
+    CompareScalarValue out;
+    out.value = value;
+    return out;
+}
+
+CompareScalarValue scalar_null() {
+    return {};
+}
+
 CompareScalarValue scalar_array(std::string lhs, std::string rhs) {
     CompareScalarArray values;
     values.push_back(scalar_string(std::move(lhs)));
@@ -142,6 +152,25 @@ TEST_CASE("text compare adapters render null identity as drift allowed") {
           std::string::npos);
     CHECK(markdown.write_compare_report(result).find("Project identity: drift allowed") !=
           std::string::npos);
+}
+
+TEST_CASE("text compare adapters render boolean and null scalar values") {
+    auto result = typical_compare_result();
+    result.translation_unit_diffs = {
+        TranslationUnitDiff{CompareDiffKind::changed,
+                            "src/app.cpp",
+                            "build",
+                            {CompareFieldChange{"feature.enabled", scalar_bool(true),
+                                                scalar_null()}}},
+    };
+
+    const ConsoleCompareAdapter console;
+    const MarkdownCompareAdapter markdown;
+
+    CHECK(console.write_compare_report(result).find("feature.enabled: true -> null") !=
+          std::string::npos);
+    CHECK(markdown.write_compare_report(result).find(
+              "| `feature.enabled` | `true` | `null` |") != std::string::npos);
 }
 
 TEST_CASE("markdown compare adapter escapes code spans in changed values") {

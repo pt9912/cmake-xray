@@ -73,8 +73,8 @@ M6 baut auf M4 und M5 auf. Ohne CMake-File-API-Daten bleiben Target-Graph-Abschn
 | 1.3 Impact-Priorisierung     | `erledigt`  | [`done/plan-M6-1-3.md`](../done/plan-M6-1-3.md)     | siehe Liefer-Stand-Block im Plan |
 | 1.4 Include-Sicht v4         | `erledigt`  | [`done/plan-M6-1-4.md`](../done/plan-M6-1-4.md)     | `2f83d7e` (Lead A.5 step 25c), Liefer-Stand-Block listet alle Tranche-Hashes |
 | 1.5 Analyseauswahl + Budgets | `erledigt`  | [`done/plan-M6-1-5.md`](../done/plan-M6-1-5.md)     | `4b03c0d` (Lead A.6 Audit-Pass), Liefer-Stand-Block listet alle Tranche-Hashes |
-| 1.6 Compare-Sicht            | `in Arbeit` | [`in-progress/plan-M6-1-6.md`](./plan-M6-1-6.md)    | — (A.1 lokal umgesetzt, Lead-Commit folgt) |
-| 1.7 Referenzdaten + Doku     | `offen`     | [`open/plan-M6-1-7.md`](../open/plan-M6-1-7.md)     | —           |
+| 1.6 Compare-Sicht            | `erledigt`  | [`done/plan-M6-1-6.md`](../done/plan-M6-1-6.md)     | `0ab9529` (A.6/A.7 Audit-Pass), Liefer-Stand-Block listet alle Tranche-Hashes |
+| 1.7 Referenzdaten + Doku     | `in Arbeit` | [`in-progress/plan-M6-1-7.md`](./plan-M6-1-7.md)    | — (A.1 startet mit Versionspin und CHANGELOG) |
 | 1.8 Praeprozessor-Include    | `offen`     | [`open/plan-M6-1-8.md`](../open/plan-M6-1-8.md)     | —           |
 
 Roadmap §0.2 spiegelt dieselbe Status-Sicht milestone-uebergreifend. Per-AP-Liefer-Stand-Bloecke leben in den jeweiligen Sub-Plaenen; dieses Dokument bleibt der M6-Master mit Arbeitspaket-Beschreibungen und Reihenfolge.

@@ -382,7 +382,7 @@ std::optional<int> validate_report_options(const CliOptions& options, std::ostre
     return ExitCode::cli_usage_error;
 }
 
-std::optional<int> validate_compare_options(const CliOptions& options, std::ostream& err) {
+std::optional<int> validate_compare_paths(const CliOptions& options, std::ostream& err) {
     if (options.compare_baseline_path.empty()) {
         err << "compare: --baseline is required\n";
         return ExitCode::cli_usage_error;
@@ -391,12 +391,23 @@ std::optional<int> validate_compare_options(const CliOptions& options, std::ostr
         err << "compare: --current is required\n";
         return ExitCode::cli_usage_error;
     }
-    if (options.report_format != "console" && options.report_format != "markdown" &&
-        options.report_format != "json") {
+    return std::nullopt;
+}
+
+bool supported_compare_format(std::string_view format) {
+    return format == "console" || format == "markdown" || format == "json";
+}
+
+std::optional<int> validate_compare_format(const CliOptions& options, std::ostream& err) {
+    if (!supported_compare_format(options.report_format)) {
         err << "compare: --format " << options.report_format
             << " is not supported; allowed: console, markdown, json\n";
         return ExitCode::cli_usage_error;
     }
+    return std::nullopt;
+}
+
+std::optional<int> validate_compare_output(const CliOptions& options, std::ostream& err) {
     if (options.report_format == "console" && !options.output_path.empty()) {
         err << "compare: --output is not allowed with --format console\n";
         return ExitCode::cli_usage_error;
@@ -407,6 +418,18 @@ std::optional<int> validate_compare_options(const CliOptions& options, std::ostr
         return ExitCode::cli_usage_error;
     }
     return std::nullopt;
+}
+
+std::optional<int> validate_compare_options(const CliOptions& options, std::ostream& err) {
+    if (const auto validation_error = validate_compare_paths(options, err);
+        validation_error.has_value()) {
+        return validation_error;
+    }
+    if (const auto validation_error = validate_compare_format(options, err);
+        validation_error.has_value()) {
+        return validation_error;
+    }
+    return validate_compare_output(options, err);
 }
 
 // AP M6-1.3 A.2: classify a non-empty --impact-target-depth text. The
@@ -1348,6 +1371,39 @@ int dispatch_subcommand(const CliOptions& options, bool is_impact,
     return handle_analysis_result(result, report_port, report_format, options, streams);
 }
 
+void configure_root_app(CLI::App& app) {
+    app.require_subcommand(0, 1);
+    // AP M5-1.6 Tranche A: global --version flag handled by CLI11 before
+    // subcommand dispatch; CLI::CallForVersion is caught as success below.
+    app.set_version_flag("--version",
+                         std::string{xray::hexagon::model::application_info().version});
+}
+
+struct CliCommandHandles {
+    CLI::App* analyze = nullptr;
+    CLI::App* impact = nullptr;
+    CLI::App* compare = nullptr;
+};
+
+CliCommandHandles configure_cli_commands(CLI::App& app, CliOptions& options) {
+    CliCommandHandles handles;
+    configure_analyze_command(app, options, handles.analyze);
+    configure_impact_command(app, options, handles.impact);
+    configure_compare_command(app, options, handles.compare);
+    return handles;
+}
+
+bool no_command_parsed(const CliCommandHandles& commands) {
+    return !commands.analyze->parsed() && !commands.impact->parsed() &&
+           !commands.compare->parsed();
+}
+
+std::optional<int> validate_parsed_command(CliOptions& options, const CliCommandHandles& commands,
+                                           std::ostream& err) {
+    if (commands.compare->parsed()) return validate_compare_options(options, err);
+    return validate_subcommand_options(options, commands.impact->parsed(), err);
+}
+
 }  // namespace
 
 int emit_rendered_report(const CliReportRenderer& renderer, std::string_view output_path,
@@ -1410,19 +1466,10 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
     // upfront makes the help-text contract independent of that detail.
     CLI::App app{"cmake-xray - build dependency analysis for CMake projects",
                   "cmake-xray"};
-    app.require_subcommand(0, 1);
-    // AP M5-1.6 Tranche A: global --version flag handled by CLI11 before
-    // subcommand dispatch; CLI::CallForVersion is caught as success below.
-    app.set_version_flag("--version",
-                         std::string{xray::hexagon::model::application_info().version});
+    configure_root_app(app);
 
     CliOptions options;
-    CLI::App* analyze_cmd = nullptr;
-    CLI::App* impact_cmd = nullptr;
-    CLI::App* compare_cmd = nullptr;
-    configure_analyze_command(app, options, analyze_cmd);
-    configure_impact_command(app, options, impact_cmd);
-    configure_compare_command(app, options, compare_cmd);
+    const auto commands = configure_cli_commands(app, options);
 
     try {
         app.parse(argc, argv);
@@ -1431,27 +1478,19 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
         return cli_exit == 0 ? ExitCode::success : ExitCode::cli_usage_error;
     }
 
-    if (!analyze_cmd->parsed() && !impact_cmd->parsed() && !compare_cmd->parsed()) {
+    if (no_command_parsed(commands)) {
         out << app.help();
         return ExitCode::success;
     }
 
-    if (compare_cmd->parsed()) {
-        if (const auto validation_error = validate_compare_options(options, err);
-            validation_error.has_value()) {
-            return *validation_error;
-        }
-    } else {
-        if (const auto validation_error =
-                validate_subcommand_options(options, impact_cmd->parsed(), err);
-            validation_error.has_value()) {
-            return *validation_error;
-        }
+    if (const auto validation_error = validate_parsed_command(options, commands, err);
+        validation_error.has_value()) {
+        return *validation_error;
     }
     options.verbosity = resolve_verbosity(options);
     const CliDispatchContext ctx{analyze_project_port_, analyze_impact_port_,
                                   compare_analysis_port_, report_ports_};
-    return dispatch_subcommand(options, impact_cmd->parsed(), compare_cmd->parsed(), ctx,
+    return dispatch_subcommand(options, commands.impact->parsed(), commands.compare->parsed(), ctx,
                                CliOutputStreams{out, err});
 }
 

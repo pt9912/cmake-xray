@@ -306,6 +306,49 @@ TEST_CASE("compare service maps reader and version errors") {
     CHECK(result.service_error->code == "incompatible_format_version");
     CHECK(result.service_error->message.find("format_version combination (5, 7)") !=
           std::string::npos);
+
+    StubAnalysisReportReader current_incompatible_reader;
+    current_incompatible_reader.add("baseline.json", success(report("baseline.json")));
+    auto current_version_error = AnalysisReportReadResult{
+        AnalysisReportReadError::incompatible_format_version, "unsupported", {}};
+    current_version_error.report.format_version = 7;
+    current_incompatible_reader.add("current.json", current_version_error);
+    const xray::hexagon::services::CompareService current_incompatible_service{
+        current_incompatible_reader};
+    result = current_incompatible_service.compare(request());
+    REQUIRE(result.service_error.has_value());
+    CHECK(result.service_error->message.find("format_version combination (6, 7)") !=
+          std::string::npos);
+
+    StubAnalysisReportReader baseline_incompatible_current_bad;
+    baseline_incompatible_current_bad.add("baseline.json", baseline_error);
+    baseline_incompatible_current_bad.add(
+        "current.json", {AnalysisReportReadError::schema_mismatch, "bad schema", {}});
+    const xray::hexagon::services::CompareService baseline_read_error_service{
+        baseline_incompatible_current_bad};
+    result = baseline_read_error_service.compare(request());
+    REQUIRE(result.service_error.has_value());
+    CHECK(result.service_error->message.find("format_version combination (5, unknown)") !=
+          std::string::npos);
+
+    StubAnalysisReportReader unknown_reader_error;
+    unknown_reader_error.add("baseline.json",
+                             {static_cast<AnalysisReportReadError>(99), "unknown", {}});
+    const xray::hexagon::services::CompareService unknown_reader_error_service{
+        unknown_reader_error};
+    result = unknown_reader_error_service.compare(request());
+    REQUIRE(result.service_error.has_value());
+    CHECK(result.service_error->message == "compare: baseline: unknown");
+
+    StubAnalysisReportReader unrecoverable_identity_reader;
+    unrecoverable_identity_reader.add(
+        "baseline.json",
+        {AnalysisReportReadError::unrecoverable_project_identity, "empty", {}});
+    const xray::hexagon::services::CompareService unrecoverable_identity_service{
+        unrecoverable_identity_reader};
+    result = unrecoverable_identity_service.compare(request());
+    REQUIRE(result.service_error.has_value());
+    CHECK(result.service_error->code == "unrecoverable_project_identity");
 }
 
 TEST_CASE("compare service validates project identity rules") {

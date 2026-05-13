@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <iterator>
 #include <map>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
@@ -157,6 +158,49 @@ bool format_versions_supported(const AnalysisReportSnapshot& baseline,
                                const AnalysisReportSnapshot& current) {
     return baseline.format_version == model::kReportFormatVersion &&
            current.format_version == model::kReportFormatVersion;
+}
+
+struct CompareInputReads {
+    AnalysisReportReadResult baseline;
+    AnalysisReportReadResult current;
+    std::optional<CompareResult> error;
+};
+
+CompareInputReads read_compare_inputs(
+    const ports::driven::AnalysisReportReaderPort& reader,
+    const ports::driving::CompareAnalysisRequest& request) {
+    using ports::driven::AnalysisReportReadError;
+    CompareInputReads reads;
+    reads.baseline = reader.read_analysis_report(request.baseline_path);
+    if (reads.baseline.error == AnalysisReportReadError::incompatible_format_version) {
+        reads.current = reader.read_analysis_report(request.current_path);
+        if (reads.current.is_success() ||
+            reads.current.error == AnalysisReportReadError::incompatible_format_version) {
+            reads.error = incompatible_format_versions(reads.baseline.report.format_version,
+                                                       reads.current.report.format_version);
+        } else {
+            reads.error = read_error("baseline", request.baseline_path, reads.baseline);
+        }
+        return reads;
+    }
+    if (!reads.baseline.is_success()) {
+        reads.error = read_error("baseline", request.baseline_path, reads.baseline);
+        return reads;
+    }
+
+    reads.current = reader.read_analysis_report(request.current_path);
+    const bool current_has_incompatible_version =
+        reads.current.error == AnalysisReportReadError::incompatible_format_version ||
+        (reads.current.is_success() &&
+         !format_versions_supported(reads.baseline.report, reads.current.report));
+    if (current_has_incompatible_version) {
+        reads.error = incompatible_format_versions(reads.baseline.report.format_version,
+                                                   reads.current.report.format_version);
+    } else if (!reads.current.is_success()) {
+        reads.error = read_error("current", request.current_path, reads.current);
+    }
+    return CompareInputReads{std::move(reads.baseline), std::move(reads.current),
+                             std::move(reads.error)};
 }
 
 std::set<std::string> normalized_source_paths(
@@ -585,49 +629,29 @@ CompareService::CompareService(const ports::driven::AnalysisReportReaderPort& re
     : reader_(reader) {}
 
 CompareResult CompareService::compare(ports::driving::CompareAnalysisRequest request) const {
-    const auto baseline = reader_.read_analysis_report(request.baseline_path);
-    if (baseline.error == ports::driven::AnalysisReportReadError::incompatible_format_version) {
-        const auto current = reader_.read_analysis_report(request.current_path);
-        if (current.is_success() ||
-            current.error ==
-                ports::driven::AnalysisReportReadError::incompatible_format_version) {
-            return incompatible_format_versions(baseline.report.format_version,
-                                                current.report.format_version);
-        }
-        return read_error("baseline", request.baseline_path, baseline);
-    }
-    if (!baseline.is_success()) return read_error("baseline", request.baseline_path, baseline);
-    const auto current = reader_.read_analysis_report(request.current_path);
-    if (current.error == ports::driven::AnalysisReportReadError::incompatible_format_version) {
-        return incompatible_format_versions(baseline.report.format_version,
-                                            current.report.format_version);
-    }
-    if (!current.is_success()) return read_error("current", request.current_path, current);
-    if (!format_versions_supported(baseline.report, current.report)) {
-        return incompatible_format_versions(baseline.report.format_version,
-                                            current.report.format_version);
-    }
+    const auto reads = read_compare_inputs(reader_, request);
+    if (reads.error.has_value()) return *reads.error;
+    const auto& baseline = reads.baseline.report;
+    const auto& current = reads.current.report;
 
     CompareResult result;
-    apply_inputs_and_identity(baseline.report, current.report, request, result);
-    if (reject_incompatible_identity(baseline.report, current.report, request, result)) {
+    apply_inputs_and_identity(baseline, current, request, result);
+    if (reject_incompatible_identity(baseline, current, request, result)) {
         return result;
     }
 
-    collect_configuration_drifts(baseline.report, current.report, result);
-    diff_translation_units(baseline.report, current.report, result);
-    diff_hotspots(baseline.report, current.report, result);
+    collect_configuration_drifts(baseline, current, result);
+    diff_translation_units(baseline, current, result);
+    diff_hotspots(baseline, current, result);
     const bool target_graph_drift = section_state_differs(
-        "target_graph", baseline.report.target_graph_state, current.report.target_graph_state,
-        result);
+        "target_graph", baseline.target_graph_state, current.target_graph_state, result);
     const bool target_hubs_drift = section_state_differs(
-        "target_hubs", baseline.report.target_hubs_state, current.report.target_hubs_state,
-        result);
+        "target_hubs", baseline.target_hubs_state, current.target_hubs_state, result);
     if (!target_graph_drift) {
-        diff_nodes(baseline.report, current.report, result);
-        diff_edges(baseline.report, current.report, result);
+        diff_nodes(baseline, current, result);
+        diff_edges(baseline, current, result);
     }
-    if (!target_hubs_drift) diff_hubs(baseline.report, current.report, result);
+    if (!target_hubs_drift) diff_hubs(baseline, current, result);
     collect_summary(result);
     return result;
 }

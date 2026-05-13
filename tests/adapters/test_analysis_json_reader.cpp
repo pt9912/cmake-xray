@@ -1,8 +1,10 @@
 #include <doctest/doctest.h>
 
 #include <cstdio>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 
 #include <nlohmann/json.hpp>
@@ -15,8 +17,10 @@ namespace {
 
 using xray::adapters::input::AnalysisJsonReadError;
 using xray::adapters::input::AnalysisJsonReader;
+using xray::adapters::input::analysis_json_read_error_to_port_error;
 using xray::adapters::input::project_identity_source_text;
 using xray::hexagon::model::ProjectIdentitySource;
+using xray::hexagon::ports::driven::AnalysisReportReadError;
 
 nlohmann::json valid_analysis_report() {
     return nlohmann::json::parse(R"json({
@@ -127,6 +131,15 @@ AnalysisJsonReadError read_error_for(nlohmann::json document) {
     const auto result = reader.read(path.string());
     remove_temp_file(path);
     return result.error;
+}
+
+xray::hexagon::ports::driven::AnalysisReportReadResult read_report_for(
+    nlohmann::json document) {
+    const auto path = write_temp_json("cmake-xray-analysis-reader-port.json", document);
+    const AnalysisJsonReader reader;
+    const auto result = reader.read_analysis_report(path);
+    remove_temp_file(path);
+    return result;
 }
 
 }  // namespace
@@ -244,6 +257,51 @@ TEST_CASE("analysis JSON reader rejects malformed nested compare inputs") {
     missing_hub_thresholds["target_hubs"].erase("thresholds");
     CHECK(read_error_for(missing_hub_thresholds) ==
           AnalysisJsonReadError::schema_mismatch);
+
+    auto unknown_analysis_section = valid_analysis_report();
+    unknown_analysis_section["analysis_configuration"]["analysis_sections"] =
+        nlohmann::json::array({"tu-ranking", "unknown"});
+    CHECK(read_error_for(unknown_analysis_section) ==
+          AnalysisJsonReadError::schema_mismatch);
+
+    auto malformed_diagnostic = valid_analysis_report();
+    malformed_diagnostic["diagnostics"] =
+        nlohmann::json::array({{{"severity", "error"}, {"message", "bad"}}});
+    CHECK(read_error_for(malformed_diagnostic) == AnalysisJsonReadError::schema_mismatch);
+
+    auto malformed_translation_unit = valid_analysis_report();
+    malformed_translation_unit["translation_unit_ranking"]["items"] =
+        nlohmann::json::array({{{"rank", 1}, {"reference", nlohmann::json::object()}}});
+    CHECK(read_error_for(malformed_translation_unit) ==
+          AnalysisJsonReadError::schema_mismatch);
+
+    auto malformed_hotspots = valid_analysis_report();
+    malformed_hotspots["include_hotspots"]["excluded_unknown_count"] = -1;
+    CHECK(read_error_for(malformed_hotspots) == AnalysisJsonReadError::schema_mismatch);
+
+    auto malformed_graph_node = valid_analysis_report();
+    malformed_graph_node["target_graph"]["nodes"] = nlohmann::json::array(
+        {{{"display_name", "app"}, {"type", "EXECUTABLE"}}});
+    CHECK(read_error_for(malformed_graph_node) == AnalysisJsonReadError::schema_mismatch);
+
+    auto malformed_graph_edge = valid_analysis_report();
+    malformed_graph_edge["target_graph"]["edges"] = nlohmann::json::array(
+        {{{"from_display_name", "app"},
+          {"from_unique_key", "app::EXECUTABLE"},
+          {"to_display_name", "lib"},
+          {"to_unique_key", "lib::STATIC_LIBRARY"},
+          {"kind", "link"},
+          {"resolution", "resolved"}}});
+    CHECK(read_error_for(malformed_graph_edge) == AnalysisJsonReadError::schema_mismatch);
+
+    auto malformed_state = valid_analysis_report();
+    malformed_state["analysis_section_states"]["target-hubs"] = "unknown";
+    CHECK(read_error_for(malformed_state) == AnalysisJsonReadError::schema_mismatch);
+
+    auto overlarge_count = valid_analysis_report();
+    overlarge_count["summary"]["translation_unit_count"] =
+        static_cast<std::int64_t>(std::numeric_limits<int>::max()) + 1;
+    CHECK(read_error_for(overlarge_count) == AnalysisJsonReadError::schema_mismatch);
 }
 
 TEST_CASE("analysis JSON reader validates project identity fields") {
@@ -274,6 +332,73 @@ TEST_CASE("analysis JSON reader renders project identity source text") {
               ProjectIdentitySource::fallback_compile_database_fingerprint) ==
           "fallback_compile_database_fingerprint");
     CHECK(project_identity_source_text(static_cast<ProjectIdentitySource>(99)).empty());
+}
+
+TEST_CASE("analysis JSON reader maps nested sections to compare snapshots") {
+    const AnalysisJsonReader reader;
+    const auto result = reader.read_analysis_report(
+        "tests/e2e/testdata/m6/json-reports/analyze-file-api-loaded.json");
+
+    REQUIRE(result.is_success());
+    REQUIRE(result.report.translation_units.size() == 10);
+    CHECK(result.report.translation_units[0].source_path == "src/hub.cpp");
+    CHECK(result.report.translation_units[0].targets[0].display_name == "hub");
+    CHECK(result.report.translation_units[0].diagnostics[0].severity == "warning");
+    REQUIRE(result.report.target_edges.size() == 10);
+    CHECK(result.report.target_edges[0].to_unique_key == "hub::STATIC_LIBRARY");
+    CHECK(result.report.target_hubs_in[0].unique_key == "hub::STATIC_LIBRARY");
+}
+
+TEST_CASE("analysis JSON reader maps include hotspots to compare snapshots") {
+    const AnalysisJsonReader reader;
+    const auto result = reader.read_analysis_report(
+        "tests/e2e/testdata/m6/json-reports/analyze-include-origin-mix.json");
+
+    REQUIRE(result.is_success());
+    REQUIRE(result.report.include_hotspots.size() == 4);
+    CHECK(result.report.include_hotspots[0].header_path == "include/config.h");
+    CHECK(result.report.include_hotspots[0].include_depth_kind == "mixed");
+    CHECK(result.report.include_hotspots[0].affected_translation_units[0].source_path ==
+          "src/a.cpp");
+}
+
+TEST_CASE("analysis JSON reader maps read errors to the driven port") {
+    const AnalysisJsonReader reader;
+    CHECK(reader.read_analysis_report("/tmp/cmake-xray-analysis-reader-port-missing.json").error ==
+          AnalysisReportReadError::file_not_accessible);
+
+    const auto invalid_json_path =
+        write_temp_text("cmake-xray-analysis-reader-port-invalid.json", "{");
+    CHECK(reader.read_analysis_report(invalid_json_path).error ==
+          AnalysisReportReadError::invalid_json);
+    remove_temp_file(invalid_json_path);
+
+    auto schema_mismatch = valid_analysis_report();
+    schema_mismatch["summary"] = nlohmann::json::array();
+    CHECK(read_report_for(schema_mismatch).error == AnalysisReportReadError::schema_mismatch);
+
+    auto impact = valid_analysis_report();
+    impact["report_type"] = "impact";
+    CHECK(read_report_for(impact).error == AnalysisReportReadError::unsupported_report_type);
+
+    auto incompatible = valid_analysis_report();
+    incompatible["format_version"] = 5;
+    const auto incompatible_result = read_report_for(incompatible);
+    CHECK(incompatible_result.error == AnalysisReportReadError::incompatible_format_version);
+    CHECK(incompatible_result.report.format_version == 5);
+
+    auto invalid_source = valid_analysis_report();
+    invalid_source["inputs"]["project_identity_source"] = "unknown";
+    CHECK(read_report_for(invalid_source).error ==
+          AnalysisReportReadError::invalid_project_identity_source);
+
+    auto empty_identity = valid_analysis_report();
+    empty_identity["inputs"]["project_identity"] = "";
+    CHECK(read_report_for(empty_identity).error ==
+          AnalysisReportReadError::unrecoverable_project_identity);
+
+    CHECK(analysis_json_read_error_to_port_error(static_cast<AnalysisJsonReadError>(99)) ==
+          AnalysisReportReadError::schema_mismatch);
 }
 
 TEST_CASE("compare result model exposes format version and default counters") {

@@ -23,11 +23,11 @@ Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**.
 | M6 AP 1.3            | `erledigt`        | Impact-Priorisierung ueber Target-Graph ([`done/plan-M6-1-3.md`](../done/plan-M6-1-3.md)).   |
 | M6 AP 1.4            | `erledigt`        | Include-Sicht (Origin + Tiefe) — Liefer-Stand in [`done/plan-M6-1-4.md`](../done/plan-M6-1-4.md).             |
 | M6 AP 1.5            | `erledigt`        | Analyseauswahl, Schwellenwerte, Impact-Budget ([`done/plan-M6-1-5.md`](../done/plan-M6-1-5.md)).    |
-| **M6 AP 1.6**        | **`in Arbeit`**   | Vergleich zweier Analyse-JSON-Berichte ([`in-progress/plan-M6-1-6.md`](./plan-M6-1-6.md)).           |
-| M6 AP 1.7            | `offen`           | Referenzdaten, Doku, Release ([`open/plan-M6-1-7.md`](../open/plan-M6-1-7.md)).              |
+| **M6 AP 1.6**        | **`erledigt`**    | Vergleich zweier Analyse-JSON-Berichte ([`done/plan-M6-1-6.md`](../done/plan-M6-1-6.md)).             |
+| **M6 AP 1.7**        | **`in Arbeit`**   | Referenzdaten, Doku, Release ([`in-progress/plan-M6-1-7.md`](./plan-M6-1-7.md)).             |
 | M6 AP 1.8            | `offen`           | Praeprozessor-Include + Konfig-Override ([`open/plan-M6-1-8.md`](../open/plan-M6-1-8.md)).   |
 
-Naechster konkreter Schritt: M6 AP 1.6 A.2 (Compare-Modell und JSON-Reader), siehe `in-progress/plan-M6-1-6.md` Step 5.
+Naechster konkreter Schritt: M6 AP 1.7 A.1 (Versionspin und CHANGELOG), siehe `in-progress/plan-M6-1-7.md` Step 1.
 
 ## 1. Planungsgrundsaetze
 

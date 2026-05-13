@@ -1112,8 +1112,7 @@ Bis zum Abschluss aller A-Tranchen ist AP 1.6 nicht abnahmefaehig.
   Diagnostics erfasst; Summary-Zaehler werden aus den Diff-Listen
   abgeleitet. Lokale Gates gruen: `make docker-test` (41/41),
   `make coverage-gate COVERAGE_THRESHOLD=100` (Coverage 100%) und
-  `make quality-gate` (clang-tidy 0, lizard 0). Commit wird nach
-  Auslieferung gepinnt.
+  `make quality-gate` (clang-tidy 0, lizard 0). Commit: `154a0c3`.
 - A.4 (CLI und Compare-Schema): **lokal umgesetzt**.
   Das `compare`-Subkommando ist in der CLI registriert, validiert
   `--baseline`, `--current`, `--format`, `--output` und
@@ -1123,8 +1122,10 @@ Bis zum Abschluss aller A-Tranchen ist AP 1.6 nicht abnahmefaehig.
   direkt in `AnalysisReportSnapshot` fuer den Service abbilden.
   `spec/compare-matrix.md` und `spec/report-compare.schema.json`
   legen Matrix und initialen Compare-Schema-Rahmen an; die vollstaendige
-  JSON-Serialisierung folgt in A.5. Lokale Gates gruen:
-  `make docker-test` (41/41). Commit wird nach Auslieferung gepinnt.
+  JSON-Serialisierung folgt in A.5. Lokaler Testlauf gruen:
+  `make docker-test` (41/41). Coverage-/Quality-Gates wurden in diesem
+  Schnitt nicht erneut ausgefuehrt; der CI-Folgefix schliesst diese
+  Luecke. Commit: `b1678d5`.
 - A.5 (JSON-Compare-Adapter): **lokal umgesetzt**.
   `JsonCompareAdapter` serialisiert `CompareResult` mit
   `format=cmake-xray.compare`, `format_version=1`, `report_type=compare`,
@@ -1134,8 +1135,9 @@ Bis zum Abschluss aller A-Tranchen ist AP 1.6 nicht abnahmefaehig.
   `tests/e2e/testdata/m6/compare-reports/json/compare-empty.json`
   pinnt einen ersten JSON-Golden und
   `report_compare_schema_validation_m6` validiert ihn im CTest-Gate.
-  Lokale Gates gruen: `make docker-test` (42/42). Commit wird nach
-  Auslieferung gepinnt.
+  Lokaler Testlauf gruen: `make docker-test` (42/42). Coverage-/
+  Quality-Gates wurden in diesem Schnitt nicht erneut ausgefuehrt; der
+  CI-Folgefix schliesst diese Luecke. Commit: `b1678d5`.
 - A.6 (Console- und Markdown-Compare-Adapter): **lokal umgesetzt**.
   `ConsoleCompareAdapter` und `MarkdownCompareAdapter` serialisieren
   `CompareResult` fuer `compare --format console` und
@@ -1144,15 +1146,18 @@ Bis zum Abschluss aller A-Tranchen ist AP 1.6 nicht abnahmefaehig.
   Output-Adapter. Goldens unter
   `tests/e2e/testdata/m6/compare-reports/{console,markdown}/` pinnen
   typische Textausgaben; eigene Manifest-Gates validieren die neuen
-  Compare-Text-Goldens. Lokale Gates gruen: `make docker-test` (44/44).
-  Commit wird nach Auslieferung gepinnt.
+  Compare-Text-Goldens. Lokaler Testlauf gruen: `make docker-test` (44/44).
+  Coverage-/Quality-Gates wurden in diesem Schnitt nicht erneut ausgefuehrt;
+  der CI-Folgefix schliesst diese Luecke. Commit: `0ab9529`.
 - A.7 (Audit-Pass): **lokal umgesetzt**.
   Compare-Eingangsdaten liegen unter
   `tests/e2e/testdata/m6/compare-reports/inputs/` und werden mit
   `report_compare_input_schema_validation_m6` gegen den Analyze-v6-
   Vertrag validiert. Die CLI-E2E-Tests nutzen diese Inputs fuer JSON,
-  Console und Markdown. Der abschliessende Docker-Gate-Lauf ist gruen:
-  `make docker-test` (45/45). Commit wird nach Auslieferung gepinnt.
+  Console und Markdown. Der abschliessende lokale Testlauf war gruen:
+  `make docker-test` (45/45). Der vollstaendige Docker-Gate-Lauf
+  (`coverage-gate`, `quality-gate`) wurde erst durch CI auf `0ab9529`
+  als fehlend sichtbar und wird im Folgefix geschlossen.
 
 ## Abnahmekriterien
 
