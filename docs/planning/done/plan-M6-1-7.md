@@ -615,7 +615,7 @@ abnahmefaehig.
   `git diff --check` und `make docker-gates` (Docker-Test 47/47,
   Coverage 100% bei 100%-Schwellwert, clang-tidy 0 Findings, lizard
   0 Warnings).
-  Commit: ausstehend.
+  Commit: `3a371fe`.
 
 ## Abnahmekriterien
 

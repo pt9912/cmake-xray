@@ -74,7 +74,7 @@ M6 baut auf M4 und M5 auf. Ohne CMake-File-API-Daten bleiben Target-Graph-Abschn
 | 1.4 Include-Sicht v4         | `erledigt`  | [`done/plan-M6-1-4.md`](../done/plan-M6-1-4.md)     | `2f83d7e` (Lead A.5 step 25c), Liefer-Stand-Block listet alle Tranche-Hashes |
 | 1.5 Analyseauswahl + Budgets | `erledigt`  | [`done/plan-M6-1-5.md`](../done/plan-M6-1-5.md)     | `4b03c0d` (Lead A.6 Audit-Pass), Liefer-Stand-Block listet alle Tranche-Hashes |
 | 1.6 Compare-Sicht            | `erledigt`  | [`done/plan-M6-1-6.md`](../done/plan-M6-1-6.md)     | `0ab9529` (A.6/A.7 Audit-Pass), Liefer-Stand-Block listet alle Tranche-Hashes |
-| 1.7 Referenzdaten + Doku     | `erledigt`  | [`done/plan-M6-1-7.md`](../done/plan-M6-1-7.md)     | `e4722a4` (A.3 Review-Fix), A.4-Pin folgt im Liefer-Stand |
+| 1.7 Referenzdaten + Doku     | `erledigt`  | [`done/plan-M6-1-7.md`](../done/plan-M6-1-7.md)     | `3a371fe` (A.4 Audit), Liefer-Stand listet A.1-A.4 |
 | 1.8 Praeprozessor-Include    | `offen`     | [`open/plan-M6-1-8.md`](../open/plan-M6-1-8.md)     | —           |
 
 Roadmap §0.2 spiegelt dieselbe Status-Sicht milestone-uebergreifend. Per-AP-Liefer-Stand-Bloecke leben in den jeweiligen Sub-Plaenen; dieses Dokument bleibt der M6-Master mit Arbeitspaket-Beschreibungen und Reihenfolge.
@@ -502,7 +502,7 @@ dient als M6-Masterindex fuer Audit, Review und Release-Vorbereitung.
 | 1.4 | `erledigt` | A.1-A.6 | `dbd51e0`, `7881ffa`, `e770238`, `e5e668e`, `041aaf4`, `c5896e2`, `c48e45c`, `248c863`, `6db5a9f`, `16f5b2a`, `f7afa6e`, `94d4267`, `aa29322`, `be4c314`, `36bb1ab`, `3b92a8a`, `bbeee3e`, `d70ceb7`, `2f83d7e`, `e0fd969` | Include-Origin/-Depth, v4-Adapter, Goldens, Budget-Fixtures und Audit-Schluss. |
 | 1.5 | `erledigt` | A.1-A.6 | `ac5dda0`, `beb55dd`, `570820d`, `c5d30c9`, `0e7045c`, `4d5d1ff`, `95d2db2`, `4b03c0d` | Analyseauswahl, Schwellenwerte, Section-States, v5-Reports und Audit-Gates. |
 | 1.6 | `erledigt` | A.1-A.7 | `85de345`, `53b9dfb`, `b4f7e76`, `154a0c3`, `b1678d5`, `0ab9529` | Project-Identity, Compare-Service, CLI, Schema, JSON/Console/Markdown-Adapter und Compare-Audit. |
-| 1.7 | `erledigt` | A.1-A.4 | `821a84f`, `d42273d`, `254bc09`, `c01436b`, `7a19023`, `9ffbc5a`, `e4722a4`, `ausstehend` | Versionspin/CHANGELOG, Format-Final-Sweep, M6-Beispiele, Nutzer-/Quality-/Performance-Doku, Manifest-Baselines und A.4-Audit. |
+| 1.7 | `erledigt` | A.1-A.4 | `821a84f`, `d42273d`, `254bc09`, `c01436b`, `7a19023`, `9ffbc5a`, `e4722a4`, `3a371fe` | Versionspin/CHANGELOG, Format-Final-Sweep, M6-Beispiele, Nutzer-/Quality-/Performance-Doku, Manifest-Baselines und A.4-Audit. |
 
 AP 1.8 bleibt als offener Folgeplan unter
 [`open/plan-M6-1-8.md`](../open/plan-M6-1-8.md) gefuehrt. AP 1.7 ist
