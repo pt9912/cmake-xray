@@ -162,6 +162,10 @@ if(BASH_PROGRAM)
     )
     set_tests_properties(release_dry_run PROPERTIES
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        # GitHub's native linux runner can spend most of the default 1500s
+        # CTest timeout on cold Docker pulls and nested image builds even when
+        # all dry-run scenarios pass. Keep this above the observed CI tail.
+        TIMEOUT 2400
     )
 
     # AP M5-1.6 Tranche E: release-allowlist guard tests. Pinnt die
