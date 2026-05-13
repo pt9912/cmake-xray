@@ -602,7 +602,7 @@ Bis dahin ist AP 1.7 nicht abnahmefaehig.
   fuehrt die M6-Datensatztypen `file_api_extraction`, `reverse_bfs`
   und `compare`. `docs/planning/roadmap.md` zeigt A.4 als naechsten
   Schritt; die M6-Abschlussmarkierung bleibt A.4 vorbehalten.
-  Commit: ausstehend.
+  Commit: `7a19023`.
 - A.4 (Audit-Pass und Liefer-Stand-Konsolidierung): noch nicht
   ausgeliefert.
 
