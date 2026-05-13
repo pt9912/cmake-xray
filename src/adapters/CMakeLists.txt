@@ -10,6 +10,7 @@ add_library(
     output/console_report_adapter.cpp
     output/dot_report_adapter.cpp
     output/html_report_adapter.cpp
+    output/json_compare_adapter.cpp
     output/json_report_adapter.cpp
     output/markdown_report_adapter.cpp
     output/target_display_support.cpp

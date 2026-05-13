@@ -459,6 +459,19 @@ Diagnostic-Korrespondenz:
 | BFS endet vorzeitig vor Budget mit Seeds | `note` | `reverse target graph traversal stopped at depth N (no further reachable targets)` |
 | BFS erreicht Tiefenbudget mit nicht-leerer Frontier | `warning` | `reverse target graph traversal hit depth limit N within a cycle; some transitively dependent targets may be missing` |
 
+## Compare-Kompatibilitaetsmatrix (M6 AP 1.6)
+
+`cmake-xray compare` akzeptiert in M6 ausschliesslich Analyze-JSON mit
+`format_version=6` auf beiden Seiten. Version 6 ist die erste Analyze-
+Version mit den Pflichtfeldern `inputs.project_identity` und
+`inputs.project_identity_source`, die Compare fuer die
+Projektidentitaetspruefung benoetigt.
+
+Die normative Matrix ist in [`compare-matrix.md`](./compare-matrix.md)
+gespiegelt. Fuer M6 gilt: `(6, 6)` ist erlaubt; alle Kombinationen mit
+`1` bis `5` oder `7+` werden vor Reporterzeugung mit
+`incompatible_format_version` abgelehnt.
+
 ## Schema-Validierung
 
 - `spec/report-json.schema.json` ist die formale Schema-Definition (JSON Schema Draft 2020-12).

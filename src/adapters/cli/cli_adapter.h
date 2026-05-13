@@ -9,6 +9,7 @@
 #include "hexagon/ports/driving/analyze_impact_port.h"
 #include "hexagon/ports/driving/generate_report_port.h"
 #include "hexagon/ports/driving/analyze_project_port.h"
+#include "hexagon/ports/driving/compare_analysis_port.h"
 
 namespace xray::adapters::cli {
 
@@ -64,12 +65,17 @@ public:
     CliAdapter(const xray::hexagon::ports::driving::AnalyzeProjectPort& analyze_project_port,
                const xray::hexagon::ports::driving::AnalyzeImpactPort& analyze_impact_port,
                ReportPorts report_ports);
+    CliAdapter(const xray::hexagon::ports::driving::AnalyzeProjectPort& analyze_project_port,
+               const xray::hexagon::ports::driving::AnalyzeImpactPort& analyze_impact_port,
+               const xray::hexagon::ports::driving::CompareAnalysisPort& compare_analysis_port,
+               ReportPorts report_ports);
 
     int run(int argc, const char* const* argv, std::ostream& out, std::ostream& err) const;
 
 private:
     const xray::hexagon::ports::driving::AnalyzeProjectPort& analyze_project_port_;
     const xray::hexagon::ports::driving::AnalyzeImpactPort& analyze_impact_port_;
+    const xray::hexagon::ports::driving::CompareAnalysisPort* compare_analysis_port_{nullptr};
     ReportPorts report_ports_;
 };
 

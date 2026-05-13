@@ -7,6 +7,8 @@
 #include <string_view>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #ifdef _WIN32
 #include <process.h>
 #else
@@ -18,6 +20,32 @@
 #include "cli_test_support.h"
 
 using namespace xray::tests::cli_support;
+
+namespace {
+
+nlohmann::json example_analyze_report() {
+    return nlohmann::json::parse(read_text_file("docs/examples/analyze-report.json"));
+}
+
+std::filesystem::path write_json_fixture(const TemporaryDirectory& temp_dir,
+                                         std::string_view name,
+                                         const nlohmann::json& document) {
+    const auto path = temp_dir.path() / std::string{name};
+    std::ofstream out(path);
+    out << document.dump(2);
+    return path;
+}
+
+std::filesystem::path write_text_fixture(const TemporaryDirectory& temp_dir,
+                                         std::string_view name,
+                                         std::string_view text) {
+    const auto path = temp_dir.path() / std::string{name};
+    std::ofstream out(path);
+    out << text;
+    return path;
+}
+
+}  // namespace
 
 TEST_CASE_FIXTURE(CliFixture, "no subcommand returns exit 0 with help on stdout") {
     CHECK(run({}) == ExitCode::success);
@@ -46,6 +74,122 @@ TEST_CASE_FIXTURE(CliFixture, "impact --help returns exit 0 with help on stdout"
     CHECK(out.str().find("--output") != std::string::npos);
     CHECK(out.str().find("relative paths are interpreted relative") != std::string::npos);
     CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "compare --help returns exit 0 with help on stdout") {
+    CHECK(run({"compare", "--help"}) == ExitCode::success);
+    CHECK(out.str().find("--baseline") != std::string::npos);
+    CHECK(out.str().find("--current") != std::string::npos);
+    CHECK(out.str().find("--allow-project-identity-drift") != std::string::npos);
+    CHECK(err.str().empty());
+}
+
+TEST_CASE_FIXTURE(CliFixture, "compare validates required inputs and supported formats") {
+    CHECK(run({"compare"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("compare: --baseline is required") != std::string::npos);
+
+    CHECK(run({"compare", "--baseline", "a.json"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("compare: --current is required") != std::string::npos);
+
+    CHECK(run({"compare", "--baseline", "a.json", "--current", "b.json",
+               "--format", "html"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("allowed: console, markdown, json") != std::string::npos);
+
+    CHECK(run({"compare", "--baseline", "a.json", "--current", "b.json",
+               "--format", "dot"}) == ExitCode::cli_usage_error);
+    CHECK(err.str().find("allowed: console, markdown, json") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "compare rejects console output files before reading inputs") {
+    const TemporaryDirectory temp_dir;
+    const auto target = (temp_dir.path() / "compare.txt").string();
+
+    CHECK(run({"compare", "--baseline", "missing-a.json", "--current", "missing-b.json",
+               "--format", "console", "--output", target.c_str()}) ==
+          ExitCode::cli_usage_error);
+    CHECK(err.str().find("compare: --output is not allowed with --format console") !=
+          std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(target));
+}
+
+TEST_CASE_FIXTURE(CliFixture, "compare maps missing baseline to an input error") {
+    CHECK(run({"compare", "--baseline", "missing-a.json", "--current", "missing-b.json"}) ==
+          ExitCode::unexpected_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("compare: cannot read baseline file 'missing-a.json'") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "compare maps invalid JSON and report contract errors") {
+    const TemporaryDirectory temp_dir;
+    const auto invalid_json = write_text_fixture(temp_dir, "broken.json", "{");
+    const auto analyze = write_json_fixture(temp_dir, "analyze.json", example_analyze_report());
+
+    CHECK(run({"compare", "--baseline", invalid_json.string().c_str(), "--current",
+               analyze.string().c_str()}) == ExitCode::unexpected_error);
+    CHECK(out.str().empty());
+    CHECK(err.str().find("compare: baseline is not valid JSON") != std::string::npos);
+
+    auto impact_report = example_analyze_report();
+    impact_report["report_type"] = "impact";
+    const auto impact = write_json_fixture(temp_dir, "impact.json", impact_report);
+    CHECK(run({"compare", "--baseline", impact.string().c_str(), "--current",
+               analyze.string().c_str()}) == ExitCode::unexpected_error);
+    CHECK(err.str().find(
+              "compare: baseline has report_type='impact'; only 'analyze' is supported") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "compare reports unsupported format version combinations") {
+    const TemporaryDirectory temp_dir;
+    auto baseline_report = nlohmann::json::object({
+        {"format", "cmake-xray.analysis"},
+        {"format_version", 5},
+        {"report_type", "analyze"},
+    });
+    auto current_report = example_analyze_report();
+    current_report["format_version"] = 7;
+    const auto baseline = write_json_fixture(temp_dir, "baseline-v5.json", baseline_report);
+    const auto current = write_json_fixture(temp_dir, "current-v7.json", current_report);
+
+    CHECK(run({"compare", "--baseline", baseline.string().c_str(), "--current",
+               current.string().c_str()}) == ExitCode::unexpected_error);
+    CHECK(err.str().find("compare: format_version combination (5, 7) is not in "
+                         "the compatibility matrix") != std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "compare reports project identity contract failures") {
+    const TemporaryDirectory temp_dir;
+    auto baseline_report = example_analyze_report();
+    auto current_report = example_analyze_report();
+    current_report["inputs"]["project_identity"] = "compile-db:other";
+    const auto baseline = write_json_fixture(temp_dir, "baseline.json", baseline_report);
+    const auto current = write_json_fixture(temp_dir, "current.json", current_report);
+
+    CHECK(run({"compare", "--baseline", baseline.string().c_str(), "--current",
+               current.string().c_str()}) == ExitCode::unexpected_error);
+    CHECK(err.str().find("compare: project identity differs (baseline='") !=
+          std::string::npos);
+    CHECK(err.str().find("--allow-project-identity-drift") != std::string::npos);
+
+    auto invalid_source = example_analyze_report();
+    invalid_source["inputs"]["project_identity_source"] = "unknown";
+    const auto invalid = write_json_fixture(temp_dir, "invalid-source.json", invalid_source);
+    CHECK(run({"compare", "--baseline", invalid.string().c_str(), "--current",
+               baseline.string().c_str()}) == ExitCode::unexpected_error);
+    CHECK(err.str().find("compare: invalid project identity source 'unknown'") !=
+          std::string::npos);
+}
+
+TEST_CASE_FIXTURE(CliFixture, "compare json output uses compare report contract") {
+    const auto report = "docs/examples/analyze-report.json";
+
+    CHECK(run({"compare", "--baseline", report, "--current", report, "--format", "json"}) ==
+          ExitCode::success);
+    CHECK(err.str().empty());
+    CHECK(out.str().find("\"format\": \"cmake-xray.compare\"") != std::string::npos);
+    CHECK(out.str().find("\"diffs\":") != std::string::npos);
+    CHECK(out.str().find("\"diagnostics\":") != std::string::npos);
 }
 
 // ---- AP M5-1.6 Tranche A: --version-Flag ---------------------------------

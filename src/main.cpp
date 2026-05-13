@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "adapters/cli/cli_adapter.h"
+#include "adapters/input/analysis_json_reader.h"
 #include "adapters/input/cmake_file_api_adapter.h"
 #include "adapters/input/compile_commands_json_adapter.h"
 #include "adapters/input/source_parsing_include_adapter.h"
@@ -10,6 +11,7 @@
 #include "adapters/output/json_report_adapter.h"
 #include "adapters/output/markdown_report_adapter.h"
 #include "hexagon/services/impact_analyzer.h"
+#include "hexagon/services/compare_service.h"
 #include "hexagon/services/project_analyzer.h"
 #include "hexagon/services/report_generator.h"
 
@@ -17,6 +19,7 @@ int main(int argc, char* argv[]) {
     const xray::adapters::input::CompileCommandsJsonAdapter compile_database_adapter;
     const xray::adapters::input::CmakeFileApiAdapter file_api_adapter;
     const xray::adapters::input::SourceParsingIncludeAdapter include_resolver_adapter;
+    const xray::adapters::input::AnalysisJsonReader analysis_json_reader;
     const xray::adapters::output::ConsoleReportAdapter console_report_adapter;
     const xray::adapters::output::MarkdownReportAdapter markdown_report_adapter;
     const xray::adapters::output::JsonReportAdapter json_report_adapter;
@@ -26,6 +29,7 @@ int main(int argc, char* argv[]) {
         compile_database_adapter, include_resolver_adapter, file_api_adapter};
     const xray::hexagon::services::ImpactAnalyzer impact_analyzer{
         compile_database_adapter, include_resolver_adapter, file_api_adapter};
+    const xray::hexagon::services::CompareService compare_service{analysis_json_reader};
     const xray::hexagon::services::ReportGenerator console_report_generator{
         console_report_adapter};
     const xray::hexagon::services::ReportGenerator markdown_report_generator{
@@ -42,7 +46,7 @@ int main(int argc, char* argv[]) {
                                                         dot_report_generator,
                                                         html_report_generator};
     const xray::adapters::cli::CliAdapter cli_adapter{
-        project_analyzer, impact_analyzer, report_ports};
+        project_analyzer, impact_analyzer, compare_service, report_ports};
 
     return cli_adapter.run(argc, argv, std::cout, std::cerr);
 }

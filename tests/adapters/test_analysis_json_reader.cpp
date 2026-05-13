@@ -205,8 +205,45 @@ TEST_CASE("analysis JSON reader rejects non-analyze or incompatible reports") {
 
     auto version_five = valid_analysis_report();
     version_five["format_version"] = 5;
-    CHECK(read_error_for(version_five) ==
-          AnalysisJsonReadError::incompatible_format_version);
+    CHECK(read_error_for(version_five) == AnalysisJsonReadError::incompatible_format_version);
+
+    auto legacy_shape = nlohmann::json::object({
+        {"format", "cmake-xray.analysis"},
+        {"format_version", 5},
+        {"report_type", "analyze"},
+    });
+    CHECK(read_error_for(legacy_shape) == AnalysisJsonReadError::incompatible_format_version);
+}
+
+TEST_CASE("analysis JSON reader rejects malformed nested compare inputs") {
+    auto missing_sections = valid_analysis_report();
+    missing_sections["analysis_configuration"].erase("analysis_sections");
+    CHECK(read_error_for(missing_sections) == AnalysisJsonReadError::schema_mismatch);
+
+    auto wrong_items_shape = valid_analysis_report();
+    wrong_items_shape["translation_unit_ranking"]["items"] = "not an array";
+    CHECK(read_error_for(wrong_items_shape) == AnalysisJsonReadError::schema_mismatch);
+
+    auto missing_target_nodes = valid_analysis_report();
+    missing_target_nodes["target_graph"].erase("nodes");
+    CHECK(read_error_for(missing_target_nodes) == AnalysisJsonReadError::schema_mismatch);
+
+    auto extra_property = valid_analysis_report();
+    extra_property["summary"]["unexpected"] = 1;
+    CHECK(read_error_for(extra_property) == AnalysisJsonReadError::schema_mismatch);
+
+    auto negative_metric = valid_analysis_report();
+    negative_metric["summary"]["translation_unit_count"] = -1;
+    CHECK(read_error_for(negative_metric) == AnalysisJsonReadError::schema_mismatch);
+
+    auto invalid_enum = valid_analysis_report();
+    invalid_enum["include_filter"]["include_scope"] = "headers";
+    CHECK(read_error_for(invalid_enum) == AnalysisJsonReadError::schema_mismatch);
+
+    auto missing_hub_thresholds = valid_analysis_report();
+    missing_hub_thresholds["target_hubs"].erase("thresholds");
+    CHECK(read_error_for(missing_hub_thresholds) ==
+          AnalysisJsonReadError::schema_mismatch);
 }
 
 TEST_CASE("analysis JSON reader validates project identity fields") {

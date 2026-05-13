@@ -1,0 +1,2 @@
+# Manifest of cmake-xray M6 Compare JSON report goldens.
+compare-empty.json

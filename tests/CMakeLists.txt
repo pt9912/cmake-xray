@@ -17,6 +17,7 @@ add_executable(
     adapters/test_console_report_adapter.cpp
     adapters/test_dot_report_adapter.cpp
     adapters/test_html_report_adapter.cpp
+    adapters/test_json_compare_adapter.cpp
     adapters/test_json_report_adapter.cpp
     adapters/test_markdown_report_adapter.cpp
     adapters/test_source_parsing_include_adapter.cpp
@@ -202,6 +203,15 @@ add_test(
             --schema ${PROJECT_SOURCE_DIR}/spec/report-json.schema.json
             --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/json-reports
             --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/json-reports/manifest.txt
+)
+
+add_test(
+    NAME report_compare_schema_validation_m6
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/validate_json_schema.py
+            --schema ${PROJECT_SOURCE_DIR}/spec/report-compare.schema.json
+            --reports-dir ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/compare-reports/json
+            --manifest ${PROJECT_SOURCE_DIR}/tests/e2e/testdata/m6/compare-reports/json/manifest.txt
 )
 
 # AP M6-1.2 Tranche A.1: schema-asymmetry negative gates. The v2 schema

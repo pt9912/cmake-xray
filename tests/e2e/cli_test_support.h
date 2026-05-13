@@ -26,6 +26,7 @@
 #include "adapters/cli/cli_report_renderer.h"
 #include "adapters/cli/exit_codes.h"
 #include "adapters/input/cmake_file_api_adapter.h"
+#include "adapters/input/analysis_json_reader.h"
 #include "adapters/input/compile_commands_json_adapter.h"
 #include "adapters/input/source_parsing_include_adapter.h"
 #include "adapters/output/console_report_adapter.h"
@@ -40,6 +41,7 @@
 #include "hexagon/ports/driving/analyze_project_port.h"
 #include "hexagon/ports/driving/generate_report_port.h"
 #include "hexagon/services/impact_analyzer.h"
+#include "hexagon/services/compare_service.h"
 #include "hexagon/services/project_analyzer.h"
 #include "hexagon/services/report_generator.h"
 
@@ -48,6 +50,7 @@ namespace xray::tests::cli_support {
 using xray::adapters::cli::CliAdapter;
 using xray::adapters::cli::ExitCode;
 using xray::adapters::input::CmakeFileApiAdapter;
+using xray::adapters::input::AnalysisJsonReader;
 using xray::adapters::input::CompileCommandsJsonAdapter;
 using xray::adapters::input::SourceParsingIncludeAdapter;
 using xray::adapters::output::ConsoleReportAdapter;
@@ -61,6 +64,7 @@ using xray::hexagon::model::CompileDatabaseResult;
 using xray::hexagon::model::EntryDiagnostic;
 using xray::hexagon::model::ImpactResult;
 using xray::hexagon::services::ImpactAnalyzer;
+using xray::hexagon::services::CompareService;
 using xray::hexagon::services::ProjectAnalyzer;
 using xray::hexagon::services::ReportGenerator;
 
@@ -190,6 +194,7 @@ struct CliFixture {
     CompileCommandsJsonAdapter compile_database_adapter;
     CmakeFileApiAdapter file_api_adapter;
     SourceParsingIncludeAdapter include_resolver_adapter;
+    AnalysisJsonReader analysis_json_reader;
     ConsoleReportAdapter console_report_adapter;
     MarkdownReportAdapter markdown_report_adapter;
     JsonReportAdapter json_report_adapter;
@@ -199,6 +204,7 @@ struct CliFixture {
                                      file_api_adapter};
     ImpactAnalyzer impact_analyzer{compile_database_adapter, include_resolver_adapter,
                                    file_api_adapter};
+    CompareService compare_service{analysis_json_reader};
     ReportGenerator console_report_generator{console_report_adapter};
     ReportGenerator markdown_report_generator{markdown_report_adapter};
     ReportGenerator json_report_generator{json_report_adapter};
@@ -209,7 +215,7 @@ struct CliFixture {
                                                   json_report_generator,
                                                   dot_report_generator,
                                                   html_report_generator};
-    CliAdapter cli{project_analyzer, impact_analyzer, report_ports};
+    CliAdapter cli{project_analyzer, impact_analyzer, compare_service, report_ports};
     std::ostringstream out;
     std::ostringstream err;
 

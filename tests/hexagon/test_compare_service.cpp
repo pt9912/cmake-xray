@@ -287,6 +287,25 @@ TEST_CASE("compare service maps reader and version errors") {
     result = compare(report("baseline.json"), incompatible);
     REQUIRE(result.service_error.has_value());
     CHECK(result.service_error->code == "incompatible_format_version");
+    CHECK(result.service_error->message.find("format_version combination (6, 5)") !=
+          std::string::npos);
+
+    StubAnalysisReportReader incompatible_reader;
+    auto baseline_error = AnalysisReportReadResult{
+        AnalysisReportReadError::incompatible_format_version, "unsupported", {}};
+    baseline_error.report.format_version = 5;
+    auto current_error = AnalysisReportReadResult{
+        AnalysisReportReadError::incompatible_format_version, "unsupported", {}};
+    current_error.report.format_version = 7;
+    incompatible_reader.add("baseline.json", baseline_error);
+    incompatible_reader.add("current.json", current_error);
+    const xray::hexagon::services::CompareService incompatible_service{
+        incompatible_reader};
+    result = incompatible_service.compare(request());
+    REQUIRE(result.service_error.has_value());
+    CHECK(result.service_error->code == "incompatible_format_version");
+    CHECK(result.service_error->message.find("format_version combination (5, 7)") !=
+          std::string::npos);
 }
 
 TEST_CASE("compare service validates project identity rules") {
@@ -296,12 +315,22 @@ TEST_CASE("compare service validates project identity rules") {
     auto result = compare(report("baseline.json"), different_source);
     REQUIRE(result.service_error.has_value());
     CHECK(result.service_error->code == "project_identity_source_mismatch");
+    CHECK(result.service_error->message.find(
+              "baseline=fallback_compile_database_fingerprint") != std::string::npos);
+    CHECK(result.service_error->message.find("current=cmake_file_api_source_root") !=
+          std::string::npos);
 
     auto different_identity = report("current.json");
     different_identity.project_identity = "compile-db:other";
     result = compare(report("baseline.json"), different_identity);
     REQUIRE(result.service_error.has_value());
     CHECK(result.service_error->code == "project_identity_mismatch");
+    CHECK(result.service_error->message.find("baseline='compile-db:same'") !=
+          std::string::npos);
+    CHECK(result.service_error->message.find("current='compile-db:other'") !=
+          std::string::npos);
+    CHECK(result.service_error->message.find("--allow-project-identity-drift") !=
+          std::string::npos);
 
     auto baseline_file_api = report("baseline.json");
     auto current_file_api = report("current.json");

@@ -1,6 +1,7 @@
 #include "services/compare_service.h"
 
 #include <algorithm>
+#include <filesystem>
 #include <iterator>
 #include <map>
 #include <set>
@@ -102,8 +103,54 @@ CompareResult result_with_error(std::string code, std::string message) {
     return result;
 }
 
-CompareResult read_error(std::string side, const AnalysisReportReadResult& read) {
-    return result_with_error(side + "_read_failed", side + ": " + read.message);
+CompareResult incompatible_format_versions(int baseline_version, int current_version) {
+    return result_with_error(
+        "incompatible_format_version",
+        "compare: format_version combination (" + std::to_string(baseline_version) +
+            ", " + std::to_string(current_version) +
+            ") is not in the compatibility matrix");
+}
+
+CompareResult read_error(std::string side, const std::filesystem::path& path,
+                         const AnalysisReportReadResult& read) {
+    using ports::driven::AnalysisReportReadError;
+    if (read.error == AnalysisReportReadError::file_not_accessible) {
+        return result_with_error(side + "_read_failed",
+                                 "compare: cannot read " + side + " file '" +
+                                     path.string() + "'");
+    }
+    if (read.error == AnalysisReportReadError::invalid_json) {
+        return result_with_error(side + "_read_failed",
+                                 "compare: " + side + " is not valid JSON");
+    }
+    if (read.error == AnalysisReportReadError::schema_mismatch) {
+        return result_with_error(side + "_read_failed",
+                                 "compare: " + side +
+                                     " does not match the analyze JSON schema");
+    }
+    if (read.error == AnalysisReportReadError::unsupported_report_type) {
+        return result_with_error(side + "_read_failed",
+                                 "compare: " + side +
+                                     " has report_type='" + read.message +
+                                     "'; only 'analyze' is supported");
+    }
+    if (read.error == AnalysisReportReadError::invalid_project_identity_source) {
+        return result_with_error("invalid_project_identity_source",
+                                 "compare: invalid project identity source '" +
+                                     read.message + "'");
+    }
+    if (read.error == AnalysisReportReadError::unrecoverable_project_identity) {
+        return result_with_error("unrecoverable_project_identity",
+                                 "compare: project identity is empty or unrecoverable");
+    }
+    if (read.error == AnalysisReportReadError::incompatible_format_version) {
+        return result_with_error(
+            "incompatible_format_version",
+            "compare: format_version combination (" +
+                std::to_string(read.report.format_version) +
+                ", unknown) is not in the compatibility matrix");
+    }
+    return result_with_error(side + "_read_failed", "compare: " + side + ": " + read.message);
 }
 
 bool format_versions_supported(const AnalysisReportSnapshot& baseline,
@@ -146,19 +193,27 @@ bool reject_incompatible_identity(const AnalysisReportSnapshot& baseline,
     if (baseline.project_identity_source != current.project_identity_source) {
         result.service_error = model::CompareServiceError{
             "project_identity_source_mismatch",
-            "compare: project identity source mismatch"};
+            "compare: project identity source mismatch (baseline=" +
+                source_text(baseline.project_identity_source) + ", current=" +
+                source_text(current.project_identity_source) + ")"};
         return true;
     }
     if (baseline.project_identity == current.project_identity) return false;
     if (baseline.project_identity_source !=
         ProjectIdentitySource::fallback_compile_database_fingerprint) {
         result.service_error = model::CompareServiceError{
-            "project_identity_mismatch", "compare: project identity differs"};
+            "project_identity_mismatch",
+            "compare: project identity differs (baseline='" + baseline.project_identity +
+                "', current='" + current.project_identity +
+                "'); pass --allow-project-identity-drift to override (only valid for fallback_compile_database_fingerprint)"};
         return true;
     }
     if (!request.allow_project_identity_drift) {
         result.service_error = model::CompareServiceError{
-            "project_identity_mismatch", "compare: project identity differs"};
+            "project_identity_mismatch",
+            "compare: project identity differs (baseline='" + baseline.project_identity +
+                "', current='" + current.project_identity +
+                "'); pass --allow-project-identity-drift to override (only valid for fallback_compile_database_fingerprint)"};
         return true;
     }
     result.inputs.project_identity = std::nullopt;
@@ -531,12 +586,26 @@ CompareService::CompareService(const ports::driven::AnalysisReportReaderPort& re
 
 CompareResult CompareService::compare(ports::driving::CompareAnalysisRequest request) const {
     const auto baseline = reader_.read_analysis_report(request.baseline_path);
-    if (!baseline.is_success()) return read_error("baseline", baseline);
+    if (baseline.error == ports::driven::AnalysisReportReadError::incompatible_format_version) {
+        const auto current = reader_.read_analysis_report(request.current_path);
+        if (current.is_success() ||
+            current.error ==
+                ports::driven::AnalysisReportReadError::incompatible_format_version) {
+            return incompatible_format_versions(baseline.report.format_version,
+                                                current.report.format_version);
+        }
+        return read_error("baseline", request.baseline_path, baseline);
+    }
+    if (!baseline.is_success()) return read_error("baseline", request.baseline_path, baseline);
     const auto current = reader_.read_analysis_report(request.current_path);
-    if (!current.is_success()) return read_error("current", current);
+    if (current.error == ports::driven::AnalysisReportReadError::incompatible_format_version) {
+        return incompatible_format_versions(baseline.report.format_version,
+                                            current.report.format_version);
+    }
+    if (!current.is_success()) return read_error("current", request.current_path, current);
     if (!format_versions_supported(baseline.report, current.report)) {
-        return result_with_error("incompatible_format_version",
-                                 "compare: format_version combination is not supported");
+        return incompatible_format_versions(baseline.report.format_version,
+                                            current.report.format_version);
     }
 
     CompareResult result;

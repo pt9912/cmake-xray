@@ -1,0 +1,62 @@
+{
+  "format": "cmake-xray.compare",
+  "format_version": 1,
+  "report_type": "compare",
+  "inputs": {
+    "baseline_path": "baseline.json",
+    "current_path": "current.json",
+    "baseline_format_version": 6,
+    "current_format_version": 6,
+    "project_identity": "compile-db:same",
+    "project_identity_source": "fallback_compile_database_fingerprint"
+  },
+  "summary": {
+    "translation_units_added": 0,
+    "translation_units_removed": 0,
+    "translation_units_changed": 0,
+    "include_hotspots_added": 0,
+    "include_hotspots_removed": 0,
+    "include_hotspots_changed": 0,
+    "target_nodes_added": 0,
+    "target_nodes_removed": 0,
+    "target_nodes_changed": 0,
+    "target_edges_added": 0,
+    "target_edges_removed": 0,
+    "target_edges_changed": 0,
+    "target_hubs_added": 0,
+    "target_hubs_removed": 0,
+    "target_hubs_changed": 0
+  },
+  "diffs": {
+    "translation_units": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "include_hotspots": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "target_nodes": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "target_edges": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "target_hubs": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    }
+  },
+  "diagnostics": {
+    "configuration_drifts": [],
+    "data_availability_drifts": [],
+    "project_identity_drift": null
+  }
+}

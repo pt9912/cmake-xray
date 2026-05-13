@@ -1,0 +1,357 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cmake-xray.local/spec/report-compare.schema.json",
+  "title": "cmake-xray compare report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "format_version",
+    "report_type",
+    "inputs",
+    "summary",
+    "diffs",
+    "diagnostics"
+  ],
+  "properties": {
+    "format": { "const": "cmake-xray.compare" },
+    "format_version": { "const": 1 },
+    "report_type": { "const": "compare" },
+    "inputs": { "$ref": "#/$defs/inputs" },
+    "summary": { "$ref": "#/$defs/summary" },
+    "diffs": { "$ref": "#/$defs/diffs" },
+    "diagnostics": { "$ref": "#/$defs/diagnostics" }
+  },
+  "$defs": {
+    "scalar": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "integer" },
+        { "type": "boolean" },
+        { "type": "null" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scalar" }
+        }
+      ]
+    },
+    "field_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "baseline_value", "current_value"],
+      "properties": {
+        "field": { "type": "string" },
+        "baseline_value": { "$ref": "#/$defs/scalar" },
+        "current_value": { "$ref": "#/$defs/scalar" }
+      }
+    },
+    "changes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/field_change" }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_path",
+        "current_path",
+        "baseline_format_version",
+        "current_format_version",
+        "project_identity",
+        "project_identity_source"
+      ],
+      "properties": {
+        "baseline_path": { "type": "string" },
+        "current_path": { "type": "string" },
+        "baseline_format_version": { "type": "integer" },
+        "current_format_version": { "type": "integer" },
+        "project_identity": { "type": ["string", "null"] },
+        "project_identity_source": {
+          "enum": [
+            "cmake_file_api_source_root",
+            "fallback_compile_database_fingerprint"
+          ]
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "translation_units_added",
+        "translation_units_removed",
+        "translation_units_changed",
+        "include_hotspots_added",
+        "include_hotspots_removed",
+        "include_hotspots_changed",
+        "target_nodes_added",
+        "target_nodes_removed",
+        "target_nodes_changed",
+        "target_edges_added",
+        "target_edges_removed",
+        "target_edges_changed",
+        "target_hubs_added",
+        "target_hubs_removed",
+        "target_hubs_changed"
+      ],
+      "properties": {
+        "translation_units_added": { "type": "integer" },
+        "translation_units_removed": { "type": "integer" },
+        "translation_units_changed": { "type": "integer" },
+        "include_hotspots_added": { "type": "integer" },
+        "include_hotspots_removed": { "type": "integer" },
+        "include_hotspots_changed": { "type": "integer" },
+        "target_nodes_added": { "type": "integer" },
+        "target_nodes_removed": { "type": "integer" },
+        "target_nodes_changed": { "type": "integer" },
+        "target_edges_added": { "type": "integer" },
+        "target_edges_removed": { "type": "integer" },
+        "target_edges_changed": { "type": "integer" },
+        "target_hubs_added": { "type": "integer" },
+        "target_hubs_removed": { "type": "integer" },
+        "target_hubs_changed": { "type": "integer" }
+      }
+    },
+    "translation_unit_diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_path", "build_context_key"],
+      "properties": {
+        "source_path": { "type": "string" },
+        "build_context_key": { "type": "string" },
+        "changes": { "$ref": "#/$defs/changes" }
+      }
+    },
+    "include_hotspot_diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["header_path", "include_origin", "include_depth_kind"],
+      "properties": {
+        "header_path": { "type": "string" },
+        "include_origin": { "type": "string" },
+        "include_depth_kind": { "type": "string" },
+        "changes": { "$ref": "#/$defs/changes" }
+      }
+    },
+    "target_node_diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unique_key"],
+      "properties": {
+        "unique_key": { "type": "string" },
+        "changes": { "$ref": "#/$defs/changes" }
+      }
+    },
+    "target_edge_diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from_unique_key", "to_unique_key", "kind"],
+      "properties": {
+        "from_unique_key": { "type": "string" },
+        "to_unique_key": { "type": "string" },
+        "kind": { "type": "string" },
+        "changes": { "$ref": "#/$defs/changes" }
+      }
+    },
+    "target_hub_diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unique_key", "direction"],
+      "properties": {
+        "unique_key": { "type": "string" },
+        "direction": { "enum": ["inbound", "outbound"] }
+      }
+    },
+    "diff_group_translation_units": { "$ref": "#/$defs/diff_group_translation_unit" },
+    "diff_group_translation_unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["added", "removed", "changed"],
+      "properties": {
+        "added": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/translation_unit_diff" }
+        },
+        "removed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/translation_unit_diff" }
+        },
+        "changed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/translation_unit_diff" }
+        }
+      }
+    },
+    "diffs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "translation_units",
+        "include_hotspots",
+        "target_nodes",
+        "target_edges",
+        "target_hubs"
+      ],
+      "properties": {
+        "translation_units": { "$ref": "#/$defs/diff_group_translation_unit" },
+        "include_hotspots": {
+          "$ref": "#/$defs/diff_group_include_hotspot"
+        },
+        "target_nodes": { "$ref": "#/$defs/diff_group_target_node" },
+        "target_edges": { "$ref": "#/$defs/diff_group_target_edge" },
+        "target_hubs": { "$ref": "#/$defs/diff_group_target_hub" }
+      }
+    },
+    "diff_group_include_hotspot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["added", "removed", "changed"],
+      "properties": {
+        "added": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/include_hotspot_diff" }
+        },
+        "removed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/include_hotspot_diff" }
+        },
+        "changed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/include_hotspot_diff" }
+        }
+      }
+    },
+    "diff_group_target_node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["added", "removed", "changed"],
+      "properties": {
+        "added": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/target_node_diff" }
+        },
+        "removed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/target_node_diff" }
+        },
+        "changed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/target_node_diff" }
+        }
+      }
+    },
+    "diff_group_target_edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["added", "removed", "changed"],
+      "properties": {
+        "added": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/target_edge_diff" }
+        },
+        "removed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/target_edge_diff" }
+        },
+        "changed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/target_edge_diff" }
+        }
+      }
+    },
+    "diff_group_target_hub": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["added", "removed", "changed"],
+      "properties": {
+        "added": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/target_hub_diff" }
+        },
+        "removed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/target_hub_diff" }
+        },
+        "changed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/target_hub_diff" }
+        }
+      }
+    },
+    "configuration_drift": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "baseline_value",
+        "current_value",
+        "severity",
+        "ci_policy_hint"
+      ],
+      "properties": {
+        "field": { "type": "string" },
+        "baseline_value": { "$ref": "#/$defs/scalar" },
+        "current_value": { "$ref": "#/$defs/scalar" },
+        "severity": { "const": "warning" },
+        "ci_policy_hint": { "const": "review_required" }
+      }
+    },
+    "data_availability_drift": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "baseline_state", "current_state"],
+      "properties": {
+        "section": { "enum": ["target_graph", "target_hubs"] },
+        "baseline_state": {
+          "enum": ["loaded", "partial", "not_loaded", "disabled"]
+        },
+        "current_state": {
+          "enum": ["loaded", "partial", "not_loaded", "disabled"]
+        }
+      }
+    },
+    "project_identity_drift": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_project_identity",
+        "current_project_identity",
+        "baseline_source_path_count",
+        "current_source_path_count",
+        "shared_source_path_count"
+      ],
+      "properties": {
+        "baseline_project_identity": { "type": "string" },
+        "current_project_identity": { "type": "string" },
+        "baseline_source_path_count": { "type": "integer" },
+        "current_source_path_count": { "type": "integer" },
+        "shared_source_path_count": { "type": "integer" }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configuration_drifts",
+        "data_availability_drifts",
+        "project_identity_drift"
+      ],
+      "properties": {
+        "configuration_drifts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/configuration_drift" }
+        },
+        "data_availability_drifts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/data_availability_drift" }
+        },
+        "project_identity_drift": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/project_identity_drift" }
+          ]
+        }
+      }
+    }
+  }
+}

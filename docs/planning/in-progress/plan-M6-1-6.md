@@ -1114,8 +1114,28 @@ Bis zum Abschluss aller A-Tranchen ist AP 1.6 nicht abnahmefaehig.
   `make coverage-gate COVERAGE_THRESHOLD=100` (Coverage 100%) und
   `make quality-gate` (clang-tidy 0, lizard 0). Commit wird nach
   Auslieferung gepinnt.
-- A.4 (CLI und Compare-Schema): noch nicht ausgeliefert.
-- A.5 (JSON-Compare-Adapter): noch nicht ausgeliefert.
+- A.4 (CLI und Compare-Schema): **lokal umgesetzt**.
+  Das `compare`-Subkommando ist in der CLI registriert, validiert
+  `--baseline`, `--current`, `--format`, `--output` und
+  `--allow-project-identity-drift`, ruft den `CompareService` ueber
+  den `AnalysisJsonReader`-Port auf und mappt Compare-Eingabefehler
+  auf textbasierte CLI-Fehler. Der Reader kann Analyze-v6-JSON nun
+  direkt in `AnalysisReportSnapshot` fuer den Service abbilden.
+  `spec/compare-matrix.md` und `spec/report-compare.schema.json`
+  legen Matrix und initialen Compare-Schema-Rahmen an; die vollstaendige
+  JSON-Serialisierung folgt in A.5. Lokale Gates gruen:
+  `make docker-test` (41/41). Commit wird nach Auslieferung gepinnt.
+- A.5 (JSON-Compare-Adapter): **lokal umgesetzt**.
+  `JsonCompareAdapter` serialisiert `CompareResult` mit
+  `format=cmake-xray.compare`, `format_version=1`, `report_type=compare`,
+  `inputs`, `summary`, vollstaendigen `diffs`-Gruppen und
+  `diagnostics`. Die CLI nutzt den Adapter fuer `compare --format json`.
+  `spec/report-compare.schema.json` beschreibt den A.5-JSON-Vertrag,
+  `tests/e2e/testdata/m6/compare-reports/json/compare-empty.json`
+  pinnt einen ersten JSON-Golden und
+  `report_compare_schema_validation_m6` validiert ihn im CTest-Gate.
+  Lokale Gates gruen: `make docker-test` (42/42). Commit wird nach
+  Auslieferung gepinnt.
 - A.6 (Console- und Markdown-Compare-Adapter): noch nicht ausgeliefert.
 - A.7 (Audit-Pass): noch nicht ausgeliefert.
 

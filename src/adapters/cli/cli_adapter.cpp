@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <map>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -16,9 +17,11 @@
 #include "adapters/cli/cli_console_renderers.h"
 #include "adapters/cli/exit_codes.h"
 #include "adapters/cli/output_verbosity.h"
+#include "adapters/output/json_compare_adapter.h"
 #include "hexagon/model/analysis_configuration.h"
 #include "hexagon/model/application_info.h"
 #include "hexagon/model/compile_database_result.h"
+#include "hexagon/model/compare_result.h"
 #include "hexagon/model/include_filter_options.h"
 #include "hexagon/model/report_inputs.h"
 
@@ -40,8 +43,12 @@ struct CliOptions {
     std::string compile_commands_path;
     std::string cmake_file_api_path;
     std::string changed_file_path;
+    std::string compare_baseline_path;
+    std::string compare_current_path;
     std::string output_path;
     std::string report_format{"console"};
+    CLI::Option* compare_output_option{nullptr};
+    bool allow_project_identity_drift{false};
     std::size_t top_limit{10};
     // AP M5-1.5 Tranche A: command-local --quiet/--verbose flags. The two
     // booleans are intermediate parser state; resolve_verbosity() collapses
@@ -329,6 +336,24 @@ void configure_impact_command(CLI::App& app, CliOptions& options, CLI::App*& imp
     configure_verbosity_options(*impact_cmd, options);
 }
 
+void configure_compare_command(CLI::App& app, CliOptions& options, CLI::App*& compare_cmd) {
+    compare_cmd = app.add_subcommand("compare", "Compare two analyze JSON reports");
+    compare_cmd->add_option("--baseline", options.compare_baseline_path,
+                            "Baseline analyze JSON report");
+    compare_cmd->add_option("--current", options.compare_current_path,
+                            "Current analyze JSON report");
+    compare_cmd
+        ->add_option("--format", options.report_format,
+                     "Output format: console, markdown, or json")
+        ->default_val(options.report_format);
+    options.compare_output_option = compare_cmd->add_option(
+        "--output", options.output_path,
+        "Write a compare report atomically to this path; valid with markdown or json");
+    compare_cmd->add_flag("--allow-project-identity-drift",
+                          options.allow_project_identity_drift,
+                          "Allow fallback compile database project identity drift");
+}
+
 std::optional<int> validate_input_options(const CliOptions& options, std::ostream& err) {
     if (!options.compile_commands_path.empty() || !options.cmake_file_api_path.empty()) {
         return std::nullopt;
@@ -353,6 +378,33 @@ std::optional<int> validate_report_options(const CliOptions& options, std::ostre
     err << "hint: use an artifact-oriented format such as --format markdown, "
            "--format json, --format dot or --format html when writing a report file\n";
     return ExitCode::cli_usage_error;
+}
+
+std::optional<int> validate_compare_options(const CliOptions& options, std::ostream& err) {
+    if (options.compare_baseline_path.empty()) {
+        err << "compare: --baseline is required\n";
+        return ExitCode::cli_usage_error;
+    }
+    if (options.compare_current_path.empty()) {
+        err << "compare: --current is required\n";
+        return ExitCode::cli_usage_error;
+    }
+    if (options.report_format != "console" && options.report_format != "markdown" &&
+        options.report_format != "json") {
+        err << "compare: --format " << options.report_format
+            << " is not supported; allowed: console, markdown, json\n";
+        return ExitCode::cli_usage_error;
+    }
+    if (options.report_format == "console" && !options.output_path.empty()) {
+        err << "compare: --output is not allowed with --format console\n";
+        return ExitCode::cli_usage_error;
+    }
+    if (options.compare_output_option != nullptr && options.compare_output_option->count() > 0 &&
+        options.output_path.empty()) {
+        err << "compare: --output requires a value\n";
+        return ExitCode::cli_usage_error;
+    }
+    return std::nullopt;
 }
 
 // AP M6-1.3 A.2: classify a non-empty --impact-target-depth text. The
@@ -1213,6 +1265,7 @@ std::optional<int> validate_subcommand_options(CliOptions& options, bool is_impa
 struct CliDispatchContext {
     const xray::hexagon::ports::driving::AnalyzeProjectPort& analyze_project_port;
     const xray::hexagon::ports::driving::AnalyzeImpactPort& analyze_impact_port;
+    const xray::hexagon::ports::driving::CompareAnalysisPort* compare_analysis_port;
     const ReportPorts& report_ports;
 };
 
@@ -1236,9 +1289,107 @@ int handle_impact_service_validation_error(
     return ExitCode::unexpected_error;
 }
 
+std::string render_compare_summary_lines(const xray::hexagon::model::CompareSummary& summary) {
+    std::ostringstream out;
+    out << "  Translation units: +" << summary.translation_units_added << " -"
+        << summary.translation_units_removed << " ~" << summary.translation_units_changed
+        << '\n';
+    out << "  Include hotspots:  +" << summary.include_hotspots_added << " -"
+        << summary.include_hotspots_removed << " ~" << summary.include_hotspots_changed
+        << '\n';
+    out << "  Target nodes:      +" << summary.target_nodes_added << " -"
+        << summary.target_nodes_removed << " ~" << summary.target_nodes_changed << '\n';
+    out << "  Target edges:      +" << summary.target_edges_added << " -"
+        << summary.target_edges_removed << " ~" << summary.target_edges_changed << '\n';
+    out << "  Target hubs:       +" << summary.target_hubs_added << " -"
+        << summary.target_hubs_removed << " ~" << summary.target_hubs_changed << '\n';
+    return out.str();
+}
+
+std::string render_compare_console(const xray::hexagon::model::CompareResult& result) {
+    std::ostringstream out;
+    out << "cmake-xray compare\n";
+    out << "  baseline: " << result.inputs.baseline_path << " (v"
+        << result.inputs.baseline_format_version << ")\n";
+    out << "  current:  " << result.inputs.current_path << " (v"
+        << result.inputs.current_format_version << ")\n";
+    out << "  project_identity: ";
+    if (result.inputs.project_identity.has_value()) {
+        out << *result.inputs.project_identity;
+    } else {
+        out << "drift allowed";
+    }
+    out << " (" << result.inputs.project_identity_source << ")\n\n";
+    out << "Summary:\n" << render_compare_summary_lines(result.summary);
+    return out.str();
+}
+
+std::string render_compare_markdown(const xray::hexagon::model::CompareResult& result) {
+    std::ostringstream out;
+    out << "# Compare Report\n\n";
+    out << "- Baseline: `" << result.inputs.baseline_path << "` (v"
+        << result.inputs.baseline_format_version << ")\n";
+    out << "- Current: `" << result.inputs.current_path << "` (v"
+        << result.inputs.current_format_version << ")\n";
+    out << "- Project identity source: `" << result.inputs.project_identity_source << "`\n\n";
+    out << "## Summary\n\n";
+    out << "| Group | Added | Removed | Changed |\n";
+    out << "| --- | ---: | ---: | ---: |\n";
+    out << "| Translation units | " << result.summary.translation_units_added << " | "
+        << result.summary.translation_units_removed << " | "
+        << result.summary.translation_units_changed << " |\n";
+    out << "| Include hotspots | " << result.summary.include_hotspots_added << " | "
+        << result.summary.include_hotspots_removed << " | "
+        << result.summary.include_hotspots_changed << " |\n";
+    out << "| Target nodes | " << result.summary.target_nodes_added << " | "
+        << result.summary.target_nodes_removed << " | "
+        << result.summary.target_nodes_changed << " |\n";
+    out << "| Target edges | " << result.summary.target_edges_added << " | "
+        << result.summary.target_edges_removed << " | "
+        << result.summary.target_edges_changed << " |\n";
+    out << "| Target hubs | " << result.summary.target_hubs_added << " | "
+        << result.summary.target_hubs_removed << " | "
+        << result.summary.target_hubs_changed << " |\n";
+    return out.str();
+}
+
+std::string render_compare_result(const xray::hexagon::model::CompareResult& result,
+                                  ReportFormat format) {
+    if (format == ReportFormat::json) {
+        const xray::adapters::output::JsonCompareAdapter adapter;
+        return adapter.write_compare_report(result);
+    }
+    if (format == ReportFormat::markdown) return render_compare_markdown(result);
+    return render_compare_console(result);
+}
+
+int handle_compare_result(const xray::hexagon::model::CompareResult& result,
+                          ReportFormat format, const CliOptions& options,
+                          CliOutputStreams streams) {
+    if (result.service_error.has_value()) {
+        streams.err << result.service_error->message << '\n';
+        return ExitCode::unexpected_error;
+    }
+    const StringFunctionCliReportRenderer renderer{
+        [&result, format] { return render_compare_result(result, format); }};
+    return run_emit_for_renderer(renderer, options, streams);
+}
+
 int dispatch_subcommand(const CliOptions& options, bool is_impact,
-                          const CliDispatchContext& ctx, CliOutputStreams streams) {
+                        bool is_compare, const CliDispatchContext& ctx,
+                        CliOutputStreams streams) {
     const auto report_format = parse_report_format(options.report_format);
+    if (is_compare) {
+        if (ctx.compare_analysis_port == nullptr) {
+            streams.err << "compare: compare service is not configured\n";
+            return ExitCode::unexpected_error;
+        }
+        const auto result = ctx.compare_analysis_port->compare(
+            {std::filesystem::path{options.compare_baseline_path},
+             std::filesystem::path{options.compare_current_path},
+             options.allow_project_identity_drift});
+        return handle_compare_result(result, report_format, options, streams);
+    }
     const auto& report_port = select_report_port(report_format, ctx.report_ports);
     const auto report_display_base = std::filesystem::current_path();
     if (is_impact) {
@@ -1296,6 +1447,16 @@ CliAdapter::CliAdapter(
       analyze_impact_port_(analyze_impact_port),
       report_ports_(report_ports) {}
 
+CliAdapter::CliAdapter(
+    const xray::hexagon::ports::driving::AnalyzeProjectPort& analyze_project_port,
+    const xray::hexagon::ports::driving::AnalyzeImpactPort& analyze_impact_port,
+    const xray::hexagon::ports::driving::CompareAnalysisPort& compare_analysis_port,
+    ReportPorts report_ports)
+    : analyze_project_port_(analyze_project_port),
+      analyze_impact_port_(analyze_impact_port),
+      compare_analysis_port_(&compare_analysis_port),
+      report_ports_(report_ports) {}
+
 int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
                     std::ostream& err) const {
     // AP M5-1.6 Tranche A: app description plus an explicit app name so the
@@ -1316,8 +1477,10 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
     CliOptions options;
     CLI::App* analyze_cmd = nullptr;
     CLI::App* impact_cmd = nullptr;
+    CLI::App* compare_cmd = nullptr;
     configure_analyze_command(app, options, analyze_cmd);
     configure_impact_command(app, options, impact_cmd);
+    configure_compare_command(app, options, compare_cmd);
 
     try {
         app.parse(argc, argv);
@@ -1326,19 +1489,28 @@ int CliAdapter::run(int argc, const char* const* argv, std::ostream& out,
         return cli_exit == 0 ? ExitCode::success : ExitCode::cli_usage_error;
     }
 
-    if (!analyze_cmd->parsed() && !impact_cmd->parsed()) {
+    if (!analyze_cmd->parsed() && !impact_cmd->parsed() && !compare_cmd->parsed()) {
         out << app.help();
         return ExitCode::success;
     }
 
-    if (const auto validation_error =
-            validate_subcommand_options(options, impact_cmd->parsed(), err);
-        validation_error.has_value()) {
-        return *validation_error;
+    if (compare_cmd->parsed()) {
+        if (const auto validation_error = validate_compare_options(options, err);
+            validation_error.has_value()) {
+            return *validation_error;
+        }
+    } else {
+        if (const auto validation_error =
+                validate_subcommand_options(options, impact_cmd->parsed(), err);
+            validation_error.has_value()) {
+            return *validation_error;
+        }
     }
     options.verbosity = resolve_verbosity(options);
-    const CliDispatchContext ctx{analyze_project_port_, analyze_impact_port_, report_ports_};
-    return dispatch_subcommand(options, impact_cmd->parsed(), ctx, CliOutputStreams{out, err});
+    const CliDispatchContext ctx{analyze_project_port_, analyze_impact_port_,
+                                  compare_analysis_port_, report_ports_};
+    return dispatch_subcommand(options, impact_cmd->parsed(), compare_cmd->parsed(), ctx,
+                               CliOutputStreams{out, err});
 }
 
 }  // namespace xray::adapters::cli

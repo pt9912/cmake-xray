@@ -1,10 +1,12 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <string_view>
 
 #include <nlohmann/json.hpp>
 
+#include "hexagon/ports/driven/analysis_report_reader_port.h"
 #include "hexagon/model/report_inputs.h"
 
 namespace xray::adapters::input {
@@ -49,9 +51,13 @@ struct AnalysisJsonReadResult {
     }
 };
 
-class AnalysisJsonReader {
+class AnalysisJsonReader final
+    : public xray::hexagon::ports::driven::AnalysisReportReaderPort {
 public:
     AnalysisJsonReadResult read(std::string_view path) const;
+
+    xray::hexagon::ports::driven::AnalysisReportReadResult read_analysis_report(
+        const std::filesystem::path& path) const override;
 };
 
 std::string project_identity_source_text(
