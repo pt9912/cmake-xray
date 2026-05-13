@@ -226,6 +226,7 @@ cat <<'EOF' >> "$manifest_path"
         "scenario": "compile_db_identity_drift",
         "baseline": "tests/e2e/testdata/m6/json-reports/analyze-compile-db-only.json",
         "current": "tests/e2e/testdata/m6/json-reports/analyze-include-origin-mix.json",
+        "allow_project_identity_drift": true,
         "tu_count": 5,
         "hotspot_count": 7,
         "target_count": 0,

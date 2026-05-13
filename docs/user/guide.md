@@ -734,24 +734,38 @@ Aufruf: `cmake --build build --target xray`.
 Skizze fuer GitHub Actions, wenn `cmake-xray` im `PATH` des Runners liegt:
 
 ```yaml
-- run: cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-- run: cmake --build build
+- uses: actions/checkout@v6
+  with:
+    path: current
+- uses: actions/checkout@v6
+  with:
+    ref: main
+    path: baseline
+- run: cmake -S current -B current/build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+- run: cmake --build current/build
 - run: |
     cmake-xray analyze \
-      --compile-commands build/compile_commands.json \
-      --cmake-file-api build \
-      --format json --output build/xray.json --top 20
+      --compile-commands current/build/compile_commands.json \
+      --cmake-file-api current/build \
+      --format json --output current/build/xray.json --top 20
+- run: |
+    cmake -S baseline -B baseline/build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    cmake --build baseline/build
+    cmake-xray analyze \
+      --compile-commands baseline/build/compile_commands.json \
+      --cmake-file-api baseline/build \
+      --format json --output baseline/build/xray.json --top 20
 - run: |
     cmake-xray compare \
-      --baseline baseline/xray.json \
-      --current build/xray.json \
-      --format markdown --output build/xray-diff.md
+      --baseline baseline/build/xray.json \
+      --current current/build/xray.json \
+      --format markdown --output current/build/xray-diff.md
 - uses: actions/upload-artifact@v4
   with:
     name: cmake-xray
     path: |
-      build/xray*.json
-      build/xray*.md
+      current/build/xray*.json
+      current/build/xray*.md
 ```
 
 Der CI-Schritt schlaegt automatisch fehl, wenn `cmake-xray` einen Exit-Code
