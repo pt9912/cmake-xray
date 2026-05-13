@@ -24,10 +24,10 @@ Dieses Dokument beschreibt eine inkrementelle Lieferplanung fuer **cmake-xray**.
 | M6 AP 1.4            | `erledigt`        | Include-Sicht (Origin + Tiefe) — Liefer-Stand in [`done/plan-M6-1-4.md`](../done/plan-M6-1-4.md).             |
 | M6 AP 1.5            | `erledigt`        | Analyseauswahl, Schwellenwerte, Impact-Budget ([`done/plan-M6-1-5.md`](../done/plan-M6-1-5.md)).    |
 | **M6 AP 1.6**        | **`erledigt`**    | Vergleich zweier Analyse-JSON-Berichte ([`done/plan-M6-1-6.md`](../done/plan-M6-1-6.md)).             |
-| **M6 AP 1.7**        | **`in Arbeit`**   | Referenzdaten, Doku, Release ([`in-progress/plan-M6-1-7.md`](./plan-M6-1-7.md)).             |
+| **M6 AP 1.7**        | **`erledigt`**    | Referenzdaten, Doku, Release ([`done/plan-M6-1-7.md`](../done/plan-M6-1-7.md)).              |
 | M6 AP 1.8            | `offen`           | Praeprozessor-Include + Konfig-Override ([`open/plan-M6-1-8.md`](../open/plan-M6-1-8.md)).   |
 
-Naechster konkreter Schritt: M6 AP 1.7 A.4 (Audit-Pass und Liefer-Stand-Konsolidierung), siehe `in-progress/plan-M6-1-7.md` Steps 14-17.
+Naechster konkreter Schritt: M6 AP 1.8 (Praeprozessor-Include + Konfig-Override), siehe `open/plan-M6-1-8.md`.
 
 ## 1. Planungsgrundsaetze
 
@@ -58,7 +58,7 @@ Naechster konkreter Schritt: M6 AP 1.7 A.4 (Audit-Pass und Liefer-Stand-Konsolid
 | **M3 (MVP)** | `v1.0.0` | Phase 3 | Alle `AK-01` bis `AK-09` erfuellt; MVP lieferbar                                                                                          | `erledigt` |
 | **M4**       | `v1.1.0` | Phase 4 | CMake File API als zweite Eingabequelle, TU-zu-Target-Zuordnung, targetbezogene Impact-Ausgabe; ohne `compile_commands.json` analysierbar | `erledigt` |
 | **M5**       | `v1.2.0` | Phase 5 | HTML-Export, JSON-/DOT-Ausgaben, Release-Bereitstellung, Plattformunterstuetzung, Detail- und Quiet-Modi                                  | `erledigt` |
-| **M6**       | `v1.3.0` | Phase 6 | weitere Konfiguration, Vergleichsansichten und verfeinerte Analyse                                                                        | `tbd`      |
+| **M6**       | `v1.3.0` | Phase 6 | weitere Konfiguration, Vergleichsansichten und verfeinerte Analyse                                                                        | `in Arbeit` |
 
 ## 3. Phasen im Detail
 
@@ -141,15 +141,16 @@ Hinweis: `F-39` (Soll) kann bei Bedarf in Phase 2 oder 3 vorgezogen werden, fall
 
 Ziel: zusaetzliche Ausbaupunkte nach dem bereits geplanten M5-Umfang aufnehmen, ohne die historische Planung der Phasen 0 bis 5 umzuschreiben.
 
-Stand: M6 besitzt mit [`docs/planning/plan-M6.md`](./plan-M6.md) ein eigenes Planungsdokument. Die untenstehende Tabelle listet die geplanten Ausbaupunkte aus der Roadmap; konkrete Schnitt-, Vertrags- und Abnahmedetails sind im M6-Plan festgehalten. Der Status bleibt bis zur konkreten Umsetzung `geplant`.
+Stand: M6 besitzt mit [`docs/planning/in-progress/plan-M6.md`](./plan-M6.md) ein eigenes Planungsdokument. Die untenstehende Tabelle listet die Ausbaupunkte aus der Roadmap; konkrete Schnitt-, Vertrags- und Abnahmedetails sind im M6-Plan festgehalten.
 
 | Arbeitspaket                                                                            | Relevante Kennungen            | Status     |
 | --------------------------------------------------------------------------------------- | ------------------------------ | ---------- |
-| Direkte Target-Graph-Analysen und textuelle Darstellung direkter Target-Abhaengigkeiten | `F-18`                         | `geplant` |
-| Hervorhebung von Targets mit vielen ein- oder ausgehenden Abhaengigkeiten               | `F-20`                         | `geplant` |
-| Priorisierung betroffener Targets ueber den Target-Graphen hinweg                       | `F-25`                         | `geplant` |
-| Verfeinerte Include-Sicht jenseits des MVP                                              | `F-16`, `F-17`                 | `geplant` |
-| Erweiterte Analysekonfiguration, Schwellenwerte und Vergleichsansichten                 | `F-10`, `F-11`, `F-37`, `F-38` | `geplant` |
+| Direkte Target-Graph-Analysen und textuelle Darstellung direkter Target-Abhaengigkeiten | `F-18`                         | `erledigt` |
+| Hervorhebung von Targets mit vielen ein- oder ausgehenden Abhaengigkeiten               | `F-20`                         | `erledigt` |
+| Priorisierung betroffener Targets ueber den Target-Graphen hinweg                       | `F-25`                         | `erledigt` |
+| Verfeinerte Include-Sicht jenseits des MVP                                              | `F-16`, `F-17`                 | `erledigt` |
+| Erweiterte Analysekonfiguration, Schwellenwerte und Vergleichsansichten                 | `F-10`, `F-11`, `F-37`, `F-38` | `erledigt` |
+| Praeprozessor-Include und Konfig-Override                                               | Folgeumfang                    | `offen` |
 
 ## 4. MVP-Abgrenzung
 

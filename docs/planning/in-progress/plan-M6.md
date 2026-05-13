@@ -5,10 +5,10 @@
 | Feld | Wert |
 |---|---|
 | Dokument | Plan M6 `cmake-xray` |
-| Dokumentrevision | `0.2` |
+| Dokumentrevision | `0.3` |
 | Zielrelease | `v1.3.0` |
-| Stand | `2026-05-12` |
-| Status | in Arbeit |
+| Stand | `2026-05-13` |
+| Status | in Arbeit (`AP 1.8` offen) |
 | Referenzen | [Lastenheft](../../../spec/lastenheft.md), [Design](../../../spec/design.md), [Architektur](../../../spec/architecture.md), [Phasenplan](./roadmap.md), [Plan M5](../done/plan-M5.md), [Qualitaet](../../user/quality.md), [Releasing](../../user/releasing.md) |
 
 ### 0.1 Zweck
@@ -74,7 +74,7 @@ M6 baut auf M4 und M5 auf. Ohne CMake-File-API-Daten bleiben Target-Graph-Abschn
 | 1.4 Include-Sicht v4         | `erledigt`  | [`done/plan-M6-1-4.md`](../done/plan-M6-1-4.md)     | `2f83d7e` (Lead A.5 step 25c), Liefer-Stand-Block listet alle Tranche-Hashes |
 | 1.5 Analyseauswahl + Budgets | `erledigt`  | [`done/plan-M6-1-5.md`](../done/plan-M6-1-5.md)     | `4b03c0d` (Lead A.6 Audit-Pass), Liefer-Stand-Block listet alle Tranche-Hashes |
 | 1.6 Compare-Sicht            | `erledigt`  | [`done/plan-M6-1-6.md`](../done/plan-M6-1-6.md)     | `0ab9529` (A.6/A.7 Audit-Pass), Liefer-Stand-Block listet alle Tranche-Hashes |
-| 1.7 Referenzdaten + Doku     | `in Arbeit` | [`in-progress/plan-M6-1-7.md`](./plan-M6-1-7.md)    | — (A.1 startet mit Versionspin und CHANGELOG) |
+| 1.7 Referenzdaten + Doku     | `erledigt`  | [`done/plan-M6-1-7.md`](../done/plan-M6-1-7.md)     | `e4722a4` (A.3 Review-Fix), A.4-Pin folgt im Liefer-Stand |
 | 1.8 Praeprozessor-Include    | `offen`     | [`open/plan-M6-1-8.md`](../open/plan-M6-1-8.md)     | —           |
 
 Roadmap §0.2 spiegelt dieselbe Status-Sicht milestone-uebergreifend. Per-AP-Liefer-Stand-Bloecke leben in den jeweiligen Sub-Plaenen; dieses Dokument bleibt der M6-Master mit Arbeitspaket-Beschreibungen und Reihenfolge.
@@ -487,3 +487,24 @@ Nach M6 zu bewerten:
 - `compare --format html` und `compare --format dot` als moegliche Folgearbeit getrennt bewerten
 - Impact-Report-Vergleiche als moeglichen Folgeumfang mit eigenem Diff-Vertrag bewerten
 - Cross-Mode-Compare zwischen File-API-Projektidentitaet und `fallback_compile_database_fingerprint` als moeglichen Folgeumfang mit expliziter Override-Option und Risiko-Diagnostics bewerten
+
+## 6. Konsolidierter Liefer-Stand
+
+Diese Tabelle konsolidiert die Liefer-Stand-Bloecke der AP-Subplaene.
+Die Detail-Nachweise bleiben in den jeweiligen Plan-Dateien; diese Sicht
+dient als M6-Masterindex fuer Audit, Review und Release-Vorbereitung.
+
+| AP | Status | Tranche | Commit(s) | Beschreibung |
+|---|---|---|---|---|
+| 1.1 | `erledigt` | A.1-A.5 | `ea9c7e3`, `7c85bff`, `de15925`, `640e3d9`, `a620e23` | Target-Graph-Modelle, Support-Helper, File-API-Extraktion, Service-Anbindung und Audit-Gates. |
+| 1.2 | `erledigt` | A.1-A.4 | `e02944f`, `48c7ca5`, `953f2b1`, `24e4b33`, `f228676`, `e3a1f7e`, `864cc6b` | Analyze-Reportvertrag v2 mit Target-Graph/Hubs in JSON, DOT, HTML, Markdown und Console. |
+| 1.3 | `erledigt` | A.1-A.5 | `92c719a`, `535194c`, `dfc3cd5`, `87f3a25`, `99c0631`, `06f2307`, `2334623`, `ccb7ae0`, `837f848`, `c99045e`, `af5fc5c`, `4b0785f`, `90b6534` | Impact-Priorisierung ueber Reverse-Target-Graph-BFS, v3-Vertraege, Goldens, Zyklen- und Cross-Field-Gates. |
+| 1.4 | `erledigt` | A.1-A.6 | `dbd51e0`, `7881ffa`, `e770238`, `e5e668e`, `041aaf4`, `c5896e2`, `c48e45c`, `248c863`, `6db5a9f`, `16f5b2a`, `f7afa6e`, `94d4267`, `aa29322`, `be4c314`, `36bb1ab`, `3b92a8a`, `bbeee3e`, `d70ceb7`, `2f83d7e`, `e0fd969` | Include-Origin/-Depth, v4-Adapter, Goldens, Budget-Fixtures und Audit-Schluss. |
+| 1.5 | `erledigt` | A.1-A.6 | `ac5dda0`, `beb55dd`, `570820d`, `c5d30c9`, `0e7045c`, `4d5d1ff`, `95d2db2`, `4b03c0d` | Analyseauswahl, Schwellenwerte, Section-States, v5-Reports und Audit-Gates. |
+| 1.6 | `erledigt` | A.1-A.7 | `85de345`, `53b9dfb`, `b4f7e76`, `154a0c3`, `b1678d5`, `0ab9529` | Project-Identity, Compare-Service, CLI, Schema, JSON/Console/Markdown-Adapter und Compare-Audit. |
+| 1.7 | `erledigt` | A.1-A.4 | `821a84f`, `d42273d`, `254bc09`, `c01436b`, `7a19023`, `9ffbc5a`, `e4722a4`, `ausstehend` | Versionspin/CHANGELOG, Format-Final-Sweep, M6-Beispiele, Nutzer-/Quality-/Performance-Doku, Manifest-Baselines und A.4-Audit. |
+
+AP 1.8 bleibt als offener Folgeplan unter
+[`open/plan-M6-1-8.md`](../open/plan-M6-1-8.md) gefuehrt. AP 1.7 ist
+damit abgeschlossen; der M6-Masterplan bleibt bis zur Entscheidung bzw.
+Umsetzung von AP 1.8 in `in-progress`.

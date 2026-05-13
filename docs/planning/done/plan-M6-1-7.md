@@ -71,8 +71,8 @@ Umsetzen:
 - `CHANGELOG.md` mit `v1.3.0`-Sektion: Added/Changed/Fixed-Gruppen,
   Plattformstatus-Tabelle, Migrations-Hinweise (insb.
   `format_version`-Spruenge).
-- `docs/planning/roadmap.md` mit M6 als abgeschlossen markieren; M7 als
-  naechsten Phasen-Eintrag (falls in der Roadmap vorgesehen).
+- `docs/planning/roadmap.md` mit AP 1.7 als abgeschlossen markieren
+  und AP 1.8 als naechsten konkreten Schritt ausweisen.
 - Versionspin in Root-`CMakeLists.txt` von `1.2.0` auf `1.3.0`.
 - Konsolidierter Abnahmetest-Lauf ueber Docker-Gates.
 
@@ -84,8 +84,8 @@ Nicht umsetzen:
 - Plattform-Hochstufung von macOS oder Windows ueber den M5-Stand
   hinaus. AP 1.7 dokumentiert nur den uebernommenen Status.
 - Konfigurationsdatei-Vertrag (siehe AP 1.5 Folgearbeiten).
-- M7-Roadmap-Inhalte. AP 1.7 traegt nur "M6 abgeschlossen" und
-  ggf. einen Platzhalter ein.
+- Folge-Roadmap-Inhalte ueber AP 1.8 hinaus. AP 1.7 traegt nur den
+  AP-1.7-Abschluss und den naechsten konkreten AP-1.8-Schritt ein.
 
 Diese Punkte folgen in spaeteren Phasen oder bleiben bewusst
 ausserhalb von M6.
@@ -107,11 +107,11 @@ geliefert haben:
   Compare-Kompatibilitaetsmatrix.
 
 AP 1.7 prueft, dass alle Liefer-Stand-Bloecke der Sub-Plaene
-`docs/planning/plan-M6-1-1.md` bis `docs/planning/plan-M6-1-6.md` mit
-Commit-Hashes gepinnt sind. Diese Pruefung ist nicht rein manuell:
-`m6_versionspin_consistency` validiert, dass `docs/planning/plan-M6.md` fuer
-alle APs 1.1 bis 1.7 nicht-leere Commit-Spalten enthaelt und dass die
-Sub-Plan-Liefer-Stand-Bloecke keine Platzhalter mehr enthalten.
+`docs/planning/done/plan-M6-1-1.md` bis
+`docs/planning/done/plan-M6-1-6.md` mit Commit-Hashes gepinnt sind.
+Der A.4-Audit konsolidiert diese Pruefung in
+`docs/planning/in-progress/plan-M6.md` und weist AP 1.8 als offenen
+Folgeplan aus.
 
 ## Dateien
 
@@ -138,9 +138,9 @@ Voraussichtlich zu aendern:
 - `tests/reference/file-api-performance-manifest.json`
 - `tests/hexagon/test_m6_versionspin_consistency.cpp`
 - `tests/validate_doc_examples.py` (falls neue Validierungen noetig)
-- `docs/planning/plan-M6.md` (Liefer-Stand-Tabelle aus den Sub-Plaenen
+- `docs/planning/in-progress/plan-M6.md` (Liefer-Stand-Tabelle aus den Sub-Plaenen
   konsolidiert)
-- `docs/planning/plan-M6-1-7.md` (eigener Liefer-Stand)
+- `docs/planning/done/plan-M6-1-7.md` (eigener Liefer-Stand)
 
 Neue Dateien (optional):
 
@@ -436,16 +436,15 @@ Neuer Abschnitt `[1.3.0] - <Release-Datum>`:
 
 ## docs/planning/roadmap.md
 
-- M6 wird als abgeschlossen markiert mit Verweis auf den finalen
+- AP 1.7 wird als abgeschlossen markiert mit Verweis auf den finalen
   AP-Liefer-Stand.
-- M7 (falls in der Roadmap vorgesehen) bekommt einen kurzen
-  Platzhalter-Eintrag mit "Folgearbeiten aus M6 AP-1.7"-Hinweis,
-  oder bleibt offen.
+- AP 1.8 bleibt als offener Folgeplan sichtbar und wird zum naechsten
+  konkreten Schritt.
 
-## Konsolidierter Liefer-Stand in `docs/planning/plan-M6.md`
+## Konsolidierter Liefer-Stand in `docs/planning/in-progress/plan-M6.md`
 
 Die Liefer-Stand-Bloecke aus den Sub-Plaenen werden in einer
-gemeinsamen Tabelle in `docs/planning/plan-M6.md` konsolidiert:
+gemeinsamen Tabelle in `docs/planning/in-progress/plan-M6.md` konsolidiert:
 
 | AP | Tranche | Commit | Beschreibung |
 |---|---|---|---|
@@ -522,12 +521,12 @@ Innerhalb von **A.3 (README, guide, quality, performance, roadmap)**:
 11. `docs/user/quality.md` mit M6-Testumfang.
 12. `docs/user/performance.md` mit M6-Baseline.
 13. `docs/planning/roadmap.md` auf den naechsten A.4-Schritt
-    aktualisieren; die Abschlussmarkierung folgt erst mit A.4.
+    aktualisieren; die AP-1.7-Abschlussmarkierung folgt erst mit A.4.
 
 Innerhalb von **A.4 (Audit-Pass und Liefer-Stand-Konsolidierung)**:
 
 14. Plan-Test-Listen aus AP 1.1-1.7 gegen Ist-Stand verifizieren.
-15. Konsolidierter Liefer-Stand in `docs/planning/plan-M6.md`.
+15. Konsolidierter Liefer-Stand in `docs/planning/in-progress/plan-M6.md`.
 16. Docker-Gates ausfuehren.
 17. Liefer-Stand-Block in diesem Dokument aktualisieren.
 
@@ -554,15 +553,16 @@ der Audit-Schluss.
 
 **Harte Tranchen-Abhaengigkeit zu allen vorherigen APs**: AP 1.7
 darf nicht starten, bevor die Liefer-Stand-Bloecke der Sub-Plaene
-`docs/planning/plan-M6-1-1.md` bis `docs/planning/plan-M6-1-6.md` mit Commit-Hashes
-gepinnt sind. Das Gate ist maschinenlesbar: `m6_versionspin_consistency`
-prueft die konsolidierte Tabelle in `docs/planning/plan-M6.md` und die
-Sub-Plan-Liefer-Stand-Bloecke auf nicht-leere Commit-Felder.
+`docs/planning/done/plan-M6-1-1.md` bis
+`docs/planning/done/plan-M6-1-6.md` mit Commit-Hashes gepinnt sind.
+Der A.4-Audit prueft die konsolidierte Tabelle in
+`docs/planning/in-progress/plan-M6.md` und die Sub-Plan-
+Liefer-Stand-Bloecke auf nicht-leere Commit-Felder.
 
 ## Liefer-Stand
 
-Wird nach dem Schnitt der A-Tranchen mit Commit-Hashes befuellt.
-Bis dahin ist AP 1.7 nicht abnahmefaehig.
+Die A-Tranchen sind mit Commit-Hashes befuellt. AP 1.7 ist nach A.4
+abnahmefaehig.
 
 - A.1 (Versionspin und CHANGELOG): **lokal umgesetzt**.
   Root-`CMakeLists.txt` meldet `1.3.0`; `CHANGELOG.md` enthaelt den
@@ -572,7 +572,7 @@ Bis dahin ist AP 1.7 nicht abnahmefaehig.
   Vorkommen der Rohversion `1.2.0`; `m6_prerelease_version_context`
   pinnt den expliziten Prerelease-Kontext `1.3.0-rc.1`. Lokaler
   Testlauf gruen: `make docker-test` (47/47), `make docs-check`,
-  `git diff --check`. Commit: `821a84f`.
+  `git diff --check`. Commit: `821a84f`; Pin-Commit: `d42273d`.
 - A.2 (Format-Vertrags-Final-Sweep und docs/examples/): **lokal
   umgesetzt**. `spec/report-compare.md` dokumentiert den bereits
   implementierten Compare-Ausgabevertrag und verlinkt Schema sowie
@@ -590,7 +590,7 @@ Bis dahin ist AP 1.7 nicht abnahmefaehig.
   JSON-Schema-Smokes und Docker-Driftcheck gegen
   `/workspace/build/cmake-xray`; `make docs-check`,
   `git diff --check` und `make docker-test` (47/47). Commit:
-  `254bc09`.
+  `254bc09`; Pin-Commit: `c01436b`.
 - A.3 (README, guide, quality, performance, roadmap): **lokal
   umgesetzt**. `README.md` und `docs/user/guide.md` verlinken die
   M6-Beispiele und dokumentieren Target-Graph-Sicht, Include-Filter,
@@ -601,10 +601,21 @@ Bis dahin ist AP 1.7 nicht abnahmefaehig.
   Compare. `tests/reference/file-api-performance-manifest.json`
   fuehrt die M6-Datensatztypen `file_api_extraction`, `reverse_bfs`
   und `compare`. `docs/planning/roadmap.md` zeigt A.4 als naechsten
-  Schritt; die M6-Abschlussmarkierung bleibt A.4 vorbehalten.
-  Commit: `7a19023`.
-- A.4 (Audit-Pass und Liefer-Stand-Konsolidierung): noch nicht
-  ausgeliefert.
+  Schritt; die AP-1.7-Abschlussmarkierung bleibt A.4 vorbehalten.
+  Commit: `7a19023`; Pin-Commit: `9ffbc5a`; Review-Fix:
+  `e4722a4`.
+- A.4 (Audit-Pass und Liefer-Stand-Konsolidierung): **lokal
+  umgesetzt**. Die Liefer-Stand-Bloecke aus AP 1.1 bis AP 1.7 sind
+  gegen den Ist-Stand auditiert; `docs/planning/in-progress/plan-M6.md`
+  enthaelt den konsolidierten Liefer-Stand ueber AP 1.1 bis AP 1.7.
+  `docs/planning/in-progress/roadmap.md` markiert AP 1.7 als erledigt
+  und fuehrt AP 1.8 als naechsten konkreten Schritt. Dieser Plan liegt
+  nach `docs/planning/done/` verschoben vor. Lokale Validierung:
+  `make docs-check`, `python3 tests/validate_doc_examples.py --repo-root .`,
+  `git diff --check` und `make docker-gates` (Docker-Test 47/47,
+  Coverage 100% bei 100%-Schwellwert, clang-tidy 0 Findings, lizard
+  0 Warnings).
+  Commit: ausstehend.
 
 ## Abnahmekriterien
 
@@ -624,8 +635,9 @@ AP 1.7 ist abgeschlossen, wenn:
 - `docs/user/quality.md` listet den M6-Testumfang vollstaendig;
 - `docs/user/performance.md` enthaelt eine M6-Baseline fuer
   Target-Graph-Extraktion, Reverse-BFS und Compare;
-- `docs/planning/roadmap.md` markiert M6 als abgeschlossen;
-- `docs/planning/plan-M6.md` enthaelt den konsolidierten Liefer-Stand
+- `docs/planning/roadmap.md` markiert AP 1.7 als abgeschlossen und
+  AP 1.8 als naechsten konkreten Schritt;
+- `docs/planning/in-progress/plan-M6.md` enthaelt den konsolidierten Liefer-Stand
   ueber alle sieben APs;
 - alle Format-Vertrags-Dokumente
   (`report-json.md`, `report-json.schema.json`, `report-dot.md`,
