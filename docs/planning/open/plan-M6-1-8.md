@@ -10,8 +10,8 @@ heuristisch, weil der Source-Parsing-Adapter keinen vollstaendigen
 C++-Praeprozessor ersetzt und keine projektlokale Konfigurationsdatei
 auswertet.
 
-AP 1.8 nimmt zwei Folgepunkte aus `docs/planning/plan-M6.md` als
-eigenen Vertragshorizont auf:
+AP 1.8 nimmt zwei Folgepunkte aus
+`docs/planning/in-progress/plan-M6.md` als eigenen Vertragshorizont auf:
 
 - Praeprozessorgenaue Include-Aufloesung ueber einen separaten
   `PreprocessorIncludeAdapter`.

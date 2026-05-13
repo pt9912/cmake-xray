@@ -19,11 +19,12 @@ abschliessend leisten:
 - die Roadmap-Aktualisierung (`docs/planning/roadmap.md`),
 - den Versionspin in `CMakeLists.txt` von `1.2.0` auf `1.3.0`.
 
-AP 1.7 ist der **Schlussstein** der M6-Reihe. Es liefert keinen
-neuen fachlichen Code, sondern macht M6 abnahmefaehig: alle
-Doku-Quellen sind synchron, das Beispielverzeichnis ist gegen
-Generator-Drift gepinnt, der CHANGELOG dokumentiert alle
-Versionsspruenge, und der Versionspin ist auf `v1.3.0` gesetzt.
+AP 1.7 ist der **Schlussstein** der Referenzdaten-, Doku- und
+Abnahme-Tranche. Es liefert keinen neuen fachlichen Code, sondern
+macht AP 1.7 abnahmefaehig: alle Doku-Quellen sind synchron, das
+Beispielverzeichnis ist gegen Generator-Drift gepinnt, der CHANGELOG
+dokumentiert alle Versionsspruenge, und der Versionspin ist auf
+`v1.3.0` gesetzt. Der M6-Masterplan bleibt wegen AP 1.8 offen.
 
 AP 1.7 fuehrt **keinen** weiteren Versionssprung ein. AP 1.7 verwendet
 zwei symbolische Release-Konstanten: `M6_ANALYZE_FORMAT_VERSION` ist
