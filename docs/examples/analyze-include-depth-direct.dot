@@ -1,0 +1,29 @@
+digraph cmake_xray_analysis {
+  xray_report_type="analyze";
+  format_version=6;
+  graph_node_limit=50;
+  graph_edge_limit=80;
+  graph_truncated=false;
+  graph_target_graph_status="not_loaded";
+  graph_include_scope="all";
+  graph_include_depth="direct";
+  graph_include_node_budget_reached=false;
+  graph_analysis_sections="tu-ranking,include-hotspots,target-graph,target-hubs";
+  graph_min_hotspot_tus=2;
+  graph_target_hub_in_threshold=10;
+  graph_target_hub_out_threshold=10;
+  graph_tu_threshold_arg_count=0;
+  graph_tu_threshold_include_path_count=0;
+  graph_tu_threshold_define_count=0;
+  tu_1 [kind="translation_unit", rank=1, label="a.cpp", path="src/a.cpp", directory="build/a", unique_key="/workspace/tests/e2e/testdata/m6/include_origin_mix/src/a.cpp|/workspace/tests/e2e/testdata/m6/include_origin_mix/build/a"];
+  tu_2 [kind="translation_unit", rank=2, label="b.cpp", path="src/b.cpp", directory="build/b", unique_key="/workspace/tests/e2e/testdata/m6/include_origin_mix/src/b.cpp|/workspace/tests/e2e/testdata/m6/include_origin_mix/build/b"];
+  hotspot_1 [kind="include_hotspot", label="wrapper.h", path="include/wrapper.h", origin="project", depth_kind="direct", context_total_count=2, context_returned_count=2, context_truncated=false];
+  hotspot_2 [kind="include_hotspot", label="neighbor.h", path="neighbor.h", origin="unknown", depth_kind="direct", context_total_count=2, context_returned_count=2, context_truncated=false];
+  hotspot_3 [kind="include_hotspot", label="vector", path="system/vector", origin="external", depth_kind="direct", context_total_count=2, context_returned_count=2, context_truncated=false];
+  tu_1 -> hotspot_1 [kind="tu_include_hotspot"];
+  tu_2 -> hotspot_1 [kind="tu_include_hotspot"];
+  tu_1 -> hotspot_2 [kind="tu_include_hotspot"];
+  tu_2 -> hotspot_2 [kind="tu_include_hotspot"];
+  tu_1 -> hotspot_3 [kind="tu_include_hotspot"];
+  tu_2 -> hotspot_3 [kind="tu_include_hotspot"];
+}

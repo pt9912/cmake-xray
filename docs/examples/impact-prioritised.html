@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="xray-report-format-version" content="6">
+<title>cmake-xray impact report</title>
+<style>
+body{margin:0;padding:1.5rem;background:#ffffff;color:#1a1a1a;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;}
+main.report{max-width:80rem;margin:0 auto;}
+h1{font-size:1.75rem;margin:0 0 1rem 0;}
+h2{font-size:1.25rem;margin:1.5rem 0 0.75rem 0;}
+h3{font-size:1.0rem;margin:1rem 0 0.5rem 0;}
+section{margin-bottom:1.5rem;}
+table{border-collapse:collapse;width:100%;}
+th,td{border:1px solid #d0d0d0;padding:0.5rem;text-align:left;vertical-align:top;}
+th{background:#f3f3f3;font-weight:600;}
+.table-wrap{overflow-x:auto;}
+.badge{display:inline-block;padding:0.1rem 0.5rem;border:1px solid #1a1a1a;border-radius:0.25rem;background:#f0f0f0;color:#1a1a1a;font-size:0.875rem;}
+.badge--evidence-direct{background:#1a1a1a;color:#ffffff;}
+.badge--evidence-heuristic{background:#ffffff;color:#1a1a1a;}
+.badge--project{background:#e8f1ff;color:#0b3a8c;border-color:#0b3a8c;}
+.badge--external{background:#fff4e0;color:#7a4a00;border-color:#7a4a00;}
+.badge--unknown{background:#f0f0f0;color:#404040;}
+.badge--direct{background:#e8ffe8;color:#0b6b0b;border-color:#0b6b0b;}
+.badge--indirect{background:#fff0f4;color:#8c0b3a;border-color:#8c0b3a;}
+.badge--mixed{background:#fffbe0;color:#7a6a00;border-color:#7a6a00;}
+.empty{color:#404040;font-style:italic;}
+code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;}
+@page{margin:1.5cm;}
+@media print{body{background:#ffffff;color:#000000;}th{background:#ffffff;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}.table-wrap{overflow-x:visible;}}
+</style>
+</head>
+<body>
+<main class="report" data-report-type="impact" data-format-version="6">
+<header class="summary">
+<h1>cmake-xray impact report</h1>
+<dl>
+<dt>report_type</dt><dd>impact</dd>
+<dt>format_version</dt><dd>6</dd>
+<dt>changed_file</dt><dd>src/hub.cpp</dd>
+<dt>affected_translation_units</dt><dd>1</dd>
+<dt>classification</dt><dd>direct</dd>
+<dt>observation_source</dt><dd>derived</dd>
+<dt>target_metadata</dt><dd>loaded</dd>
+</dl></header>
+<section class="inputs"><h2>Inputs</h2>
+<dl>
+<dt>compile_database_path</dt><dd>not provided</dd>
+<dt>compile_database_source</dt><dd>not provided</dd>
+<dt>cmake_file_api_path</dt><dd>tests/e2e/testdata/m6/file_api_loaded/build</dd>
+<dt>cmake_file_api_resolved_path</dt><dd>tests/e2e/testdata/m6/file_api_loaded/build/.cmake/api/v1/reply</dd>
+<dt>cmake_file_api_source</dt><dd>cli</dd>
+<dt>changed_file</dt><dd>src/hub.cpp</dd>
+<dt>changed_file_source</dt><dd>file_api_source_root</dd>
+</dl></section>
+<section class="impact-direct-tus"><h2>Directly Affected Translation Units</h2>
+<div class="table-wrap"><table>
+<thead><tr><th scope="col">Source path</th><th scope="col">Directory</th><th scope="col">Targets</th></tr></thead>
+<tbody>
+<tr><td>src/hub.cpp</td><td>build</td><td><ul><li>hub <span class="badge">STATIC_LIBRARY</span></li></ul></td></tr>
+</tbody>
+</table></div></section>
+<section class="impact-heuristic-tus"><h2>Heuristically Affected Translation Units</h2>
+<p class="empty">No heuristically affected translation units.</p></section>
+<section class="impact-direct-targets"><h2>Directly Affected Targets</h2>
+<div class="table-wrap"><table>
+<thead><tr><th scope="col">Display name</th><th scope="col">Type</th></tr></thead>
+<tbody>
+<tr><td><span class="badge badge--evidence-direct">hub</span></td><td>STATIC_LIBRARY</td></tr>
+</tbody>
+</table></div></section>
+<section class="impact-heuristic-targets"><h2>Heuristically Affected Targets</h2>
+<p class="empty">No heuristically affected targets.</p></section>
+<section class="target-graph-reference"><h2>Target Graph Reference</h2>
+<p>Status: <span class="badge badge--loaded">loaded</span></p>
+<div class="table-wrap"><table>
+<thead><tr><th scope="col">From</th><th scope="col">To</th><th scope="col">Resolution</th><th scope="col">External target</th></tr></thead>
+<tbody>
+<tr><td>src00</td><td>hub</td><td>resolved</td><td></td></tr>
+<tr><td>src01</td><td>hub</td><td>resolved</td><td></td></tr>
+<tr><td>src02</td><td>hub</td><td>resolved</td><td></td></tr>
+<tr><td>src03</td><td>hub</td><td>resolved</td><td></td></tr>
+<tr><td>src04</td><td>hub</td><td>resolved</td><td></td></tr>
+<tr><td>src05</td><td>hub</td><td>resolved</td><td></td></tr>
+<tr><td>src06</td><td>hub</td><td>resolved</td><td></td></tr>
+<tr><td>src07</td><td>hub</td><td>resolved</td><td></td></tr>
+<tr><td>src08</td><td>hub</td><td>resolved</td><td></td></tr>
+<tr><td>src09</td><td>hub</td><td>resolved</td><td></td></tr>
+</tbody>
+</table></div></section>
+<section class="prioritised-affected-targets"><h2>Prioritised Affected Targets</h2>
+<p>Requested depth: 2. Effective depth: 1.</p>
+<div class="table-wrap"><table>
+<thead><tr><th scope="col">Display name</th><th scope="col">Type</th><th scope="col">Priority class</th><th scope="col">Graph distance</th><th scope="col">Evidence strength</th><th scope="col">Unique key</th></tr></thead>
+<tbody>
+<tr><td>hub</td><td>STATIC_LIBRARY</td><td>direct</td><td>0</td><td>direct</td><td>hub::STATIC_LIBRARY</td></tr>
+<tr><td>src00</td><td>STATIC_LIBRARY</td><td>direct_dependent</td><td>1</td><td>direct</td><td>src00::STATIC_LIBRARY</td></tr>
+<tr><td>src01</td><td>STATIC_LIBRARY</td><td>direct_dependent</td><td>1</td><td>direct</td><td>src01::STATIC_LIBRARY</td></tr>
+<tr><td>src02</td><td>STATIC_LIBRARY</td><td>direct_dependent</td><td>1</td><td>direct</td><td>src02::STATIC_LIBRARY</td></tr>
+<tr><td>src03</td><td>STATIC_LIBRARY</td><td>direct_dependent</td><td>1</td><td>direct</td><td>src03::STATIC_LIBRARY</td></tr>
+<tr><td>src04</td><td>STATIC_LIBRARY</td><td>direct_dependent</td><td>1</td><td>direct</td><td>src04::STATIC_LIBRARY</td></tr>
+<tr><td>src05</td><td>STATIC_LIBRARY</td><td>direct_dependent</td><td>1</td><td>direct</td><td>src05::STATIC_LIBRARY</td></tr>
+<tr><td>src06</td><td>STATIC_LIBRARY</td><td>direct_dependent</td><td>1</td><td>direct</td><td>src06::STATIC_LIBRARY</td></tr>
+<tr><td>src07</td><td>STATIC_LIBRARY</td><td>direct_dependent</td><td>1</td><td>direct</td><td>src07::STATIC_LIBRARY</td></tr>
+<tr><td>src08</td><td>STATIC_LIBRARY</td><td>direct_dependent</td><td>1</td><td>direct</td><td>src08::STATIC_LIBRARY</td></tr>
+<tr><td>src09</td><td>STATIC_LIBRARY</td><td>direct_dependent</td><td>1</td><td>direct</td><td>src09::STATIC_LIBRARY</td></tr>
+</tbody>
+</table></div></section>
+<section class="diagnostics"><h2>Diagnostics</h2>
+<ul>
+<li><span class="badge">note</span> reverse target graph traversal stopped at depth 1 (no further reachable targets)</li>
+</ul></section>
+</main>
+</body>
+</html>

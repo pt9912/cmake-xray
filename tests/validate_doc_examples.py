@@ -195,21 +195,40 @@ def run_format_validator(label: str, args: list[str]) -> int:
     return EXIT_VALIDATION_FAILED
 
 
+def schema_for_json_example(path: Path, repo_root: Path) -> tuple[Path | None, str | None]:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return None, f"cannot parse JSON example {path.name}: {exc}"
+    report_format = document.get("format")
+    if report_format in ("cmake-xray.analysis", "cmake-xray.impact"):
+        return repo_root / "spec" / "report-json.schema.json", None
+    if report_format == "cmake-xray.compare":
+        return repo_root / "spec" / "report-compare.schema.json", None
+    return None, (
+        f"JSON example {path.name} has unsupported format "
+        f"{report_format!r}; expected cmake-xray.analysis, cmake-xray.impact, "
+        "or cmake-xray.compare")
+
+
 def check_formats(manifest: dict[str, str], examples_dir: Path,
                   repo_root: Path) -> int:
     json_validator = repo_root / "tests" / "validate_json_schema.py"
     dot_validator = repo_root / "tests" / "validate_dot_reports.py"
     html_validator = repo_root / "tests" / "validate_html_reports.py"
-    json_schema = repo_root / "spec" / "report-json.schema.json"
 
     final_status = EXIT_OK
     for name in sorted(manifest.keys()):
         path = examples_dir / name
         suffix = path.suffix.lower()
         if suffix == ".json":
-            if not json_validator.is_file() or not json_schema.is_file():
-                sys.stderr.write(
-                    f"error: JSON validator or schema missing for {name}\n")
+            json_schema, schema_error = schema_for_json_example(path, repo_root)
+            if schema_error is not None:
+                sys.stderr.write(f"error: {schema_error}\n")
+                final_status = EXIT_VALIDATION_FAILED
+                continue
+            if json_schema is None or not json_validator.is_file() or not json_schema.is_file():
+                sys.stderr.write(f"error: JSON validator or schema missing for {name}\n")
                 final_status = EXIT_ENVIRONMENT_ERROR
                 continue
             status = run_format_validator(
@@ -270,8 +289,18 @@ def check_binary_drift(spec_path: Path, examples_dir: Path,
     for entry in entries:
         name = entry.get("file")
         args_list = entry.get("args")
+        expected_exit = entry.get("expected_exit", 0)
+        stream = entry.get("stream", "stdout")
         if not isinstance(name, str) or not isinstance(args_list, list):
             sys.stderr.write(f"error: malformed spec entry: {entry!r}\n")
+            failed += 1
+            continue
+        if not isinstance(expected_exit, int):
+            sys.stderr.write(f"error: malformed expected_exit for {name}: {expected_exit!r}\n")
+            failed += 1
+            continue
+        if stream not in ("stdout", "stderr"):
+            sys.stderr.write(f"error: malformed stream for {name}: {stream!r}\n")
             failed += 1
             continue
         seen.add(name)
@@ -289,23 +318,25 @@ def check_binary_drift(spec_path: Path, examples_dir: Path,
             sys.stderr.write(
                 f"error: cannot run {binary_path} for {name}: {exc}\n")
             return EXIT_ENVIRONMENT_ERROR
-        if completed.returncode != 0:
+        if completed.returncode != expected_exit:
             sys.stderr.write(
-                f"error: regen failed for {name}: exit {completed.returncode}\n")
-            sys.stderr.write(
-                completed.stderr.decode("utf-8", errors="replace"))
+                f"error: regen failed for {name}: exit {completed.returncode}, "
+                f"expected {expected_exit}\n")
+            if completed.stderr:
+                sys.stderr.write(completed.stderr.decode("utf-8", errors="replace"))
             failed += 1
             continue
         expected = target_path.read_bytes()
-        actual_for_diff = normalize_line_endings(completed.stdout)
+        actual = completed.stdout if stream == "stdout" else completed.stderr
+        actual_for_diff = normalize_line_endings(actual)
         expected_for_diff = normalize_line_endings(expected)
         if target_path.suffix.lower() == ".dot":
             actual_for_diff = normalize_dot_unique_keys(actual_for_diff)
             expected_for_diff = normalize_dot_unique_keys(expected_for_diff)
         if actual_for_diff != expected_for_diff:
             sys.stderr.write(
-                f"error: drift for {name} -- binary stdout "
-                f"({len(completed.stdout)} B) differs from committed file "
+                f"error: drift for {name} -- binary {stream} "
+                f"({len(actual)} B) differs from committed file "
                 f"({len(expected)} B)\n")
             sys.stderr.write(
                 "  rerun docs/examples/ regen via:\n"

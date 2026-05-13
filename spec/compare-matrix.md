@@ -1,5 +1,9 @@
 # Compare Compatibility Matrix
 
+See [`report-compare.md`](./report-compare.md) for the Compare output
+contract and [`report-json.md`](./report-json.md) for the Analyze input
+contract.
+
 M6 AP 1.6 supports only Analyze JSON `format_version=6` inputs for
 `cmake-xray compare`. Version 6 is the first Analyze contract that carries
 `inputs.project_identity` and `inputs.project_identity_source`.

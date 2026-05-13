@@ -1,0 +1,81 @@
+{
+  "format": "cmake-xray.compare",
+  "format_version": 1,
+  "report_type": "compare",
+  "inputs": {
+    "baseline_path": "tests/e2e/testdata/m6/json-reports/analyze-include-origin-mix.json",
+    "current_path": "tests/e2e/testdata/m6/json-reports/analyze-include-origin-mix-scope-project.json",
+    "baseline_format_version": 6,
+    "current_format_version": 6,
+    "project_identity": "compile-db:b63f61b5bb5f474ee42e7c094c64b1c7aba5635d7c0099a03273ac81276b5e60",
+    "project_identity_source": "fallback_compile_database_fingerprint"
+  },
+  "summary": {
+    "translation_units_added": 0,
+    "translation_units_removed": 0,
+    "translation_units_changed": 0,
+    "include_hotspots_added": 0,
+    "include_hotspots_removed": 2,
+    "include_hotspots_changed": 0,
+    "target_nodes_added": 0,
+    "target_nodes_removed": 0,
+    "target_nodes_changed": 0,
+    "target_edges_added": 0,
+    "target_edges_removed": 0,
+    "target_edges_changed": 0,
+    "target_hubs_added": 0,
+    "target_hubs_removed": 0,
+    "target_hubs_changed": 0
+  },
+  "diffs": {
+    "translation_units": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "include_hotspots": {
+      "added": [],
+      "removed": [
+        {
+          "header_path": "neighbor.h",
+          "include_origin": "unknown",
+          "include_depth_kind": "direct"
+        },
+        {
+          "header_path": "system/vector",
+          "include_origin": "external",
+          "include_depth_kind": "direct"
+        }
+      ],
+      "changed": []
+    },
+    "target_nodes": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "target_edges": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "target_hubs": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    }
+  },
+  "diagnostics": {
+    "configuration_drifts": [
+      {
+        "field": "include_filter.include_scope",
+        "baseline_value": "all",
+        "current_value": "project",
+        "severity": "warning",
+        "ci_policy_hint": "review_required"
+      }
+    ],
+    "data_availability_drifts": [],
+    "project_identity_drift": null
+  }
+}

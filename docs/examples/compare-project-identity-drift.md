@@ -1,0 +1,45 @@
+# Compare Report
+
+- Baseline: `tests/e2e/testdata/m6/json-reports/analyze-compile-db-only.json` (v6)
+- Current: `tests/e2e/testdata/m6/json-reports/analyze-include-origin-mix.json` (v6)
+- Project identity: drift allowed
+- Project identity source: `fallback_compile_database_fingerprint`
+
+## Summary
+
+| Group | Added | Removed | Changed |
+| --- | ---: | ---: | ---: |
+| Translation units | 2 | 3 | 0 |
+| Include hotspots | 4 | 2 | 0 |
+| Target nodes | 0 | 0 | 0 |
+| Target edges | 0 | 0 | 0 |
+| Target hubs | 0 | 0 | 0 |
+
+### Translation Units (added)
+
+- `src/a.cpp` [`build/a`]
+- `src/b.cpp` [`build/b`]
+
+### Translation Units (removed)
+
+- `src/app/main.cpp` [`build/app`]
+- `src/lib/core.cpp` [`build/lib`]
+- `src/tools/tool.cpp` [`build/tools`]
+
+### Include Hotspots (added)
+
+- `include/config.h` [`project`, `mixed`]
+- `include/wrapper.h` [`project`, `direct`]
+- `neighbor.h` [`unknown`, `direct`]
+- `system/vector` [`external`, `direct`]
+
+### Include Hotspots (removed)
+
+- `include/common/config.h` [`project`, `direct`]
+- `include/common/shared.h` [`project`, `indirect`]
+
+## Diagnostics
+
+- project_identity_drift
+  - baseline=`compile-db:79780609d59f2e65ec7ae2d0766b24d42f0395710313fb513d595d1fefd183a6`, current=`compile-db:b63f61b5bb5f474ee42e7c094c64b1c7aba5635d7c0099a03273ac81276b5e60`
+  - baseline_source_paths=3, current_source_paths=2, shared_source_paths=0

@@ -1,0 +1,123 @@
+{
+  "format": "cmake-xray.compare",
+  "format_version": 1,
+  "report_type": "compare",
+  "inputs": {
+    "baseline_path": "tests/e2e/testdata/m6/json-reports/analyze-file-api-loaded.json",
+    "current_path": "tests/e2e/testdata/m6/json-reports/analyze-file-api-partial.json",
+    "baseline_format_version": 6,
+    "current_format_version": 6,
+    "project_identity": "/project",
+    "project_identity_source": "cmake_file_api_source_root"
+  },
+  "summary": {
+    "translation_units_added": 2,
+    "translation_units_removed": 10,
+    "translation_units_changed": 0,
+    "include_hotspots_added": 0,
+    "include_hotspots_removed": 0,
+    "include_hotspots_changed": 0,
+    "target_nodes_added": 0,
+    "target_nodes_removed": 0,
+    "target_nodes_changed": 0,
+    "target_edges_added": 0,
+    "target_edges_removed": 0,
+    "target_edges_changed": 0,
+    "target_hubs_added": 0,
+    "target_hubs_removed": 0,
+    "target_hubs_changed": 0
+  },
+  "diffs": {
+    "translation_units": {
+      "added": [
+        {
+          "source_path": "src/app.cpp",
+          "build_context_key": "build"
+        },
+        {
+          "source_path": "src/lib.cpp",
+          "build_context_key": "build"
+        }
+      ],
+      "removed": [
+        {
+          "source_path": "src/hub.cpp",
+          "build_context_key": "build"
+        },
+        {
+          "source_path": "src/src00.cpp",
+          "build_context_key": "build"
+        },
+        {
+          "source_path": "src/src01.cpp",
+          "build_context_key": "build"
+        },
+        {
+          "source_path": "src/src02.cpp",
+          "build_context_key": "build"
+        },
+        {
+          "source_path": "src/src03.cpp",
+          "build_context_key": "build"
+        },
+        {
+          "source_path": "src/src04.cpp",
+          "build_context_key": "build"
+        },
+        {
+          "source_path": "src/src05.cpp",
+          "build_context_key": "build"
+        },
+        {
+          "source_path": "src/src06.cpp",
+          "build_context_key": "build"
+        },
+        {
+          "source_path": "src/src07.cpp",
+          "build_context_key": "build"
+        },
+        {
+          "source_path": "src/src08.cpp",
+          "build_context_key": "build"
+        }
+      ],
+      "changed": []
+    },
+    "include_hotspots": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "target_nodes": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "target_edges": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "target_hubs": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    }
+  },
+  "diagnostics": {
+    "configuration_drifts": [],
+    "data_availability_drifts": [
+      {
+        "section": "target_graph",
+        "baseline_state": "loaded",
+        "current_state": "partial"
+      },
+      {
+        "section": "target_hubs",
+        "baseline_state": "loaded",
+        "current_state": "partial"
+      }
+    ],
+    "project_identity_drift": null
+  }
+}

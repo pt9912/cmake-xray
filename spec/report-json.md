@@ -467,10 +467,14 @@ Version mit den Pflichtfeldern `inputs.project_identity` und
 `inputs.project_identity_source`, die Compare fuer die
 Projektidentitaetspruefung benoetigt.
 
-Die normative Matrix ist in [`compare-matrix.md`](./compare-matrix.md)
-gespiegelt. Fuer M6 gilt: `(6, 6)` ist erlaubt; alle Kombinationen mit
-`1` bis `5` oder `7+` werden vor Reporterzeugung mit
-`incompatible_format_version` abgelehnt.
+Der Compare-Ausgabevertrag ist in
+[`report-compare.md`](./report-compare.md) beschrieben und durch
+[`report-compare.schema.json`](./report-compare.schema.json) formal
+validiert. Die normative Eingangsmatrix ist in
+[`compare-matrix.md`](./compare-matrix.md) gespiegelt. Fuer M6 gilt:
+`(6, 6)` ist erlaubt; alle Kombinationen mit `1` bis `5` oder `7+`
+werden vor Reporterzeugung mit `incompatible_format_version`
+abgelehnt.
 
 ## Schema-Validierung
 

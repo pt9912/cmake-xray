@@ -1,0 +1,61 @@
+observation source: derived
+target metadata: loaded
+translation units with target mapping: 11 of 11
+Analysis Configuration:
+  Sections: tu-ranking, target-graph
+  TU thresholds: arg_count=0, include_path_count=0, define_count=0
+  Min hotspot TUs: 2
+  Target hub thresholds: in=10, out=10
+
+Section states:
+  tu-ranking: active
+  include-hotspots: disabled
+  target-graph: active
+  target-hubs: disabled
+
+translation unit ranking
+based on metrics: arg_count + include_path_count + define_count
+top 10 of 11 translation units
+1. src/hub.cpp [directory: build] [targets: hub]
+   arg_count=3 include_path_count=0 define_count=0
+   warning: cannot read source file for include analysis: src/hub.cpp
+2. src/src00.cpp [directory: build] [targets: src00]
+   arg_count=3 include_path_count=0 define_count=0
+   warning: cannot read source file for include analysis: src/src00.cpp
+3. src/src01.cpp [directory: build] [targets: src01]
+   arg_count=3 include_path_count=0 define_count=0
+   warning: cannot read source file for include analysis: src/src01.cpp
+4. src/src02.cpp [directory: build] [targets: src02]
+   arg_count=3 include_path_count=0 define_count=0
+   warning: cannot read source file for include analysis: src/src02.cpp
+5. src/src03.cpp [directory: build] [targets: src03]
+   arg_count=3 include_path_count=0 define_count=0
+   warning: cannot read source file for include analysis: src/src03.cpp
+6. src/src04.cpp [directory: build] [targets: src04]
+   arg_count=3 include_path_count=0 define_count=0
+   warning: cannot read source file for include analysis: src/src04.cpp
+7. src/src05.cpp [directory: build] [targets: src05]
+   arg_count=3 include_path_count=0 define_count=0
+   warning: cannot read source file for include analysis: src/src05.cpp
+8. src/src06.cpp [directory: build] [targets: src06]
+   arg_count=3 include_path_count=0 define_count=0
+   warning: cannot read source file for include analysis: src/src06.cpp
+9. src/src07.cpp [directory: build] [targets: src07]
+   arg_count=3 include_path_count=0 define_count=0
+   warning: cannot read source file for include analysis: src/src07.cpp
+10. src/src08.cpp [directory: build] [targets: src08]
+   arg_count=3 include_path_count=0 define_count=0
+   warning: cannot read source file for include analysis: src/src08.cpp
+
+Direct Target Dependencies (target_graph_status: loaded):
+  src00 -> hub
+  src01 -> hub
+  src02 -> hub
+  src03 -> hub
+  src04 -> hub
+  src05 -> hub
+  src06 -> hub
+  src07 -> hub
+  src08 -> hub
+  src09 -> hub
+note: include-based results are heuristic; conditional or generated includes may be missing

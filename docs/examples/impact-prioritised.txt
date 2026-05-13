@@ -1,0 +1,38 @@
+impact analysis for src/hub.cpp
+affected translation units: 1
+observation source: derived
+target metadata: loaded
+affected targets: 1
+  src/hub.cpp [directory: build] [targets: hub] [direct]
+
+directly affected targets
+- hub [type: STATIC_LIBRARY]
+
+heuristically affected targets
+no heuristically affected targets
+
+Target Graph Reference (target_graph_status: loaded):
+  src00 -> hub
+  src01 -> hub
+  src02 -> hub
+  src03 -> hub
+  src04 -> hub
+  src05 -> hub
+  src06 -> hub
+  src07 -> hub
+  src08 -> hub
+  src09 -> hub
+
+Prioritised Affected Targets (requested depth: 2, effective depth: 1):
+  [direct, distance=0, evidence=direct] hub
+  [direct_dependent, distance=1, evidence=direct] src00
+  [direct_dependent, distance=1, evidence=direct] src01
+  [direct_dependent, distance=1, evidence=direct] src02
+  [direct_dependent, distance=1, evidence=direct] src03
+  [direct_dependent, distance=1, evidence=direct] src04
+  [direct_dependent, distance=1, evidence=direct] src05
+  [direct_dependent, distance=1, evidence=direct] src06
+  [direct_dependent, distance=1, evidence=direct] src07
+  [direct_dependent, distance=1, evidence=direct] src08
+  [direct_dependent, distance=1, evidence=direct] src09
+note: reverse target graph traversal stopped at depth 1 (no further reachable targets)

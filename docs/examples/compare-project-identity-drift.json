@@ -1,0 +1,122 @@
+{
+  "format": "cmake-xray.compare",
+  "format_version": 1,
+  "report_type": "compare",
+  "inputs": {
+    "baseline_path": "tests/e2e/testdata/m6/json-reports/analyze-compile-db-only.json",
+    "current_path": "tests/e2e/testdata/m6/json-reports/analyze-include-origin-mix.json",
+    "baseline_format_version": 6,
+    "current_format_version": 6,
+    "project_identity": null,
+    "project_identity_source": "fallback_compile_database_fingerprint"
+  },
+  "summary": {
+    "translation_units_added": 2,
+    "translation_units_removed": 3,
+    "translation_units_changed": 0,
+    "include_hotspots_added": 4,
+    "include_hotspots_removed": 2,
+    "include_hotspots_changed": 0,
+    "target_nodes_added": 0,
+    "target_nodes_removed": 0,
+    "target_nodes_changed": 0,
+    "target_edges_added": 0,
+    "target_edges_removed": 0,
+    "target_edges_changed": 0,
+    "target_hubs_added": 0,
+    "target_hubs_removed": 0,
+    "target_hubs_changed": 0
+  },
+  "diffs": {
+    "translation_units": {
+      "added": [
+        {
+          "source_path": "src/a.cpp",
+          "build_context_key": "build/a"
+        },
+        {
+          "source_path": "src/b.cpp",
+          "build_context_key": "build/b"
+        }
+      ],
+      "removed": [
+        {
+          "source_path": "src/app/main.cpp",
+          "build_context_key": "build/app"
+        },
+        {
+          "source_path": "src/lib/core.cpp",
+          "build_context_key": "build/lib"
+        },
+        {
+          "source_path": "src/tools/tool.cpp",
+          "build_context_key": "build/tools"
+        }
+      ],
+      "changed": []
+    },
+    "include_hotspots": {
+      "added": [
+        {
+          "header_path": "include/config.h",
+          "include_origin": "project",
+          "include_depth_kind": "mixed"
+        },
+        {
+          "header_path": "include/wrapper.h",
+          "include_origin": "project",
+          "include_depth_kind": "direct"
+        },
+        {
+          "header_path": "neighbor.h",
+          "include_origin": "unknown",
+          "include_depth_kind": "direct"
+        },
+        {
+          "header_path": "system/vector",
+          "include_origin": "external",
+          "include_depth_kind": "direct"
+        }
+      ],
+      "removed": [
+        {
+          "header_path": "include/common/config.h",
+          "include_origin": "project",
+          "include_depth_kind": "direct"
+        },
+        {
+          "header_path": "include/common/shared.h",
+          "include_origin": "project",
+          "include_depth_kind": "indirect"
+        }
+      ],
+      "changed": []
+    },
+    "target_nodes": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "target_edges": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "target_hubs": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    }
+  },
+  "diagnostics": {
+    "configuration_drifts": [],
+    "data_availability_drifts": [],
+    "project_identity_drift": {
+      "baseline_project_identity": "compile-db:79780609d59f2e65ec7ae2d0766b24d42f0395710313fb513d595d1fefd183a6",
+      "current_project_identity": "compile-db:b63f61b5bb5f474ee42e7c094c64b1c7aba5635d7c0099a03273ac81276b5e60",
+      "baseline_source_path_count": 3,
+      "current_source_path_count": 2,
+      "shared_source_path_count": 0
+    }
+  }
+}

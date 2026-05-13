@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="xray-report-format-version" content="6">
+<title>cmake-xray analyze report</title>
+<style>
+body{margin:0;padding:1.5rem;background:#ffffff;color:#1a1a1a;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;}
+main.report{max-width:80rem;margin:0 auto;}
+h1{font-size:1.75rem;margin:0 0 1rem 0;}
+h2{font-size:1.25rem;margin:1.5rem 0 0.75rem 0;}
+h3{font-size:1.0rem;margin:1rem 0 0.5rem 0;}
+section{margin-bottom:1.5rem;}
+table{border-collapse:collapse;width:100%;}
+th,td{border:1px solid #d0d0d0;padding:0.5rem;text-align:left;vertical-align:top;}
+th{background:#f3f3f3;font-weight:600;}
+.table-wrap{overflow-x:auto;}
+.badge{display:inline-block;padding:0.1rem 0.5rem;border:1px solid #1a1a1a;border-radius:0.25rem;background:#f0f0f0;color:#1a1a1a;font-size:0.875rem;}
+.badge--evidence-direct{background:#1a1a1a;color:#ffffff;}
+.badge--evidence-heuristic{background:#ffffff;color:#1a1a1a;}
+.badge--project{background:#e8f1ff;color:#0b3a8c;border-color:#0b3a8c;}
+.badge--external{background:#fff4e0;color:#7a4a00;border-color:#7a4a00;}
+.badge--unknown{background:#f0f0f0;color:#404040;}
+.badge--direct{background:#e8ffe8;color:#0b6b0b;border-color:#0b6b0b;}
+.badge--indirect{background:#fff0f4;color:#8c0b3a;border-color:#8c0b3a;}
+.badge--mixed{background:#fffbe0;color:#7a6a00;border-color:#7a6a00;}
+.empty{color:#404040;font-style:italic;}
+code,pre{font-family:ui-monospace,"SFMono-Regular","Menlo","Consolas",monospace;}
+@page{margin:1.5cm;}
+@media print{body{background:#ffffff;color:#000000;}th{background:#ffffff;}thead{display:table-header-group;}tr{break-inside:avoid;page-break-inside:avoid;}.table-wrap{overflow-x:visible;}}
+</style>
+</head>
+<body>
+<main class="report" data-report-type="analyze" data-format-version="6">
+<header class="summary">
+<h1>cmake-xray analyze report</h1>
+<dl>
+<dt>report_type</dt><dd>analyze</dd>
+<dt>format_version</dt><dd>6</dd>
+<dt>translation_units</dt><dd>1</dd>
+<dt>ranking_entries</dt><dd>1 of 1</dd>
+<dt>top_limit</dt><dd>10</dd>
+<dt>observation_source</dt><dd>exact</dd>
+<dt>target_metadata</dt><dd>not_loaded</dd>
+</dl></header>
+<section class="inputs"><h2>Inputs</h2>
+<dl>
+<dt>compile_database_path</dt><dd>tests/e2e/testdata/m3/report_project/compile_commands.json</dd>
+<dt>compile_database_source</dt><dd>cli</dd>
+<dt>cmake_file_api_path</dt><dd>not provided</dd>
+<dt>cmake_file_api_resolved_path</dt><dd>not provided</dd>
+<dt>cmake_file_api_source</dt><dd>not provided</dd>
+</dl></section>
+<section class="analysis-configuration"><h2>Analysis Configuration</h2>
+<dl>
+<dt>Sections</dt><dd>tu-ranking, include-hotspots, target-graph, target-hubs</dd>
+<dt>TU thresholds</dt><dd>arg_count=0, include_path_count=2, define_count=0</dd>
+<dt>Min hotspot TUs</dt><dd>3</dd>
+<dt>Target hub thresholds</dt><dd>in=10, out=10</dd>
+</dl>
+<h3>Section States</h3>
+<dl class="section-states">
+<dt>tu-ranking</dt><dd>active</dd>
+<dt>include-hotspots</dt><dd>active</dd>
+<dt>target-graph</dt><dd>not_loaded</dd>
+<dt>target-hubs</dt><dd>not_loaded</dd>
+</dl></section>
+<section class="ranking"><h2>Translation Unit Ranking <span class="badge badge--state-active">Status: active</span></h2>
+<div class="table-wrap"><table>
+<thead><tr><th scope="col">Rank</th><th scope="col">Source path</th><th scope="col">Directory</th><th scope="col">Score</th><th scope="col">Arguments</th><th scope="col">Include paths</th><th scope="col">Defines</th><th scope="col">Targets</th><th scope="col">Diagnostics</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>src/app/main.cpp</td><td>build/app</td><td>11</td><td>8</td><td>2</td><td>1</td><td><span class="empty">no targets</span></td><td><ul><li><span class="badge">warning</span> could not resolve include "generated/version.h" from src/app/main.cpp</li></ul></td></tr>
+</tbody>
+</table></div></section>
+<section class="hotspots"><h2>Include Hotspots <span class="badge badge--state-active">Status: active</span></h2>
+<p class="include-filter">Filter: scope=<span class="badge badge--all">all</span>, depth=<span class="badge badge--all">all</span>. Excluded: 0 unknown, 0 mixed.</p>
+<div class="table-wrap"><table>
+<thead><tr><th scope="col">Header</th><th scope="col">Origin</th><th scope="col">Depth</th><th scope="col">Affected translation units</th><th scope="col">Translation unit context</th></tr></thead>
+<tbody>
+<tr><td>include/common/config.h</td><td><span class="badge badge--project">project</span></td><td><span class="badge badge--direct">direct</span></td><td>3</td><td><ul><li>src/app/main.cpp <span class="badge">build/app</span></li><li>src/lib/core.cpp <span class="badge">build/lib</span></li><li>src/tools/tool.cpp <span class="badge">build/tools</span></li></ul></td></tr>
+<tr><td>include/common/shared.h</td><td><span class="badge badge--project">project</span></td><td><span class="badge badge--indirect">indirect</span></td><td>3</td><td><ul><li>src/app/main.cpp <span class="badge">build/app</span></li><li>src/lib/core.cpp <span class="badge">build/lib</span></li><li>src/tools/tool.cpp <span class="badge">build/tools</span></li></ul></td></tr>
+</tbody>
+</table></div></section>
+<section class="target-metadata"><h2>Target Metadata</h2>
+<dl>
+<dt>observation_source</dt><dd>exact</dd>
+<dt>target_metadata</dt><dd>not_loaded</dd>
+<dt>translation_units_with_targets</dt><dd>0 of 1</dd>
+</dl>
+<p class="empty">No target metadata loaded.</p></section>
+<section class="target-graph"><h2>Target Graph <span class="badge badge--state-not-loaded">Status: not_loaded</span></h2>
+<p class="empty">Section not loaded.</p></section>
+<section class="target-hubs"><h2>Target Hubs <span class="badge badge--state-not-loaded">Status: not_loaded</span></h2>
+<p class="empty">Section not loaded.</p></section>
+<section class="diagnostics"><h2>Diagnostics</h2>
+<ul>
+<li><span class="badge">note</span> include-based results are heuristic; conditional or generated includes may be missing</li>
+</ul></section>
+</main>
+</body>
+</html>

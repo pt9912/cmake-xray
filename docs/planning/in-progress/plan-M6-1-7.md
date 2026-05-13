@@ -572,8 +572,22 @@ Bis dahin ist AP 1.7 nicht abnahmefaehig.
   pinnt den expliziten Prerelease-Kontext `1.3.0-rc.1`. Lokaler
   Testlauf gruen: `make docker-test` (47/47), `make docs-check`,
   `git diff --check`. Commit: `821a84f`.
-- A.2 (Format-Vertrags-Final-Sweep und docs/examples/): noch nicht
-  ausgeliefert.
+- A.2 (Format-Vertrags-Final-Sweep und docs/examples/): **lokal
+  umgesetzt**. `spec/report-compare.md` dokumentiert den bereits
+  implementierten Compare-Ausgabevertrag und verlinkt Schema sowie
+  Kompatibilitaetsmatrix; `spec/report-json.md` und
+  `spec/compare-matrix.md` verweisen auf den Compare-Vertrag.
+  `docs/examples/` enthaelt generator-gepinnte M6-Beispiele fuer
+  Target-Graph loaded/partial, Include-Scope, Include-Depth,
+  Schwellenwerte, deaktivierte Target-Hubs, Impact-Priorisierung,
+  `--require-target-graph`-Fehlerausgabe sowie Compare-Typical-,
+  Config-Drift- und Project-Identity-Drift-Faelle. Der
+  Doc-Example-Validator waehlt JSON-Schemas nach `format`
+  (`analysis`/`impact` vs. `compare`) und kann absichtliche
+  stderr/Exit-Code-Beispiele validieren. Lokale Validierung gruen:
+  `python3 tests/validate_doc_examples.py --repo-root .`, Compare-
+  JSON-Schema-Smokes und Docker-Driftcheck gegen
+  `/workspace/build/cmake-xray`.
 - A.3 (README, guide, quality, performance, roadmap): noch nicht
   ausgeliefert.
 - A.4 (Audit-Pass und Liefer-Stand-Konsolidierung): noch nicht
