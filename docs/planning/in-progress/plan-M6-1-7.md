@@ -571,7 +571,7 @@ Bis dahin ist AP 1.7 nicht abnahmefaehig.
   Vorkommen der Rohversion `1.2.0`; `m6_prerelease_version_context`
   pinnt den expliziten Prerelease-Kontext `1.3.0-rc.1`. Lokaler
   Testlauf gruen: `make docker-test` (47/47), `make docs-check`,
-  `git diff --check`. Commit wird nach Auslieferung gepinnt.
+  `git diff --check`. Commit: `821a84f`.
 - A.2 (Format-Vertrags-Final-Sweep und docs/examples/): noch nicht
   ausgeliefert.
 - A.3 (README, guide, quality, performance, roadmap): noch nicht
