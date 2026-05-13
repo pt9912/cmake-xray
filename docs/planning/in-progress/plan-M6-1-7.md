@@ -587,7 +587,9 @@ Bis dahin ist AP 1.7 nicht abnahmefaehig.
   stderr/Exit-Code-Beispiele validieren. Lokale Validierung gruen:
   `python3 tests/validate_doc_examples.py --repo-root .`, Compare-
   JSON-Schema-Smokes und Docker-Driftcheck gegen
-  `/workspace/build/cmake-xray`.
+  `/workspace/build/cmake-xray`; `make docs-check`,
+  `git diff --check` und `make docker-test` (47/47). Commit:
+  `254bc09`.
 - A.3 (README, guide, quality, performance, roadmap): noch nicht
   ausgeliefert.
 - A.4 (Audit-Pass und Liefer-Stand-Konsolidierung): noch nicht
